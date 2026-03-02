@@ -21,12 +21,3 @@ export const signup = async (email, role) => {
     );
     return response || null
 }
-
-export const sizeIn = async (email, role) => {
-    const response = await axiosClient.post("/auth/register", {
-            email: email,
-            role: role
-        }
-    );
-    return response || null
-}
