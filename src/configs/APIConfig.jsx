@@ -18,23 +18,41 @@ axiosClient.interceptors.response.use(
     async error => {
         const originalRequest = error.config;
 
+        // Kiểm tra nếu request đã được retry rồi thì không retry nữa
+        if (originalRequest._retry) {
+            return Promise.reject(error);
+        }
+
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            if (originalRequest.url === "/auth/refresh") {
-                console.error("Refresh token request failed, redirecting to login.");
-                window.location.href = "/login";
+            // Nếu là request refresh token thì không retry
+            if (originalRequest.url === "/auth/refresh" || originalRequest.url === "/account/access") {
+                console.error("Auth request failed, redirecting to login.");
+                // Không redirect ngay, để component tự xử lý
                 return Promise.reject(error);
             }
 
+            // Đánh dấu request đã được retry
+            originalRequest._retry = true;
+
             try {
                 const refreshRes = await refreshToken();
-                if (refreshRes.status === 200) {
+                if (refreshRes && refreshRes.status === 200) {
+                    // Retry original request sau khi refresh thành công
                     return axiosClient(originalRequest);
                 } else {
-                    window.location.href = "/login";
+                    // Refresh failed, redirect to login
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = "/login";
+                    }
+                    return Promise.reject(error);
                 }
             } catch (refreshError) {
-                console.log("Token refresh failed:", refreshError);
-                window.location.href = "/login";
+                console.error("Token refresh failed:", refreshError);
+                // Refresh failed, redirect to login
+                if (!window.location.pathname.includes('/login')) {
+                    window.location.href = "/login";
+                }
+                return Promise.reject(error);
             }
         }
         return Promise.reject(error);

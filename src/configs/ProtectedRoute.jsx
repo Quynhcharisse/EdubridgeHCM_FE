@@ -1,30 +1,56 @@
 import {useEffect, useState} from "react";
 import {refreshToken} from "../services/AuthService.jsx";
+import {getAccess, signout} from "../services/AccountService.jsx";
 import {useLoading} from "../contexts/LoadingContext.jsx";
 
 async function GetAccessData() {
-    const response = await getAccess()
-    if (response && response.status === 200) {
-        return response.data.body
-    } else {
-        return null
+    try {
+        const response = await getAccess();
+        if (response && response.status === 200) {
+            return response.data.body;
+        } else {
+            return null;
+        }
+    } catch (error) {
+        console.error("GetAccessData error:", error);
+        return null;
     }
 }
 
 async function Logout() {
-    signout().then(res => {
+    try {
+        const res = await signout();
         if (res && res.status === 200) {
             if (localStorage.length > 0) {
                 localStorage.clear();
             }
             if (sessionStorage.length > 0) {
-                sessionStorage.clear()
+                sessionStorage.clear();
             }
             setTimeout(() => {
-                window.location.href = "/login"
-            }, 1000)
+                window.location.href = "/login";
+            }, 1000);
+        } else {
+            // Nếu logout fail, vẫn clear storage và redirect
+            if (localStorage.length > 0) {
+                localStorage.clear();
+            }
+            if (sessionStorage.length > 0) {
+                sessionStorage.clear();
+            }
+            window.location.href = "/login";
         }
-    })
+    } catch (error) {
+        console.error("Logout error:", error);
+        // Vẫn clear storage và redirect dù có lỗi
+        if (localStorage.length > 0) {
+            localStorage.clear();
+        }
+        if (sessionStorage.length > 0) {
+            sessionStorage.clear();
+        }
+        window.location.href = "/login";
+    }
 }
 
 async function CheckIfRoleValid(allowRoles, role) {

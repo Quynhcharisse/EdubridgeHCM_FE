@@ -1,14 +1,41 @@
-import {useState} from 'react';
+import {useState, useRef} from 'react';
 import {Box, Button, Container, Divider, Paper, Stack, Typography} from '@mui/material';
-import {Link as RouterLink} from 'react-router-dom';
+import {Link as RouterLink, useNavigate} from 'react-router-dom';
 import LoginGoogle from '../ui/LoginGoogle';
 import backgroundLogin from '../../assets/backgroundLogin.png';
+import {getAccess} from '../../services/AccountService';
 
 export default function Login() {
     const [userEmail, setUserEmail] = useState(null);
     const [userData, setUserData] = useState(null);
+    const navigate = useNavigate();
+    const hasNavigated = useRef(false); // Flag để prevent multiple navigate calls
 
-    const handleLoginSuccess = (data) => {
+    const getRoleBasedRoute = (role) => {
+        // Normalize role về uppercase để match với constants
+        const normalizedRole = role?.toUpperCase();
+        
+        switch (normalizedRole) {
+            case 'ADMIN':
+                return '/admin/dashboard';
+            case 'SCHOOL':
+                return '/school/dashboard';
+            case 'STUDENT':
+                return '/student/dashboard';
+            case 'PARENT':
+                return '/home'; // Chưa có route riêng cho PARENT
+            default:
+                return '/home';
+        }
+    };
+
+    const handleLoginSuccess = async (data) => {
+        // Prevent multiple calls
+        if (hasNavigated.current) {
+            console.log('Navigation already triggered, skipping...');
+            return;
+        }
+
         const {email, name, picture, response} = data;
 
         setUserEmail(email);
@@ -19,6 +46,55 @@ export default function Login() {
         console.log('Name:', name);
         console.log('Picture:', picture);
         console.log('Auth Response:', response);
+        console.log('Full response data:', response?.data);
+
+        // Lấy role từ signin response
+        let role = null;
+        
+        // Response structure: { message: "...", body: { role: "admin", ... } }
+        if (response && response.data) {
+            // Thử cả response.data.body.role và response.data.role
+            if (response.data.body && response.data.body.role) {
+                role = response.data.body.role;
+                console.log('Role from response.data.body.role:', role);
+            } else if (response.data.role) {
+                role = response.data.role;
+                console.log('Role from response.data.role:', role);
+            }
+        }
+
+        // Nếu không có trong response, gọi getAccess() để lấy role
+        if (!role) {
+            try {
+                const accessResponse = await getAccess();
+                if (accessResponse && accessResponse.status === 200 && accessResponse.data.body) {
+                    role = accessResponse.data.body.role;
+                    console.log('Role from getAccess:', role);
+                }
+            } catch (error) {
+                console.error('Error getting user role:', error);
+            }
+        }
+
+        // Navigate đến trang tương ứng với role (chỉ navigate 1 lần)
+        if (!hasNavigated.current) {
+            hasNavigated.current = true; // Đánh dấu đã navigate
+            
+            if (role) {
+                const normalizedRole = role.toUpperCase();
+                const route = getRoleBasedRoute(normalizedRole);
+                console.log('User role:', normalizedRole, '-> Navigating to:', route);
+                setTimeout(() => {
+                    navigate(route);
+                }, 1000); // Delay 1 giây để user thấy thông báo thành công
+            } else {
+                // Nếu không có role, navigate về home
+                console.warn('No role found, navigating to home');
+                setTimeout(() => {
+                    navigate('/home');
+                }, 1000);
+            }
+        }
     };
 
     const handleLoginError = (error) => {

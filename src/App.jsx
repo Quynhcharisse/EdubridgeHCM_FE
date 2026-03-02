@@ -11,6 +11,9 @@ const HomePage = lazy(() => import("./components/Page/HomePage.jsx"));
 const Login = lazy(() => import("./components/auth/Login.jsx"));
 const Register = lazy(() => import("./components/auth/Register.jsx"));
 const ProtectedRoute = lazy(() => import("./configs/ProtectedRoute.jsx"));
+const AdminLayout = lazy(() => import("./components/layouts/AdminLayout.jsx"));
+const AdminDashboard = lazy(() => import("./components/Page/admin/AdminDashboard.jsx"));
+const AdminUsersManagement = lazy(() => import("./components/Page/admin/AdminUsersManagement.jsx"));
 
 const LoadingFallback = () => {
     return null;
@@ -219,7 +222,7 @@ const router = createBrowserRouter([
             <Suspense fallback={<LoadingFallback/>}>
                 <ProtectedRoute allowRoles={['ADMIN']}>
                     <Suspense fallback={<LoadingFallback/>}>
-                        <div>Admin Dashboard Layout</div>
+                        <AdminLayout/>
                     </Suspense>
                 </ProtectedRoute>
             </Suspense>
@@ -233,7 +236,7 @@ const router = createBrowserRouter([
                 path: 'dashboard',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
-                        <div>Admin Dashboard</div>
+                        <AdminDashboard/>
                     </Suspense>
                 )
             },
@@ -241,7 +244,7 @@ const router = createBrowserRouter([
                 path: 'users',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
-                        <div>Users Management</div>
+                        <AdminUsersManagement/>
                     </Suspense>
                 )
             }
