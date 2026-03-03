@@ -8,7 +8,18 @@ export default function AuthHeader() {
     };
 
     return (
-        <AppBar position="static" elevation={0} sx={{bgcolor: 'white', borderBottom: '1px solid #e0e7ff'}}>
+        <AppBar 
+            position="fixed" 
+            elevation={0} 
+            sx={{
+                bgcolor: 'white', 
+                borderBottom: '1px solid #e0e7ff',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1100,
+            }}
+        >
             <Container maxWidth={false} sx={{px: {xs: 2, md: 8}}}>
                 <Box
                     sx={{
