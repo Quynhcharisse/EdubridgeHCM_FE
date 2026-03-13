@@ -48,18 +48,23 @@ export default function Login() {
         console.log('Auth Response:', response);
         console.log('Full response data:', response?.data);
 
-        // Lấy role từ signin response
+        // Lấy role và firstLogin từ signin response
         let role = null;
+        let firstLogin = false;
         
-        // Response structure: { message: "...", body: { role: "admin", ... } }
+        // Response structure: { message: "...", body: { role: "admin", firstLogin: true, ... } }
         if (response && response.data) {
             // Thử cả response.data.body.role và response.data.role
             if (response.data.body && response.data.body.role) {
                 role = response.data.body.role;
+                firstLogin = response.data.body.firstLogin || false;
                 console.log('Role from response.data.body.role:', role);
+                console.log('FirstLogin from response.data.body.firstLogin:', firstLogin);
             } else if (response.data.role) {
                 role = response.data.role;
+                firstLogin = response.data.firstLogin || false;
                 console.log('Role from response.data.role:', role);
+                console.log('FirstLogin from response.data.firstLogin:', firstLogin);
             }
         }
 
@@ -69,7 +74,9 @@ export default function Login() {
                 const accessResponse = await getAccess();
                 if (accessResponse && accessResponse.status === 200 && accessResponse.data.body) {
                     role = accessResponse.data.body.role;
+                    firstLogin = accessResponse.data.body.firstLogin || false;
                     console.log('Role from getAccess:', role);
+                    console.log('FirstLogin from getAccess:', firstLogin);
                 }
             } catch (error) {
                 console.error('Error getting user role:', error);
@@ -83,7 +90,8 @@ export default function Login() {
                 email: email,
                 name: name,
                 picture: picture,
-                role: normalizedRole
+                role: normalizedRole,
+                firstLogin: firstLogin
             };
             localStorage.setItem('user', JSON.stringify(userData));
             console.log('User data saved to localStorage:', userData);
@@ -95,6 +103,12 @@ export default function Login() {
             
             if (role) {
                 const normalizedRole = role.toUpperCase();
+                
+                // Nếu là PARENT và firstLogin = true, cần điền thông tin
+                if (normalizedRole === 'PARENT' && firstLogin) {
+                    console.log('PARENT first login detected, user needs to fill information');
+                }
+                
                 const route = getRoleBasedRoute(normalizedRole);
                 console.log('User role:', normalizedRole, '-> Navigating to:', route);
                 setTimeout(() => {

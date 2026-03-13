@@ -54,7 +54,11 @@ async function Logout() {
 }
 
 async function CheckIfRoleValid(allowRoles, role) {
-    return !!allowRoles.includes(role);
+    if (!role) return false;
+    // Normalize role to uppercase for comparison
+    const normalizedRole = role.toUpperCase();
+    const normalizedAllowRoles = allowRoles.map(r => r.toUpperCase());
+    return normalizedAllowRoles.includes(normalizedRole);
 }
 
 export default function ProtectedRoute({children, allowRoles = []}) {
@@ -75,47 +79,73 @@ export default function ProtectedRoute({children, allowRoles = []}) {
                 setAuthLoading(true);
                 setHasAttemptedAuth(true);
 
+                // First, try to get access data
                 const data = await GetAccessData();
 
-                if (data != null) {
+                if (data != null && data.role) {
+                    // User is authenticated, check role
                     const isValidRole = await CheckIfRoleValid(allowRoles, data.role);
                     if (isValidRole) {
                         setIsAuthenticated(true);
                         setHasValidRole(true);
                         setIsLoading(false);
+                        setAuthLoading(false);
                         return;
                     } else {
-                        await Logout();
+                        // User has wrong role, redirect to home (don't logout, just redirect)
+                        console.warn(`User has role ${data.role} but route requires:`, allowRoles);
+                        window.location.href = "/home";
                         return;
                     }
                 }
 
-                const refreshResponse = await refreshToken();
-                if (refreshResponse.status === 401 || refreshResponse.status === 403) {
-                    await Logout();
-                    return;
+                // If no data, try to refresh token
+                try {
+                    const refreshResponse = await refreshToken();
+                    if (refreshResponse && refreshResponse.status === 200) {
+                        // Retry getting access data after refresh
+                        const retryData = await GetAccessData();
+                        if (retryData != null && retryData.role) {
+                            const isValidRole = await CheckIfRoleValid(allowRoles, retryData.role);
+                            if (isValidRole) {
+                                setIsAuthenticated(true);
+                                setHasValidRole(true);
+                                setIsLoading(false);
+                                setAuthLoading(false);
+                                return;
+                            } else {
+                                // User has wrong role after refresh, redirect to home (don't logout)
+                                console.warn(`User has role ${retryData.role} but route requires:`, allowRoles);
+                                window.location.href = "/home";
+                                return;
+                            }
+                        }
+                    }
+                } catch (refreshError) {
+                    // Refresh failed, user is not authenticated
+                    console.log("Token refresh failed, user not authenticated");
                 }
 
-                const retryData = await GetAccessData();
-                if (retryData != null) {
-                    const isValidRole = await CheckIfRoleValid(allowRoles, retryData.role);
-                    if (isValidRole) {
-                        setIsAuthenticated(true);
-                        setHasValidRole(true);
-                        setIsLoading(false);
-                        return;
-                    } else {
-                        await Logout();
-                        return;
-                    }
-                } else {
-                    await Logout();
-                    return;
+                // If we reach here, user is not authenticated
+                // Clear any stale data and redirect to login
+                if (localStorage.length > 0) {
+                    localStorage.clear();
                 }
+                if (sessionStorage.length > 0) {
+                    sessionStorage.clear();
+                }
+                window.location.href = "/login";
 
             } catch (error) {
                 console.error("Authentication error:", error);
-                await Logout();
+                // On error, clear storage and redirect to login
+                if (localStorage.length > 0) {
+                    localStorage.clear();
+                }
+                if (sessionStorage.length > 0) {
+                    sessionStorage.clear();
+                }
+                window.location.href = "/login";
             } finally {
                 setIsLoading(false);
                 setAuthLoading(false);
@@ -123,7 +153,7 @@ export default function ProtectedRoute({children, allowRoles = []}) {
         };
 
         checkAuthentication();
-    }, [allowRoles]);
+    }, [allowRoles, setAuthLoading]);
 
     if (isLoading) {
         // Không hiển thị loading UI ở đây nữa, sẽ dùng GlobalLoadingOverlay

@@ -1,8 +1,8 @@
 import React, {useState} from 'react';
-import {GoogleLogin} from '@react-oauth/google';
 import {jwtDecode} from 'jwt-decode';
 import {signup} from '../../services/AuthService';
 import {ROLES} from '../../constants/roles';
+import RegisterGoogle from '../ui/RegisterGoogle';
 import {
     Box,
     Button,
@@ -12,8 +12,11 @@ import {
     Stack,
     TextField,
     Typography,
+    CircularProgress,
 } from '@mui/material';
 import backgroundLogin from '../../assets/backgroundLogin.png';
+import SchoolRegistrationForm from './SchoolRegistrationForm';
+import {useNavigate} from 'react-router-dom';
 
 const roleOptions = [
     {value: ROLES.PARENT, label: 'Phụ huynh'},
@@ -21,44 +24,146 @@ const roleOptions = [
 ];
 
 const Register = () => {
+    const navigate = useNavigate();
+    const [step, setStep] = useState(1); // 1: Google auth, 2: Role selection, 3: School form, 4: Parent form
     const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [picture, setPicture] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const [isEmailVerified, setIsEmailVerified] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleGoogleSuccess = (credentialResponse) => {
-        const decoded = jwtDecode(credentialResponse.credential);
-        setEmail(decoded.email);
+    const handleGoogleSuccess = (data) => {
+        setEmail(data.email);
+        setName(data.name || '');
+        setPicture(data.picture || '');
         setIsEmailVerified(true);
+        setStep(2); // Move to role selection
     };
 
     const handleGoogleError = () => {
         console.error('Đăng nhập Google thất bại');
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!isEmailVerified) {
-            alert('Vui lòng xác thực email bằng Google trước khi đăng ký.');
-            return;
-        }
-
+    const handleRoleSelect = async () => {
         if (!selectedRole) {
             alert('Vui lòng chọn vai trò (Phụ huynh hoặc Nhà trường).');
             return;
         }
+
+        setIsSubmitting(true);
 
         try {
             const response = await signup(email, selectedRole);
 
             if (response) {
                 console.log('Đăng ký thành công:', response);
-                // Redirect hoặc xử lý tiếp theo
+                
+                // Check if it's SCHOOL role, show school registration form
+                if (selectedRole === ROLES.SCHOOL) {
+                    setStep(3); // Show school registration form
+                } else if (selectedRole === ROLES.PARENT) {
+                    // Check for firstLogin flag in response
+                    const firstLogin = response?.data?.firstLogin || response?.data?.body?.firstLogin || response?.firstLogin;
+                    if (firstLogin) {
+                        // Show parent registration form
+                        setStep(4);
+                    } else {
+                        // Already registered, redirect to login
+                        alert('Tài khoản đã tồn tại. Vui lòng đăng nhập.');
+                        navigate('/login');
+                    }
+                }
             }
         } catch (error) {
             console.error('Lỗi đăng ký:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.';
+            
+            // If user already exists, redirect to login
+            if (error?.response?.status === 400 || errorMessage.includes('đã tồn tại') || errorMessage.includes('already exists')) {
+                alert('Tài khoản đã tồn tại. Vui lòng đăng nhập.');
+                navigate('/login');
+            } else {
+                alert(errorMessage);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    const handleBackToRoleSelection = () => {
+        setStep(2);
+    };
+
+    // If showing school registration form
+    if (step === 3) {
+        return <SchoolRegistrationForm email={email} onBack={handleBackToRoleSelection} />;
+    }
+
+    // If showing parent registration form (step 4)
+    if (step === 4) {
+        return (
+            <Box
+                sx={{
+                    position: 'fixed',
+                    top: '64px',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 'calc(100vh - 64px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    py: {xs: 2, md: 3},
+                    px: {xs: 2, md: 0},
+                    backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.55), rgba(15,23,42,0.35)), url(${backgroundLogin})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundAttachment: 'fixed',
+                    overflow: 'auto',
+                }}
+            >
+                <Container maxWidth="sm">
+                    <Paper
+                        elevation={8}
+                        sx={{
+                            p: 4,
+                            borderRadius: 4,
+                            background: 'radial-gradient(circle at top left, rgba(239,246,255,0.96) 0, rgba(239,246,255,0.98) 40%, #ffffff 100%)',
+                            border: '1px solid #dbeafe',
+                            backdropFilter: 'blur(10px)',
+                        }}
+                    >
+                        <Stack spacing={3}>
+                            <Box>
+                                <Typography variant="h5" sx={{fontWeight: 700, color: '#1e293b'}}>
+                                    Đăng ký phụ huynh
+                                </Typography>
+                                <Typography variant="body2" sx={{color: '#64748b', mt: 0.5}}>
+                                    Vui lòng điền thông tin để hoàn tất đăng ký.
+                                </Typography>
+                            </Box>
+                            <Typography variant="body1" sx={{color: '#64748b'}}>
+                                Form đăng ký phụ huynh sẽ được hiển thị ở đây.
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                onClick={handleBackToRoleSelection}
+                                fullWidth
+                                sx={{
+                                    textTransform: 'none',
+                                    borderRadius: 999,
+                                }}
+                            >
+                                Quay lại
+                            </Button>
+                        </Stack>
+                    </Paper>
+                </Container>
+            </Box>
+        );
+    }
 
     return (
         <Box
@@ -102,68 +207,97 @@ const Register = () => {
                     <Stack spacing={3}>
                         <Box>
                             <Typography variant="h5" sx={{fontWeight: 700, color: '#1e293b'}}>
-                                Đăng ký tài khoản
+                                {step === 1 ? 'Đăng ký tài khoản' : 'Chọn vai trò'}
                             </Typography>
                             <Typography variant="body2" sx={{color: '#64748b', mt: 0.5}}>
-                                Chọn vai trò của bạn trong hệ thống, sau đó xác thực email bằng Google để hoàn tất đăng ký.
+                                {step === 1
+                                    ? 'Vui lòng đăng nhập bằng tài khoản Google để xác thực email của bạn.'
+                                    : 'Vui lòng chọn vai trò phù hợp với bạn trong hệ thống.'}
                             </Typography>
                         </Box>
 
-                        <Box component="form" onSubmit={handleSubmit}>
-                            <Stack spacing={3}>
-                                <TextField
-                                    select
-                                    label="Vai trò trong hệ thống"
-                                    value={selectedRole}
-                                    onChange={(e) => setSelectedRole(e.target.value)}
-                                    fullWidth
-                                    size="small"
-                                    helperText="Vui lòng chọn đúng vai trò: Phụ huynh hoặc Nhà trường"
-                                >
-                                    {roleOptions.map((role) => (
-                                        <MenuItem key={role.value} value={role.value}>
-                                            {role.label}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-
-                                <Stack spacing={2} alignItems="center">
-                                    <Typography variant="body2" sx={{color: '#475569', width: '100%'}}>
-                                        Xác thực email bằng tài khoản Google được chỉ định cho bạn.
-                                    </Typography>
-                                    <GoogleLogin
+                        {step === 1 ? (
+                            <Stack spacing={2} alignItems="center">
+                                <Typography variant="body2" sx={{color: '#475569', width: '100%'}}>
+                                    Đăng ký bằng tài khoản Google của bạn để tiếp tục quá trình đăng ký.
+                                </Typography>
+                                <Box sx={{width: '100%', display: 'flex', justifyContent: 'center'}}>
+                                    <RegisterGoogle
                                         onSuccess={handleGoogleSuccess}
                                         onError={handleGoogleError}
                                     />
-                                    <Typography variant="caption" sx={{color: '#94a3b8', width: '100%', textAlign: 'left'}}>
-                                        {isEmailVerified
-                                            ? `Email đã được xác thực: ${email}`
-                                            : 'Sau khi đăng nhập Google, hệ thống sẽ tự động lấy email của bạn.'}
-                                    </Typography>
-                                </Stack>
-
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    fullWidth
-                                    sx={{
-                                        mt: 1,
-                                        py: 1.1,
-                                        textTransform: 'none',
-                                        fontWeight: 700,
-                                        borderRadius: 999,
-                                        background: 'linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%)',
-                                        boxShadow: '0 10px 30px rgba(37, 99, 235, 0.35)',
-                                        '&:hover': {
-                                            background: 'linear-gradient(90deg, #1d4ed8 0%, #1d4ed8 100%)',
-                                            boxShadow: '0 12px 36px rgba(30, 64, 175, 0.45)',
-                                        },
-                                    }}
-                                >
-                                    Đăng ký
-                                </Button>
+                                </Box>
+                                <Typography variant="caption" sx={{color: '#94a3b8', width: '100%', textAlign: 'left'}}>
+                                    Sau khi đăng ký bằng Google, hệ thống sẽ tự động lấy email của bạn.
+                                </Typography>
                             </Stack>
-                        </Box>
+                        ) : (
+                            <Box component="form" onSubmit={(e) => { e.preventDefault(); handleRoleSelect(); }}>
+                                <Stack spacing={3}>
+                                    {isEmailVerified && (
+                                        <Box sx={{p: 2, bgcolor: '#e0f2fe', borderRadius: 2}}>
+                                            <Typography variant="body2" sx={{color: '#0369a1', fontWeight: 600}}>
+                                                Email đã được xác thực: {email}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    <TextField
+                                        select
+                                        label="Vai trò trong hệ thống"
+                                        value={selectedRole}
+                                        onChange={(e) => setSelectedRole(e.target.value)}
+                                        fullWidth
+                                        size="small"
+                                        helperText="Vui lòng chọn đúng vai trò: Phụ huynh hoặc Nhà trường"
+                                    >
+                                        {roleOptions.map((role) => (
+                                            <MenuItem key={role.value} value={role.value}>
+                                                {role.label}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+
+                                    <Button
+                                        type="submit"
+                                        variant="contained"
+                                        disabled={isSubmitting || !selectedRole}
+                                        fullWidth
+                                        sx={{
+                                            mt: 1,
+                                            py: 1.1,
+                                            textTransform: 'none',
+                                            fontWeight: 700,
+                                            borderRadius: 999,
+                                            background: 'linear-gradient(90deg, #1d4ed8 0%, #2563eb 100%)',
+                                            boxShadow: '0 10px 30px rgba(37, 99, 235, 0.35)',
+                                            '&:hover': {
+                                                background: 'linear-gradient(90deg, #1d4ed8 0%, #1d4ed8 100%)',
+                                                boxShadow: '0 12px 36px rgba(30, 64, 175, 0.45)',
+                                            },
+                                        }}
+                                    >
+                                        {isSubmitting ? (
+                                            <CircularProgress size={24} color="inherit" />
+                                        ) : (
+                                            'Tiếp tục'
+                                        )}
+                                    </Button>
+
+                                    <Button
+                                        variant="outlined"
+                                        onClick={() => setStep(1)}
+                                        fullWidth
+                                        sx={{
+                                            textTransform: 'none',
+                                            borderRadius: 999,
+                                        }}
+                                    >
+                                        Quay lại
+                                    </Button>
+                                </Stack>
+                            </Box>
+                        )}
                     </Stack>
                 </Paper>
             </Container>
