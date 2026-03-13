@@ -40,16 +40,20 @@ axiosClient.interceptors.response.use(
                     // Retry original request sau khi refresh thành công
                     return axiosClient(originalRequest);
                 } else {
-                    // Refresh failed, redirect to login
-                    if (!window.location.pathname.includes('/login')) {
+                    // Refresh failed, chỉ redirect nếu không phải trang public
+                    const publicPaths = ['/home', '/register', '/login', '/schools', '/guide', '/about', '/policy/privacy', '/tos', '/faq', '/'];
+                    const isPublicPath = publicPaths.some(path => window.location.pathname === path || window.location.pathname.startsWith(path + '/'));
+                    if (!isPublicPath && !window.location.pathname.includes('/login')) {
                         window.location.href = "/login";
                     }
                     return Promise.reject(error);
                 }
             } catch (refreshError) {
                 console.error("Token refresh failed:", refreshError);
-                // Refresh failed, redirect to login
-                if (!window.location.pathname.includes('/login')) {
+                // Refresh failed, chỉ redirect nếu không phải trang public
+                const publicPaths = ['/home', '/register', '/login', '/schools', '/guide', '/about', '/policy/privacy', '/tos', '/faq', '/'];
+                const isPublicPath = publicPaths.some(path => window.location.pathname === path || window.location.pathname.startsWith(path + '/'));
+                if (!isPublicPath && !window.location.pathname.includes('/login')) {
                     window.location.href = "/login";
                 }
                 return Promise.reject(error);

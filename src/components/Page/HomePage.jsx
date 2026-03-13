@@ -25,12 +25,8 @@ import {
 } from "@mui/icons-material";
 
 export default function HomePage() {
-    const handleParentClick = () => {
-        window.location.href = '/register?role=PARENT';
-    };
-
-    const handleSchoolClick = () => {
-        window.location.href = '/register?role=SCHOOL';
+    const handleRegisterClick = () => {
+        window.location.href = '/register';
     };
 
     return (
@@ -117,69 +113,31 @@ export default function HomePage() {
                         >
                             Nền tảng tư vấn tuyển sinh thông minh giúp phụ huynh tìm trường phù hợp và trường học tiếp cận học sinh tiềm năng
                         </Typography>
-                        <Stack
-                            direction={{xs: 'column', sm: 'row'}}
-                            spacing={2.5}
-                            justifyContent="center"
-                            alignItems="center"
+                        <Button
+                            variant="contained"
+                            size="large"
+                            onClick={handleRegisterClick}
+                            sx={{
+                                bgcolor: 'white',
+                                color: '#1976d2',
+                                px: {xs: 6, md: 8},
+                                py: 2,
+                                fontSize: {xs: '1rem', md: '1.25rem'},
+                                fontWeight: 700,
+                                borderRadius: 3,
+                                textTransform: 'none',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                                minWidth: {xs: '100%', sm: '280px'},
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                '&:hover': {
+                                    bgcolor: '#f5f5f5',
+                                    boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                                    transform: 'translateY(-3px) scale(1.02)'
+                                }
+                            }}
                         >
-                            <Button
-                                variant="contained"
-                                size="large"
-                                startIcon={<ParentIcon/>}
-                                onClick={handleParentClick}
-                                sx={{
-                                    bgcolor: 'white',
-                                    color: '#1976d2',
-                                    px: {xs: 4, md: 6},
-                                    py: 2,
-                                    fontSize: {xs: '1rem', md: '1.125rem'},
-                                    fontWeight: 700,
-                                    borderRadius: 3,
-                                    textTransform: 'none',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                                    minWidth: {xs: '100%', sm: '240px'},
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        bgcolor: '#f5f5f5',
-                                        boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-                                        transform: 'translateY(-3px) scale(1.02)'
-                                    }
-                                }}
-                            >
-                                Tôi là Phụ huynh
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                size="large"
-                                startIcon={<SchoolIcon/>}
-                                onClick={handleSchoolClick}
-                                sx={{
-                                    borderColor: 'white',
-                                    color: 'white',
-                                    borderWidth: 2.5,
-                                    px: {xs: 4, md: 6},
-                                    py: 2,
-                                    fontSize: {xs: '1rem', md: '1.125rem'},
-                                    fontWeight: 700,
-                                    borderRadius: 3,
-                                    textTransform: 'none',
-                                    minWidth: {xs: '100%', sm: '240px'},
-                                    backdropFilter: 'blur(10px)',
-                                    bgcolor: 'rgba(255,255,255,0.1)',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        borderColor: 'white',
-                                        bgcolor: 'rgba(255,255,255,0.2)',
-                                        borderWidth: 2.5,
-                                        transform: 'translateY(-3px) scale(1.02)',
-                                        boxShadow: '0 8px 24px rgba(255,255,255,0.2)'
-                                    }
-                                }}
-                            >
-                                Tôi là Trường học
-                            </Button>
-                        </Stack>
+                            Đăng ký ngay
+                        </Button>
                     </Box>
                 </Container>
             </Box>
@@ -1019,69 +977,31 @@ export default function HomePage() {
                             >
                                 Tham gia cùng hàng nghìn phụ huynh và trường học đã tin tưởng EduBridgeHCM
                             </Typography>
-                            <Stack
-                                direction={{xs: 'column', sm: 'row'}}
-                                spacing={2.5}
-                                justifyContent="center"
-                                alignItems="center"
+                            <Button
+                                variant="contained"
+                                size="large"
+                                onClick={handleRegisterClick}
+                                sx={{
+                                    bgcolor: 'white',
+                                    color: '#1976d2',
+                                    px: {xs: 6, md: 8},
+                                    py: 2,
+                                    fontSize: {xs: '1rem', md: '1.25rem'},
+                                    fontWeight: 700,
+                                    borderRadius: 3,
+                                    textTransform: 'none',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                                    minWidth: {xs: '100%', sm: '280px'},
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        bgcolor: '#f5f5f5',
+                                        boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                                        transform: 'translateY(-3px) scale(1.02)'
+                                    }
+                                }}
                             >
-                                <Button
-                                    variant="contained"
-                                    size="large"
-                                    startIcon={<ParentIcon/>}
-                                    onClick={handleParentClick}
-                                    sx={{
-                                        bgcolor: 'white',
-                                        color: '#1976d2',
-                                        px: {xs: 4, md: 6},
-                                        py: 2,
-                                        fontSize: {xs: '1rem', md: '1.125rem'},
-                                        fontWeight: 700,
-                                        borderRadius: 3,
-                                        textTransform: 'none',
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                                        minWidth: {xs: '100%', sm: '240px'},
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            bgcolor: '#f5f5f5',
-                                            boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
-                                            transform: 'translateY(-3px) scale(1.02)'
-                                        }
-                                    }}
-                                >
-                                    Đăng Ký Phụ Huynh
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    size="large"
-                                    startIcon={<SchoolIcon/>}
-                                    onClick={handleSchoolClick}
-                                    sx={{
-                                        borderColor: 'white',
-                                        color: 'white',
-                                        borderWidth: 2.5,
-                                        px: {xs: 4, md: 6},
-                                        py: 2,
-                                        fontSize: {xs: '1rem', md: '1.125rem'},
-                                        fontWeight: 700,
-                                        borderRadius: 3,
-                                        textTransform: 'none',
-                                        minWidth: {xs: '100%', sm: '240px'},
-                                        backdropFilter: 'blur(10px)',
-                                        bgcolor: 'rgba(255,255,255,0.1)',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            borderColor: 'white',
-                                            bgcolor: 'rgba(255,255,255,0.2)',
-                                            borderWidth: 2.5,
-                                            transform: 'translateY(-3px) scale(1.02)',
-                                            boxShadow: '0 8px 24px rgba(255,255,255,0.2)'
-                                        }
-                                    }}
-                                >
-                                    Đăng Ký Trường Học
-                                </Button>
-                            </Stack>
+                                Đăng ký ngay
+                            </Button>
                         </Box>
                     </Card>
                 </Container>
