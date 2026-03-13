@@ -23,9 +23,9 @@ export default function Login() {
             case 'STUDENT':
                 return '/student/dashboard';
             case 'PARENT':
-                return '/home'; // Chưa có route riêng cho PARENT
+                return '/'; // Redirect về homepage cho PARENT
             default:
-                return '/home';
+                return '/';
         }
     };
 
@@ -118,7 +118,7 @@ export default function Login() {
                 // Nếu không có role, navigate về home
                 console.warn('No role found, navigating to home');
                 setTimeout(() => {
-                    navigate('/home');
+                    navigate('/');
                 }, 1000);
             }
         }

@@ -38,6 +38,20 @@ function MainHeader() {
     const isHomePage = location.pathname === '/home' || location.pathname === '/';
     const isSignedIn = typeof window !== 'undefined' && localStorage.getItem('user');
 
+    const getUserInfo = () => {
+        if (localStorage.getItem('user')) {
+            try {
+                return JSON.parse(localStorage.getItem('user'));
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    };
+    
+    const userInfo = getUserInfo();
+    const isParent = userInfo?.role === 'PARENT';
+
     useEffect(() => {
         const fetchProfile = async () => {
             if (isSignedIn) {
@@ -95,26 +109,64 @@ function MainHeader() {
         }
     };
 
-    const getUserInfo = () => {
-        if (localStorage.getItem('user')) {
-            try {
-                return JSON.parse(localStorage.getItem('user'));
-            } catch (e) {
-                return null;
+    const smoothScrollToSection = (sectionId) => {
+        if (isHomePage) {
+            const element = document.getElementById(sectionId);
+            if (element) {
+                const headerHeight = 80; // Header height
+                // Get element's position relative to document
+                const elementTop = element.offsetTop;
+                const offsetPosition = elementTop - headerHeight;
+
+                // Update URL hash
+                window.history.pushState(null, '', `#${sectionId}`);
+                
+                // Smooth scroll with custom easing
+                const startPosition = window.pageYOffset;
+                const distance = offsetPosition - startPosition;
+                const duration = Math.min(Math.abs(distance) * 0.8, 1200); // Max 1.2 seconds, smoother
+                let start = null;
+
+                const easeInOutCubic = (t) => {
+                    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                };
+
+                const step = (timestamp) => {
+                    if (!start) start = timestamp;
+                    const progress = timestamp - start;
+                    const progressPercent = Math.min(progress / duration, 1);
+                    const eased = easeInOutCubic(progressPercent);
+                    
+                    window.scrollTo(0, startPosition + distance * eased);
+                    
+                    if (progress < duration) {
+                        requestAnimationFrame(step);
+                    }
+                };
+
+                requestAnimationFrame(step);
             }
+        } else {
+            // If not on homepage, navigate to homepage first then scroll
+            window.location.href = `/#${sectionId}`;
         }
-        return null;
     };
 
-    const userInfo = getUserInfo();
     const profileBody = profileData?.body ? (typeof profileData.body === 'string' ? JSON.parse(profileData.body) : profileData.body) : null;
     const displayName = profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
     const displayEmail = profileBody?.email || userInfo?.email || '';
     const avatarUrl = profileBody?.picture || userInfo?.picture || null;
 
     return (
-        <AppBar position="sticky" elevation={0}
-                sx={{bgcolor: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 1000}}>
+        <AppBar position="fixed" elevation={0}
+                sx={{
+                    bgcolor: 'white', 
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)', 
+                    zIndex: 1000,
+                    top: 0,
+                    left: 0,
+                    right: 0
+                }}>
             <Container maxWidth={false} sx={{px: {xs: 2, md: 8}}}>
                 <Box sx={{
                     py: 2,
@@ -126,7 +178,7 @@ function MainHeader() {
                         <Box component="img"
                              src={logo}
                              alt="EduBridgeHCM"
-                             onClick={() => window.location.href = "/home"}
+                             onClick={() => window.location.href = "/"}
                              sx={{
                                  cursor: "pointer",
                                  height: 50,
@@ -136,12 +188,125 @@ function MainHeader() {
                                  boxShadow: '0 4px 12px rgba(25,118,210,0.3)'
                              }}
                         />
-                        <Typography onClick={() => window.location.href = "/home"} variant="h5"
+                        <Typography onClick={() => window.location.href = "/"} variant="h5"
                                     sx={{cursor: "pointer", fontWeight: 800, color: '#1976d2', letterSpacing: 1}}>
                             EduBridgeHCM
                         </Typography>
                     </Box>
-                    {!isHomePage && (
+                    {isSignedIn && isParent ? (
+                        // Navigation cho PARENT đã đăng nhập
+                        <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => window.location.href = '/'}
+                            >
+                                Tìm trường
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => window.location.href = '/saved-schools'}
+                            >
+                                Trường đã lưu
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => window.location.href = '/consultation-requests'}
+                            >
+                                Yêu cầu tư vấn
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => window.location.href = '/admission-news'}
+                            >
+                                Tin tuyển sinh
+                            </Button>
+                        </Box>
+                    ) : isHomePage && !isSignedIn ? (
+                        // Navigation cho guest ở homepage
+                        <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => smoothScrollToSection('trường-nổi-bật')}
+                            >
+                                Trường nổi bật
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => smoothScrollToSection('quy-trình')}
+                            >
+                                Quy trình
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => smoothScrollToSection('tin-tuyen-sinh')}
+                            >
+                                Tin Tuyển Sinh
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={{
+                                    fontWeight: 600,
+                                    color: '#333',
+                                    fontSize: 16,
+                                    px: 2,
+                                    '&:hover': {color: '#1976d2', bgcolor: 'rgba(25,118,210,0.1)'}
+                                }}
+                                onClick={() => smoothScrollToSection('tu-van-ngay')}
+                            >
+                                Tư vấn ngay
+                            </Button>
+                        </Box>
+                    ) : !isHomePage && (
+                        // Navigation mặc định cho các trang khác
                         <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
                             <Button
                                 color="inherit"
@@ -287,6 +452,52 @@ function MainHeader() {
                                             </Box>
                                         </Box>
                                     </Box>
+                                    {isParent ? (
+                                        <>
+                                            <MenuItem
+                                                onClick={() => {
+                                                    handleUserMenuClose();
+                                                    window.location.href = '/profile';
+                                                }}
+                                                sx={{
+                                                    fontSize: 15,
+                                                    fontWeight: 500,
+                                                    color: '#1976d2',
+                                                    borderRadius: 1,
+                                                    gap: 1.5,
+                                                    mt: 0.5,
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(25,118,210,0.08)',
+                                                        color: '#1565c0',
+                                                    },
+                                                    transition: 'background 0.2s, color 0.2s',
+                                                }}
+                                            >
+                                                <PersonIcon sx={{color: '#1976d2', fontSize: 20}}/> Hồ sơ cá nhân
+                                            </MenuItem>
+                                            <MenuItem
+                                                onClick={() => {
+                                                    handleUserMenuClose();
+                                                    window.location.href = '/children-info';
+                                                }}
+                                                sx={{
+                                                    fontSize: 15,
+                                                    fontWeight: 500,
+                                                    color: '#1976d2',
+                                                    borderRadius: 1,
+                                                    gap: 1.5,
+                                                    mt: 0.5,
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(25,118,210,0.08)',
+                                                        color: '#1565c0',
+                                                    },
+                                                    transition: 'background 0.2s, color 0.2s',
+                                                }}
+                                            >
+                                                <AccountCircleIcon sx={{color: '#1976d2', fontSize: 20}}/> Thông tin con
+                                            </MenuItem>
+                                        </>
+                                    ) : (
                                     <MenuItem
                                         onClick={() => {
                                             handleUserMenuClose();
@@ -318,6 +529,7 @@ function MainHeader() {
                                     >
                                         <DashboardIcon sx={{color: '#1976d2', fontSize: 20}}/> Bảng Điều Khiển
                                     </MenuItem>
+                                    )}
                                     <MenuItem
                                         onClick={() => {
                                             handleUserMenuClose();
@@ -362,7 +574,7 @@ function MainHeader() {
                                 }}
                                 onClick={handleButtonClick}
                             >
-                                {buttonText}
+                                Đăng nhập
                             </Button>
                         )}
                     </Box>
@@ -382,7 +594,37 @@ function MainHeader() {
                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}>
                         <List>
-                            {!isHomePage && (
+                            {isSignedIn && isParent ? (
+                                <>
+                                    <ListItem onClick={() => window.location.href = '/'}>
+                                        <ListItemText primary="Tìm trường" sx={{color: '#1976d2', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => window.location.href = '/saved-schools'}>
+                                        <ListItemText primary="Trường đã lưu" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => window.location.href = '/consultation-requests'}>
+                                        <ListItemText primary="Yêu cầu tư vấn" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => window.location.href = '/admission-news'}>
+                                        <ListItemText primary="Tin tuyển sinh" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                </>
+                            ) : isHomePage && !isSignedIn ? (
+                                <>
+                                    <ListItem onClick={() => smoothScrollToSection('trường-nổi-bật')}>
+                                        <ListItemText primary="Trường nổi bật" sx={{color: '#1976d2', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => smoothScrollToSection('quy-trình')}>
+                                        <ListItemText primary="Quy trình" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => smoothScrollToSection('tin-tuyen-sinh')}>
+                                        <ListItemText primary="Tin Tuyển Sinh" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => smoothScrollToSection('tu-van-ngay')}>
+                                        <ListItemText primary="Tư vấn ngay" sx={{color: '#333', fontWeight: 600}}/>
+                                    </ListItem>
+                                </>
+                            ) : !isHomePage && (
                                 <>
                                     <ListItem onClick={() => window.location.href = '/home'}>
                                         <ListItemText primary="Trang Chủ" sx={{color: '#1976d2', fontWeight: 600}}/>
@@ -426,13 +668,36 @@ function MainHeader() {
                                                     <Typography sx={{fontSize: 11, color: '#1976d2', mt: 0.5}}>
                                                         {userInfo.role === 'STUDENT' ? 'Học sinh' : 
                                                          userInfo.role === 'SCHOOL' ? 'Trường học' : 
-                                                         userInfo.role === 'ADMIN' ? 'Quản trị viên' : userInfo.role}
+                                                         userInfo.role === 'ADMIN' ? 'Quản trị viên' :
+                                                         userInfo.role === 'PARENT' ? 'Phụ huynh' : userInfo.role}
                                                     </Typography>
                                                 )}
                                             </Box>
                                         </Box>
                                     </ListItem>
                                     <Divider sx={{my: 1}}/>
+                                    {isParent ? (
+                                        <>
+                                            <ListItem 
+                                                onClick={() => window.location.href = '/profile'}
+                                                sx={{cursor: 'pointer'}}
+                                            >
+                                                <ListItemText 
+                                                    primary="Hồ sơ cá nhân"
+                                                    sx={{color: '#1976d2', fontWeight: 600}}
+                                                />
+                                            </ListItem>
+                                            <ListItem 
+                                                onClick={() => window.location.href = '/children-info'}
+                                                sx={{cursor: 'pointer'}}
+                                            >
+                                                <ListItemText 
+                                                    primary="Thông tin con"
+                                                    sx={{color: '#1976d2', fontWeight: 600}}
+                                                />
+                                            </ListItem>
+                                        </>
+                                    ) : (
                                     <ListItem 
                                         onClick={() => {
                                             if (userInfo) {
@@ -454,6 +719,7 @@ function MainHeader() {
                                             sx={{color: '#1976d2', fontWeight: 600}}
                                         />
                                     </ListItem>
+                                    )}
                                     <ListItem onClick={handleLogout} sx={{cursor: 'pointer'}}>
                                         <ListItemText 
                                             primary="Đăng Xuất" 
