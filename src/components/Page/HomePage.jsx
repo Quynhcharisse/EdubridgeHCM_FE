@@ -16,7 +16,14 @@ import {
     Step,
     StepLabel,
     Chip,
-    MenuItem
+    MenuItem,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    FormControl,
+    InputLabel,
+    Select
 } from "@mui/material";
 import {
     School as SchoolIcon,
@@ -172,7 +179,14 @@ function LatestAdmissionNewsSection() {
     ];
 
     return (
-        <Box sx={{py: {xs: 10, md: 12}, bgcolor: '#DBEAFE'}}>
+        <Box 
+            id="tin-tuyen-sinh"
+            sx={{
+                py: {xs: 10, md: 12}, 
+                bgcolor: '#DBEAFE',
+                scrollMarginTop: '80px'
+            }}
+        >
             <Container maxWidth="lg" sx={{px: {xs: 3, md: 4}}}>
                 <Box sx={{textAlign: 'center', mb: {xs: 6, md: 8}}}>
                     <Typography
@@ -254,13 +268,230 @@ const HCM_DISTRICTS = [
 export default function HomePage() {
     const [searchKeyword, setSearchKeyword] = React.useState('');
     const [selectedDistrict, setSelectedDistrict] = React.useState(HCM_DISTRICTS[0]);
+    const [showParentFormModal, setShowParentFormModal] = React.useState(false);
+    const [parentFormData, setParentFormData] = React.useState({
+        occupation: '',
+        gender: '',
+        name: '',
+        idCardNumber: '',
+        relationship: '',
+        workplace: '',
+        currentAddress: ''
+    });
+
+    React.useEffect(() => {
+        // Check if user is PARENT and firstLogin is true
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                if (user.role === 'PARENT' && user.firstLogin === true) {
+                    setShowParentFormModal(true);
+                }
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        }
+
+        // Handle hash navigation for smooth scroll
+        const smoothScrollToElement = (element, headerHeight) => {
+            const elementTop = element.offsetTop;
+            const offsetPosition = elementTop - headerHeight;
+            const startPosition = window.pageYOffset;
+            const distance = offsetPosition - startPosition;
+            const duration = Math.min(Math.abs(distance) * 0.8, 1200);
+            let start = null;
+
+            const easeInOutCubic = (t) => {
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            };
+
+            const step = (timestamp) => {
+                if (!start) start = timestamp;
+                const progress = timestamp - start;
+                const progressPercent = Math.min(progress / duration, 1);
+                const eased = easeInOutCubic(progressPercent);
+                
+                window.scrollTo(0, startPosition + distance * eased);
+                
+                if (progress < duration) {
+                    requestAnimationFrame(step);
+                }
+            };
+
+            requestAnimationFrame(step);
+        };
+
+        const handleHashNavigation = () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash) {
+                setTimeout(() => {
+                    const element = document.getElementById(hash);
+                    if (element) {
+                        const headerHeight = 80;
+                        smoothScrollToElement(element, headerHeight);
+                    }
+                }, 100);
+            }
+        };
+
+        // Check hash on mount
+        handleHashNavigation();
+
+        // Listen for hash changes
+        window.addEventListener('hashchange', handleHashNavigation);
+        return () => window.removeEventListener('hashchange', handleHashNavigation);
+    }, []);
 
     const handleRegisterClick = () => {
         window.location.href = '/register';
     };
 
+    const handleParentFormChange = (field) => (event) => {
+        setParentFormData({
+            ...parentFormData,
+            [field]: event.target.value
+        });
+    };
+
+    const handleParentFormSubmit = () => {
+        // TODO: Call API to update profile when API is available
+        // For now, just close the modal and update localStorage to mark firstLogin as false
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                user.firstLogin = false;
+                localStorage.setItem('user', JSON.stringify(user));
+            } catch (e) {
+                console.error('Error updating user data:', e);
+            }
+        }
+        setShowParentFormModal(false);
+    };
+
+    const handleParentFormClose = () => {
+        setShowParentFormModal(false);
+    };
+
     return (
-        <Box sx={{bgcolor: '#ffffff', overflow: 'hidden'}}>
+        <Box sx={{bgcolor: '#ffffff', overflow: 'hidden', pt: '80px'}}>
+            {/* Modal form điền thông tin phụ huynh khi firstLogin = true */}
+            <Dialog
+                open={showParentFormModal}
+                onClose={handleParentFormClose}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        boxShadow: '0 12px 40px rgba(15,23,42,0.15)',
+                    }
+                }}
+            >
+                <DialogTitle sx={{fontWeight: 700, color: '#1e293b', pb: 1}}>
+                    Điền thông tin phụ huynh
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{color: '#64748b', mb: 3}}>
+                        Vui lòng điền đầy đủ thông tin để hoàn tất hồ sơ của bạn.
+                    </Typography>
+                    <Stack spacing={2.5} sx={{mt: 1}}>
+                        <TextField
+                            label="Họ và tên"
+                            fullWidth
+                            value={parentFormData.name}
+                            onChange={handleParentFormChange('name')}
+                            size="small"
+                        />
+                        <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Giới tính</InputLabel>
+                                <Select
+                                    value={parentFormData.gender}
+                                    onChange={handleParentFormChange('gender')}
+                                    label="Giới tính"
+                                >
+                                    <MenuItem value="MALE">Nam</MenuItem>
+                                    <MenuItem value="FEMALE">Nữ</MenuItem>
+                                    <MenuItem value="OTHER">Khác</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                label="Số CMND/CCCD"
+                                fullWidth
+                                value={parentFormData.idCardNumber}
+                                onChange={handleParentFormChange('idCardNumber')}
+                                size="small"
+                            />
+                        </Stack>
+                        <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Mối quan hệ với học sinh</InputLabel>
+                                <Select
+                                    value={parentFormData.relationship}
+                                    onChange={handleParentFormChange('relationship')}
+                                    label="Mối quan hệ với học sinh"
+                                >
+                                    <MenuItem value="FATHER">Cha</MenuItem>
+                                    <MenuItem value="MOTHER">Mẹ</MenuItem>
+                                    <MenuItem value="GUARDIAN">Người giám hộ</MenuItem>
+                                    <MenuItem value="OTHER">Khác</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                label="Nghề nghiệp"
+                                fullWidth
+                                value={parentFormData.occupation}
+                                onChange={handleParentFormChange('occupation')}
+                                size="small"
+                            />
+                        </Stack>
+                        <TextField
+                            label="Nơi làm việc"
+                            fullWidth
+                            value={parentFormData.workplace}
+                            onChange={handleParentFormChange('workplace')}
+                            size="small"
+                        />
+                        <TextField
+                            label="Địa chỉ hiện tại"
+                            fullWidth
+                            value={parentFormData.currentAddress}
+                            onChange={handleParentFormChange('currentAddress')}
+                            size="small"
+                            multiline
+                            rows={2}
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{px: 3, pb: 3, pt: 2}}>
+                    <Button
+                        onClick={handleParentFormClose}
+                        sx={{
+                            textTransform: 'none',
+                            color: '#64748b',
+                        }}
+                    >
+                        Đóng
+                    </Button>
+                    <Button
+                        onClick={handleParentFormSubmit}
+                        variant="contained"
+                        sx={{
+                            textTransform: 'none',
+                            bgcolor: '#1976d2',
+                            fontWeight: 600,
+                            px: 3,
+                            '&:hover': {
+                                bgcolor: '#1565c0',
+                            }
+                        }}
+                    >
+                        Lưu thông tin
+                    </Button>
+                </DialogActions>
+            </Dialog>
             {/* 2️⃣ Hero banner */}
             <Box
                 sx={{
@@ -491,11 +722,15 @@ export default function HomePage() {
             </Box>
 
             {/* 4️⃣ Trường nổi bật */}
-            <Box sx={{
-                py: {xs: 8, md: 10},
-                bgcolor: '#E6F0FF',
-                position: 'relative'
-            }}>
+            <Box 
+                id="trường-nổi-bật"
+                sx={{
+                    py: {xs: 8, md: 10},
+                    bgcolor: '#E6F0FF',
+                    position: 'relative',
+                    scrollMarginTop: '80px'
+                }}
+            >
                 <Container maxWidth="xl" sx={{px: {xs: 2, sm: 3, md: 4}}}>
                     <Box sx={{mb: {xs: 4, md: 6}, textAlign: 'center'}}>
                         <Box sx={{
@@ -800,7 +1035,14 @@ export default function HomePage() {
             </Box>
 
             {/* 6️⃣ Quy trình tư vấn */}
-            <Box sx={{py: {xs: 10, md: 12}, bgcolor: '#FFFFFF'}}>
+            <Box 
+                id="quy-trình"
+                sx={{
+                    py: {xs: 10, md: 12}, 
+                    bgcolor: '#FFFFFF',
+                    scrollMarginTop: '80px'
+                }}
+            >
                 <Container maxWidth="md" sx={{px: {xs: 3, md: 4}}}>
                     <Box sx={{textAlign: 'center', mb: {xs: 6, md: 8}}}>
                         <Typography 
@@ -912,7 +1154,14 @@ export default function HomePage() {
             <LatestAdmissionNewsSection/>
 
             {/* 8️⃣ Form đăng ký tư vấn */}
-            <Box sx={{py: {xs: 10, md: 14}, bgcolor: '#2563EB'}}>
+            <Box 
+                id="tu-van-ngay"
+                sx={{
+                    py: {xs: 10, md: 14}, 
+                    bgcolor: '#2563EB',
+                    scrollMarginTop: '80px'
+                }}
+            >
                 <Container maxWidth="lg" sx={{px: {xs: 3, md: 4}, color: '#FFFFFF'}}>
                     <>
                         <Box sx={{textAlign: 'center', mb: {xs: 6, md: 8}}}>

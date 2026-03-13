@@ -25,7 +25,7 @@ const roleOptions = [
 
 const Register = () => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1); // 1: Google auth, 2: Role selection, 3: School form, 4: Parent form
+    const [step, setStep] = useState(1); // 1: Google auth, 2: Role selection, 3: School form
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [picture, setPicture] = useState('');
@@ -63,16 +63,9 @@ const Register = () => {
                 if (selectedRole === ROLES.SCHOOL) {
                     setStep(3); // Show school registration form
                 } else if (selectedRole === ROLES.PARENT) {
-                    // Check for firstLogin flag in response
-                    const firstLogin = response?.data?.firstLogin || response?.data?.body?.firstLogin || response?.firstLogin;
-                    if (firstLogin) {
-                        // Show parent registration form
-                        setStep(4);
-                    } else {
-                        // Already registered, redirect to login
-                        alert('Tài khoản đã tồn tại. Vui lòng đăng nhập.');
-                        navigate('/login');
-                    }
+                    // PARENT registration successful, show success message and redirect to login
+                    alert('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.');
+                    navigate('/login');
                 }
             }
         } catch (error) {
@@ -98,71 +91,6 @@ const Register = () => {
     // If showing school registration form
     if (step === 3) {
         return <SchoolRegistrationForm email={email} onBack={handleBackToRoleSelection} />;
-    }
-
-    // If showing parent registration form (step 4)
-    if (step === 4) {
-        return (
-            <Box
-                sx={{
-                    position: 'fixed',
-                    top: '64px',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 'calc(100vh - 64px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    py: {xs: 2, md: 3},
-                    px: {xs: 2, md: 0},
-                    backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.55), rgba(15,23,42,0.35)), url(${backgroundLogin})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundAttachment: 'fixed',
-                    overflow: 'auto',
-                }}
-            >
-                <Container maxWidth="sm">
-                    <Paper
-                        elevation={8}
-                        sx={{
-                            p: 4,
-                            borderRadius: 4,
-                            background: 'radial-gradient(circle at top left, rgba(239,246,255,0.96) 0, rgba(239,246,255,0.98) 40%, #ffffff 100%)',
-                            border: '1px solid #dbeafe',
-                            backdropFilter: 'blur(10px)',
-                        }}
-                    >
-                        <Stack spacing={3}>
-                            <Box>
-                                <Typography variant="h5" sx={{fontWeight: 700, color: '#1e293b'}}>
-                                    Đăng ký phụ huynh
-                                </Typography>
-                                <Typography variant="body2" sx={{color: '#64748b', mt: 0.5}}>
-                                    Vui lòng điền thông tin để hoàn tất đăng ký.
-                                </Typography>
-                            </Box>
-                            <Typography variant="body1" sx={{color: '#64748b'}}>
-                                Form đăng ký phụ huynh sẽ được hiển thị ở đây.
-                            </Typography>
-                            <Button
-                                variant="outlined"
-                                onClick={handleBackToRoleSelection}
-                                fullWidth
-                                sx={{
-                                    textTransform: 'none',
-                                    borderRadius: 999,
-                                }}
-                            >
-                                Quay lại
-                            </Button>
-                        </Stack>
-                    </Paper>
-                </Container>
-            </Box>
-        );
     }
 
     return (
