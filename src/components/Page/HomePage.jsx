@@ -23,9 +23,12 @@ import {
     DialogActions,
     FormControl,
     InputLabel,
-    Select
+    Select,
+    CircularProgress
 } from "@mui/material";
 import TuitionFilter from "../ui/TuitionFilter";
+import {updateProfile} from "../../services/AccountService";
+import {enqueueSnackbar} from "notistack";
 import {
     School as SchoolIcon,
     FamilyRestroom as ParentIcon,
@@ -273,10 +276,13 @@ export default function HomePage() {
     const [tuitionMin, setTuitionMin] = React.useState(0);
     const [tuitionMax, setTuitionMax] = React.useState(30);
     const [showParentFormModal, setShowParentFormModal] = React.useState(false);
+    const [isSubmittingParentForm, setIsSubmittingParentForm] = React.useState(false);
+    const submitRef = React.useRef(false);
     const [parentFormData, setParentFormData] = React.useState({
         occupation: '',
         gender: '',
         name: '',
+        phone: '',
         idCardNumber: '',
         relationship: '',
         workplace: '',
@@ -358,20 +364,90 @@ export default function HomePage() {
         });
     };
 
-    const handleParentFormSubmit = () => {
-        // TODO: Call API to update profile when API is available
-        // For now, just close the modal and update localStorage to mark firstLogin as false
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            try {
-                const user = JSON.parse(userData);
-                user.firstLogin = false;
-                localStorage.setItem('user', JSON.stringify(user));
-            } catch (e) {
-                console.error('Error updating user data:', e);
-            }
+    const handleParentFormSubmit = async () => {
+        // Prevent double submit
+        if (isSubmittingParentForm || submitRef.current) {
+            return;
         }
-        setShowParentFormModal(false);
+        
+        submitRef.current = true;
+
+        // Validate required fields
+        if (!parentFormData.idCardNumber || !parentFormData.idCardNumber.trim()) {
+            enqueueSnackbar('Vui lòng nhập số CMND/CCCD', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.name || !parentFormData.name.trim()) {
+            enqueueSnackbar('Vui lòng nhập họ và tên', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.phone || !parentFormData.phone.trim()) {
+            enqueueSnackbar('Vui lòng nhập số điện thoại', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.gender) {
+            enqueueSnackbar('Vui lòng chọn giới tính', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.relationship) {
+            enqueueSnackbar('Vui lòng chọn mối quan hệ với học sinh', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.occupation || !parentFormData.occupation.trim()) {
+            enqueueSnackbar('Vui lòng nhập nghề nghiệp', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.workplace || !parentFormData.workplace.trim()) {
+            enqueueSnackbar('Vui lòng nhập nơi làm việc', {variant: 'error'});
+            return;
+        }
+        if (!parentFormData.currentAddress || !parentFormData.currentAddress.trim()) {
+            enqueueSnackbar('Vui lòng nhập địa chỉ hiện tại', {variant: 'error'});
+            return;
+        }
+
+        setIsSubmittingParentForm(true);
+
+        try {
+            const profilePayload = {
+                parentData: {
+                    idCardNumber: parentFormData.idCardNumber.trim(),
+                },
+                gender: parentFormData.gender,
+                name: parentFormData.name.trim(),
+                phone: parentFormData.phone.trim(),
+                relationship: parentFormData.relationship,
+                workplace: parentFormData.workplace.trim(),
+                occupation: parentFormData.occupation.trim(),
+                currentAddress: parentFormData.currentAddress.trim(),
+                idCardNumber: parentFormData.idCardNumber.trim(),
+            };
+
+            const response = await updateProfile(profilePayload);
+            
+            if (response && response.status === 200) {
+                enqueueSnackbar('Cập nhật thông tin thành công!', {variant: 'success'});
+                // Update localStorage to mark firstLogin as false
+                const userData = localStorage.getItem('user');
+                if (userData) {
+                    try {
+                        const user = JSON.parse(userData);
+                        user.firstLogin = false;
+                        localStorage.setItem('user', JSON.stringify(user));
+                    } catch (e) {
+                        console.error('Error updating user data:', e);
+                    }
+                }
+                setShowParentFormModal(false);
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.';
+            enqueueSnackbar(errorMessage, {variant: 'error'});
+        } finally {
+            setIsSubmittingParentForm(false);
+            submitRef.current = false;
+        }
     };
 
     const handleParentFormClose = () => {
@@ -444,6 +520,16 @@ export default function HomePage() {
                                 </Select>
                             </FormControl>
                             <TextField
+                                label="Số điện thoại *"
+                                fullWidth
+                                value={parentFormData.phone}
+                                onChange={handleParentFormChange('phone')}
+                                size="small"
+                                placeholder="Nhập số điện thoại"
+                            />
+                        </Stack>
+                        <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                            <TextField
                                 label="Nghề nghiệp"
                                 fullWidth
                                 value={parentFormData.occupation}
@@ -480,8 +566,10 @@ export default function HomePage() {
                         Đóng
                     </Button>
                     <Button
+                        type="button"
                         onClick={handleParentFormSubmit}
                         variant="contained"
+                        disabled={isSubmittingParentForm}
                         sx={{
                             textTransform: 'none',
                             bgcolor: '#1976d2',
@@ -489,10 +577,17 @@ export default function HomePage() {
                             px: 3,
                             '&:hover': {
                                 bgcolor: '#1565c0',
+                            },
+                            '&:disabled': {
+                                bgcolor: '#90caf9',
                             }
                         }}
                     >
-                        Lưu thông tin
+                        {isSubmittingParentForm ? (
+                            <CircularProgress size={20} color="inherit" />
+                        ) : (
+                            'Lưu thông tin'
+                        )}
                     </Button>
                 </DialogActions>
             </Dialog>

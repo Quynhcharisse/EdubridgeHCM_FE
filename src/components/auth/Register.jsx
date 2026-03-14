@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {jwtDecode} from 'jwt-decode';
-import {signup} from '../../services/AuthService';
+import {signup, signin} from '../../services/AuthService';
+import {getAccess} from '../../services/AccountService';
 import {ROLES} from '../../constants/roles';
 import RegisterGoogle from '../ui/RegisterGoogle';
 import {
@@ -18,7 +19,9 @@ import {
 import {ArrowBack} from '@mui/icons-material';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import SchoolRegistrationForm from './SchoolRegistrationForm';
+import ParentRegistrationForm from './ParentRegistrationForm';
 import {useNavigate} from 'react-router-dom';
+import {enqueueSnackbar} from 'notistack';
 
 const roleOptions = [
     {value: ROLES.PARENT, label: 'Phụ huynh'},
@@ -49,7 +52,7 @@ const Register = () => {
 
     const handleRoleSelect = async () => {
         if (!selectedRole) {
-            alert('Vui lòng chọn vai trò (Phụ huynh hoặc Nhà trường).');
+            enqueueSnackbar('Vui lòng chọn vai trò (Phụ huynh hoặc Nhà trường).', {variant: 'warning'});
             return;
         }
 
@@ -67,18 +70,64 @@ const Register = () => {
 
             if (response) {
                 console.log('Đăng ký thành công:', response);
-                alert('Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.');
-                navigate('/login');
+                
+                // Auto login after signup
+                try {
+                    const loginResponse = await signin(email);
+                    if (loginResponse && loginResponse.status === 200) {
+                        // Get user role and firstLogin status
+                        let role = null;
+                        let firstLogin = false;
+                        
+                        if (loginResponse.data && loginResponse.data.body) {
+                            role = loginResponse.data.body.role;
+                            firstLogin = loginResponse.data.body.firstLogin || false;
+                        }
+                        
+                        // If role not in login response, get from access endpoint
+                        if (!role) {
+                            try {
+                                const accessResponse = await getAccess();
+                                if (accessResponse && accessResponse.status === 200 && accessResponse.data.body) {
+                                    role = accessResponse.data.body.role;
+                                    firstLogin = accessResponse.data.body.firstLogin || false;
+                                }
+                            } catch (error) {
+                                console.error('Error getting user role:', error);
+                            }
+                        }
+                        
+                        // Save user data to localStorage
+                        if (role) {
+                            const userData = {
+                                email: email,
+                                name: name,
+                                picture: picture,
+                                role: role.toUpperCase(),
+                                firstLogin: firstLogin
+                            };
+                            localStorage.setItem('user', JSON.stringify(userData));
+                            console.log('User data saved to localStorage:', userData);
+                        }
+                    }
+                } catch (loginError) {
+                    console.error('Error auto-login after signup:', loginError);
+                    // Continue to form even if auto-login fails
+                }
+                
+                enqueueSnackbar('Đăng ký thành công! Vui lòng điền thông tin để hoàn tất.', {variant: 'success'});
+                // Move to step 3 to fill parent information
+                setStep(3);
             }
         } catch (error) {
             console.error('Lỗi đăng ký:', error);
             const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.';
             
             if (error?.response?.status === 400 || errorMessage.includes('đã tồn tại') || errorMessage.includes('already exists')) {
-                alert('Tài khoản đã tồn tại. Vui lòng đăng nhập.');
+                enqueueSnackbar('Tài khoản đã tồn tại. Vui lòng đăng nhập.', {variant: 'error'});
                 navigate('/login');
             } else {
-                alert(errorMessage);
+                enqueueSnackbar(errorMessage, {variant: 'error'});
             }
         } finally {
             setIsSubmitting(false);
@@ -90,7 +139,11 @@ const Register = () => {
     };
 
     if (step === 3) {
-        return <SchoolRegistrationForm email={email} onBack={handleBackToRoleSelection} />;
+        if (selectedRole === ROLES.SCHOOL) {
+            return <SchoolRegistrationForm email={email} onBack={handleBackToRoleSelection} />;
+        } else if (selectedRole === ROLES.PARENT) {
+            return <ParentRegistrationForm email={email} name={name} onBack={handleBackToRoleSelection} />;
+        }
     }
 
     return (
@@ -164,7 +217,7 @@ const Register = () => {
 
                         {step === 1 ? (
                             <Stack spacing={2} alignItems="center">
-                                <Typography variant="body2" sx={{color: '#475569', width: '100%'}}>
+                                <Typography variant="body2" sx={{color: '#475569', width: '100%', textAlign: 'center'}}>
                                     Đăng ký bằng tài khoản Google của bạn để tiếp tục quá trình đăng ký.
                                 </Typography>
                                 <Box sx={{width: '100%', display: 'flex', justifyContent: 'center'}}>
@@ -173,9 +226,9 @@ const Register = () => {
                                         onError={handleGoogleError}
                                     />
                                 </Box>
-                                <Typography variant="caption" sx={{color: '#94a3b8', width: '100%', textAlign: 'left'}}>
+                                {/* <Typography variant="caption" sx={{color: '#94a3b8', width: '100%', textAlign: 'left'}}>
                                     Sau khi đăng ký bằng Google, hệ thống sẽ tự động lấy email của bạn.
-                                </Typography>
+                                </Typography> */}
                             </Stack>
                         ) : (
                             <Box component="form" onSubmit={(e) => { e.preventDefault(); handleRoleSelect(); }}>

@@ -18,3 +18,12 @@ export const getProfile = async () => {
     const response = await axiosClient.get("/account/profile");
     return response || null;
 }
+
+export const updateProfile = async (profileData) => {
+    const response = await axiosClient.post("/account/profile", profileData, {
+        headers: {
+            "X-Device-Type": "web"
+        }
+    });
+    return response || null;
+}
