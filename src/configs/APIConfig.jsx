@@ -23,12 +23,17 @@ axiosClient.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        if (error.response && error.response.status === 401) {
             if (originalRequest.url === "/auth/refresh" || 
                 originalRequest.url === "/account/access" ||
                 originalRequest.url === "/auth/login" ||
                 originalRequest.url === "/auth/register") {
                 console.error("Auth request failed, skipping auto refresh.");
+                return Promise.reject(error);
+            }
+
+            // Only retry on 401 (Unauthorized), not on 403 (Forbidden)
+            if (originalRequest._retry) {
                 return Promise.reject(error);
             }
 
@@ -55,6 +60,11 @@ axiosClient.interceptors.response.use(
                 }
                 return Promise.reject(error);
             }
+        }
+        
+        // For 403 (Forbidden), don't auto-retry, just reject
+        if (error.response && error.response.status === 403) {
+            return Promise.reject(error);
         }
         return Promise.reject(error);
     }
