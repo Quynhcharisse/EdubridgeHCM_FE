@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useState, useMemo} from "react";
 import {
     Box,
     Button,
@@ -8,9 +8,14 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    Grid,
+    FormControl,
     IconButton,
+    InputAdornment,
+    InputLabel,
+    MenuItem,
+    Select,
     Stack,
+    Switch,
     Table,
     TableBody,
     TableCell,
@@ -18,231 +23,1058 @@ import {
     TableHead,
     TableRow,
     TextField,
-    Typography
+    Typography,
+    TablePagination,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import BlockIcon from "@mui/icons-material/Block";
+import ApartmentIcon from "@mui/icons-material/Apartment";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import PersonOffIcon from "@mui/icons-material/PersonOff";
 import {enqueueSnackbar} from "notistack";
 
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
+
+// Mock data for UI
+const initialMockCampuses = [
+    {
+        id: 1,
+        name: "Cơ sở 1 - Quận 1",
+        address: "123 Nguyễn Huệ, Phường Bến Nghé",
+        city: "Quận 1",
+        phone: "028 3822 1234",
+        email: "campus1@school.edu.vn",
+        description: "Cơ sở chính, gần trung tâm thành phố.",
+        imageUrl: null,
+        status: "active",
+        counselorCount: 3,
+    },
+    {
+        id: 2,
+        name: "Cơ sở 2 - Bình Thạnh",
+        address: "456 Điện Biên Phủ, Phường 25",
+        city: "Bình Thạnh",
+        phone: "028 3899 5678",
+        email: "campus2@school.edu.vn",
+        description: "Cơ sở mở rộng, khu vực phía Bắc.",
+        imageUrl: null,
+        status: "active",
+        counselorCount: 2,
+    },
+    {
+        id: 3,
+        name: "Cơ sở 3 - Thủ Đức",
+        address: "789 Võ Văn Ngân, Phường Linh Chiểu",
+        city: "Thủ Đức",
+        phone: "028 3726 9012",
+        email: "campus3@school.edu.vn",
+        description: "Cơ sở tại thành phố Thủ Đức.",
+        imageUrl: null,
+        status: "inactive",
+        counselorCount: 0,
+    },
+];
+
+const emptyForm = {
+    name: "",
+    address: "",
+    city: "",
+    phone: "",
+    email: "",
+    description: "",
+    imageFile: null,
+    imagePreview: null,
+    status: true,
+};
+
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60' viewBox='0 0 80 60' fill='%23e2e8f0'%3E%3Crect width='80' height='60' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='10' fill='%2394a3b8'%3ECampus%3C/text%3E%3C/svg%3E";
+
 export default function SchoolCampus() {
-    const [campuses, setCampuses] = useState([]);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingCampus, setEditingCampus] = useState(null);
-    const [formValues, setFormValues] = useState({
-        name: "",
-        address: "",
-        phone: "",
-    });
+    const [campuses, setCampuses] = useState(initialMockCampuses);
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [cityFilter, setCityFilter] = useState("all");
+    const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
+    const [selectedCampus, setSelectedCampus] = useState(null);
+    const [formValues, setFormValues] = useState(emptyForm);
     const [formErrors, setFormErrors] = useState({});
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
-    const addCampusToState = (campus) => {
-        setCampuses((prev) => [...prev, {...campus, id: campus.id ?? Date.now()}]);
-    };
-
-    const updateCampusInState = (id, campus) => {
-        setCampuses((prev) => prev.map((c) => (c.id === id ? {...c, ...campus} : c)));
-    };
-
-    const deleteCampusInState = (id) => {
-        setCampuses((prev) => prev.filter((c) => c.id !== id));
-    };
-
-    const handleOpenCreate = () => {
-        setEditingCampus(null);
-        setFormValues({name: "", address: "", phone: ""});
-        setFormErrors({});
-        setDialogOpen(true);
-    };
-
-    const handleOpenEdit = (campus) => {
-        setEditingCampus(campus);
-        setFormValues({
-            name: campus.name || "",
-            address: campus.address || "",
-            phone: campus.phone || "",
-        });
-        setFormErrors({});
-        setDialogOpen(true);
-    };
-
-    const handleCloseDialog = () => {
-        setDialogOpen(false);
-    };
+    const cities = useMemo(() => {
+        const set = new Set(campuses.map((c) => c.city).filter(Boolean));
+        return Array.from(set).sort();
+    }, [campuses]);
 
     const handleChange = (e) => {
         const {name, value} = e.target;
         setFormValues((prev) => ({...prev, [name]: value}));
     };
 
-    const validate = () => {
-        const errors = {};
-        if (!formValues.name?.trim()) {
-            errors.name = "Tên cơ sở là bắt buộc";
+    const handleStatusToggle = (e) => {
+        setFormValues((prev) => ({...prev, status: e.target.checked}));
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const preview = URL.createObjectURL(file);
+        setFormValues((prev) => ({
+            ...prev,
+            imageFile: file,
+            imagePreview: preview,
+        }));
+    };
+
+    const clearImagePreview = () => {
+        if (formValues.imagePreview) {
+            URL.revokeObjectURL(formValues.imagePreview);
         }
+        setFormValues((prev) => ({
+            ...prev,
+            imageFile: null,
+            imagePreview: null,
+        }));
+    };
+
+    const filteredCampuses = useMemo(() => {
+        let list = campuses;
+        const q = search.trim().toLowerCase();
+        if (q) {
+            list = list.filter(
+                (c) =>
+                    c.name?.toLowerCase().includes(q) ||
+                    c.address?.toLowerCase().includes(q)
+            );
+        }
+        if (statusFilter === "active") {
+            list = list.filter((c) => c.status === "active");
+        } else if (statusFilter === "inactive") {
+            list = list.filter((c) => c.status === "inactive");
+        }
+        if (cityFilter !== "all") {
+            list = list.filter((c) => c.city === cityFilter);
+        }
+        return list;
+    }, [campuses, search, statusFilter, cityFilter]);
+
+    const paginatedCampuses = useMemo(() => {
+        const start = page * rowsPerPage;
+        return filteredCampuses.slice(start, start + rowsPerPage);
+    }, [filteredCampuses, page, rowsPerPage]);
+
+    const validateForm = () => {
+        const errors = {};
+        if (!formValues.name?.trim()) errors.name = "Campus name is required";
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
 
-    const handleSubmit = async () => {
-        if (!validate()) return;
+    const getPayload = () => ({
+        name: formValues.name.trim(),
+        address: formValues.address?.trim() || "",
+        city: formValues.city?.trim() || "",
+        phone: formValues.phone?.trim() || "",
+        email: formValues.email?.trim() || "",
+        description: formValues.description?.trim() || "",
+        status: formValues.status ? "active" : "inactive",
+        imageUrl: formValues.imagePreview || null,
+        counselorCount: selectedCampus?.counselorCount ?? 0,
+    });
 
-        const payload = {
-            name: formValues.name.trim(),
-            address: formValues.address?.trim() || "",
-            phone: formValues.phone?.trim() || "",
-        };
-
-        if (editingCampus?.id) {
-            updateCampusInState(editingCampus.id, payload);
-            enqueueSnackbar("Cập nhật cơ sở thành công (frontend)", {variant: "success"});
-        } else {
-            addCampusToState(payload);
-            enqueueSnackbar("Tạo cơ sở mới thành công (frontend)", {variant: "success"});
-        }
-
-        setDialogOpen(false);
+    const handleOpenCreate = () => {
+        setSelectedCampus(null);
+        setFormValues(emptyForm);
+        setFormErrors({});
+        setCreateModalOpen(true);
     };
 
-    const handleDelete = async (campus) => {
-        if (!window.confirm(`Bạn chắc chắn muốn xóa cơ sở "${campus.name}"?`)) return;
-        deleteCampusInState(campus.id);
-        enqueueSnackbar("Xóa cơ sở thành công (frontend)", {variant: "success"});
+    const handleCloseCreate = () => {
+        clearImagePreview();
+        setCreateModalOpen(false);
+    };
+
+    const handleCreateSubmit = () => {
+        if (!validateForm()) return;
+        const payload = getPayload();
+        const newCampus = {
+            id: Date.now(),
+            ...payload,
+        };
+        setCampuses((prev) => [newCampus, ...prev]);
+        enqueueSnackbar("Campus created successfully", {variant: "success"});
+        handleCloseCreate();
+    };
+
+    const handleOpenView = (campus) => {
+        setSelectedCampus(campus);
+        setViewModalOpen(true);
+    };
+
+    const handleOpenEdit = (campus) => {
+        setSelectedCampus(campus);
+        setFormValues({
+            name: campus.name || "",
+            address: campus.address || "",
+            city: campus.city || "",
+            phone: campus.phone || "",
+            email: campus.email || "",
+            description: campus.description || "",
+            imageFile: null,
+            imagePreview: campus.imageUrl || null,
+            status: campus.status === "active",
+        });
+        setFormErrors({});
+        setEditModalOpen(true);
+    };
+
+    const handleEditSubmit = () => {
+        if (!selectedCampus || !validateForm()) return;
+        const payload = getPayload();
+        setCampuses((prev) =>
+            prev.map((c) =>
+                c.id === selectedCampus.id ? {...c, ...payload} : c
+            )
+        );
+        enqueueSnackbar("Campus updated successfully", {variant: "success"});
+        setEditModalOpen(false);
+    };
+
+    const handleOpenDisableConfirm = (campus) => {
+        setSelectedCampus(campus);
+        setDisableConfirmOpen(true);
+    };
+
+    const handleDisableConfirm = () => {
+        if (!selectedCampus) return;
+        setCampuses((prev) =>
+            prev.map((c) =>
+                c.id === selectedCampus.id ? {...c, status: "inactive"} : c
+            )
+        );
+        enqueueSnackbar("Campus has been disabled", {variant: "info"});
+        setDisableConfirmOpen(false);
+        setSelectedCampus(null);
     };
 
     return (
-        <Box>
-            <Box sx={{display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3}}>
-                <Typography variant="h4" sx={{fontWeight: 700, color: "#1e293b"}}>
-                    Quản Lý Cơ Sở
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon/>}
-                    onClick={handleOpenCreate}
-                    sx={{
-                        borderRadius: 999,
-                        textTransform: "none",
-                        fontWeight: 600,
-                        px: 3,
-                        py: 1,
-                    }}
-                >
-                    Thêm Cơ Sở
-                </Button>
-            </Box>
-
-            <Card
-                elevation={2}
+        <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
+            {/* Page Header */}
+            <Box
                 sx={{
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
-                    border: "1px solid #e0e7ff",
+                    p: 3,
+                    color: "white",
+                    boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",
                 }}
             >
-                <CardContent>
-                    <TableContainer>
-                        <Table>
-                            <TableHead>
-                                <TableRow sx={{bgcolor: "#f8fafc"}}>
-                                    <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>STT</TableCell>
-                                    <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Tên cơ sở</TableCell>
-                                    <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Địa chỉ</TableCell>
-                                    <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Số điện thoại</TableCell>
-                                    <TableCell sx={{fontWeight: 700, color: "#1e293b"}} align="right">
-                                        Thao tác
-                                    </TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {campuses.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{py: 4}}>
-                                            <Typography sx={{color: "#64748b"}}>
-                                                "Chưa có cơ sở nào"
-                                            </Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    campuses.map((campus, index) => (
-                                        <TableRow key={campus.id || index} hover>
-                                            <TableCell>{index + 1}</TableCell>
-                                            <TableCell>{campus.name}</TableCell>
-                                            <TableCell>{campus.address}</TableCell>
-                                            <TableCell>{campus.phone}</TableCell>
-                                            <TableCell align="right">
-                                                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                    <IconButton
-                                                        color="primary"
-                                                        size="small"
-                                                        onClick={() => handleOpenEdit(campus)}
-                                                    >
-                                                        <EditIcon fontSize="small"/>
-                                                    </IconButton>
-                                                    <IconButton
-                                                        color="error"
-                                                        size="small"
-                                                        onClick={() => handleDelete(campus)}
-                                                    >
-                                                        <DeleteIcon fontSize="small"/>
-                                                    </IconButton>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: {xs: "column", sm: "row"},
+                        alignItems: {xs: "stretch", sm: "center"},
+                        justifyContent: "space-between",
+                        gap: 2,
+                    }}
+                >
+                    <Box>
+                        <Typography
+                            variant="h4"
+                            sx={{
+                                fontWeight: 700,
+                                letterSpacing: "-0.02em",
+                                textShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                            }}
+                        >
+                            Campus Management
+                        </Typography>
+                        <Typography variant="body2" sx={{mt: 0.5, opacity: 0.95}}>
+                            Manage all campuses of your school
+                        </Typography>
+                    </Box>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon/>}
+                        onClick={handleOpenCreate}
+                        sx={{
+                            bgcolor: "rgba(255,255,255,0.95)",
+                            color: "#0D64DE",
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontWeight: 600,
+                            px: 3,
+                            py: 1.5,
+                            boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+                            "&:hover": {
+                                bgcolor: "white",
+                                boxShadow: "0 6px 20px rgba(0,0,0,0.2)",
+                            },
+                        }}
+                    >
+                        Create Campus
+                    </Button>
+                </Box>
+            </Box>
+
+            {/* Search & Filter */}
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <CardContent sx={{p: 2.5}}>
+                    <Stack
+                        direction={{xs: "column", md: "row"}}
+                        spacing={2}
+                        alignItems={{xs: "stretch", md: "center"}}
+                        flexWrap="wrap"
+                    >
+                        <TextField
+                            placeholder="Search by name or address..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            size="small"
+                            sx={{
+                                flex: 1,
+                                minWidth: 200,
+                                maxWidth: {md: 320},
+                                "& .MuiOutlinedInput-root": {
+                                    borderRadius: 2,
+                                    bgcolor: "white",
+                                },
+                            }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{color: "#64748b"}}/>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <FormControl size="small" sx={{minWidth: 140}}>
+                            <InputLabel>Status</InputLabel>
+                            <Select
+                                value={statusFilter}
+                                label="Status"
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                sx={{borderRadius: 2, bgcolor: "white"}}
+                            >
+                                <MenuItem value="all">All</MenuItem>
+                                <MenuItem value="active">Active</MenuItem>
+                                <MenuItem value="inactive">Inactive</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{minWidth: 160}}>
+                            <InputLabel>City / Location</InputLabel>
+                            <Select
+                                value={cityFilter}
+                                label="City / Location"
+                                onChange={(e) => setCityFilter(e.target.value)}
+                                sx={{borderRadius: 2, bgcolor: "white"}}
+                            >
+                                <MenuItem value="all">All</MenuItem>
+                                {cities.map((city) => (
+                                    <MenuItem key={city} value={city}>
+                                        {city}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Stack>
                 </CardContent>
             </Card>
 
-            <Dialog open={dialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="sm">
-                <DialogTitle>
-                    {editingCampus ? "Chỉnh sửa cơ sở" : "Thêm cơ sở mới"}
+            {/* Campus Table */}
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    overflow: "hidden",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow sx={{bgcolor: "#f1f5f9"}}>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Campus
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Address
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    City
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Phone
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Counselors
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Status
+                                </TableCell>
+                                <TableCell
+                                    sx={{fontWeight: 700, color: "#1e293b", py: 2}}
+                                    align="right"
+                                >
+                                    Actions
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {paginatedCampuses.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={7} align="center" sx={{py: 8}}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                gap: 1.5,
+                                            }}
+                                        >
+                                            <ApartmentIcon
+                                                sx={{fontSize: 56, color: "#cbd5e1"}}
+                                            />
+                                            <Typography
+                                                variant="h6"
+                                                sx={{color: "#64748b", fontWeight: 600}}
+                                            >
+                                                No campuses yet
+                                            </Typography>
+                                            <Typography variant="body2" sx={{color: "#94a3b8"}}>
+                                                {filteredCampuses.length === 0 && campuses.length > 0
+                                                    ? "No results match your search or filter."
+                                                    : "Create your first campus to get started."}
+                                            </Typography>
+                                            {campuses.length === 0 && (
+                                                <Button
+                                                    variant="contained"
+                                                    startIcon={<AddIcon/>}
+                                                    onClick={handleOpenCreate}
+                                                    sx={{
+                                                        mt: 1,
+                                                        borderRadius: 2,
+                                                        textTransform: "none",
+                                                        fontWeight: 600,
+                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                    }}
+                                                >
+                                                    Create Campus
+                                                </Button>
+                                            )}
+                                        </Box>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginatedCampuses.map((row) => (
+                                    <TableRow
+                                        key={row.id}
+                                        hover
+                                        sx={{
+                                            "&:hover": {
+                                                bgcolor: "rgba(122, 169, 235, 0.06)",
+                                            },
+                                        }}
+                                    >
+                                        <TableCell>
+                                            <Stack direction="row" alignItems="center" spacing={2}>
+                                                <Box
+                                                    component="img"
+                                                    src={row.imageUrl || PLACEHOLDER_IMAGE}
+                                                    alt={row.name}
+                                                    sx={{
+                                                        width: 56,
+                                                        height: 42,
+                                                        borderRadius: 1.5,
+                                                        objectFit: "cover",
+                                                        border: "1px solid #e2e8f0",
+                                                    }}
+                                                />
+                                                <Typography
+                                                    sx={{fontWeight: 600, color: "#1e293b"}}
+                                                >
+                                                    {row.name}
+                                                </Typography>
+                                            </Stack>
+                                        </TableCell>
+                                        <TableCell sx={{color: "#64748b", maxWidth: 200}}>
+                                            <Typography noWrap title={row.address}>
+                                                {row.address || "—"}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{color: "#64748b"}}>
+                                            {row.city || "—"}
+                                        </TableCell>
+                                        <TableCell sx={{color: "#64748b"}}>
+                                            {row.phone || "—"}
+                                        </TableCell>
+                                        <TableCell sx={{color: "#64748b"}}>
+                                            {row.counselorCount ?? 0}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    px: 1.5,
+                                                    py: 0.5,
+                                                    borderRadius: 999,
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    bgcolor:
+                                                        row.status === "active"
+                                                            ? "rgba(34, 197, 94, 0.12)"
+                                                            : "rgba(148, 163, 184, 0.2)",
+                                                    color:
+                                                        row.status === "active"
+                                                            ? "#16a34a"
+                                                            : "#64748b",
+                                                }}
+                                            >
+                                                {row.status === "active" ? "Active" : "Inactive"}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Stack
+                                                direction="row"
+                                                spacing={0.5}
+                                                justifyContent="flex-end"
+                                            >
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenView(row)}
+                                                    sx={{
+                                                        color: "#64748b",
+                                                        "&:hover": {color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)"},
+                                                    }}
+                                                    title="View details"
+                                                >
+                                                    <VisibilityIcon fontSize="small"/>
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenEdit(row)}
+                                                    sx={{
+                                                        color: "#64748b",
+                                                        "&:hover": {color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)"},
+                                                    }}
+                                                    title="Edit"
+                                                >
+                                                    <EditIcon fontSize="small"/>
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenDisableConfirm(row)}
+                                                    disabled={row.status === "inactive"}
+                                                    sx={{
+                                                        color: "#64748b",
+                                                        "&:hover": {color: "#dc2626", bgcolor: "rgba(220, 38, 38, 0.08)"},
+                                                    }}
+                                                    title="Deactivate"
+                                                >
+                                                    <BlockIcon fontSize="small"/>
+                                                </IconButton>
+                                            </Stack>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                {filteredCampuses.length > 0 && (
+                    <TablePagination
+                        component="div"
+                        count={filteredCampuses.length}
+                        page={page}
+                        onPageChange={(_, newPage) => setPage(newPage)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                        rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+                        sx={{
+                            borderTop: "1px solid #e2e8f0",
+                            bgcolor: "#f8fafc",
+                            ".MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
+                                color: "#64748b",
+                            },
+                        }}
+                    />
+                )}
+            </Card>
+
+            {/* Create Campus Modal */}
+            <Dialog
+                open={createModalOpen}
+                onClose={handleCloseCreate}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        boxShadow: "0 24px 48px rgba(13, 100, 222, 0.12)",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        fontWeight: 700,
+                        color: "#1e293b",
+                        borderBottom: "1px solid #e2e8f0",
+                        pb: 2,
+                    }}
+                >
+                    Create Campus
+                </DialogTitle>
+                <DialogContent dividers sx={{pt: 2, bgcolor: "#F8FAFC"}}>
+                    <Stack spacing={2.5}>
+                        <TextField
+                            label="Campus Name"
+                            name="name"
+                            fullWidth
+                            value={formValues.name}
+                            onChange={handleChange}
+                            error={!!formErrors.name}
+                            helperText={formErrors.name}
+                            required
+                        />
+                        <TextField
+                            label="Address"
+                            name="address"
+                            fullWidth
+                            value={formValues.address}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="City / District"
+                            name="city"
+                            fullWidth
+                            value={formValues.city}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Phone Number"
+                            name="phone"
+                            fullWidth
+                            value={formValues.phone}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Email"
+                            name="email"
+                            type="email"
+                            fullWidth
+                            value={formValues.email}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Description"
+                            name="description"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            value={formValues.description}
+                            onChange={handleChange}
+                        />
+                        <Box>
+                            <Typography variant="body2" sx={{mb: 1, color: "#64748b"}}>
+                                Campus Image
+                            </Typography>
+                            <Button
+                                component="label"
+                                variant="outlined"
+                                startIcon={<CloudUploadIcon/>}
+                                sx={{borderRadius: 2, textTransform: "none"}}
+                            >
+                                Upload image
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                />
+                            </Button>
+                            {formValues.imagePreview && (
+                                <Box
+                                    component="img"
+                                    src={formValues.imagePreview}
+                                    alt="Preview"
+                                    sx={{
+                                        mt: 1,
+                                        maxHeight: 120,
+                                        borderRadius: 2,
+                                        border: "1px solid #e2e8f0",
+                                    }}
+                                />
+                            )}
+                        </Box>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                py: 0.5,
+                            }}
+                        >
+                            <Typography sx={{fontWeight: 500, color: "#1e293b"}}>
+                                Status
+                            </Typography>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{color: formValues.status ? "#16a34a" : "#94a3b8"}}
+                                >
+                                    {formValues.status ? "Active" : "Inactive"}
+                                </Typography>
+                                <Switch
+                                    checked={formValues.status}
+                                    onChange={handleStatusToggle}
+                                    sx={{
+                                        "& .MuiSwitch-switchBase.Mui-checked": {color: "#0D64DE"},
+                                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                                            backgroundColor: "#0D64DE",
+                                        },
+                                    }}
+                                />
+                            </Stack>
+                        </Box>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "white"}}>
+                    <Button onClick={handleCloseCreate} color="inherit" sx={{textTransform: "none"}}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleCreateSubmit}
+                        variant="contained"
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                        }}
+                    >
+                        Create Campus
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* View Details Modal */}
+            <Dialog
+                open={viewModalOpen}
+                onClose={() => setViewModalOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{sx: {borderRadius: 3}}}
+            >
+                <DialogTitle sx={{fontWeight: 700, color: "#1e293b"}}>
+                    Campus Details
                 </DialogTitle>
                 <DialogContent dividers>
-                    <Grid container spacing={2} sx={{mt: 0.5}}>
-                        <Grid item xs={12}>
-                            <TextField
-                                label="Tên cơ sở"
-                                name="name"
-                                fullWidth
-                                value={formValues.name}
-                                onChange={handleChange}
-                                error={!!formErrors.name}
-                                helperText={formErrors.name}
+                    {selectedCampus && (
+                        <Stack spacing={2}>
+                            <Box
+                                component="img"
+                                src={selectedCampus.imageUrl || PLACEHOLDER_IMAGE}
+                                alt={selectedCampus.name}
+                                sx={{
+                                    width: "100%",
+                                    maxHeight: 200,
+                                    borderRadius: 2,
+                                    objectFit: "cover",
+                                    border: "1px solid #e2e8f0",
+                                }}
                             />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                label="Địa chỉ"
-                                name="address"
-                                fullWidth
-                                value={formValues.address}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                label="Số điện thoại"
-                                name="phone"
-                                fullWidth
-                                value={formValues.phone}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                    </Grid>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Campus Name
+                                </Typography>
+                                <Typography variant="h6" sx={{fontWeight: 600}}>
+                                    {selectedCampus.name}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Address
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.address || "—"}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    City / District
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.city || "—"}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Phone
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.phone || "—"}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Email
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.email || "—"}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Description
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.description || "—"}
+                                </Typography>
+                            </Box>
+                            <Box sx={{display: "flex", gap: 2, alignItems: "center"}}>
+                                <Typography variant="caption" color="text.secondary">
+                                    Status
+                                </Typography>
+                                <Box
+                                    component="span"
+                                    sx={{
+                                        px: 1.5,
+                                        py: 0.5,
+                                        borderRadius: 999,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        bgcolor:
+                                            selectedCampus.status === "active"
+                                                ? "rgba(34, 197, 94, 0.12)"
+                                                : "rgba(148, 163, 184, 0.2)",
+                                        color:
+                                            selectedCampus.status === "active"
+                                                ? "#16a34a"
+                                                : "#64748b",
+                                    }}
+                                >
+                                    {selectedCampus.status === "active" ? "Active" : "Inactive"}
+                                </Box>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Number of Counselors
+                                </Typography>
+                                <Typography variant="body1">
+                                    {selectedCampus.counselorCount ?? 0}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewModalOpen(false)} color="inherit">
+                        Close
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<EditIcon/>}
+                        onClick={() => {
+                            setViewModalOpen(false);
+                            handleOpenEdit(selectedCampus);
+                        }}
+                        sx={{
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            textTransform: "none",
+                        }}
+                    >
+                        Edit
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Campus Modal */}
+            <Dialog
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{sx: {borderRadius: 3}}}
+            >
+                <DialogTitle sx={{fontWeight: 700, color: "#1e293b"}}>
+                    Edit Campus
+                </DialogTitle>
+                <DialogContent dividers sx={{bgcolor: "#F8FAFC"}}>
+                    <Stack spacing={2.5} sx={{pt: 0.5}}>
+                        <TextField
+                            label="Campus Name"
+                            name="name"
+                            fullWidth
+                            value={formValues.name}
+                            onChange={handleChange}
+                            error={!!formErrors.name}
+                            helperText={formErrors.name}
+                        />
+                        <TextField
+                            label="Address"
+                            name="address"
+                            fullWidth
+                            value={formValues.address}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="City / District"
+                            name="city"
+                            fullWidth
+                            value={formValues.city}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Phone Number"
+                            name="phone"
+                            fullWidth
+                            value={formValues.phone}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Email"
+                            name="email"
+                            type="email"
+                            fullWidth
+                            value={formValues.email}
+                            onChange={handleChange}
+                        />
+                        <TextField
+                            label="Description"
+                            name="description"
+                            fullWidth
+                            multiline
+                            rows={3}
+                            value={formValues.description}
+                            onChange={handleChange}
+                        />
+                        <Box>
+                            <Typography variant="body2" sx={{mb: 1, color: "#64748b"}}>
+                                Campus Image
+                            </Typography>
+                            <Button
+                                component="label"
+                                variant="outlined"
+                                startIcon={<CloudUploadIcon/>}
+                                sx={{borderRadius: 2, textTransform: "none"}}
+                            >
+                                Upload image
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                />
+                            </Button>
+                            {(formValues.imagePreview || selectedCampus?.imageUrl) && (
+                                <Box
+                                    component="img"
+                                    src={formValues.imagePreview || selectedCampus?.imageUrl || PLACEHOLDER_IMAGE}
+                                    alt="Preview"
+                                    sx={{
+                                        mt: 1,
+                                        maxHeight: 120,
+                                        borderRadius: 2,
+                                        border: "1px solid #e2e8f0",
+                                    }}
+                                />
+                            )}
+                        </Box>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <Typography sx={{fontWeight: 500}}>Status</Typography>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{color: formValues.status ? "#16a34a" : "#94a3b8"}}
+                                >
+                                    {formValues.status ? "Active" : "Inactive"}
+                                </Typography>
+                                <Switch
+                                    checked={formValues.status}
+                                    onChange={handleStatusToggle}
+                                    sx={{
+                                        "& .MuiSwitch-switchBase.Mui-checked": {color: "#0D64DE"},
+                                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                                            backgroundColor: "#0D64DE",
+                                        },
+                                    }}
+                                />
+                            </Stack>
+                        </Box>
+                    </Stack>
                 </DialogContent>
                 <DialogActions sx={{px: 3, py: 2}}>
-                    <Button onClick={handleCloseDialog} color="inherit">
-                        Hủy
+                    <Button onClick={() => setEditModalOpen(false)} color="inherit">
+                        Cancel
                     </Button>
-                    <Button onClick={handleSubmit} variant="contained">
-                        Lưu
+                    <Button
+                        onClick={handleEditSubmit}
+                        variant="contained"
+                        sx={{
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            textTransform: "none",
+                        }}
+                    >
+                        Save
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Disable confirmation dialog */}
+            <Dialog
+                open={disableConfirmOpen}
+                onClose={() => setDisableConfirmOpen(false)}
+                PaperProps={{sx: {borderRadius: 3, p: 1}}}
+            >
+                <DialogTitle sx={{display: "flex", alignItems: "center", gap: 1}}>
+                    <PersonOffIcon color="error"/> Deactivate Campus
+                </DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to deactivate{" "}
+                        <strong>{selectedCampus?.name}</strong>? This campus will be
+                        marked as inactive and may be hidden from parents.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{px: 3, pb: 2}}>
+                    <Button onClick={() => setDisableConfirmOpen(false)} color="inherit">
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDisableConfirm}
+                        startIcon={<BlockIcon/>}
+                    >
+                        Deactivate
                     </Button>
                 </DialogActions>
             </Dialog>
         </Box>
     );
 }
-
