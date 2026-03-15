@@ -17,6 +17,7 @@ const AdminUsersManagement = lazy(() => import("./components/Page/admin/AdminUse
 const SchoolLayout = lazy(() => import("./components/layouts/SchoolLayout.jsx"));
 const SchoolDashboard = lazy(() => import("./components/Page/school/SchoolDashboard.jsx"));
 const SchoolCampus = lazy(() => import("./components/Page/school/SchoolCampus.jsx"));
+const SchoolCounselors = lazy(() => import("./components/Page/school/SchoolCounselors.jsx"));
 
 const LoadingFallback = () => {
     return null;
@@ -214,6 +215,14 @@ const router = createBrowserRouter([
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
                         <SchoolCampus/>
+                    </Suspense>
+                )
+            },
+            {
+                path: 'counselors',
+                element: (
+                    <Suspense fallback={<LoadingFallback/>}>
+                        <SchoolCounselors/>
                     </Suspense>
                 )
             },

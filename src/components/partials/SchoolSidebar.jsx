@@ -2,6 +2,7 @@ import React from "react";
 import {Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography} from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import ApartmentIcon from "@mui/icons-material/Apartment";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import {useNavigate} from "react-router-dom";
 
 const menuItems = [
@@ -14,6 +15,11 @@ const menuItems = [
         text: "Cơ Sở",
         icon: <ApartmentIcon/>,
         path: "/school/campus",
+    },
+    {
+        text: "Quản lý Tư vấn viên",
+        icon: <SupportAgentIcon/>,
+        path: "/school/counselors",
     },
 ];
 
