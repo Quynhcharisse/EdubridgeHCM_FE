@@ -14,6 +14,7 @@ const ProtectedRoute = lazy(() => import("./configs/ProtectedRoute.jsx"));
 const AdminLayout = lazy(() => import("./components/layouts/AdminLayout.jsx"));
 const AdminDashboard = lazy(() => import("./components/Page/admin/AdminDashboard.jsx"));
 const AdminUsersManagement = lazy(() => import("./components/Page/admin/AdminUsersManagement.jsx"));
+const AdminSchoolVerification = lazy(() => import("./components/Page/admin/AdminSchoolVerification.jsx"));
 const SchoolLayout = lazy(() => import("./components/layouts/SchoolLayout.jsx"));
 const SchoolDashboard = lazy(() => import("./components/Page/school/SchoolDashboard.jsx"));
 const SchoolCampus = lazy(() => import("./components/Page/school/SchoolCampus.jsx"));
@@ -285,6 +286,14 @@ const router = createBrowserRouter([
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
                         <AdminUsersManagement/>
+                    </Suspense>
+                )
+            },
+            {
+                path: 'schools/verification',
+                element: (
+                    <Suspense fallback={<LoadingFallback/>}>
+                        <AdminSchoolVerification/>
                     </Suspense>
                 )
             }

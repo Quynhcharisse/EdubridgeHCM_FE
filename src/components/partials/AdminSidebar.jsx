@@ -2,6 +2,7 @@ import React from "react";
 import {Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography} from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
 import {useNavigate} from "react-router-dom";
 
 const menuItems = [
@@ -14,6 +15,11 @@ const menuItems = [
         text: 'Quản Lý Người Dùng',
         icon: <PeopleIcon/>,
         path: '/admin/users',
+    },
+    {
+        text: 'Xác Thực Trường',
+        icon: <SchoolIcon/>,
+        path: '/admin/schools/verification',
     },
 ];
 
