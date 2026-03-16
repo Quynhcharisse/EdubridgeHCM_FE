@@ -25,18 +25,18 @@ import {
     TextField,
     Typography,
     TablePagination,
+    Avatar,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import BlockIcon from "@mui/icons-material/Block";
-import ApartmentIcon from "@mui/icons-material/Apartment";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import CloseIcon from "@mui/icons-material/Close";
 import {enqueueSnackbar} from "notistack";
-import {listCampuses, createCampus} from "../../../services/CampusService.jsx";
+import {fetchCounsellors, createCounsellor} from "../../../services/CounsellorService.jsx";
 
 const modalPaperSx = {
     borderRadius: "16px",
@@ -52,72 +52,60 @@ const modalBackdropSx = {
 const ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
 
 // Mock data cho fallback khi API lỗi
-const initialMockCampuses = [
+const initialMockCounsellors = [
     {
         id: 1,
-        name: "Cơ sở 1 - Quận 1",
-        address: "123 Nguyễn Huệ, Phường Bến Nghé",
-        city: "Quận 1",
-        district: "Quận 1",
-        phone: "028 3822 1234",
-        email: "campus1@school.edu.vn",
-        description: "Cơ sở chính, gần trung tâm thành phố.",
-        imageUrl: null,
+        fullName: "Nguyễn Thị Mai",
+        email: "mai.nguyen@school.edu.vn",
+        phone: "0901234567",
+        specialty: "Tư vấn tuyển sinh THPT",
+        shortBio: "5 năm kinh nghiệm tư vấn tuyển sinh.",
+        avatar: null,
         status: "active",
-        counselorCount: 3,
     },
     {
         id: 2,
-        name: "Cơ sở 2 - Bình Thạnh",
-        address: "456 Điện Biên Phủ, Phường 25",
-        city: "Bình Thạnh",
-        district: "Bình Thạnh",
-        phone: "028 3899 5678",
-        email: "campus2@school.edu.vn",
-        description: "Cơ sở mở rộng, khu vực phía Bắc.",
-        imageUrl: null,
+        fullName: "Trần Văn Minh",
+        email: "minh.tran@school.edu.vn",
+        phone: "0912345678",
+        specialty: "Tư vấn chương trình quốc tế",
+        shortBio: "Chuyên gia tư vấn chương trình song ngữ.",
+        avatar: null,
         status: "active",
-        counselorCount: 2,
     },
     {
         id: 3,
-        name: "Cơ sở 3 - Thủ Đức",
-        address: "789 Võ Văn Ngân, Phường Linh Chiểu",
-        city: "Thủ Đức",
-        district: "Thủ Đức",
-        phone: "028 3726 9012",
-        email: "campus3@school.edu.vn",
-        description: "Cơ sở tại thành phố Thủ Đức.",
-        imageUrl: null,
+        fullName: "Lê Thị Hương",
+        email: "huong.le@school.edu.vn",
+        phone: "0923456789",
+        specialty: "Hỗ trợ phụ huynh",
+        shortBio: "Tư vấn định hướng và hỗ trợ hồ sơ.",
+        avatar: null,
         status: "inactive",
-        counselorCount: 0,
+        campusName: "Cơ sở 1 - Quận 1",
+        employeeCode: "MOCK-EMP-003",
+        registerDate: "2024-03-10",
     },
 ];
 
-const BOARDING_TYPE_OPTIONS = [
-    { value: "NONE", label: "Không nội trú" },
-    { value: "FULL_BOARDING", label: "Nội trú toàn phần" },
-    { value: "SEMI_BOARDING", label: "Nội trú bán phần" },
-    { value: "BOTH", label: "Cả hai" },
-];
-
 const emptyForm = {
-    name: "",
-    address: "",
-    city: "",
-    district: "",
-    phone: "",
     email: "",
-    latitude: "",
-    longitude: "",
-    boardingType: "NONE",
-    description: "",
-    imageFile: null,
-    imagePreview: null,
     status: true,
 };
 
-const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60' viewBox='0 0 80 60' fill='%23e2e8f0'%3E%3Crect width='80' height='60' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='10' fill='%2394a3b8'%3ECampus%3C/text%3E%3C/svg%3E";
+const mapCounsellorFromApi = (dto) => ({
+    id: dto.id,
+    fullName: dto.name || "",
+    email: dto.account?.email || "",
+    phone: "",
+    specialty: "",
+    shortBio: "",
+    avatar: null,
+    status: dto.account?.status === "ACCOUNT_ACTIVE" ? "active" : "inactive",
+    campusName: dto.campusName,
+    employeeCode: dto.employeeCode,
+    registerDate: dto.account?.registerDate || "",
+});
 
 const formatDate = (d) => {
     if (!d) return "—";
@@ -126,31 +114,39 @@ const formatDate = (d) => {
     return date.toLocaleDateString("vi-VN");
 };
 
-const getBoardingTypeLabelVi = (boardingType, boardingTypeLabel) => {
-    const match = BOARDING_TYPE_OPTIONS.find((o) => o.value === boardingType);
-    if (match) return match.label;
-    return boardingTypeLabel || "—";
-};
-
-export default function SchoolCampus() {
-    const [campuses, setCampuses] = useState([]);
+export default function SchoolCounselors() {
+    const [counselors, setCounselors] = useState([]);
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [districtFilter, setDistrictFilter] = useState("all");
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
-    const [selectedCampus, setSelectedCampus] = useState(null);
+    const [selectedCounselor, setSelectedCounselor] = useState(null);
     const [formValues, setFormValues] = useState(emptyForm);
     const [formErrors, setFormErrors] = useState({});
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
-    const districts = useMemo(() => {
-        const set = new Set(campuses.map((c) => c.district).filter(Boolean));
-        return Array.from(set).sort();
-    }, [campuses]);
+    useEffect(() => {
+        const loadCounsellors = async () => {
+            try {
+                const res = await fetchCounsellors();
+                const list = res?.data?.body;
+                if (res && res.status === 200 && Array.isArray(list)) {
+                    setCounselors(list.map(mapCounsellorFromApi));
+                } else {
+                    setCounselors(initialMockCounsellors);
+                }
+            } catch (error) {
+                console.error("Fetch counsellors error:", error);
+                enqueueSnackbar("Không tải được danh sách tư vấn viên", {variant: "error"});
+                setCounselors(initialMockCounsellors);
+            }
+        };
+
+        loadCounsellors();
+    }, []);
 
     const handleChange = (e) => {
         const {name, value} = e.target;
@@ -161,36 +157,14 @@ export default function SchoolCampus() {
         setFormValues((prev) => ({...prev, status: e.target.checked}));
     };
 
-    const handleImageChange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const preview = URL.createObjectURL(file);
-        setFormValues((prev) => ({
-            ...prev,
-            imageFile: file,
-            imagePreview: preview,
-        }));
-    };
-
-    const clearImagePreview = () => {
-        if (formValues.imagePreview) {
-            URL.revokeObjectURL(formValues.imagePreview);
-        }
-        setFormValues((prev) => ({
-            ...prev,
-            imageFile: null,
-            imagePreview: null,
-        }));
-    };
-
-    const filteredCampuses = useMemo(() => {
-        let list = campuses;
+    const filteredCounselors = useMemo(() => {
+        let list = counselors;
         const q = search.trim().toLowerCase();
         if (q) {
             list = list.filter(
                 (c) =>
-                    c.name?.toLowerCase().includes(q) ||
-                    c.address?.toLowerCase().includes(q)
+                    c.fullName?.toLowerCase().includes(q) ||
+                    c.email?.toLowerCase().includes(q)
             );
         }
         if (statusFilter === "active") {
@@ -198,170 +172,128 @@ export default function SchoolCampus() {
         } else if (statusFilter === "inactive") {
             list = list.filter((c) => c.status === "inactive");
         }
-        if (districtFilter !== "all") {
-            list = list.filter((c) => c.district === districtFilter);
-        }
         return list;
-    }, [campuses, search, statusFilter, districtFilter]);
+    }, [counselors, search, statusFilter]);
 
-    const paginatedCampuses = useMemo(() => {
+    const paginatedCounselors = useMemo(() => {
         const start = page * rowsPerPage;
-        return filteredCampuses.slice(start, start + rowsPerPage);
-    }, [filteredCampuses, page, rowsPerPage]);
+        return filteredCounselors.slice(start, start + rowsPerPage);
+    }, [filteredCounselors, page, rowsPerPage]);
 
-    const validateForm = () => {
+    const validateCreate = () => {
         const errors = {};
-        if (!formValues.name?.trim()) errors.name = "Tên cơ sở là bắt buộc";
         if (!formValues.email?.trim()) errors.email = "Email là bắt buộc";
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
 
-    const mapCampusFromApi = (dto, account) => ({
-        id: dto.id,
-        name: dto.name,
-        address: dto.address,
-        city: dto.city ?? "",
-        district: dto.district ?? "",
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        boardingType: dto.boardingType ?? "NONE",
-        boardingTypeLabel: dto.boardingTypeLabel ?? "",
-        phone: dto.phoneNumber,
-        email: account?.email ?? "",
-        description: "",
-        imageUrl: null,
-        isPrimaryBranch: dto.isPrimaryBranch ?? false,
-        campusStatus: dto.status,
-        status: dto.status === "VERIFIED" ? "active" : "inactive",
-        accountStatus: account?.status ?? "",
-        accountRegisterDate: account?.registerDate ?? "",
-        counselorCount: 0,
-    });
-
-    useEffect(() => {
-        const loadCampuses = async () => {
-            try {
-                const res = await listCampuses();
-                const list = res?.data?.body;
-                if (res && res.status === 200 && Array.isArray(list)) {
-                    // Mỗi phần tử body đã chứa cả campus và account
-                    setCampuses(list.map((dto) => mapCampusFromApi(dto, dto.account)));
-                } else {
-                    setCampuses(initialMockCampuses);
-                }
-            } catch (error) {
-                console.error("Fetch campuses error:", error);
-                enqueueSnackbar("Không tải được danh sách cơ sở", {variant: "error"});
-                setCampuses(initialMockCampuses);
-            }
-        };
-
-        loadCampuses();
-    }, []);
-
     const handleOpenCreate = () => {
-        setSelectedCampus(null);
         setFormValues(emptyForm);
         setFormErrors({});
         setCreateModalOpen(true);
     };
 
     const handleCloseCreate = () => {
-        clearImagePreview();
         setCreateModalOpen(false);
     };
 
     const handleCreateSubmit = async () => {
-        if (!validateForm()) return;
-
+        if (!validateCreate()) return;
         try {
-            const res = await createCampus({
-                email: formValues.email.trim(),
-                name: formValues.name.trim(),
-                address: formValues.address?.trim() || "",
-                phone: formValues.phone?.trim() || "",
-                city: formValues.city?.trim() || undefined,
-                district: formValues.district?.trim() || undefined,
-                latitude: formValues.latitude !== "" ? formValues.latitude : undefined,
-                longitude: formValues.longitude !== "" ? formValues.longitude : undefined,
-                boardingType: formValues.boardingType || "NONE",
-            });
-
-            const body = res?.data?.body;
-            if (res && res.status === 200 && body?.campus) {
-                const account = body.campus.account ?? body.account;
-                const newCampus = mapCampusFromApi(body.campus, account);
-                setCampuses((prev) => [newCampus, ...prev]);
-                enqueueSnackbar("Tạo cơ sở thành công", {variant: "success"});
-                handleCloseCreate();
+            const res = await createCounsellor(formValues.email.trim());
+            const dto = res?.data?.body;
+            if (res && res.status === 200 && dto) {
+                const newCounsellor = mapCounsellorFromApi(dto);
+                setCounselors((prev) => [newCounsellor, ...prev]);
+                enqueueSnackbar("Tạo tài khoản tư vấn viên thành công", {variant: "success"});
+                setCreateModalOpen(false);
             } else {
-                enqueueSnackbar("Không thể tạo cơ sở", {variant: "error"});
+                enqueueSnackbar("Không thể tạo tư vấn viên", {variant: "error"});
             }
         } catch (error) {
-            console.error("Create campus error:", error);
-            enqueueSnackbar("Lỗi khi tạo cơ sở", {variant: "error"});
+            console.error("Create counsellor error:", error);
+            enqueueSnackbar("Lỗi khi tạo tư vấn viên", {variant: "error"});
         }
     };
 
-    const handleOpenView = (campus) => {
-        setSelectedCampus(campus);
+    const handleOpenView = (counselor) => {
+        setSelectedCounselor(counselor);
         setViewModalOpen(true);
     };
 
-    const handleOpenEdit = (campus) => {
-        setSelectedCampus(campus);
+    const handleOpenEdit = (counselor) => {
+        setSelectedCounselor(counselor);
         setFormValues({
-            name: campus.name || "",
-            address: campus.address || "",
-            city: campus.city || "",
-            district: campus.district || "",
-            phone: campus.phone || "",
-            email: campus.email || "",
-            latitude: campus.latitude ?? "",
-            longitude: campus.longitude ?? "",
-            boardingType: campus.boardingType || "NONE",
-            description: campus.description || "",
-            imageFile: null,
-            imagePreview: campus.imageUrl || null,
-            status: campus.status === "active",
+            fullName: counselor.fullName || "",
+            email: counselor.email || "",
+            phone: counselor.phone || "",
+            password: "",
+            specialty: counselor.specialty || "",
+            shortBio: counselor.shortBio || "",
+            status: counselor.status === "active",
         });
         setFormErrors({});
         setEditModalOpen(true);
     };
 
     const handleEditSubmit = () => {
-        if (!selectedCampus || !validateForm()) return;
-        const payload = getPayload();
-        setCampuses((prev) =>
+        if (!selectedCounselor) return;
+        const errors = {};
+        if (!formValues.fullName?.trim()) errors.fullName = "Họ tên là bắt buộc";
+        if (!formValues.email?.trim()) errors.email = "Email là bắt buộc";
+        setFormErrors(errors);
+        if (Object.keys(errors).length > 0) return;
+
+        setCounselors((prev) =>
             prev.map((c) =>
-                c.id === selectedCampus.id ? {...c, ...payload} : c
+                c.id === selectedCounselor.id
+                    ? {
+                        ...c,
+                        fullName: formValues.fullName.trim(),
+                        email: formValues.email.trim(),
+                        phone: formValues.phone?.trim() || "",
+                        specialty: formValues.specialty?.trim() || "",
+                        shortBio: formValues.shortBio?.trim() || "",
+                        status: formValues.status ? "active" : "inactive",
+                    }
+                    : c
             )
         );
-        enqueueSnackbar("Cập nhật cơ sở thành công", {variant: "success"});
+        enqueueSnackbar("Cập nhật tư vấn viên thành công", {variant: "success"});
         setEditModalOpen(false);
     };
 
-    const handleOpenDisableConfirm = (campus) => {
-        setSelectedCampus(campus);
+    const handleOpenDisableConfirm = (counselor) => {
+        setSelectedCounselor(counselor);
         setDisableConfirmOpen(true);
     };
 
     const handleDisableConfirm = () => {
-        if (!selectedCampus) return;
-        setCampuses((prev) =>
+        if (!selectedCounselor) return;
+        setCounselors((prev) =>
             prev.map((c) =>
-                c.id === selectedCampus.id ? {...c, status: "inactive"} : c
+                c.id === selectedCounselor.id ? {...c, status: "inactive"} : c
             )
         );
-        enqueueSnackbar("Đã vô hiệu hóa cơ sở", {variant: "info"});
+        enqueueSnackbar("Đã vô hiệu hóa tài khoản tư vấn viên", {variant: "info"});
         setDisableConfirmOpen(false);
-        setSelectedCampus(null);
+        setSelectedCounselor(null);
+    };
+
+    const getInitials = (name) => {
+        if (!name?.trim()) return "?";
+        return name
+            .trim()
+            .split(/\s+/)
+            .map((s) => s[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase();
     };
 
     return (
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
-            {/* Page Header */}
+            {/* Header with gradient */}
             <Box
                 sx={{
                     background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
@@ -389,10 +321,10 @@ export default function SchoolCampus() {
                                 textShadow: "0 1px 2px rgba(0,0,0,0.1)",
                             }}
                         >
-                            Quản lý Cơ sở
+                            Quản lý Tư vấn viên
                         </Typography>
                         <Typography variant="body2" sx={{mt: 0.5, opacity: 0.95}}>
-                            Quản lý tất cả cơ sở của trường bạn
+                            Quản lý tài khoản tư vấn viên của trường
                         </Typography>
                     </Box>
                     <Button
@@ -414,7 +346,7 @@ export default function SchoolCampus() {
                             },
                         }}
                     >
-                        Tạo cơ sở
+                        Tạo tài khoản tư vấn viên
                     </Button>
                 </Box>
             </Box>
@@ -426,7 +358,6 @@ export default function SchoolCampus() {
                     borderRadius: 3,
                     border: "1px solid #e2e8f0",
                     boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
-                    bgcolor: "#F8FAFC",
                 }}
             >
                 <CardContent sx={{p: 2.5}}>
@@ -434,20 +365,18 @@ export default function SchoolCampus() {
                         direction={{xs: "column", md: "row"}}
                         spacing={2}
                         alignItems={{xs: "stretch", md: "center"}}
-                        flexWrap="wrap"
                     >
                         <TextField
-                            placeholder="Tìm theo tên hoặc địa chỉ..."
+                            placeholder="Tìm theo tên hoặc email..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             size="small"
                             sx={{
                                 flex: 1,
-                                minWidth: 200,
-                                maxWidth: {md: 320},
+                                maxWidth: {md: 360},
                                 "& .MuiOutlinedInput-root": {
                                     borderRadius: 2,
-                                    bgcolor: "white",
+                                    bgcolor: "#f8fafc",
                                 },
                             }}
                             InputProps={{
@@ -458,40 +387,24 @@ export default function SchoolCampus() {
                                 ),
                             }}
                         />
-                        <FormControl size="small" sx={{minWidth: 140}}>
+                        <FormControl size="small" sx={{minWidth: 160}}>
                             <InputLabel>Trạng thái</InputLabel>
                             <Select
                                 value={statusFilter}
                                 label="Trạng thái"
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                sx={{borderRadius: 2, bgcolor: "white"}}
+                                sx={{borderRadius: 2, bgcolor: "#f8fafc"}}
                             >
                                 <MenuItem value="all">Tất cả</MenuItem>
                                 <MenuItem value="active">Hoạt động</MenuItem>
                                 <MenuItem value="inactive">Ngưng hoạt động</MenuItem>
                             </Select>
                         </FormControl>
-                        <FormControl size="small" sx={{minWidth: 160}}>
-                            <InputLabel>Quận / Khu vực</InputLabel>
-                            <Select
-                                value={districtFilter}
-                                label="Quận / Khu vực"
-                                onChange={(e) => setDistrictFilter(e.target.value)}
-                                sx={{borderRadius: 2, bgcolor: "white"}}
-                            >
-                                <MenuItem value="all">Tất cả</MenuItem>
-                                {districts.map((district) => (
-                                    <MenuItem key={district} value={district}>
-                                        {district}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
                     </Stack>
                 </CardContent>
             </Card>
 
-            {/* Campus Table */}
+            {/* Table Card */}
             <Card
                 elevation={0}
                 sx={{
@@ -499,27 +412,23 @@ export default function SchoolCampus() {
                     border: "1px solid #e2e8f0",
                     boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
                     overflow: "hidden",
-                    bgcolor: "#F8FAFC",
                 }}
             >
                 <TableContainer>
                     <Table>
                         <TableHead>
-                            <TableRow sx={{bgcolor: "#f1f5f9"}}>
+                            <TableRow sx={{bgcolor: "#f8fafc"}}>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Tư vấn viên
+                                </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
+                                    Email
+                                </TableCell>
                                 <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
                                     Cơ sở
                                 </TableCell>
                                 <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
-                                    Địa chỉ
-                                </TableCell>
-                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
-                                    Số điện thoại
-                                </TableCell>
-                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
-                                    Chi nhánh chính
-                                </TableCell>
-                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
-                                    Trạng thái cơ sở
+                                    Trạng thái
                                 </TableCell>
                                 <TableCell
                                     sx={{fontWeight: 700, color: "#1e293b", py: 2}}
@@ -530,9 +439,9 @@ export default function SchoolCampus() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {paginatedCampuses.length === 0 ? (
+                            {paginatedCounselors.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{py: 8}}>
+                                    <TableCell colSpan={5} align="center" sx={{py: 8}}>
                                         <Box
                                             sx={{
                                                 display: "flex",
@@ -541,21 +450,21 @@ export default function SchoolCampus() {
                                                 gap: 1.5,
                                             }}
                                         >
-                                            <ApartmentIcon
+                                            <SupportAgentIcon
                                                 sx={{fontSize: 56, color: "#cbd5e1"}}
                                             />
                                             <Typography
                                                 variant="h6"
                                                 sx={{color: "#64748b", fontWeight: 600}}
                                             >
-                                                Chưa có cơ sở nào
+                                                Chưa có tư vấn viên nào
                                             </Typography>
                                             <Typography variant="body2" sx={{color: "#94a3b8"}}>
-                                                {filteredCampuses.length === 0 && campuses.length > 0
+                                                {filteredCounselors.length === 0 && counselors.length > 0
                                                     ? "Không có kết quả phù hợp với tìm kiếm hoặc bộ lọc."
-                                                    : "Tạo cơ sở đầu tiên để bắt đầu."}
+                                                    : "Tạo tài khoản tư vấn viên đầu tiên để bắt đầu."}
                                             </Typography>
-                                            {campuses.length === 0 && (
+                                            {counselors.length === 0 && (
                                                 <Button
                                                     variant="contained"
                                                     startIcon={<AddIcon/>}
@@ -568,54 +477,48 @@ export default function SchoolCampus() {
                                                         background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                                     }}
                                                 >
-                                                    Tạo cơ sở
+                                                    Tạo tài khoản tư vấn viên
                                                 </Button>
                                             )}
                                         </Box>
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                paginatedCampuses.map((row) => (
+                                paginatedCounselors.map((row) => (
                                     <TableRow
                                         key={row.id}
                                         hover
                                         sx={{
                                             "&:hover": {
-                                                bgcolor: "rgba(122, 169, 235, 0.06)",
+                                                bgcolor: "rgba(122, 169, 235, 0.04)",
                                             },
                                         }}
                                     >
                                         <TableCell>
                                             <Stack direction="row" alignItems="center" spacing={2}>
-                                                <Box
-                                                    component="img"
-                                                    src={row.imageUrl || PLACEHOLDER_IMAGE}
-                                                    alt={row.name}
+                                                <Avatar
                                                     sx={{
-                                                        width: 56,
-                                                        height: 42,
-                                                        borderRadius: 1.5,
-                                                        objectFit: "cover",
-                                                        border: "1px solid #e2e8f0",
+                                                        width: 40,
+                                                        height: 40,
+                                                        bgcolor: "#7AA9EB",
+                                                        fontSize: "0.875rem",
+                                                        fontWeight: 600,
                                                     }}
-                                                />
+                                                >
+                                                    {getInitials(row.fullName)}
+                                                </Avatar>
                                                 <Typography
                                                     sx={{fontWeight: 600, color: "#1e293b"}}
                                                 >
-                                                    {row.name}
+                                                    {row.fullName}
                                                 </Typography>
                                             </Stack>
                                         </TableCell>
-                                        <TableCell sx={{color: "#64748b", maxWidth: 200}}>
-                                            <Typography noWrap title={row.address}>
-                                                {row.address || "—"}
-                                            </Typography>
+                                        <TableCell sx={{color: "#64748b"}}>
+                                            {row.email}
                                         </TableCell>
                                         <TableCell sx={{color: "#64748b"}}>
-                                            {row.phone || "—"}
-                                        </TableCell>
-                                        <TableCell sx={{color: "#64748b"}}>
-                                            {row.isPrimaryBranch ? "Có" : "Không"}
+                                            {row.campusName || "—"}
                                         </TableCell>
                                         <TableCell>
                                             <Box
@@ -636,7 +539,7 @@ export default function SchoolCampus() {
                                                             : "#64748b",
                                                 }}
                                             >
-                                                {row.status === "active" ? "Xác thực" : "Chưa xác thực"}
+                                                {row.status === "active" ? "Hoạt động" : "Ngưng hoạt động"}
                                             </Box>
                                         </TableCell>
                                         <TableCell align="right">
@@ -652,7 +555,7 @@ export default function SchoolCampus() {
                                                         color: "#64748b",
                                                         "&:hover": {color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)"},
                                                     }}
-                                                    title="Xem chi tiết"
+                                                    title="Xem"
                                                 >
                                                     <VisibilityIcon fontSize="small"/>
                                                 </IconButton>
@@ -687,10 +590,10 @@ export default function SchoolCampus() {
                         </TableBody>
                     </Table>
                 </TableContainer>
-                {filteredCampuses.length > 0 && (
+                {filteredCounselors.length > 0 && (
                     <TablePagination
                         component="div"
-                        count={filteredCampuses.length}
+                        count={filteredCounselors.length}
                         page={page}
                         onPageChange={(_, newPage) => setPage(newPage)}
                         rowsPerPage={rowsPerPage}
@@ -701,7 +604,6 @@ export default function SchoolCampus() {
                         rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
                         sx={{
                             borderTop: "1px solid #e2e8f0",
-                            bgcolor: "#f8fafc",
                             ".MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows": {
                                 color: "#64748b",
                             },
@@ -710,7 +612,7 @@ export default function SchoolCampus() {
                 )}
             </Card>
 
-            {/* Create Campus Modal */}
+            {/* Create Counselor Modal */}
             <Dialog
                 open={createModalOpen}
                 onClose={handleCloseCreate}
@@ -730,10 +632,10 @@ export default function SchoolCampus() {
                     >
                         <Box>
                             <Typography variant="h6" sx={{fontWeight: 700, color: "#1e293b"}}>
-                                Tạo cơ sở
+                                Tạo tài khoản tư vấn viên
                             </Typography>
                             <Typography variant="body2" sx={{color: "#64748b", mt: 0.5}}>
-                                Điền thông tin cơ sở mới bên dưới.
+                                Điền thông tin tư vấn viên mới bên dưới.
                             </Typography>
                         </Box>
                         <IconButton
@@ -749,88 +651,7 @@ export default function SchoolCampus() {
                 <DialogContent dividers={false} sx={{px: 3, pt: 2, pb: 1}}>
                     <Stack spacing={2.5}>
                         <TextField
-                            label="Tên cơ sở"
-                            name="name"
-                            fullWidth
-                            value={formValues.name}
-                            onChange={handleChange}
-                            error={!!formErrors.name}
-                            helperText={formErrors.name}
-                            required
-                        />
-                        <TextField
-                            label="Địa chỉ"
-                            name="address"
-                            fullWidth
-                            value={formValues.address}
-                            onChange={handleChange}
-                            placeholder="8, Hồ Đắc Di, Tây Thạnh Tân Phú, TP Hồ Chí Minh"
-                        />
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                            <TextField
-                                label="Thành phố"
-                                name="city"
-                                fullWidth
-                                value={formValues.city}
-                                onChange={handleChange}
-                                placeholder="TP Hồ Chí Minh"
-                            />
-                            <TextField
-                                label="Quận / Huyện"
-                                name="district"
-                                fullWidth
-                                value={formValues.district}
-                                onChange={handleChange}
-                                placeholder="Tân Phú"
-                            />
-                        </Stack>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                            <TextField
-                                label="Vĩ độ"
-                                name="latitude"
-                                type="number"
-                                fullWidth
-                                value={formValues.latitude}
-                                onChange={handleChange}
-                                placeholder="10.8012"
-                                inputProps={{ step: "any" }}
-                            />
-                            <TextField
-                                label="Kinh độ"
-                                name="longitude"
-                                type="number"
-                                fullWidth
-                                value={formValues.longitude}
-                                onChange={handleChange}
-                                placeholder="106.7104"
-                                inputProps={{ step: "any" }}
-                            />
-                        </Stack>
-                        <FormControl fullWidth>
-                            <InputLabel>Loại nội trú</InputLabel>
-                            <Select
-                                name="boardingType"
-                                value={formValues.boardingType}
-                                label="Loại nội trú"
-                                onChange={handleChange}
-                            >
-                                {BOARDING_TYPE_OPTIONS.map((opt) => (
-                                    <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <TextField
-                            label="Số điện thoại"
-                            name="phone"
-                            fullWidth
-                            value={formValues.phone}
-                            onChange={handleChange}
-                            placeholder="0983810915"
-                        />
-                        <TextField
-                            label="Email quản lý cơ sở"
+                            label="Email tư vấn viên"
                             name="email"
                             type="email"
                             fullWidth
@@ -838,12 +659,12 @@ export default function SchoolCampus() {
                             onChange={handleChange}
                             error={!!formErrors.email}
                             helperText={formErrors.email}
-                            placeholder="truonghongductphcm@gmail.com"
                             required
                         />
                         <Typography variant="body2" sx={{color: "#64748b", fontSize: 13}}>
-                            Hệ thống sẽ tạo cơ sở mới và tài khoản quản lý tương ứng với role{" "}
-                            <strong>SCHOOL</strong> dựa trên email này.
+                            Hệ thống sẽ tạo tài khoản với role <strong>COUNSELLOR</strong> dựa trên địa chỉ
+                            email. Các thông tin khác (họ tên, mật khẩu, chuyên môn) sẽ được cập nhật sau khi
+                            tư vấn viên đăng nhập lần đầu hoặc qua trang quản trị.
                         </Typography>
                     </Stack>
                 </DialogContent>
@@ -867,174 +688,123 @@ export default function SchoolCampus() {
                             background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
-                        Tạo cơ sở
+                        Tạo
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* View Details Modal */}
+            {/* View Detail Modal */}
             <Dialog
                 open={viewModalOpen}
                 onClose={() => setViewModalOpen(false)}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{sx: {borderRadius: 3}}}
+                PaperProps={{sx: modalPaperSx}}
+                slotProps={{backdrop: {sx: modalBackdropSx}}}
             >
-                <DialogTitle sx={{fontWeight: 700, color: "#1e293b"}}>
-                    Chi tiết cơ sở
-                </DialogTitle>
-                <DialogContent dividers>
-                    {selectedCampus && (
+                <Box sx={{px: 3, pt: 3, pb: 0}}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                            gap: 2,
+                        }}
+                    >
+                        <Typography variant="h6" sx={{fontWeight: 700, color: "#1e293b"}}>
+                            Chi tiết tư vấn viên
+                        </Typography>
+                        <IconButton
+                            onClick={() => setViewModalOpen(false)}
+                            size="small"
+                            sx={{mt: -0.5, mr: -0.5}}
+                            aria-label="Đóng"
+                        >
+                            <CloseIcon fontSize="small"/>
+                        </IconButton>
+                    </Box>
+                </Box>
+                <DialogContent dividers={false} sx={{px: 3, pt: 2, pb: 2}}>
+                    {selectedCounselor && (
                         <Stack spacing={2}>
-                            <Box
-                                component="img"
-                                src={selectedCampus.imageUrl || PLACEHOLDER_IMAGE}
-                                alt={selectedCampus.name}
-                                sx={{
-                                    width: "100%",
-                                    maxHeight: 200,
-                                    borderRadius: 2,
-                                    objectFit: "cover",
-                                    border: "1px solid #e2e8f0",
-                                }}
-                            />
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Tên cơ sở
-                                </Typography>
-                                <Typography variant="h6" sx={{fontWeight: 600}}>
-                                    {selectedCampus.name}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Địa chỉ
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.address || "—"}
-                                </Typography>
-                            </Box>
-                            {(selectedCampus.city || selectedCampus.district) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Thành phố / Quận
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {[selectedCampus.city, selectedCampus.district].filter(Boolean).join(" / ") || "—"}
-                                    </Typography>
-                                </Box>
-                            )}
-                            {(selectedCampus.latitude != null || selectedCampus.longitude != null) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Tọa độ
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {[selectedCampus.latitude, selectedCampus.longitude].filter((v) => v != null && v !== "").join(", ") || "—"}
-                                    </Typography>
-                                </Box>
-                            )}
-                            {(selectedCampus.boardingType || selectedCampus.boardingTypeLabel) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Loại nội trú
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {getBoardingTypeLabelVi(
-                                            selectedCampus.boardingType,
-                                            selectedCampus.boardingTypeLabel
-                                        )}
-                                    </Typography>
-                                </Box>
-                            )}
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Số điện thoại
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.phone || "—"}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Email
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.email || "—"}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Chi nhánh chính
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.isPrimaryBranch ? "Có" : "Không"}
-                                </Typography>
-                            </Box>
-                            <Box sx={{display: "flex", gap: 2, alignItems: "center"}}>
-                                <Typography variant="caption" color="text.secondary">
-                                    Trạng thái cơ sở
-                                </Typography>
-                                <Box
-                                    component="span"
+                            <Stack direction="row" alignItems="center" spacing={2}>
+                                <Avatar
                                     sx={{
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 999,
-                                        fontSize: 12,
+                                        width: 56,
+                                        height: 56,
+                                        bgcolor: "#7AA9EB",
+                                        fontSize: "1.25rem",
                                         fontWeight: 600,
-                                        bgcolor:
-                                            selectedCampus.status === "active"
-                                                ? "rgba(34, 197, 94, 0.12)"
-                                                : "rgba(148, 163, 184, 0.2)",
-                                        color:
-                                            selectedCampus.status === "active"
-                                                ? "#16a34a"
-                                                : "#64748b",
                                     }}
                                 >
-                                    {selectedCampus.status === "active" ? "Xác thực" : "Chưa xác thực"}
+                                    {getInitials(selectedCounselor.fullName)}
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="h6" sx={{fontWeight: 600}}>
+                                        {selectedCounselor.fullName}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {selectedCounselor.email}
+                                    </Typography>
                                 </Box>
-                            </Box>
-                            <Box sx={{display: "flex", gap: 2, alignItems: "center"}}>
+                            </Stack>
+                            <Box>
                                 <Typography variant="caption" color="text.secondary">
-                                    Trạng thái tài khoản
+                                    Cơ sở
                                 </Typography>
-                                <Box
-                                    component="span"
-                                    sx={{
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        bgcolor:
-                                            selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                                ? "rgba(34, 197, 94, 0.12)"
-                                                : "rgba(148, 163, 184, 0.2)",
-                                        color:
-                                            selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                                ? "#16a34a"
-                                                : "#64748b",
-                                    }}
-                                >
-                                    {selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                        ? "Hoạt động"
-                                        : "Ngưng hoạt động"}
-                                </Box>
+                                <Typography variant="body1">
+                                    {selectedCounselor.campusName || "—"}
+                                </Typography>
                             </Box>
                             <Box>
                                 <Typography variant="caption" color="text.secondary">
-                                    Ngày đăng ký tài khoản
+                                    Mã nhân viên
                                 </Typography>
                                 <Typography variant="body1">
-                                    {formatDate(selectedCampus.accountRegisterDate)}
+                                    {selectedCounselor.employeeCode || "—"}
                                 </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Ngày đăng ký
+                                </Typography>
+                                <Typography variant="body1">
+                                    {formatDate(selectedCounselor.registerDate)}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Trạng thái
+                                </Typography>
+                                <Box component="span" sx={{mt: 0.5, display: "inline-block"}}>
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            px: 1.5,
+                                            py: 0.5,
+                                            borderRadius: 999,
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            bgcolor:
+                                                selectedCounselor.status === "active"
+                                                    ? "rgba(34, 197, 94, 0.12)"
+                                                    : "rgba(148, 163, 184, 0.2)",
+                                            color:
+                                                selectedCounselor.status === "active"
+                                                    ? "#16a34a"
+                                                    : "#64748b",
+                                        }}
+                                    >
+                                        {selectedCounselor.status === "active"
+                                            ? "Hoạt động"
+                                            : "Ngưng hoạt động"}
+                                    </Box>
+                                </Box>
                             </Box>
                         </Stack>
                     )}
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{px: 3, py: 2, borderTop: "1px solid #e2e8f0"}}>
                     <Button onClick={() => setViewModalOpen(false)} color="inherit">
                         Đóng
                     </Button>
@@ -1043,7 +813,7 @@ export default function SchoolCampus() {
                         startIcon={<EditIcon/>}
                         onClick={() => {
                             setViewModalOpen(false);
-                            handleOpenEdit(selectedCampus);
+                            handleOpenEdit(selectedCounselor);
                         }}
                         sx={{
                             background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
@@ -1055,7 +825,7 @@ export default function SchoolCampus() {
                 </DialogActions>
             </Dialog>
 
-            {/* Edit Campus Modal */}
+            {/* Edit Modal */}
             <Dialog
                 open={editModalOpen}
                 onClose={() => setEditModalOpen(false)}
@@ -1075,10 +845,10 @@ export default function SchoolCampus() {
                     >
                         <Box>
                             <Typography variant="h6" sx={{fontWeight: 700, color: "#1e293b"}}>
-                                Chỉnh sửa cơ sở
+                                Chỉnh sửa tư vấn viên
                             </Typography>
                             <Typography variant="body2" sx={{color: "#64748b", mt: 0.5}}>
-                                Cập nhật thông tin cơ sở.
+                                Cập nhật thông tin tư vấn viên.
                             </Typography>
                         </Box>
                         <IconButton
@@ -1094,27 +864,23 @@ export default function SchoolCampus() {
                 <DialogContent dividers={false} sx={{px: 3, pt: 2, pb: 1}}>
                     <Stack spacing={2.5}>
                         <TextField
-                            label="Tên cơ sở"
-                            name="name"
+                            label="Họ và tên"
+                            name="fullName"
                             fullWidth
-                            value={formValues.name}
+                            value={formValues.fullName}
                             onChange={handleChange}
-                            error={!!formErrors.name}
-                            helperText={formErrors.name}
+                            error={!!formErrors.fullName}
+                            helperText={formErrors.fullName}
                         />
                         <TextField
-                            label="Địa chỉ"
-                            name="address"
+                            label="Email"
+                            name="email"
+                            type="email"
                             fullWidth
-                            value={formValues.address}
+                            value={formValues.email}
                             onChange={handleChange}
-                        />
-                        <TextField
-                            label="Quận / Thành phố"
-                            name="city"
-                            fullWidth
-                            value={formValues.city}
-                            onChange={handleChange}
+                            error={!!formErrors.email}
+                            helperText={formErrors.email}
                         />
                         <TextField
                             label="Số điện thoại"
@@ -1124,54 +890,21 @@ export default function SchoolCampus() {
                             onChange={handleChange}
                         />
                         <TextField
-                            label="Email"
-                            name="email"
-                            type="email"
+                            label="Chuyên môn / Lĩnh vực"
+                            name="specialty"
                             fullWidth
-                            value={formValues.email}
+                            value={formValues.specialty}
                             onChange={handleChange}
                         />
                         <TextField
-                            label="Mô tả"
-                            name="description"
+                            label="Tiểu sử ngắn"
+                            name="shortBio"
                             fullWidth
                             multiline
                             rows={3}
-                            value={formValues.description}
+                            value={formValues.shortBio}
                             onChange={handleChange}
                         />
-                        <Box>
-                            <Typography variant="body2" sx={{mb: 1, color: "#64748b"}}>
-                                Ảnh cơ sở
-                            </Typography>
-                            <Button
-                                component="label"
-                                variant="outlined"
-                                startIcon={<CloudUploadIcon/>}
-                                sx={{borderRadius: 2, textTransform: "none"}}
-                            >
-                                Tải ảnh lên
-                                <input
-                                    type="file"
-                                    hidden
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                />
-                            </Button>
-                            {(formValues.imagePreview || selectedCampus?.imageUrl) && (
-                                <Box
-                                    component="img"
-                                    src={formValues.imagePreview || selectedCampus?.imageUrl || PLACEHOLDER_IMAGE}
-                                    alt="Preview"
-                                    sx={{
-                                        mt: 1,
-                                        maxHeight: 120,
-                                        borderRadius: 2,
-                                        border: "1px solid #e2e8f0",
-                                    }}
-                                />
-                            )}
-                        </Box>
                         <Box
                             sx={{
                                 display: "flex",
@@ -1233,13 +966,13 @@ export default function SchoolCampus() {
                 PaperProps={{sx: {borderRadius: 3, p: 1}}}
             >
                 <DialogTitle sx={{display: "flex", alignItems: "center", gap: 1}}>
-                    <PersonOffIcon color="error"/> Vô hiệu hóa cơ sở
+                    <PersonOffIcon color="error"/> Vô hiệu hóa tài khoản tư vấn viên
                 </DialogTitle>
                 <DialogContent>
                     <Typography>
-                        Bạn có chắc muốn vô hiệu hóa{" "}
-                        <strong>{selectedCampus?.name}</strong>? Cơ sở này sẽ được
-                        đánh dấu là ngưng hoạt động và có thể bị ẩn khỏi phụ huynh.
+                        Bạn có chắc muốn vô hiệu hóa tài khoản của{" "}
+                        <strong>{selectedCounselor?.fullName}</strong>? Tư vấn viên này sẽ không thể
+                        đăng nhập hoặc truy cập hệ thống nữa.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{px: 3, pb: 2}}>
