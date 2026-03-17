@@ -208,47 +208,61 @@ export default function AdminUsersManagement() {
                                         STT
                                     </TableCell>
                                     {roleTab === "SCHOOL" && (
-                                        <TableCell
-                                            align="center"
-                                            sx={{fontWeight: 700, color: '#1e293b', minWidth: 220}}
-                                        >
-                                            Trường
-                                        </TableCell>
+                                        <>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', minWidth: 160}}
+                                            >
+                                                Tên trường
+                                            </TableCell>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', minWidth: 200}}
+                                            >
+                                                Website
+                                            </TableCell>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', width: 160}}
+                                            >
+                                                Hotline
+                                            </TableCell>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', width: 180}}
+                                            >
+                                                Mã số thuế
+                                            </TableCell>
+                                        </>
                                     )}
-                                    <TableCell
-                                        align="center"
-                                        sx={{fontWeight: 700, color: '#1e293b', minWidth: 200}}
-                                    >
-                                        Email
-                                    </TableCell>
                                     {roleTab === "PARENT" && (
-                                        <TableCell
-                                            align="center"
-                                            sx={{fontWeight: 700, color: '#1e293b', minWidth: 160}}
-                                        >
-                                            Mối quan hệ
-                                        </TableCell>
+                                        <>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', minWidth: 200}}
+                                            >
+                                                Email
+                                            </TableCell>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', minWidth: 160}}
+                                            >
+                                                Mối quan hệ
+                                            </TableCell>
+                                            <TableCell
+                                                align="center"
+                                                sx={{fontWeight: 700, color: '#1e293b', minWidth: 160}}
+                                            >
+                                                Tên
+                                            </TableCell>
+                                        </>
                                     )}
-                                    <TableCell
-                                        align="center"
-                                        sx={{fontWeight: 700, color: '#1e293b', minWidth: 160}}
-                                    >
-                                        Tên
-                                    </TableCell>
                                     <TableCell
                                         align="center"
                                         sx={{fontWeight: 700, color: '#1e293b', width: 140}}
                                     >
                                         Trạng Thái
                                     </TableCell>
-                                    {roleTab === "SCHOOL" && (
-                                        <TableCell
-                                            align="center"
-                                            sx={{fontWeight: 700, color: '#1e293b', width: 80}}
-                                        >
-                                            Chi tiết
-                                        </TableCell>
-                                    )}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -282,40 +296,67 @@ export default function AdminUsersManagement() {
                                                 {pagination.page * pagination.pageSize + index + 1}
                                             </TableCell>
                                             {roleTab === "SCHOOL" && (
-                                                <TableCell>
-                                                    <Typography sx={{fontWeight: 600, fontSize: 14}}>
-                                                        {user.schoolName || "Trường chưa đặt tên"}
-                                                    </Typography>
-                                                    {user.primaryCampus?.address && (
-                                                        <Typography
-                                                            variant="body2"
-                                                            sx={{color: "#64748b", fontSize: 12}}
-                                                        >
-                                                            {user.primaryCampus.address}
+                                                <>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontWeight: 600, fontSize: 14}}>
+                                                            {user.schoolName || "Trường chưa đặt tên"}
                                                         </Typography>
-                                                    )}
-                                                </TableCell>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: 13,
+                                                                color: "#2563eb",
+                                                                textDecoration: user.websiteUrl ? "underline" : "none",
+                                                                wordBreak: "break-all",
+                                                                cursor: user.websiteUrl ? "pointer" : "default",
+                                                            }}
+                                                            component={user.websiteUrl ? "a" : "span"}
+                                                            href={user.websiteUrl || undefined}
+                                                            target={user.websiteUrl ? "_blank" : undefined}
+                                                            rel={user.websiteUrl ? "noopener noreferrer" : undefined}
+                                                            onClick={(e) => {
+                                                                // Không trigger onClick row khi bấm vào link
+                                                                e.stopPropagation();
+                                                            }}
+                                                        >
+                                                            {user.websiteUrl || "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontSize: 14}}>
+                                                            {user.hotline || "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontSize: 14}}>
+                                                            {user.taxCode || "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </>
                                             )}
-                                            <TableCell>
-                                                <Typography sx={{fontSize: 14}}>
-                                                    {user.primaryCampus?.account?.email ||
-                                                     user.email ||
-                                                     user.account?.email ||
-                                                     "-"}
-                                                </Typography>
-                                            </TableCell>
                                             {roleTab === "PARENT" && (
-                                                <TableCell align="center">
-                                                    <Typography sx={{fontSize: 14}}>
-                                                        {user.relationship || user.relationshipToStudent || "-"}
-                                                    </Typography>
-                                                </TableCell>
+                                                <>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontSize: 14}}>
+                                                            {user.primaryCampus?.account?.email ||
+                                                             user.email ||
+                                                             user.account?.email ||
+                                                             "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontSize: 14}}>
+                                                            {user.relationship || user.relationshipToStudent || "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Typography sx={{fontSize: 14}}>
+                                                            {user.name || user.representativeName || "-"}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </>
                                             )}
-                                            <TableCell>
-                                                <Typography sx={{fontSize: 14}}>
-                                                    {user.name || user.representativeName || "-"}
-                                                </Typography>
-                                            </TableCell>
                                             <TableCell align="center">
                                                 {renderStatusChip(
                                                     user.overallStatus ||
@@ -323,11 +364,6 @@ export default function AdminUsersManagement() {
                                                     user.primaryCampus?.status
                                                 )}
                                             </TableCell>
-                                            {roleTab === "SCHOOL" && (
-                                                <TableCell align="right">
-                                                    <ArrowForwardIosIcon sx={{fontSize: 16, color: "#94a3b8"}}/>
-                                                </TableCell>
-                                            )}
                                         </TableRow>
                                     ))
                                 )}
