@@ -10,6 +10,7 @@ const WebAppLayout = lazy(() => import("./components/ui/WebAppLayout.jsx"));
 const HomePage = lazy(() => import("./components/Page/HomePage.jsx"));
 const Login = lazy(() => import("./components/auth/Login.jsx"));
 const Register = lazy(() => import("./components/auth/Register.jsx"));
+const ParentRegistrationForm = lazy(() => import("./components/auth/ParentRegistrationForm.jsx"));
 const ProtectedRoute = lazy(() => import("./configs/ProtectedRoute.jsx"));
 const AdminLayout = lazy(() => import("./components/layouts/AdminLayout.jsx"));
 const AdminDashboard = lazy(() => import("./components/Page/admin/AdminDashboard.jsx"));
@@ -157,6 +158,14 @@ const router = createBrowserRouter([
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
                         <Register/>
+                    </Suspense>
+                )
+            },
+            {
+                path: 'parent-first-login',
+                element: (
+                    <Suspense fallback={<LoadingFallback/>}>
+                        <ParentRegistrationForm isFirstLogin />
                     </Suspense>
                 )
             }

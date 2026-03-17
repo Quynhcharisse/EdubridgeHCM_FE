@@ -1,7 +1,5 @@
 import React, {useState} from 'react';
-import {jwtDecode} from 'jwt-decode';
-import {signup, signin} from '../../services/AuthService';
-import {getAccess} from '../../services/AccountService';
+import {signup} from '../../services/AuthService';
 import {ROLES} from '../../constants/roles';
 import RegisterGoogle from '../ui/RegisterGoogle';
 import {
@@ -69,7 +67,7 @@ const Register = () => {
                 {
                     onClose: (event, reason) => {
                         if (reason === 'clickaway') return;
-            setStep(3);
+                        setStep(3);
                     }
                 }
             );
@@ -81,59 +79,19 @@ const Register = () => {
         try {
             const response = await signup(email, selectedRole);
 
-            if (response) {
-                console.log('Đăng ký thành công:', response);
-                
-                // Auto login after signup
-                try {
-                    const loginResponse = await signin(email);
-                    if (loginResponse && loginResponse.status === 200) {
-                        let role = null;
-                        let firstLogin = false;
-                        
-                        if (loginResponse.data && loginResponse.data.body) {
-                            role = loginResponse.data.body.role;
-                            firstLogin = loginResponse.data.body.firstLogin || false;
-                        }
-                        
-                        if (!role) {
-                            try {
-                                const accessResponse = await getAccess();
-                                if (accessResponse && accessResponse.status === 200 && accessResponse.data.body) {
-                                    role = accessResponse.data.body.role;
-                                    firstLogin = accessResponse.data.body.firstLogin || false;
-                                }
-                            } catch (error) {
-                                console.error('Error getting user role:', error);
-                            }
-                        }
-                        
-                        if (role) {
-                            const userData = {
-                                email: email,
-                                name: name,
-                                picture: picture,
-                                role: role.toUpperCase(),
-                                firstLogin: firstLogin
-                            };
-                            localStorage.setItem('user', JSON.stringify(userData));
-                            console.log('User data saved to localStorage:', userData);
-                        }
+            if (response && response.status === 200) {
+                const message = 'Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.';
+                showSuccessSnackbar(message, {
+                    onClose: (event, reason) => {
+                        if (reason === 'clickaway') return;
+                        navigate('/login');
                     }
-                } catch (loginError) {
-                    console.error('Error auto-login after signup:', loginError);
-                }
-                
-                const message = 'Đăng ký thành công! Vui lòng điền thông tin để hoàn tất.';
-                setSuccessMessage(message);
-                enqueueSnackbar(message, { variant: 'success', autoHideDuration: 5000 });
-                // Move to step 3 to fill parent information
-                setStep(3);
+                });
             }
         } catch (error) {
             console.error('Lỗi đăng ký:', error);
             const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.';
-            
+
             if (error?.response?.status === 400 || errorMessage.includes('đã tồn tại') || errorMessage.includes('already exists')) {
                 enqueueSnackbar('Tài khoản đã tồn tại. Vui lòng đăng nhập.', {variant: 'error'});
                 navigate('/login');
@@ -152,8 +110,6 @@ const Register = () => {
     if (step === 3) {
         if (selectedRole === ROLES.SCHOOL) {
             return <SchoolRegistrationForm email={email} onBack={handleBackToRoleSelection} />;
-        } else if (selectedRole === ROLES.PARENT) {
-            return <ParentRegistrationForm email={email} name={name} onBack={handleBackToRoleSelection} />;
         }
     }
 
