@@ -20,10 +20,10 @@ export const getProfile = async () => {
 }
 
 export const updateProfile = async (profileData) => {
-    const response = await axiosClient.post("/account/profile", profileData, {
+    const response = await axiosClient.put("/account/profile", profileData, {
         headers: {
             "X-Device-Type": "web"
         }
     });
     return response || null;
-}
+};
