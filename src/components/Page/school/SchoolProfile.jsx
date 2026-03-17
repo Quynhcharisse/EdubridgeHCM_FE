@@ -1,0 +1,495 @@
+import React, { useState, useEffect } from "react";
+import {
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    IconButton,
+    Skeleton,
+    Stack,
+    TextField,
+    Typography,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import PersonIcon from "@mui/icons-material/Person";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import SettingsIcon from "@mui/icons-material/Settings";
+import TimelineIcon from "@mui/icons-material/Timeline";
+import SchoolIcon from "@mui/icons-material/School";
+import CloseIcon from "@mui/icons-material/Close";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import LockIcon from "@mui/icons-material/Lock";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { enqueueSnackbar } from "notistack";
+import { getProfile, updateProfile } from "../../../services/AccountService.jsx";
+
+const SectionHeader = ({ icon: Icon, title }) => (
+    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+        <Box
+            sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: "rgba(29, 78, 216, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
+            <Icon sx={{ color: "#1d4ed8", fontSize: 22 }} />
+        </Box>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#1e293b" }}>
+            {title}
+        </Typography>
+    </Stack>
+);
+
+function InfoRow({ label, value }) {
+    return (
+        <Box sx={{ py: 1.25, borderBottom: "1px solid #f1f5f9", "&:last-of-type": { borderBottom: 0 } }}>
+            <Typography variant="caption" sx={{ color: "#64748b", display: "block", mb: 0.25 }}>
+                {label}
+            </Typography>
+            <Typography variant="body2" fontWeight={500} sx={{ color: "#1e293b" }}>
+                {value || "—"}
+            </Typography>
+        </Box>
+    );
+}
+
+export default function SchoolProfile() {
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState(null);
+    const [editOpen, setEditOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [formValues, setFormValues] = useState({
+        campusName: "",
+        phoneNumber: "",
+        policyDetail: "",
+        address: "",
+        schoolName: "",
+        logoUrl: "",
+        coverUrl: "",
+        itemList: [],
+    });
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const res = await getProfile();
+                const body = res?.data?.body;
+                setProfile(body);
+                const campus = body?.campus || {};
+                const imageJson = campus.imageJson || {};
+                const list = imageJson.itemList && Array.isArray(imageJson.itemList) ? imageJson.itemList : [];
+                setFormValues({
+                    campusName: campus.name || "",
+                    phoneNumber: campus.phoneNumber || "",
+                    policyDetail: campus.policyDetail || "",
+                    address: campus.address || "",
+                    schoolName: campus.schoolName || "",
+                    logoUrl: campus.schoolData?.logoUrl || "",
+                    coverUrl: imageJson.coverUrl || "",
+                    itemList: list.map((item) => ({
+                        name: item.name || "",
+                        url: item.url || "",
+                        altName: item.altName || "",
+                    })),
+                });
+            } catch {
+                enqueueSnackbar("Không tải được thông tin hồ sơ", { variant: "error" });
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
+
+    const handleImageItemChange = (index, field) => (e) => {
+        const next = formValues.itemList.map((item, i) => (i === index ? { ...item, [field]: e.target.value } : item));
+        setFormValues((p) => ({ ...p, itemList: next }));
+    };
+
+    const handleAddImageItem = () => {
+        setFormValues((p) => ({ ...p, itemList: [...p.itemList, { name: "", url: "", altName: "" }] }));
+    };
+
+    const handleRemoveImageItem = (index) => {
+        setFormValues((p) => ({ ...p, itemList: p.itemList.filter((_, i) => i !== index) }));
+    };
+
+    const handleSaveProfile = async () => {
+        setSaving(true);
+        try {
+            const itemListPayload = formValues.itemList
+                .filter((item) => item.url?.trim())
+                .map((item) => ({
+                    name: item.name?.trim() || "",
+                    url: item.url?.trim() || "",
+                    altName: item.altName?.trim() || "",
+                    uploadDate: new Date().toISOString(),
+                    usage: true,
+                }));
+            const payload = {
+                campusData: {
+                    name: formValues.campusName?.trim() || undefined,
+                    phoneNumber: formValues.phoneNumber?.trim() || undefined,
+                    policyDetail: formValues.policyDetail?.trim() || undefined,
+                    address: formValues.address?.trim() || undefined,
+                    schoolData: formValues.schoolName || formValues.logoUrl ? { name: formValues.schoolName?.trim() || undefined, logoUrl: formValues.logoUrl?.trim() || undefined } : undefined,
+                    imageJson:
+                        formValues.coverUrl?.trim() || itemListPayload.length > 0
+                            ? {
+                                  coverUrl: formValues.coverUrl?.trim() || undefined,
+                                  itemList: itemListPayload.length > 0 ? itemListPayload : undefined,
+                              }
+                            : undefined,
+                },
+            };
+            if (payload.campusData.imageJson) {
+                if (!payload.campusData.imageJson.coverUrl) delete payload.campusData.imageJson.coverUrl;
+                if (!payload.campusData.imageJson.itemList?.length) delete payload.campusData.imageJson.itemList;
+                if (Object.keys(payload.campusData.imageJson).length === 0) delete payload.campusData.imageJson;
+            }
+            const res = await updateProfile(payload);
+            if (res?.status === 200) {
+                enqueueSnackbar("Cập nhật hồ sơ thành công", { variant: "success" });
+                setEditOpen(false);
+                const body = res.data?.body;
+                if (body) setProfile(body);
+            } else {
+                enqueueSnackbar("Cập nhật thất bại", { variant: "error" });
+            }
+        } catch (e) {
+            enqueueSnackbar(e?.response?.data?.message || "Cập nhật thất bại", { variant: "error" });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const campus = profile?.campus || {};
+
+    if (loading) {
+        return (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4 }}>
+                <Skeleton variant="rectangular" height={140} sx={{ borderRadius: 3 }} />
+                <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 3 }} />
+            </Box>
+        );
+    }
+
+    return (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4 }}>
+            {/* Header: giống các trang School khác */}
+            <Box
+                sx={{
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    borderRadius: 3,
+                    p: 3,
+                    color: "white",
+                    boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",
+                }}
+            >
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", sm: "row" },
+                        alignItems: { xs: "flex-start", sm: "center" },
+                        justifyContent: "space-between",
+                        gap: 2,
+                    }}
+                >
+                    <Stack direction="row" alignItems="center" spacing={2} sx={{ flex: 1, minWidth: 0 }}>
+                        <Box
+                            sx={{
+                                width: 72,
+                                height: 72,
+                                borderRadius: "50%",
+                                bgcolor: "rgba(255,255,255,0.25)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                overflow: "hidden",
+                            }}
+                        >
+                            {formValues.logoUrl ? (
+                                <Box component="img" src={formValues.logoUrl} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} />
+                            ) : null}
+                            {!formValues.logoUrl && <SchoolIcon sx={{ fontSize: 36 }} />}
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
+                                {campus.schoolName || campus.name || "Hồ sơ trường"}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.95 }}>
+                                Quản lý thông tin và cài đặt tài khoản
+                            </Typography>
+                            <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 0.5 }}>
+                                <Chip label="Trường học" size="small" sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "white", fontWeight: 600 }} />
+                                {campus.status === "VERIFIED" && (
+                                    <Chip icon={<VerifiedUserIcon sx={{ fontSize: 16, color: "white !important" }} />} label="Đã xác thực" size="small" sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "white", fontWeight: 600 }} />
+                                )}
+                            </Stack>
+                        </Box>
+                    </Stack>
+                    <Button
+                        variant="contained"
+                        startIcon={<EditIcon />}
+                        onClick={() => setEditOpen(true)}
+                        sx={{
+                            bgcolor: "rgba(255,255,255,0.95)",
+                            color: "#0D64DE",
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontWeight: 600,
+                            px: 3,
+                            py: 1.25,
+                            boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+                            "&:hover": { bgcolor: "white", boxShadow: "0 6px 20px rgba(0,0,0,0.2)" },
+                        }}
+                    >
+                        Chỉnh sửa hồ sơ
+                    </Button>
+                </Box>
+            </Box>
+
+            {/* Nội dung: 1 cột, full width */}
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <SectionHeader icon={PersonIcon} title="Thông tin liên hệ" />
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                        <InfoRow label="Tên trường" value={campus.schoolName} />
+                        <InfoRow label="Cơ sở" value={campus.name} />
+                        <InfoRow label="Email" value={profile?.email} />
+                        <InfoRow label="Số điện thoại" value={campus.phoneNumber} />
+                        <InfoRow label="Đại diện" value={campus.schoolData?.representativeName} />
+                        <InfoRow label="Hotline" value={campus.schoolData?.hotline} />
+                    </Box>
+                </CardContent>
+            </Card>
+
+            {/* Hình ảnh: coverUrl + itemList */}
+            {(campus.imageJson?.coverUrl || (campus.imageJson?.itemList?.length > 0)) && (
+                <Card
+                    elevation={0}
+                    sx={{
+                        borderRadius: 3,
+                        border: "1px solid #e2e8f0",
+                        boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                        bgcolor: "#F8FAFC",
+                    }}
+                >
+                    <CardContent sx={{ p: 3 }}>
+                        <SectionHeader icon={AddPhotoAlternateIcon} title="Hình ảnh cơ sở" />
+                        {campus.imageJson?.coverUrl && (
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: "#64748b", display: "block", mb: 1 }}>
+                                    Ảnh bìa
+                                </Typography>
+                                <Box
+                                    component="img"
+                                    src={campus.imageJson.coverUrl}
+                                    alt="Ảnh bìa"
+                                    onError={(e) => { e.target.style.display = "none"; }}
+                                    sx={{
+                                        width: "100%",
+                                        maxHeight: 280,
+                                        objectFit: "cover",
+                                        borderRadius: 2,
+                                        border: "1px solid #e2e8f0",
+                                    }}
+                                />
+                            </Box>
+                        )}
+                        {campus.imageJson?.itemList?.length > 0 && (
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#64748b", display: "block", mb: 1 }}>
+                                    Danh sách ảnh
+                                </Typography>
+                                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 2 }}>
+                                    {campus.imageJson.itemList.map((item, index) => (
+                                        <Box
+                                            key={index}
+                                            sx={{
+                                                borderRadius: 2,
+                                                overflow: "hidden",
+                                                border: "1px solid #e2e8f0",
+                                                bgcolor: "#f8fafc",
+                                                aspectRatio: "1",
+                                            }}
+                                        >
+                                            <Box
+                                                component="img"
+                                                src={item.url}
+                                                alt={item.altName || item.name || "Ảnh"}
+                                                onError={(e) => { e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100' fill='%23e2e8f0'%3E%3Crect width='100' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='12'%3E?%3C/text%3E%3C/svg%3E"; }}
+                                                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                            />
+                                            {(item.name || item.altName) && (
+                                                <Typography variant="caption" sx={{ display: "block", p: 1, color: "#64748b" }} noWrap>
+                                                    {item.name || item.altName}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    ))}
+                                </Box>
+                            </Box>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <SectionHeader icon={LocationOnIcon} title="Địa chỉ" />
+                    <InfoRow label="Địa chỉ" value={campus.address} />
+                    <Box
+                        sx={{
+                            mt: 2,
+                            height: 180,
+                            borderRadius: 2,
+                            bgcolor: "#f1f5f9",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "1px dashed #e2e8f0",
+                        }}
+                    >
+                        <Typography variant="body2" color="text.secondary">
+                            Bản đồ (tích hợp sau)
+                        </Typography>
+                    </Box>
+                </CardContent>
+            </Card>
+
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <SectionHeader icon={SettingsIcon} title="Cài đặt tài khoản" />
+                    <Button variant="outlined" startIcon={<LockIcon />} size="medium" sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}>
+                        Đổi mật khẩu
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <Card
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                    bgcolor: "#F8FAFC",
+                }}
+            >
+                <CardContent sx={{ p: 3 }}>
+                    <SectionHeader icon={TimelineIcon} title="Hoạt động gần đây" />
+                    <Box sx={{ py: 4, display: "flex", flexDirection: "column", alignItems: "center", color: "#94a3b8" }}>
+                        <TimelineIcon sx={{ fontSize: 48, mb: 1, opacity: 0.6 }} />
+                        <Typography variant="body2">Chưa có hoạt động nào</Typography>
+                    </Box>
+                </CardContent>
+            </Card>
+
+            {/* Modal chỉnh sửa */}
+            <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    Chỉnh sửa hồ sơ
+                    <IconButton onClick={() => setEditOpen(false)} size="small" aria-label="Đóng">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ maxHeight: "85vh" }}>
+                    <Stack spacing={2.5} sx={{ pt: 1 }}>
+                        <TextField label="Tên trường" value={formValues.schoolName} onChange={(e) => setFormValues((p) => ({ ...p, schoolName: e.target.value }))} fullWidth size="small" />
+                        <TextField label="Tên cơ sở" value={formValues.campusName} onChange={(e) => setFormValues((p) => ({ ...p, campusName: e.target.value }))} fullWidth size="small" />
+                        <TextField label="Số điện thoại" value={formValues.phoneNumber} onChange={(e) => setFormValues((p) => ({ ...p, phoneNumber: e.target.value }))} fullWidth size="small" />
+                        <TextField label="Địa chỉ" value={formValues.address} onChange={(e) => setFormValues((p) => ({ ...p, address: e.target.value }))} fullWidth size="small" multiline rows={2} />
+                        <TextField label="Mô tả chính sách" value={formValues.policyDetail} onChange={(e) => setFormValues((p) => ({ ...p, policyDetail: e.target.value }))} fullWidth size="small" multiline rows={2} placeholder="policyDetail" />
+                        <TextField label="URL logo" value={formValues.logoUrl} onChange={(e) => setFormValues((p) => ({ ...p, logoUrl: e.target.value }))} fullWidth size="small" placeholder="https://..." />
+
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1e293b", pt: 1 }}>
+                            Hình ảnh (imageJson)
+                        </Typography>
+                        <TextField label="URL ảnh bìa (coverUrl)" value={formValues.coverUrl} onChange={(e) => setFormValues((p) => ({ ...p, coverUrl: e.target.value }))} fullWidth size="small" placeholder="https://..." />
+
+                        <Box>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                                <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                                    Danh sách ảnh (itemList)
+                                </Typography>
+                                <Button size="small" startIcon={<AddPhotoAlternateIcon />} onClick={handleAddImageItem} sx={{ textTransform: "none", fontWeight: 600 }}>
+                                    Thêm ảnh
+                                </Button>
+                            </Box>
+                            <Stack spacing={2}>
+                                {formValues.itemList.map((item, index) => (
+                                    <Box
+                                        key={index}
+                                        sx={{
+                                            p: 1.5,
+                                            borderRadius: 2,
+                                            border: "1px solid #e2e8f0",
+                                            bgcolor: "#f8fafc",
+                                        }}
+                                    >
+                                        <Stack spacing={1.5}>
+                                            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                                                <IconButton size="small" onClick={() => handleRemoveImageItem(index)} aria-label="Xóa ảnh" sx={{ color: "#64748b" }}>
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                            <TextField label="URL ảnh" value={item.url} onChange={handleImageItemChange(index, "url")} fullWidth size="small" placeholder="https://..." />
+                                            <TextField label="Tên" value={item.name} onChange={handleImageItemChange(index, "name")} fullWidth size="small" />
+                                            <TextField label="Alt / Mô tả" value={item.altName} onChange={handleImageItemChange(index, "altName")} fullWidth size="small" />
+                                        </Stack>
+                                    </Box>
+                                ))}
+                                {formValues.itemList.length === 0 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                                        Chưa có ảnh. Bấm &quot;Thêm ảnh&quot; để thêm.
+                                    </Typography>
+                                )}
+                            </Stack>
+                        </Box>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={() => setEditOpen(false)} sx={{ textTransform: "none" }}>Hủy</Button>
+                    <Button variant="contained" onClick={handleSaveProfile} disabled={saving} sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, bgcolor: "#1d4ed8", "&:hover": { bgcolor: "#1e40af" } }}>
+                        {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
+    );
+}

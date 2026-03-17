@@ -365,7 +365,13 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
                     )}
                 </Box>
                 <Divider />
-                <MenuItem onClick={handleUserMenuClose} sx={{ gap: 1.5, py: 1.25 }}>
+                <MenuItem
+                    onClick={() => {
+                        handleUserMenuClose();
+                        navigate("/school/profile");
+                    }}
+                    sx={{ gap: 1.5, py: 1.25 }}
+                >
                     <PersonOutlineIcon fontSize="small" sx={{ color: "#64748b" }} />
                     Hồ sơ
                 </MenuItem>

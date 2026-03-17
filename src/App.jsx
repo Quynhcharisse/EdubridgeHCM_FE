@@ -24,6 +24,7 @@ const SchoolCampaigns = lazy(() => import("./components/Page/school/SchoolCampai
 const SchoolCampaignOfferings = lazy(() =>
     import("./components/Page/school/SchoolCampaignOfferings.jsx")
 );
+const SchoolProfile = lazy(() => import("./components/Page/school/SchoolProfile.jsx"));
 
 const LoadingFallback = () => {
     return null;
@@ -252,7 +253,7 @@ const router = createBrowserRouter([
                 path: 'profile',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
-                        <UserProfilePage/>
+                        <SchoolProfile/>
                     </Suspense>
                 )
             }
