@@ -1,13 +1,15 @@
 import {useState, useRef} from 'react';
-import {Box, Button, Container, Divider, Paper, Stack, Typography} from '@mui/material';
+import {Alert, Box, Button, Container, Divider, Paper, Stack, Typography} from '@mui/material';
 import {Link as RouterLink, useNavigate} from 'react-router-dom';
 import LoginGoogle from '../ui/LoginGoogle';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import {getAccess} from '../../services/AccountService';
+import {enqueueSnackbar} from 'notistack';
 
 export default function Login() {
     const [userEmail, setUserEmail] = useState(null);
     const [userData, setUserData] = useState(null);
+    const [loginStatusMessage, setLoginStatusMessage] = useState(null);
     const navigate = useNavigate();
     const hasNavigated = useRef(false);
 
@@ -30,7 +32,6 @@ export default function Login() {
 
     const handleLoginSuccess = async (data) => {
         if (hasNavigated.current) {
-            console.log('Navigation already triggered, skipping...');
             return;
         }
 
@@ -39,13 +40,6 @@ export default function Login() {
         setUserEmail(email);
         setUserData({email, name, picture});
 
-        console.log('Login successful!');
-        console.log('Email:', email);
-        console.log('Name:', name);
-        console.log('Picture:', picture);
-        console.log('Auth Response:', response);
-        console.log('Full response data:', response?.data);
-
         let role = null;
         let firstLogin = false;
         
@@ -53,13 +47,9 @@ export default function Login() {
             if (response.data.body && response.data.body.role) {
                 role = response.data.body.role;
                 firstLogin = response.data.body.firstLogin || false;
-                console.log('Role from response.data.body.role:', role);
-                console.log('FirstLogin from response.data.body.firstLogin:', firstLogin);
             } else if (response.data.role) {
                 role = response.data.role;
                 firstLogin = response.data.firstLogin || false;
-                console.log('Role from response.data.role:', role);
-                console.log('FirstLogin from response.data.firstLogin:', firstLogin);
             }
         }
 
@@ -69,8 +59,6 @@ export default function Login() {
                 if (accessResponse && accessResponse.status === 200 && accessResponse.data.body) {
                     role = accessResponse.data.body.role;
                     firstLogin = accessResponse.data.body.firstLogin || false;
-                    console.log('Role from getAccess:', role);
-                    console.log('FirstLogin from getAccess:', firstLogin);
                 }
             } catch (error) {
                 console.error('Error getting user role:', error);
@@ -87,8 +75,17 @@ export default function Login() {
                 firstLogin: firstLogin
             };
             localStorage.setItem('user', JSON.stringify(userData));
-            console.log('User data saved to localStorage:', userData);
         }
+
+        setLoginStatusMessage('Đăng nhập thành công! Hệ thống đang chuyển bạn tới trang phù hợp.');
+        enqueueSnackbar('Đăng nhập thành công!', {
+            autoHideDuration: 2000,
+            content: (key, message) => (
+                <Alert variant="filled" severity="success" sx={{width: '100%'}}>
+                    {message}
+                </Alert>
+            ),
+        });
 
         if (!hasNavigated.current) {
             hasNavigated.current = true;
@@ -96,20 +93,14 @@ export default function Login() {
             if (role) {
                 const normalizedRole = role.toUpperCase();
                 
-                if (normalizedRole === 'PARENT' && firstLogin) {
-                    console.log('PARENT first login detected, user needs to fill information');
-                }
-                
                 const route = getRoleBasedRoute(normalizedRole);
-                console.log('User role:', normalizedRole, '-> Navigating to:', route);
                 setTimeout(() => {
                     navigate(route);
-                }, 1000);
+                }, 2200);
             } else {
-                console.warn('No role found, navigating to home');
                 setTimeout(() => {
                     navigate('/');
-                }, 1000);
+                }, 2200);
             }
         }
     };

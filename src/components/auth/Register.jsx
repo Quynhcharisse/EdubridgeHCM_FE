@@ -5,6 +5,7 @@ import {getAccess} from '../../services/AccountService';
 import {ROLES} from '../../constants/roles';
 import RegisterGoogle from '../ui/RegisterGoogle';
 import {
+    Alert,
     Box,
     Button,
     Container,
@@ -37,6 +38,7 @@ const Register = () => {
     const [selectedRole, setSelectedRole] = useState('');
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     const handleGoogleSuccess = (data) => {
         setEmail(data.email);
@@ -115,7 +117,16 @@ const Register = () => {
                     // Continue to form even if auto-login fails
                 }
                 
-                enqueueSnackbar('Đăng ký thành công! Vui lòng điền thông tin để hoàn tất.', {variant: 'success'});
+                const message = 'Đăng ký thành công! Vui lòng điền thông tin để hoàn tất.';
+                setSuccessMessage(message);
+                enqueueSnackbar(message, {
+                    autoHideDuration: 2000,
+                    content: (key, msg) => (
+                        <Alert variant="filled" severity="success" sx={{width: '100%'}}>
+                            {msg}
+                        </Alert>
+                    ),
+                });
                 // Move to step 3 to fill parent information
                 setStep(3);
             }
@@ -186,6 +197,15 @@ const Register = () => {
                     }}
                 >
                     <Stack spacing={3}>
+                        {successMessage && (
+                            <Alert
+                                variant="filled"
+                                severity="success"
+                                sx={{width: '100%'}}
+                            >
+                                {successMessage}
+                            </Alert>
+                        )}
                         <Box sx={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40px'}}>
                             {step === 2 && (
                                 <IconButton
