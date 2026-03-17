@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
     Box,
     Button,
@@ -13,7 +13,7 @@ import {
     Grid,
 } from '@mui/material';
 import {ArrowBack} from '@mui/icons-material';
-import {updateProfile} from '../../services/AccountService';
+import {updateProfile, signout} from '../../services/AccountService';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import {useNavigate} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
@@ -31,7 +31,7 @@ const relationshipOptions = [
     {value: 'OTHER', label: 'Khác'},
 ];
 
-const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
+const ParentRegistrationForm = ({email, name: initialName, onBack, isFirstLogin = false}) => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: initialName || '',
@@ -46,6 +46,25 @@ const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
     
     const [formErrors, setFormErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (!initialName) {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                try {
+                    const parsed = JSON.parse(storedUser);
+                    if (parsed?.name) {
+                        setFormData(prev => ({
+                            ...prev,
+                            name: parsed.name,
+                        }));
+                    }
+                } catch {
+                    // ignore parse errors
+                }
+            }
+        }
+    }, [initialName]);
 
     const handleInputChange = (e) => {
         const {name, value} = e.target;
@@ -110,31 +129,51 @@ const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
         try {
             const profilePayload = {
                 parentData: {
+                    gender: formData.gender,
+                    name: formData.name.trim(),
+                    phone: formData.phone.trim(),
+                    relationship: formData.relationship,
+                    workplace: formData.workplace.trim(),
+                    occupation: formData.occupation.trim(),
+                    currentAddress: formData.currentAddress.trim(),
                     idCardNumber: formData.idCardNumber.trim(),
                 },
-                gender: formData.gender,
-                name: formData.name.trim(),
-                phone: formData.phone.trim(),
-                relationship: formData.relationship,
-                workplace: formData.workplace.trim(),
-                occupation: formData.occupation.trim(),
-                currentAddress: formData.currentAddress.trim(),
-                idCardNumber: formData.idCardNumber.trim(),
             };
 
             const response = await updateProfile(profilePayload);
             
             if (response && response.status === 200) {
-                enqueueSnackbar('Cập nhật thông tin thành công!', {variant: 'success'});
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    try {
+                        const parsed = JSON.parse(storedUser);
+                        localStorage.setItem('user', JSON.stringify({...parsed, firstLogin: false}));
+                    } catch {
+                        // ignore
+                    }
+                }
+
+                enqueueSnackbar('Cập nhật thông tin phụ huynh thành công!', {variant: 'success'});
                 setTimeout(() => {
                     navigate('/home');
-                }, 1500);
+                }, 800);
             }
         } catch (error) {
             console.error('Error updating profile:', error);
             const errorMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.';
             enqueueSnackbar(errorMessage, {variant: 'error'});
             setIsSubmitting(false);
+        }
+    };
+
+    const handleExit = async () => {
+        try {
+            await signout();
+        } catch (error) {
+            console.error('Error during logout:', error);
+        } finally {
+            localStorage.removeItem('user');
+            navigate('/login');
         }
     };
 
@@ -175,20 +214,22 @@ const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
                     <Box component="form" onSubmit={handleSubmit}>
                         <Stack spacing={3}>
                             <Box sx={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40px'}}>
-                                <IconButton
-                                    onClick={onBack}
-                                    sx={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        color: '#64748b',
-                                        '&:hover': {
-                                            bgcolor: 'rgba(25, 118, 210, 0.08)',
-                                            color: '#1976d2',
-                                        },
-                                    }}
-                                >
-                                    <ArrowBack />
-                                </IconButton>
+                                {!isFirstLogin && (
+                                    <IconButton
+                                        onClick={onBack}
+                                        sx={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            color: '#64748b',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(25, 118, 210, 0.08)',
+                                                color: '#1976d2',
+                                            },
+                                        }}
+                                    >
+                                        <ArrowBack />
+                                    </IconButton>
+                                )}
                                 <Typography 
                                     variant="h5" 
                                     sx={{
@@ -378,8 +419,8 @@ const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
 
                             <Box sx={{display: 'flex', justifyContent: 'flex-end', gap: 2, pt: 1}}>
                                 <Button
-                                    variant="outlined"
-                                    onClick={onBack}
+                                variant="outlined"
+                                onClick={isFirstLogin ? handleExit : onBack}
                                     sx={{
                                         py: 1.1,
                                         px: 3,
@@ -394,7 +435,7 @@ const ParentRegistrationForm = ({email, name: initialName, onBack}) => {
                                         },
                                     }}
                                 >
-                                    Đóng
+                                    {isFirstLogin ? 'Thoát' : 'Đóng'}
                                 </Button>
                                 <Button
                                     type="submit"
