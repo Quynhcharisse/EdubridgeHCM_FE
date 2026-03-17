@@ -1,12 +1,13 @@
 import React, {useEffect} from "react";
 import {Box, Fade} from "@mui/material";
-import {Outlet, useLocation} from "react-router-dom";
+import {Outlet, useLocation, useNavigate} from "react-router-dom";
 import Header, {ScrollTopButton} from "../partials/Header.jsx";
 import Footer from "../partials/Footer.jsx";
 import AuthHeader from "../partials/AuthHeader.jsx";
 
 export default function WebAppLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
     useEffect(() => {
@@ -28,6 +29,27 @@ export default function WebAppLayout() {
             document.body.style.width = '';
         };
     }, [isAuthPage]);
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+
+        if (!storedUser) {
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(storedUser);
+            const isParent = parsed?.role === 'PARENT';
+            const isFirstLogin = !!parsed?.firstLogin;
+
+            if (isParent && isFirstLogin) {
+                if (location.pathname !== '/parent-first-login') {
+                    navigate('/parent-first-login', {replace: true});
+                }
+            }
+        } catch {
+        }
+    }, [location.pathname, navigate]);
 
     return (
             <Box
