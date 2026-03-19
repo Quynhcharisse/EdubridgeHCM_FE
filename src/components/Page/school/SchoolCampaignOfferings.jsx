@@ -122,7 +122,8 @@ export default function SchoolCampaignOfferings() {
         listCampuses()
             .then((res) => {
                 if (cancelled) return;
-                const list = res?.data?.body ?? res?.data;
+                const body = res?.data?.body ?? res?.data;
+                const list = body?.items ?? body;
                 const arr = Array.isArray(list)
                     ? list.map((c) => ({ id: c.id ?? c.campusId, name: c.name ?? "Cơ sở" }))
                     : [];

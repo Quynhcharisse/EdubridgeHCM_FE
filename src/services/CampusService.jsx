@@ -1,7 +1,14 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
 export const listCampuses = async () => {
-    const response = await axiosClient.get("/school/campus/list");
+    // API yêu cầu query params `page` và `pageSize`
+    // Default pageSize lớn để các màn hình hiện tại có thể tự paginate/filter ở client.
+    const response = await axiosClient.get("/school/campus/list", {
+        params: {
+            page: 0,
+            pageSize: 1000,
+        },
+    });
     return response || null;
 };
 
