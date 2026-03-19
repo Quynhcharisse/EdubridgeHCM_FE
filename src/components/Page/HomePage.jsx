@@ -275,6 +275,7 @@ export default function HomePage() {
     const [selectedDistrict, setSelectedDistrict] = React.useState(HCM_DISTRICTS[0]);
     const [tuitionMin, setTuitionMin] = React.useState(0);
     const [tuitionMax, setTuitionMax] = React.useState(30);
+    const [isParentRole, setIsParentRole] = React.useState(false);
     const [showParentFormModal, setShowParentFormModal] = React.useState(false);
     const [isSubmittingParentForm, setIsSubmittingParentForm] = React.useState(false);
     const submitRef = React.useRef(false);
@@ -294,6 +295,7 @@ export default function HomePage() {
         if (userData) {
             try {
                 const user = JSON.parse(userData);
+                setIsParentRole(user.role === 'PARENT');
                 if (user.role === 'PARENT' && user.firstLogin === true) {
                     setShowParentFormModal(true);
                 }
@@ -658,32 +660,34 @@ export default function HomePage() {
                         >
                             Nền tảng giúp phụ huynh tìm trường phù hợp, so sánh khách quan và kết nối nhanh chóng với các trường THCS, THPT tại TP.HCM.
                         </Typography>
-                        <Button
-                            variant="contained"
-                            size="medium"
-                            onClick={handleRegisterClick}
-                            sx={{
-                                bgcolor: 'white',
-                                color: '#1976d2',
-                                px: {xs: 4, md: 5},
-                                py: {xs: 1.2, md: 1.4},
-                                fontSize: {xs: '0.95rem', md: '1.05rem'},
-                                fontWeight: 600,
-                                borderRadius: 2.5,
-                                textTransform: 'none',
-                                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                                minWidth: {xs: '100%', sm: '240px'},
-                                mb: 3,
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                '&:hover': {
-                                    bgcolor: '#f8f9fa',
-                                    boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
-                                    transform: 'translateY(-2px)'
-                                }
-                            }}
-                        >
-                            Đăng ký ngay
-                        </Button>
+                        {!isParentRole && (
+                            <Button
+                                variant="contained"
+                                size="medium"
+                                onClick={handleRegisterClick}
+                                sx={{
+                                    bgcolor: 'white',
+                                    color: '#1976d2',
+                                    px: {xs: 4, md: 5},
+                                    py: {xs: 1.2, md: 1.4},
+                                    fontSize: {xs: '0.95rem', md: '1.05rem'},
+                                    fontWeight: 600,
+                                    borderRadius: 2.5,
+                                    textTransform: 'none',
+                                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                                    minWidth: {xs: '100%', sm: '240px'},
+                                    mb: 3,
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        bgcolor: '#f8f9fa',
+                                        boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
+                                        transform: 'translateY(-2px)'
+                                    }
+                                }}
+                            >
+                                Đăng ký ngay
+                            </Button>
+                        )}
 
                         <Box
                             sx={{
