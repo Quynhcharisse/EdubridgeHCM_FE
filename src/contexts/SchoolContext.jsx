@@ -31,7 +31,8 @@ export function SchoolProvider({ children }) {
     listCampuses()
       .then((res) => {
         if (cancelled) return;
-        const list = res?.data?.body;
+        const body = res?.data?.body;
+        const list = body?.items ?? body;
         if (res && res.status === 200 && Array.isArray(list)) {
           // Campus phụ: backend chỉ trả về 1 campus và isPrimaryBranch = false
           const singleCampus = list.length === 1 ? list[0] : null;

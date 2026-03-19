@@ -242,10 +242,13 @@ export default function SchoolCampus() {
         const loadCampuses = async () => {
             try {
                 const res = await listCampuses();
-                const list = res?.data?.body;
-                if (res && res.status === 200 && Array.isArray(list)) {
-                    // Mỗi phần tử body đã chứa cả campus và account
-                    setCampuses(list.map((dto) => mapCampusFromApi(dto, dto.account)));
+                const body = res?.data?.body;
+                // Backend trả về: { body: { items: [...] , currentPage, pageSize, ... } }
+                // Frontend chỉ cần list items để map sang model.
+                const items = body?.items ?? body;
+                if (res && res.status === 200 && Array.isArray(items)) {
+                    // Mỗi phần tử item đã chứa cả campus và account
+                    setCampuses(items.map((dto) => mapCampusFromApi(dto, dto.account)));
                 } else {
                     setCampuses(initialMockCampuses);
                 }
