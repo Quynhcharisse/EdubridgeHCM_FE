@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Box, Drawer, Fade } from "@mui/material";
+import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import { Outlet, useLocation } from "react-router-dom";
 import { SchoolProvider } from "../../contexts/SchoolContext.jsx";
 import SchoolAuthHeader from "../Page/school/SchoolAuthHeader.jsx";
@@ -9,7 +10,50 @@ const SIDEBAR_WIDTH_EXPANDED = 240;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 const SIDEBAR_WIDTH_TRANSITION = "280ms cubic-bezier(0.4, 0, 0.2, 1)";
 
+/** Phông chữ dùng cho toàn bộ trang School (sidebar + nội dung) */
+const SCHOOL_FONT = '"Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif';
+
 export default function SchoolLayout() {
+  const baseTheme = useTheme();
+  const schoolTheme = useMemo(
+    () =>
+      createTheme(baseTheme, {
+        typography: {
+          ...baseTheme.typography,
+          fontFamily: SCHOOL_FONT,
+          allVariants: { fontFamily: SCHOOL_FONT },
+        },
+        components: {
+          MuiButton: {
+            styleOverrides: {
+              root: { fontFamily: SCHOOL_FONT },
+            },
+          },
+          MuiInputBase: {
+            styleOverrides: {
+              root: { fontFamily: SCHOOL_FONT },
+            },
+          },
+          MuiTab: {
+            styleOverrides: {
+              root: { fontFamily: SCHOOL_FONT },
+            },
+          },
+          MuiTableCell: {
+            styleOverrides: {
+              root: { fontFamily: SCHOOL_FONT },
+            },
+          },
+          MuiChip: {
+            styleOverrides: {
+              root: { fontFamily: SCHOOL_FONT },
+            },
+          },
+        },
+      }),
+    [baseTheme]
+  );
+
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
@@ -17,8 +61,16 @@ export default function SchoolLayout() {
   const HEADER_HEIGHT = 65;
 
   return (
-    <SchoolProvider>
-      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8fafc" }}>
+    <ThemeProvider theme={schoolTheme}>
+      <SchoolProvider>
+        <Box
+          sx={{
+            display: "flex",
+            minHeight: "100vh",
+            bgcolor: "#f8fafc",
+            fontFamily: SCHOOL_FONT,
+          }}
+        >
         {/* Sidebar: full height bên trái */}
         <Drawer
         variant="persistent"
@@ -71,6 +123,7 @@ export default function SchoolLayout() {
         </Fade>
       </Box>
     </Box>
-    </SchoolProvider>
+      </SchoolProvider>
+    </ThemeProvider>
   );
 }
