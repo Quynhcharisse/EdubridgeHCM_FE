@@ -2,10 +2,12 @@ import React, {useState, useEffect} from "react";
 import {
     AppBar,
     Avatar,
+    Badge,
     Box,
     Button,
     Collapse,
     Container,
+    CircularProgress,
     Divider,
     Fab,
     IconButton,
@@ -22,17 +24,26 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
+import SearchIcon from "@mui/icons-material/Search";
 import Fade from '@mui/material/Fade';
 import {enqueueSnackbar} from "notistack";
 import {signout, getProfile} from "../../services/AccountService.jsx";
+import {getParentConversations} from "../../services/ConversationService.jsx";
 import logo from "../../assets/logo.png";
 import {useLocation} from "react-router-dom";
 
 function MainHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
+    const [messageAnchorEl, setMessageAnchorEl] = useState(null);
     const [profileData, setProfileData] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
+    const [conversationItems, setConversationItems] = useState([]);
+    const [conversationLoading, setConversationLoading] = useState(false);
+    const [conversationError, setConversationError] = useState('');
+    const [nextCursorId, setNextCursorId] = useState(null);
+    const [hasMoreConversations, setHasMoreConversations] = useState(false);
 
     const location = useLocation();
     const isHomePage = location.pathname === '/home' || location.pathname === '/';
@@ -51,6 +62,41 @@ function MainHeader() {
     
     const userInfo = getUserInfo();
     const isParent = userInfo?.role === 'PARENT';
+    const unreadMessagesCount = conversationItems.reduce((sum, item) => {
+        const unread = Number(item?.unreadCount ?? item?.unreadMessages ?? 0);
+        return Number.isFinite(unread) ? sum + unread : sum;
+    }, 0);
+
+    const parseConversationResponse = (response) => {
+        const payload = response?.data?.body?.body || response?.data?.body || {};
+        return {
+            items: Array.isArray(payload?.items) ? payload.items : [],
+            nextCursorId: payload?.nextCursorId ?? null,
+            hasMore: !!payload?.hasMore
+        };
+    };
+
+    const loadConversations = async (cursorId = null) => {
+        setConversationLoading(true);
+        setConversationError('');
+
+        try {
+            const response = await getParentConversations(cursorId);
+            if (response?.status === 200) {
+                const parsed = parseConversationResponse(response);
+                setConversationItems((prev) => (cursorId ? [...prev, ...parsed.items] : parsed.items));
+                setNextCursorId(parsed.nextCursorId);
+                setHasMoreConversations(parsed.hasMore);
+            } else {
+                setConversationError('Không thể tải danh sách tin nhắn.');
+            }
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+            setConversationError('Không thể tải danh sách tin nhắn.');
+        } finally {
+            setConversationLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -81,6 +127,15 @@ function MainHeader() {
 
     const handleUserMenuClose = () => {
         setAnchorEl(null);
+    };
+
+    const handleMessageMenuOpen = async (event) => {
+        setMessageAnchorEl(event.currentTarget);
+        await loadConversations();
+    };
+
+    const handleMessageMenuClose = () => {
+        setMessageAnchorEl(null);
     };
 
     const handleLogout = async () => {
@@ -148,7 +203,16 @@ function MainHeader() {
         }
     };
 
-    const profileBody = profileData?.body ? (typeof profileData.body === 'string' ? JSON.parse(profileData.body) : profileData.body) : null;
+    const profileBody = React.useMemo(() => {
+        if (!profileData?.body) return null;
+        if (typeof profileData.body !== 'string') return profileData.body;
+        try {
+            return JSON.parse(profileData.body);
+        } catch (error) {
+            console.error('Invalid profile body JSON:', error);
+            return null;
+        }
+    }, [profileData]);
     const displayName = profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
     const displayEmail = profileBody?.email || userInfo?.email || '';
     const avatarUrl = profileBody?.picture || userInfo?.picture || null;
@@ -445,6 +509,198 @@ function MainHeader() {
                     <Box sx={{position: 'relative', display: 'flex', alignItems: 'center', gap: 1}}>
                         {isSignedIn ? (
                             <>
+                                {isParent && (
+                                    <Badge
+                                        badgeContent={unreadMessagesCount}
+                                        color="error"
+                                        overlap="circular"
+                                        invisible={unreadMessagesCount === 0}
+                                        sx={{
+                                            mr: 0.5,
+                                            '& .MuiBadge-badge': {
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                minWidth: 18,
+                                                height: 18,
+                                                borderRadius: 9,
+                                                boxShadow: '0 2px 8px rgba(220,53,69,0.4)'
+                                            }
+                                        }}
+                                    >
+                                        <IconButton
+                                            onClick={handleMessageMenuOpen}
+                                            aria-label="Tin nhắn"
+                                            sx={{
+                                                width: 42,
+                                                height: 42,
+                                                bgcolor: 'rgba(25,118,210,0.14)',
+                                                color: '#1976d2',
+                                                border: '1px solid rgba(25,118,210,0.22)',
+                                                transition: 'all 0.2s ease',
+                                                '&:hover': {
+                                                    bgcolor: 'rgba(25,118,210,0.2)',
+                                                    color: '#1565c0',
+                                                    transform: 'translateY(-1px)',
+                                                    boxShadow: '0 4px 10px rgba(25,118,210,0.22)'
+                                                }
+                                            }}
+                                        >
+                                            <ChatBubbleRoundedIcon sx={{fontSize: 22}}/>
+                                        </IconButton>
+                                    </Badge>
+                                )}
+                                <Menu
+                                    anchorEl={messageAnchorEl}
+                                    open={Boolean(messageAnchorEl)}
+                                    onClose={handleMessageMenuClose}
+                                    anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
+                                    transformOrigin={{vertical: 'top', horizontal: 'right'}}
+                                    disableScrollLock={true}
+                                    slotProps={{
+                                        paper: {
+                                            sx: {
+                                                borderRadius: 2.5,
+                                                border: '1px solid rgba(37,99,235,0.22)',
+                                                boxShadow: '0 18px 40px rgba(15,23,42,0.22), 0 0 0 4px rgba(37,99,235,0.10)',
+                                                minWidth: 360,
+                                                maxWidth: 380,
+                                                mt: 1.2,
+                                                p: 0,
+                                                overflow: 'hidden',
+                                                backdropFilter: 'blur(2px)'
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            px: 2,
+                                            py: 1.5,
+                                            borderBottom: '1px solid rgba(15,23,42,0.08)',
+                                            bgcolor: '#ffffff'
+                                        }}
+                                    >
+                                        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                                            <Typography sx={{fontSize: 22, fontWeight: 800, color: '#0f172a'}}>
+                                                Đoạn chat
+                                            </Typography>
+                                        </Box>
+                                        <Box
+                                            sx={{
+                                                mt: 1.5,
+                                                px: 1.25,
+                                                py: 0.9,
+                                                borderRadius: 999,
+                                                bgcolor: '#f1f5f9',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1
+                                            }}
+                                        >
+                                            <SearchIcon sx={{fontSize: 19, color: '#94a3b8'}}/>
+                                            <Typography sx={{fontSize: 14, color: '#64748b'}}>
+                                                Tìm kiếm trên đoạn chat
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {conversationLoading && conversationItems.length === 0 ? (
+                                        <Box sx={{display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4}}>
+                                            <CircularProgress size={24}/>
+                                        </Box>
+                                    ) : conversationError ? (
+                                        <Box sx={{px: 2, py: 3}}>
+                                            <Typography sx={{fontSize: 14, color: '#dc2626'}}>
+                                                {conversationError}
+                                            </Typography>
+                                        </Box>
+                                    ) : conversationItems.length === 0 ? (
+                                        <Box sx={{px: 2, py: 4, textAlign: 'center'}}>
+                                            <ChatBubbleRoundedIcon sx={{fontSize: 30, color: '#94a3b8'}}/>
+                                            <Typography sx={{fontSize: 14, color: '#475569', mt: 1}}>
+                                                Chưa có tin nhắn nào
+                                            </Typography>
+                                        </Box>
+                                    ) : (
+                                        <Box sx={{maxHeight: 420, overflowY: 'auto'}}>
+                                            {conversationItems.map((conversation, index) => {
+                                                const conversationId = conversation?.id || conversation?.conversationId;
+                                                const conversationName = conversation?.title || conversation?.name || conversation?.schoolName || conversation?.participantName || 'Cuộc trò chuyện';
+                                                const latestMessage = conversation?.lastMessage?.content || conversation?.lastMessage || conversation?.latestMessage || 'Chưa có nội dung';
+                                                const unreadCount = Number(conversation?.unreadCount ?? conversation?.unreadMessages ?? 0) || 0;
+
+                                                return (
+                                                    <Box
+                                                        key={conversationId || `${conversationName}-${index}`}
+                                                        onClick={() => {
+                                                            handleMessageMenuClose();
+                                                            window.location.href = conversationId ? `/messages/${conversationId}` : '/messages';
+                                                        }}
+                                                        sx={{
+                                                            px: 2,
+                                                            py: 1.25,
+                                                            borderBottom: '1px solid rgba(15,23,42,0.06)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 1.5,
+                                                            cursor: 'pointer',
+                                                            transition: 'background-color 0.2s ease',
+                                                            '&:hover': {
+                                                                bgcolor: 'rgba(25,118,210,0.08)'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Avatar sx={{width: 38, height: 38, bgcolor: '#1d4ed8', fontSize: 14, fontWeight: 700}}>
+                                                            {conversationName.charAt(0).toUpperCase()}
+                                                        </Avatar>
+                                                        <Box sx={{minWidth: 0, flex: 1}}>
+                                                            <Typography noWrap sx={{fontSize: 14, fontWeight: 700, color: '#0f172a'}}>
+                                                                {conversationName}
+                                                            </Typography>
+                                                            <Typography noWrap sx={{fontSize: 13, color: '#475569'}}>
+                                                                {latestMessage}
+                                                            </Typography>
+                                                        </Box>
+                                                        {unreadCount > 0 && (
+                                                            <Badge
+                                                                badgeContent={unreadCount}
+                                                                color="error"
+                                                                sx={{
+                                                                    '& .MuiBadge-badge': {
+                                                                        right: 0,
+                                                                        top: 0
+                                                                    }
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Box>
+                                    )}
+
+                                    {hasMoreConversations && (
+                                        <Box sx={{px: 2, py: 1.25, borderTop: '1px solid rgba(15,23,42,0.08)'}}>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant="text"
+                                                disabled={conversationLoading}
+                                                onClick={() => loadConversations(nextCursorId)}
+                                                sx={{
+                                                    textTransform: 'none',
+                                                    fontWeight: 600,
+                                                    color: '#1976d2',
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(25,118,210,0.08)'
+                                                    }
+                                                }}
+                                            >
+                                                {conversationLoading ? 'Đang tải...' : 'Xem thêm'}
+                                            </Button>
+                                        </Box>
+                                    )}
+                                </Menu>
                                 <Box
                                     onClick={handleUserMenuClick}
                                     sx={{
