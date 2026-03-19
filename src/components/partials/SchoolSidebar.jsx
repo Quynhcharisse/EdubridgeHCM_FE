@@ -112,6 +112,7 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
                 flexDirection: "column",
                 bgcolor: "#ffffff",
                 overflow: "hidden",
+                fontFamily: '"Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif',
             }}
         >
             {/* Top: Trường Học + nút thu gọn/mở rộng */}
