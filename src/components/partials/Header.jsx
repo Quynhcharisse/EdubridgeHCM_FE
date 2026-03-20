@@ -211,7 +211,13 @@ function MainHeader() {
             if (response?.status === 200) {
                 const parsed = parseHistoryResponse(response);
                 const normalized = parsed.items.map(normalizeMessage);
-                setMessageItems((prev) => (cursorId ? mergeUniqueMessages([...normalized, ...prev]) : mergeUniqueMessages(normalized)));
+                setMessageItems((prev) => {
+                    // When refreshing after sending, backend may not persist instantly.
+                    // If history returns empty array, keep current messages (e.g. the websocket event).
+                    if (cursorId) return mergeUniqueMessages([...normalized, ...prev]);
+                    if (!normalized.length) return prev;
+                    return mergeUniqueMessages(normalized);
+                });
                 setMessageNextCursorId(parsed.nextCursorId);
                 setMessageHasMore(parsed.hasMore);
             } else {
@@ -275,7 +281,7 @@ function MainHeader() {
         }
     };
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         const trimmed = chatInput.trim();
         if (!trimmed || !selectedConversation) return;
 
@@ -291,6 +297,11 @@ function MainHeader() {
             return;
         }
         setChatInput('');
+
+        // Refresh full history so the UI always reflects the latest backend state.
+        // Delay helps the backend persist message before history request.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await loadMessageHistory({ conversation: selectedConversation, cursorId: null });
     };
 
     useEffect(() => {

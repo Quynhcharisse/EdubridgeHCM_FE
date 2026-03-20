@@ -22,7 +22,7 @@ export const markParentMessagesRead = async ({conversationId, username}) => {
     const encodedUsername = encodeURIComponent(username || "");
     const endpoint = `/parent/messages/read/${encodedConversationId}/${encodedUsername}`;
 
-    const response = await axiosClient.post(endpoint, {}, {
+    const response = await axiosClient.put(endpoint, {}, {
         headers: {
             "X-Device-Type": "web"
         }
