@@ -25,8 +25,6 @@ import {
     setSavedSchools
 } from "../../utils/savedSchoolsStorage";
 
-// Mock data: (Tỉnh/Thành phố, Phường/Xã, Trường)
-// Dùng tạm để fill UI filter + danh sách trường.
 const MOCK_SCHOOLS = [
     {province: "TP.HCM", ward: "Phường Sài Gòn", school: "THPT Quốc tế Á Châu – Cơ sở 2"},
     {province: "TP.HCM", ward: "Phường Tân Định", school: "Asian International Primary, Secondary and High School"},
@@ -140,6 +138,10 @@ export default function SchoolSearchPage() {
     const [tuitionMax, setTuitionMax] = React.useState(30);
     const [selectedProvince, setSelectedProvince] = React.useState(DEFAULT_PROVINCE);
     const [selectedBoardingType, setSelectedBoardingType] = React.useState(null);
+
+    React.useEffect(() => {
+        window.scrollTo({top: 0, left: 0, behavior: 'auto'});
+    }, []);
 
     const [savedSchoolKeys, setSavedSchoolKeys] = React.useState(() => {
         if (typeof window === "undefined" || !isParent || !userInfo) return new Set();

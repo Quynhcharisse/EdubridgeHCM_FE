@@ -31,12 +31,10 @@ import {enqueueSnackbar} from "notistack";
 import {
     School as SchoolIcon,
     FamilyRestroom as ParentIcon,
-    Search as SearchIcon,
     Chat as ChatIcon,
     Assignment as AssignmentIcon,
     CalendarToday as CalendarIcon,
     TrendingUp as TrendingUpIcon,
-    CheckCircle as CheckCircleIcon,
     ArrowForward as ArrowForwardIcon,
     LocationOn as LocationIcon,
     Star as StarIcon,
@@ -46,6 +44,7 @@ import {
     Groups as GroupsIcon,
     Verified as VerifiedIcon
 } from "@mui/icons-material";
+import {useNavigate} from "react-router-dom";
 import Chatbot from "../ui/Chatbot";
 
 function BlogCard({title, description, image, date, tags}) {
@@ -244,6 +243,7 @@ function LatestAdmissionNewsSection() {
 }
 
 export default function HomePage() {
+    const navigate = useNavigate();
     const [isParentRole, setIsParentRole] = React.useState(false);
     const [showParentFormModal, setShowParentFormModal] = React.useState(false);
     const [isSubmittingParentForm, setIsSubmittingParentForm] = React.useState(false);
@@ -332,14 +332,12 @@ export default function HomePage() {
     };
 
     const handleParentFormSubmit = async () => {
-        // Prevent double submit
         if (isSubmittingParentForm || submitRef.current) {
             return;
         }
         
         submitRef.current = true;
 
-        // Validate required fields
         if (!parentFormData.idCardNumber || !parentFormData.idCardNumber.trim()) {
             enqueueSnackbar('Vui lòng nhập số CMND/CCCD', {variant: 'error'});
             return;
@@ -394,7 +392,6 @@ export default function HomePage() {
             
             if (response && response.status === 200) {
                 enqueueSnackbar('Cập nhật thông tin thành công!', {variant: 'success'});
-                // Update localStorage to mark firstLogin as false
                 const userData = localStorage.getItem('user');
                 if (userData) {
                     try {
@@ -763,7 +760,6 @@ export default function HomePage() {
                                             }
                                         }}
                                     >
-                                    {/* Image Section */}
                                     <Box sx={{
                                         position: 'relative',
                                         width: '100%',
@@ -775,7 +771,6 @@ export default function HomePage() {
                                                 justifyContent: 'center',
                                         overflow: 'hidden'
                                     }}>
-                                        {/* Badge Nổi bật */}
                                         {school.featured && (
                                             <Box sx={{
                                                         position: 'absolute',
@@ -802,7 +797,6 @@ export default function HomePage() {
                                     </Box>
                                         )}
                                         
-                                        {/* Badge Trường tư */}
                                         {school.boarding && (
                                             <Box sx={{
                                             position: 'absolute',
@@ -829,7 +823,6 @@ export default function HomePage() {
                                     </Box>
                                         )}
                                         
-                                        {/* School Logo/Avatar */}
                                         <Avatar
                                             className="school-image"
                                 sx={{
@@ -847,14 +840,12 @@ export default function HomePage() {
                                         </Avatar>
                                     </Box>
                                     
-                                    {/* Content Section */}
                                     <CardContent sx={{
                                         flexGrow: 1,
                                                 display: 'flex',
                                         flexDirection: 'column',
                                         p: 2.5
                                     }}>
-                                        {/* School Name */}
                                         <Box sx={{display: 'flex', alignItems: 'flex-start', mb: 1.5, gap: 1}}>
                                             <Typography 
                                                 variant="h6" 
@@ -870,7 +861,6 @@ export default function HomePage() {
                                         </Typography>
                                         </Box>
                                         
-                                        {/* Tuition */}
                                         <Box sx={{
                                             display: 'flex',
                                             alignItems: 'center',
@@ -887,7 +877,6 @@ export default function HomePage() {
                                         </Typography>
                                     </Box>
                                         
-                                        {/* Location */}
                                         <Box sx={{
                                             display: 'flex',
                                             alignItems: 'center',
@@ -903,7 +892,6 @@ export default function HomePage() {
                                             </Typography>
                                     </Box>
                                         
-                                        {/* Rating & Grade */}
                                         <Box sx={{
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -955,7 +943,6 @@ export default function HomePage() {
                                     </Box>
                                         </Box>
                                         
-                                        {/* Arrow Icon */}
                                         <Box sx={{
                                             display: 'flex',
                                             justifyContent: 'flex-end',
@@ -982,7 +969,7 @@ export default function HomePage() {
                     scrollMarginTop: '80px'
                 }}
             >
-                <Container maxWidth="md" sx={{px: {xs: 3, md: 4}}}>
+                <Container maxWidth="lg" sx={{px: {xs: 3, md: 4}}}>
                     <Box sx={{textAlign: 'center', mb: {xs: 6, md: 8}}}>
                         <Typography 
                             variant="h2"
@@ -994,7 +981,7 @@ export default function HomePage() {
                                 letterSpacing: '-0.02em'
                             }}
                         >
-                            Quy Trình Tư Vấn
+                            Tư Vấn & Giải Đáp
                         </Typography>
                         <Typography variant="body1" sx={{
                             color: '#666',
@@ -1003,218 +990,147 @@ export default function HomePage() {
                             mx: 'auto',
                             lineHeight: 1.7
                         }}>
-                            Từ bước tìm hiểu ban đầu đến khi chốt trường, mọi thứ đều được hệ thống hóa rõ ràng
+                            Giải đáp mọi thắc mắc, đồng hành cùng phụ huynh trong suốt quá trình chọn trường.
                         </Typography>
                     </Box>
-                    <Box sx={{maxWidth: 700, mx: 'auto'}}>
-                        {[
-                            {icon: <SearchIcon/>, title: 'Khảo sát nhu cầu', desc: 'Phụ huynh nhập thông tin, khu vực, ngân sách và mong muốn cho con.'},
-                            {icon: <SchoolIcon/>, title: 'Đề xuất trường phù hợp', desc: 'Hệ thống gợi ý danh sách trường phù hợp, kèm so sánh chi tiết.'},
-                            {icon: <ChatIcon/>, title: 'Kết nối tư vấn', desc: 'Gửi yêu cầu tới trường, chat trực tiếp với bộ phận tuyển sinh.'},
-                            {icon: <CalendarIcon/>, title: 'Tham quan & hoàn tất', desc: 'Đặt lịch tham quan, phỏng vấn và hoàn tất thủ tục nhập học.'}
-                        ].map((step, index, arr) => (
-                            <Box
-                                key={index}
-                                        sx={{
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    mb: index === arr.length - 1 ? 0 : 3
-                                }}
-                            >
-                                <Box sx={{position: 'relative', mr: 2}}>
-                                            <Box
-                                                sx={{
-                                            width: 36,
-                                            height: 36,
-                                                    borderRadius: '50%',
-                                            bgcolor: '#1976d2',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                            color: 'white',
-                                            boxShadow: '0 4px 10px rgba(25,118,210,0.3)'
-                                        }}
-                                    >
-                                        {index + 1}
-                                    </Box>
-                                    {index !== arr.length - 1 && (
-                                        <Box
-                                            sx={{
-                                                        position: 'absolute',
-                                                top: 36,
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                width: 2,
-                                                height: 48,
-                                                bgcolor: '#e5e7eb'
-                                            }}
-                                        />
-                                    )}
-                                </Box>
+                    <Box sx={{maxWidth: 1000, mx: 'auto'}}>
+                        <Box
+                            sx={{
+                                display: 'grid',
+                                gridTemplateColumns: {xs: '1fr', md: 'repeat(2, minmax(0, 1fr))'},
+                                gap: {xs: 2.5, md: 3}
+                            }}
+                        >
+                            <Box>
                                 <Card
                                     sx={{
-                                        flex: 1,
-                                        mb: 0,
-                                        borderRadius: 2,
-                                        boxShadow: '0 4px 18px rgba(15,23,42,0.06)',
-                                        border: '1px solid rgba(15,23,42,0.06)'
+                                        height: '100%',
+                                        borderRadius: 4,
+                                        boxShadow: '0 8px 28px rgba(15,23,42,0.08)',
+                                        border: '1px solid rgba(59,130,246,0.2)',
+                                        transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                                        '&:hover': {
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 12px 34px rgba(37,99,235,0.16)'
+                                        }
                                     }}
                                 >
-                                    <CardContent sx={{p: {xs: 2.5, md: 3}}}>
-                                        <Box sx={{display: 'flex', alignItems: 'center', mb: 1.5, gap: 1}}>
+                                    <CardContent sx={{p: {xs: 2.75, md: 3.2}, display: 'flex', flexDirection: 'column', height: '100%'}}>
+                                        <Box sx={{display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.75}}>
                                             <Box sx={{
-                                                width: 32,
-                                                height: 32,
+                                                width: 38,
+                                                height: 38,
                                                 borderRadius: '50%',
-                                                bgcolor: '#e3f2fd',
+                                                bgcolor: '#DBEAFE',
+                                                color: '#1D4ED8',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#1976d2'
+                                                justifyContent: 'center'
                                             }}>
-                                                    {step.icon}
-                                                </Box>
-                                            <Typography sx={{fontWeight: 700, fontSize: '1rem', color: '#111827'}}>
-                                                {step.title}
+                                                <ChatIcon sx={{fontSize: 20}}/>
+                                            </Box>
+                                            <Typography sx={{fontWeight: 800, fontSize: {xs: '1rem', md: '1.08rem'}, color: '#0f172a'}}>
+                                                Cách 1: Tư vấn online
                                             </Typography>
                                         </Box>
-                                        <Typography sx={{color: '#6b7280', fontSize: '0.95rem', lineHeight: 1.7}}>
-                                                {step.desc}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
+                                        <Typography sx={{color: '#1D4ED8', fontWeight: 700, fontSize: '0.77rem', letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.2}}>
+                                            Linh hoạt - nhanh chóng
+                                        </Typography>
+                                        <Stack spacing={1} sx={{mb: 2.75}}>
+                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1}}>
+                                                <Box sx={{width: 6, height: 6, borderRadius: '50%', bgcolor: '#3B82F6', mt: '8px', flexShrink: 0}}/>
+                                                <Typography sx={{color: '#475569', fontSize: '0.94rem', lineHeight: 1.67}}>
+                                                    Nhắn tin trực tiếp với tư vấn viên.
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1}}>
+                                                <Box sx={{width: 6, height: 6, borderRadius: '50%', bgcolor: '#3B82F6', mt: '8px', flexShrink: 0}}/>
+                                                <Typography sx={{color: '#475569', fontSize: '0.94rem', lineHeight: 1.67}}>
+                                                    Nhận phản hồi nhanh chóng, phù hợp khi cần hỏi ngay.
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
                             </Box>
-                            ))}
+
+                            <Box>
+                                <Card
+                                    sx={{
+                                        height: '100%',
+                                        borderRadius: 4,
+                                        boxShadow: '0 8px 28px rgba(15,23,42,0.08)',
+                                        border: '1px solid rgba(16,185,129,0.22)',
+                                        transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                                        '&:hover': {
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: '0 12px 34px rgba(5,150,105,0.16)'
+                                        }
+                                    }}
+                                >
+                                    <CardContent sx={{p: {xs: 2.75, md: 3.2}, display: 'flex', flexDirection: 'column', height: '100%'}}>
+                                        <Box sx={{display: 'flex', alignItems: 'center', gap: 1.2, mb: 1.75}}>
+                                            <Box sx={{
+                                                width: 38,
+                                                height: 38,
+                                                borderRadius: '50%',
+                                                bgcolor: '#DCFCE7',
+                                                color: '#15803D',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <CalendarIcon sx={{fontSize: 20}}/>
+                                            </Box>
+                                            <Typography sx={{fontWeight: 800, fontSize: {xs: '1rem', md: '1.08rem'}, color: '#0f172a'}}>
+                                                Cách 2: Tư vấn trực tiếp
+                                            </Typography>
+                                        </Box>
+                                        <Typography sx={{color: '#15803D', fontWeight: 700, fontSize: '0.77rem', letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1.2}}>
+                                            Trực quan - chuyên sâu
+                                        </Typography>
+                                        <Stack spacing={1} sx={{mb: 2.75}}>
+                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1}}>
+                                                <Box sx={{width: 6, height: 6, borderRadius: '50%', bgcolor: '#22C55E', mt: '8px', flexShrink: 0}}/>
+                                                <Typography sx={{color: '#475569', fontSize: '0.94rem', lineHeight: 1.67}}>
+                                                    Đặt lịch hẹn trực tiếp với nhà trường.
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1}}>
+                                                <Box sx={{width: 6, height: 6, borderRadius: '50%', bgcolor: '#22C55E', mt: '8px', flexShrink: 0}}/>
+                                                <Typography sx={{color: '#475569', fontSize: '0.94rem', lineHeight: 1.67}}>
+                                                    Tham quan và trao đổi chi tiết, phù hợp khi cần trải nghiệm thực tế.
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
+                            </Box>
+                        </Box>
+
+                        <Box sx={{display: 'flex', justifyContent: 'center', mt: 3.5}}>
+                            <Button
+                                variant="contained"
+                                onClick={() => {
+                                    navigate('/search-schools');
+                                }}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 700,
+                                    px: {xs: 4, md: 5},
+                                    py: 1.2,
+                                    borderRadius: 2.5,
+                                    boxShadow: '0 8px 20px rgba(25,118,210,0.28)'
+                                }}
+                            >
+                                Tìm trường
+                            </Button>
+                        </Box>
                     </Box>
                 </Container>
             </Box>
 
             <LatestAdmissionNewsSection/>
-
-            <Box 
-                id="tu-van-ngay"
-                sx={{
-                    py: {xs: 10, md: 14}, 
-                    bgcolor: '#2563EB',
-                    scrollMarginTop: '80px'
-                }}
-            >
-                <Container maxWidth="lg" sx={{px: {xs: 3, md: 4}, color: '#FFFFFF'}}>
-                    <>
-                        <Box sx={{textAlign: 'center', mb: {xs: 6, md: 8}}}>
-                            <Typography
-                                variant="h2"
-                                sx={{
-                                    fontWeight: 800,
-                                    mb: 2,
-                                    fontSize: {xs: '1.9rem', md: '2.5rem'},
-                                    letterSpacing: '-0.02em',
-                                    color: '#FFFFFF'
-                                }}
-                            >
-                                Đăng Ký Nhận Tư Vấn Miễn Phí
-                            </Typography>
-                            <Typography
-                                variant="body1"
-                                sx={{
-                                    mb: 3,
-                                    fontSize: {xs: '0.95rem', md: '1.05rem'},
-                                    lineHeight: 1.7,
-                                    color: 'rgba(255,255,255,0.9)',
-                                    maxWidth: '640px',
-                                    mx: 'auto'
-                                }}
-                            >
-                                Để lại thông tin, đội ngũ tư vấn của EduBridgeHCM sẽ liên hệ trong vòng
-                                24 giờ để hỗ trợ bạn chọn trường, chọn ngành phù hợp với nhu cầu và tài chính.
-                            </Typography>
-                            <Stack spacing={1.5} sx={{color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', alignItems: 'center'}}>
-                                <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                                    <CheckCircleIcon sx={{fontSize: 18, color: '#22c55e'}}/>
-                                    <Typography>Hoàn toàn miễn phí, bảo mật thông tin.</Typography>
-                                </Box>
-                                <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
-                                    <CheckCircleIcon sx={{fontSize: 18, color: '#22c55e'}}/>
-                                    <Typography>Tư vấn 1-1 theo hồ sơ và nhu cầu của từng gia đình.</Typography>
-                                </Box>
-                            </Stack>
-                        </Box>
-                        <Box sx={{display: 'flex', justifyContent: 'center'}}>
-                            <Card
-                                sx={{
-                                    borderRadius: 3,
-                                    boxShadow: '0 12px 40px rgba(15,23,42,0.15)',
-                                    p: {xs: 3, md: 4},
-                                    bgcolor: 'white',
-                                    border: '1px solid rgba(15,23,42,0.06)',
-                                    maxWidth: '700px',
-                                    width: '100%'
-                                }}
-                            >
-                                <Stack spacing={2.5}>
-                                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
-                                        <TextField
-                                            label="Họ và tên phụ huynh"
-                                            fullWidth
-                                            size="small"
-                                        />
-                                        <TextField
-                                            label="Họ tên học sinh"
-                                            fullWidth
-                                            size="small"
-                                        />
-                                    </Stack>
-                                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
-                                        <TextField
-                                            label="Email liên hệ"
-                                            fullWidth
-                                            size="small"
-                                            type="email"
-                                        />
-                                        <TextField
-                                            label="Số điện thoại"
-                                            fullWidth
-                                            size="small"
-                                        />
-                                    </Stack>
-                                    <TextField
-                                        label="Khu vực / Quận quan tâm"
-                                        fullWidth
-                                        size="small"
-                                    />
-                                    <TextField
-                                        label="Nhu cầu tư vấn (ví dụ: chọn trường THCS/THPT, học bổng, chuyển trường...)"
-                                        fullWidth
-                                        size="small"
-                                        multiline
-                                        rows={4}
-                                    />
-                                    <Button
-                                        variant="contained"
-                                        size="large"
-                                        onClick={handleRegisterClick}
-                                        sx={{
-                                            mt: 1,
-                                            bgcolor: '#1976d2',
-                                            textTransform: 'none',
-                                            fontWeight: 700,
-                                            py: 1.4,
-                                            borderRadius: 2,
-                                            boxShadow: '0 8px 20px rgba(25,118,210,0.35)',
-                                            '&:hover': {
-                                                bgcolor: '#1565c0',
-                                                boxShadow: '0 10px 28px rgba(25,118,210,0.45)',
-                                            }
-                                        }}
-                                    >
-                                        Gửi yêu cầu tư vấn
-                                    </Button>
-                                </Stack>
-                            </Card>
-                        </Box>
-                    </>
-                </Container>
-            </Box>
 
             <Box sx={{py: {xs: 10, md: 14}, bgcolor: '#EFF6FF', position: 'relative', overflow: 'hidden'}}>
                 <Container maxWidth="lg" sx={{px: {xs: 3, md: 4}, position: 'relative', zIndex: 1}}>
@@ -1277,7 +1193,6 @@ export default function HomePage() {
                 </Container>
             </Box>
 
-            {/* Chatbot */}
             <Chatbot />
         </Box>
     );
