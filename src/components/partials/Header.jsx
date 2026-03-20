@@ -36,7 +36,7 @@ import {getParentConversations} from "../../services/ConversationService.jsx";
 import {getParentMessagesHistory, markParentMessagesRead} from "../../services/MessageService.jsx";
 import {connectPrivateMessageSocket, disconnect, sendMessage} from "../../services/WebSocketService.jsx";
 import logo from "../../assets/logo.png";
-import {useLocation} from "react-router-dom";
+import {useLocation, useNavigate} from "react-router-dom";
 
 function MainHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,6 +63,7 @@ function MainHeader() {
     const selectedConversationRef = React.useRef(null);
 
     const location = useLocation();
+    const navigate = useNavigate();
     const isHomePage = location.pathname === '/home' || location.pathname === '/';
     const isSignedIn = typeof window !== 'undefined' && localStorage.getItem('user');
 
@@ -377,7 +378,7 @@ function MainHeader() {
 
     const handleButtonClick = (event) => {
         if (!isSignedIn) {
-            window.location.href = '/login';
+            navigate('/login');
         } else {
             handleUserMenuClick(event);
         }
@@ -418,8 +419,13 @@ function MainHeader() {
                 requestAnimationFrame(step);
             }
         } else {
-            window.location.href = `/#${sectionId}`;
+            navigate(`/home#${sectionId}`);
         }
+    };
+
+    const goTo = (path) => {
+        navigate(path);
+        setMobileMenuOpen(false);
     };
 
     const profileBody = React.useMemo(() => {
@@ -435,6 +441,43 @@ function MainHeader() {
     const displayName = profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
     const displayEmail = profileBody?.email || userInfo?.email || '';
     const avatarUrl = profileBody?.picture || userInfo?.picture || null;
+    const isActivePath = (path) => location.pathname === path;
+    const navButtonSx = (path) => ({
+        fontWeight: 600,
+        color: isActivePath(path) ? '#0f4fbf' : '#334155',
+        fontSize: 16,
+        textTransform: 'none',
+        px: 2,
+        py: 1,
+        borderRadius: 999,
+        border: isActivePath(path) ? '1px solid rgba(25,118,210,0.35)' : '1px solid transparent',
+        bgcolor: isActivePath(path)
+            ? 'linear-gradient(135deg, rgba(227,242,253,1) 0%, rgba(219,234,254,1) 100%)'
+            : 'transparent',
+        boxShadow: isActivePath(path)
+            ? '0 6px 16px rgba(25,118,210,0.18), inset 0 1px 0 rgba(255,255,255,0.75)'
+            : 'none',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        '&:hover': {
+            color: '#1976d2',
+            bgcolor: 'rgba(25,118,210,0.08)',
+            borderColor: 'rgba(25,118,210,0.25)',
+            boxShadow: '0 4px 12px rgba(25,118,210,0.14)',
+            transform: 'translateY(-1px)'
+        }
+    });
+    const navMobileItemSx = (path) => ({
+        cursor: 'pointer',
+        bgcolor: isActivePath(path)
+            ? 'linear-gradient(135deg, rgba(227,242,253,1) 0%, rgba(219,234,254,1) 100%)'
+            : 'transparent',
+        border: isActivePath(path) ? '1px solid rgba(25,118,210,0.28)' : '1px solid transparent',
+        borderRadius: 2
+    });
+    const navMobileTextSx = (path) => ({
+        color: isActivePath(path) ? '#0f4fbf' : '#334155',
+        fontWeight: isActivePath(path) ? 700 : 600
+    });
 
     return (
         <AppBar position="fixed" elevation={0}
@@ -457,7 +500,7 @@ function MainHeader() {
                         <Box component="img"
                              src={logo}
                              alt="EduBridgeHCM"
-                             onClick={() => window.location.href = "/"}
+                             onClick={() => goTo('/home')}
                              sx={{
                                  cursor: "pointer",
                                  height: 50,
@@ -467,7 +510,7 @@ function MainHeader() {
                                  boxShadow: '0 4px 12px rgba(25,118,210,0.3)'
                              }}
                         />
-                        <Typography onClick={() => window.location.href = "/"} variant="h5"
+                        <Typography onClick={() => goTo('/home')} variant="h5"
                                     sx={{cursor: "pointer", fontWeight: 800, color: '#1976d2', letterSpacing: 1}}>
                             EduBridgeHCM
                         </Typography>
@@ -477,21 +520,15 @@ function MainHeader() {
                         <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/'}
+                                sx={navButtonSx('/home')}
+                                onClick={() => goTo('/home')}
+                            >
+                                Trang chủ
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={navButtonSx('/search-schools')}
+                                onClick={() => goTo('/search-schools')}
                             >
                                 Tìm trường
                             </Button>
@@ -501,6 +538,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -511,7 +549,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/login'}
+                                onClick={() => goTo('/login')}
                             >
                                 Trường đã lưu
                             </Button>
@@ -521,6 +559,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -531,7 +570,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/login'}
+                                onClick={() => goTo('/login')}
                             >
                                 Yêu cầu tư vấn
                             </Button>
@@ -541,6 +580,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -551,7 +591,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/admission-news'}
+                                onClick={() => goTo('/admission-news')}
                             >
                                 Tin tuyển sinh
                             </Button>
@@ -561,21 +601,15 @@ function MainHeader() {
                         <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/'}
+                                sx={navButtonSx('/home')}
+                                onClick={() => goTo('/home')}
+                            >
+                                Trang chủ
+                            </Button>
+                            <Button
+                                color="inherit"
+                                sx={navButtonSx('/search-schools')}
+                                onClick={() => goTo('/search-schools')}
                             >
                                 Tìm trường
                             </Button>
@@ -585,6 +619,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -595,7 +630,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/saved-schools'}
+                                onClick={() => goTo('/saved-schools')}
                             >
                                 Trường đã lưu
                             </Button>
@@ -605,6 +640,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -615,7 +651,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/consultation-requests'}
+                                onClick={() => goTo('/consultation-requests')}
                             >
                                 Yêu cầu tư vấn
                             </Button>
@@ -625,6 +661,7 @@ function MainHeader() {
                                     fontWeight: 600,
                                     color: '#333',
                                     fontSize: 16,
+                                    textTransform: 'none',
                                     px: 2,
                                     py: 1,
                                     borderRadius: 2,
@@ -635,7 +672,7 @@ function MainHeader() {
                                         transform: 'translateY(-1px)',
                                     }
                                 }}
-                                onClick={() => window.location.href = '/admission-news'}
+                                onClick={() => goTo('/admission-news')}
                             >
                                 Tin tuyển sinh
                             </Button>
@@ -645,81 +682,29 @@ function MainHeader() {
                         <Box sx={{display: {xs: 'none', md: 'flex'}, gap: 1}}>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/home'}
+                                sx={navButtonSx('/home')}
+                                onClick={() => goTo('/home')}
                             >
                                 Trang Chủ
                             </Button>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/schools'}
+                                sx={navButtonSx('/search-schools')}
+                                onClick={() => goTo('/search-schools')}
                             >
                                 Danh Sách Trường
                             </Button>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/guide'}
+                                sx={navButtonSx('/guide')}
+                                onClick={() => goTo('/guide')}
                             >
                                 Hướng Dẫn
                             </Button>
                             <Button
                                 color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => window.location.href = '/about'}
+                                sx={navButtonSx('/about')}
+                                onClick={() => goTo('/about')}
                             >
                                 Về Chúng Tôi
                             </Button>
@@ -1103,7 +1088,7 @@ function MainHeader() {
                                             <MenuItem
                                                 onClick={() => {
                                                     handleUserMenuClose();
-                                                    window.location.href = '/parent/profile';
+                                                    goTo('/parent/profile');
                                                 }}
                                                 sx={{
                                                     fontSize: 15,
@@ -1124,7 +1109,7 @@ function MainHeader() {
                                             <MenuItem
                                                 onClick={() => {
                                                     handleUserMenuClose();
-                                                    window.location.href = '/children-info';
+                                                    goTo('/children-info');
                                                 }}
                                                 sx={{
                                                     fontSize: 15,
@@ -1149,15 +1134,15 @@ function MainHeader() {
                                             handleUserMenuClose();
                                             if (userInfo) {
                                                 if (userInfo.role === 'STUDENT') {
-                                                    window.location.href = '/student/dashboard';
+                                                    goTo('/student/dashboard');
                                                 } else if (userInfo.role === 'SCHOOL') {
-                                                    window.location.href = '/school/dashboard';
+                                                    goTo('/school/dashboard');
                                                 } else if (userInfo.role === 'ADMIN') {
-                                                    window.location.href = '/admin/dashboard';
+                                                    goTo('/admin/dashboard');
                                                 } else if (userInfo.role === 'COUNSELLOR') {
-                                                    window.location.href = '/counsellor/dashboard';
+                                                    goTo('/counsellor/dashboard');
                                                 } else {
-                                                    window.location.href = '/home';
+                                                    goTo('/home');
                                                 }
                                             }
                                         }}
@@ -1244,47 +1229,53 @@ function MainHeader() {
                         <List>
                             {isSignedIn && isParent ? (
                                 <>
-                                    <ListItem onClick={() => window.location.href = '/'}>
-                                        <ListItemText primary="Tìm trường" sx={{color: '#1976d2', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/home')} sx={navMobileItemSx('/home')}>
+                                        <ListItemText primary="Trang chủ" sx={navMobileTextSx('/home')}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/saved-schools'}>
+                                    <ListItem onClick={() => goTo('/search-schools')} sx={navMobileItemSx('/search-schools')}>
+                                        <ListItemText primary="Tìm trường" sx={navMobileTextSx('/search-schools')}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => goTo('/saved-schools')}>
                                         <ListItemText primary="Trường đã lưu" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/consultation-requests'}>
+                                    <ListItem onClick={() => goTo('/consultation-requests')}>
                                         <ListItemText primary="Yêu cầu tư vấn" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/admission-news'}>
+                                    <ListItem onClick={() => goTo('/admission-news')}>
                                         <ListItemText primary="Tin tuyển sinh" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
                                 </>
                             ) : !isSignedIn ? (
                                 <>
-                                    <ListItem onClick={() => window.location.href = '/'}>
-                                        <ListItemText primary="Tìm trường" sx={{color: '#1976d2', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/home')} sx={navMobileItemSx('/home')}>
+                                        <ListItemText primary="Trang chủ" sx={navMobileTextSx('/home')}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/saved-schools'}>
+                                    <ListItem onClick={() => goTo('/search-schools')} sx={navMobileItemSx('/search-schools')}>
+                                        <ListItemText primary="Tìm trường" sx={navMobileTextSx('/search-schools')}/>
+                                    </ListItem>
+                                    <ListItem onClick={() => goTo('/saved-schools')}>
                                         <ListItemText primary="Trường đã lưu" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/consultation-requests'}>
+                                    <ListItem onClick={() => goTo('/consultation-requests')}>
                                         <ListItemText primary="Yêu cầu tư vấn" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/admission-news'}>
+                                    <ListItem onClick={() => goTo('/admission-news')}>
                                         <ListItemText primary="Tin tuyển sinh" sx={{color: '#333', fontWeight: 600}}/>
                                     </ListItem>
                                 </>
                             ) : !isHomePage && (
                                 <>
-                                    <ListItem onClick={() => window.location.href = '/home'}>
-                                        <ListItemText primary="Trang Chủ" sx={{color: '#1976d2', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/home')} sx={navMobileItemSx('/home')}>
+                                        <ListItemText primary="Trang Chủ" sx={navMobileTextSx('/home')}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/schools'}>
-                                        <ListItemText primary="Danh Sách Trường" sx={{color: '#333', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/search-schools')} sx={navMobileItemSx('/search-schools')}>
+                                        <ListItemText primary="Danh Sách Trường" sx={navMobileTextSx('/search-schools')}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/guide'}>
-                                        <ListItemText primary="Hướng Dẫn" sx={{color: '#333', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/guide')} sx={navMobileItemSx('/guide')}>
+                                        <ListItemText primary="Hướng Dẫn" sx={navMobileTextSx('/guide')}/>
                                     </ListItem>
-                                    <ListItem onClick={() => window.location.href = '/about'}>
-                                        <ListItemText primary="Về Chúng Tôi" sx={{color: '#333', fontWeight: 600}}/>
+                                    <ListItem onClick={() => goTo('/about')} sx={navMobileItemSx('/about')}>
+                                        <ListItemText primary="Về Chúng Tôi" sx={navMobileTextSx('/about')}/>
                                     </ListItem>
                                 </>
                             )}
@@ -1327,7 +1318,7 @@ function MainHeader() {
                                     {isParent ? (
                                         <>
                                             <ListItem 
-                                                onClick={() => window.location.href = '/profile'}
+                                                onClick={() => goTo('/profile')}
                                                 sx={{cursor: 'pointer'}}
                                             >
                                                 <ListItemText 
@@ -1336,7 +1327,7 @@ function MainHeader() {
                                                 />
                                             </ListItem>
                                             <ListItem 
-                                                onClick={() => window.location.href = '/children-info'}
+                                                onClick={() => goTo('/children-info')}
                                                 sx={{cursor: 'pointer'}}
                                             >
                                                 <ListItemText 
@@ -1350,15 +1341,15 @@ function MainHeader() {
                                         onClick={() => {
                                             if (userInfo) {
                                                 if (userInfo.role === 'STUDENT') {
-                                                    window.location.href = '/student/dashboard';
+                                                    goTo('/student/dashboard');
                                                 } else if (userInfo.role === 'SCHOOL') {
-                                                    window.location.href = '/school/dashboard';
+                                                    goTo('/school/dashboard');
                                                 } else if (userInfo.role === 'ADMIN') {
-                                                    window.location.href = '/admin/dashboard';
+                                                    goTo('/admin/dashboard');
                                                 } else if (userInfo.role === 'COUNSELLOR') {
-                                                    window.location.href = '/counsellor/dashboard';
+                                                    goTo('/counsellor/dashboard');
                                                 } else {
-                                                    window.location.href = '/home';
+                                                    goTo('/home');
                                                 }
                                             }
                                         }}

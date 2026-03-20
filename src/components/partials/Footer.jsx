@@ -111,7 +111,7 @@ export default function Footer() {
                             gap: 1
                         }}>
                             <div><a href="/home" style={{color: 'inherit', textDecoration: 'none'}}>Trang Chủ</a></div>
-                            <div><a href="/schools" style={{color: 'inherit', textDecoration: 'none'}}>Danh Sách Trường</a></div>
+                            <div><a href="/search-schools" style={{color: 'inherit', textDecoration: 'none'}}>Danh Sách Trường</a></div>
                             <div><a href="/guide" style={{color: 'inherit', textDecoration: 'none'}}>Hướng Dẫn</a></div>
                             <div><a href="/about" style={{color: 'inherit', textDecoration: 'none'}}>Về Chúng Tôi</a></div>
                         </Box>
