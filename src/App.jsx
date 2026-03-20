@@ -8,6 +8,7 @@ import {GlobalLoadingOverlay, LoadingProvider} from './contexts/LoadingContext.j
 // Lazy load components
 const WebAppLayout = lazy(() => import("./components/ui/WebAppLayout.jsx"));
 const HomePage = lazy(() => import("./components/Page/HomePage.jsx"));
+const SchoolSearchPage = lazy(() => import("./components/Page/SchoolSearchPage.jsx"));
 const Login = lazy(() => import("./components/auth/Login.jsx"));
 const Register = lazy(() => import("./components/auth/Register.jsx"));
 const ParentRegistrationForm = lazy(() => import("./components/auth/ParentRegistrationForm.jsx"));
@@ -108,12 +109,16 @@ const router = createBrowserRouter([
                 )
             },
             {
-                path: 'schools',
+                path: 'search-schools',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
-                        <div>Schools List</div>
+                        <SchoolSearchPage/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'schools',
+                element: <Navigate to={'/search-schools'} replace />
             },
             {
                 path: 'guide',

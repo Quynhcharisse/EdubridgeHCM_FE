@@ -39,14 +39,15 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
         <Box
             sx={{
                 position: 'relative',
-                minWidth: { xs: '100%', md: 300 },
+                minWidth: 0,
+                width: '100%'
             }}
         >
             <Typography
                 sx={{
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    color: '#ffffff',
+                    color: '#334155',
                     mb: 1,
                 }}
             >
@@ -58,7 +59,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                 onChange={handleChange}
                 min={0}
                 max={60}
-                step={3}
+                step={1}
                 valueLabelDisplay="off"
                 marks={marks}
                 disableSwap
@@ -99,7 +100,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                     },
                     '& .MuiSlider-markLabel': {
                         fontSize: '0.7rem',
-                        color: '#ffffff',
+                        color: '#64748b',
                         fontWeight: 600,
                         mt: 0.5,
                     },
@@ -118,7 +119,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                     sx={{
                         fontSize: '0.8rem',
                         fontWeight: 700,
-                        color: '#ffffff',
+                        color: '#1e293b',
                     }}
                 >
                     {formatCurrency(value[0])}
@@ -126,7 +127,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                 <Typography
                     sx={{
                         fontSize: '0.7rem',
-                        color: '#ffffff',
+                        color: '#64748b',
                         fontWeight: 600,
                         mx: 1,
                     }}
@@ -137,7 +138,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                     sx={{
                         fontSize: '0.8rem',
                         fontWeight: 700,
-                        color: '#ffffff',
+                        color: '#1e293b',
                     }}
                 >
                     {formatCurrency(value[1])}
