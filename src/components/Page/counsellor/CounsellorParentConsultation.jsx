@@ -274,7 +274,13 @@ export default function CounsellorParentConsultation() {
         const parsed = parseHistoryResponse(response);
         const normalized = parsed.items.map(normalizeMessage);
         setMessageItems((prev) =>
-          cursorId ? mergeUniqueMessages([...normalized, ...prev]) : mergeUniqueMessages(normalized)
+          // If history returns empty while we're refreshing after sending,
+          // keep current messages instead of wiping UI.
+          cursorId
+            ? mergeUniqueMessages([...normalized, ...prev])
+            : normalized.length
+              ? mergeUniqueMessages(normalized)
+              : prev
         );
         setMessageNextCursorId(parsed.nextCursorId);
         setMessageHasMore(parsed.hasMore);
