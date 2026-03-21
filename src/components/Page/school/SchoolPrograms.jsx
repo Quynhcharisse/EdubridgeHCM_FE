@@ -88,11 +88,30 @@ const formatVND = (value) => {
     }
 };
 
+/** Đồng bộ với SchoolCurriculums: subTypeName dùng cho form/API không được chứa tiền tố "Hệ " lặp. */
+function stripLeadingHePrefix(value) {
+    let s = String(value ?? "").trim();
+    while (s.length > 0) {
+        const m = s.match(/^Hệ\s+/u);
+        if (!m) break;
+        s = s.slice(m[0].length).trim();
+    }
+    return s;
+}
+
+function mapSubTypeNameForProgramSelect(item) {
+    const raw = item?.subTypeName;
+    if (raw != null && String(raw).trim() !== "") {
+        return stripLeadingHePrefix(raw);
+    }
+    return item?.name ?? "";
+}
+
 function mapCurriculumForProgramSelect(item) {
     if (!item) return null;
     return {
         id: item.id,
-        subTypeName: item.subTypeName ?? item.name ?? "",
+        subTypeName: mapSubTypeNameForProgramSelect(item),
         curriculumType: item.curriculumType,
         enrollmentYear: item.enrollmentYear,
         curriculumStatus: item.curriculumStatus,
@@ -890,7 +909,7 @@ export default function SchoolPrograms() {
                                             label="Khung chương trình"
                                             placeholder="Chọn khung chương trình..."
                                             error={!!formErrors.curriculumId}
-                                            helperText={formErrors.curriculumId || "Chỉ hiển thị CUR_ACTIVE. Ưu tiên bản mới nhất."}
+                                            helperText={formErrors.curriculumId || ""}
                                         />
                                     )}
                                     renderOption={(props, option) => (

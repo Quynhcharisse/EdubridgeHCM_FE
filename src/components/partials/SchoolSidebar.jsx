@@ -33,9 +33,9 @@ const menuItems = [
     { text: "Bảng điều khiển", icon: <DashboardIcon />, path: "/school/dashboard" },
     { text: "Cơ sở", icon: <ApartmentIcon />, path: "/school/campus" },
     { text: "Tư vấn viên", icon: <SupportAgentIcon />, path: "/school/counselors" },
+    { text: "Chiến dịch tuyển sinh", icon: <CampaignIcon />, path: "/school/campaigns" },
     { text: "Chương trình học", icon: <MenuBookIcon />, path: "/school/curriculums" },
     { text: "Quản lý Program", icon: <ViewAgendaIcon />, path: "/school/programs" },
-    { text: "Chiến dịch tuyển sinh", icon: <CampaignIcon />, path: "/school/campaigns" },
 ];
 
 const LABEL_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
