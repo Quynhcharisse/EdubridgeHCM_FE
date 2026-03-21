@@ -35,6 +35,11 @@ import ApartmentIcon from "@mui/icons-material/Apartment";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import PhoneIcon from "@mui/icons-material/Phone";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import {enqueueSnackbar} from "notistack";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {listCampuses, createCampus} from "../../../services/CampusService.jsx";
@@ -898,166 +903,525 @@ export default function SchoolCampus() {
             <Dialog
                 open={viewModalOpen}
                 onClose={() => setViewModalOpen(false)}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
-                PaperProps={{sx: {borderRadius: 3}}}
+                PaperProps={{
+                    sx: {
+                        ...modalPaperSx,
+                        display: "flex",
+                        flexDirection: "column",
+                    },
+                }}
+                slotProps={{backdrop: {sx: modalBackdropSx}}}
             >
-                <DialogTitle sx={{fontWeight: 700, color: "#1e293b"}}>
-                    Chi tiết cơ sở
-                </DialogTitle>
-                <DialogContent dividers>
-                    {selectedCampus && (
-                        <Stack spacing={2}>
-                            <Box
-                                component="img"
-                                src={selectedCampus.imageUrl || PLACEHOLDER_IMAGE}
-                                alt={selectedCampus.name}
+                <DialogTitle sx={{px: 3, pt: 3, pb: 1.5}}>
+                    <Box sx={{display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2}}>
+                        <Box>
+                            <Typography
                                 sx={{
-                                    width: "100%",
-                                    maxHeight: 200,
-                                    borderRadius: 2,
-                                    objectFit: "cover",
+                                    fontSize: 22,
+                                    fontWeight: 800,
+                                    color: "#1e293b",
+                                    lineHeight: 1.2,
+                                }}
+                            >
+                                Chi tiết cơ sở
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    mt: 0.75,
+                                    color: "#64748b",
+                                    fontSize: 13,
+                                    maxWidth: 520,
+                                    lineHeight: 1.4,
+                                }}
+                            >
+                                {selectedCampus
+                                    ? selectedCampus.address ||
+                                      [selectedCampus.city, selectedCampus.district].filter(Boolean).join(" / ") ||
+                                      "—"
+                                    : "—"}
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{display: "flex", alignItems: "center", gap: 1.25}}>
+                            {selectedCampus && (
+                                <>
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            px: 1.25,
+                                            py: 0.75,
+                                            borderRadius: 999,
+                                            fontSize: 13,
+                                            fontWeight: 900,
+                                            bgcolor:
+                                                selectedCampus.status === "active"
+                                                    ? "rgba(22, 163, 74, 0.12)"
+                                                    : "rgba(148, 163, 184, 0.25)",
+                                            color:
+                                                selectedCampus.status === "active" ? "#16a34a" : "#64748b",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 0.75,
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        <Box component="span" sx={{display: "inline-flex", alignItems: "center"}}>
+                                            {selectedCampus.status === "active" ? (
+                                                <CheckCircleIcon sx={{fontSize: 16, color: "inherit"}}/>
+                                            ) : (
+                                                <WarningAmberOutlinedIcon sx={{fontSize: 16, color: "inherit"}}/>
+                                            )}
+                                        </Box>
+                                        {selectedCampus.status === "active" ? "Xác thực" : "Chưa xác thực"}
+                                    </Box>
+
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            px: 1.25,
+                                            py: 0.75,
+                                            borderRadius: 999,
+                                            fontSize: 13,
+                                            fontWeight: 900,
+                                            bgcolor:
+                                                selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
+                                                    ? "rgba(22, 163, 74, 0.12)"
+                                                    : "rgba(239, 68, 68, 0.10)",
+                                            color:
+                                                selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
+                                                    ? "#16a34a"
+                                                    : "#ef4444",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 0.75,
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        <Box component="span" sx={{display: "inline-flex", alignItems: "center"}}>
+                                            {selectedCampus.accountStatus === "ACCOUNT_ACTIVE" ? (
+                                                <CheckCircleIcon sx={{fontSize: 16, color: "inherit"}}/>
+                                            ) : (
+                                                <WarningAmberOutlinedIcon sx={{fontSize: 16, color: "inherit"}}/>
+                                            )}
+                                        </Box>
+                                        {selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
+                                            ? "Hoạt động"
+                                            : "Ngưng hoạt động"}
+                                    </Box>
+                                </>
+                            )}
+
+                            <IconButton
+                                onClick={() => setViewModalOpen(false)}
+                                size="small"
+                                sx={{mt: -0.5, mr: -0.5}}
+                                aria-label="Đóng"
+                            >
+                                <CloseIcon fontSize="small"/>
+                            </IconButton>
+                        </Box>
+                    </Box>
+                </DialogTitle>
+
+                <DialogContent
+                    sx={{
+                        px: 3,
+                        pt: 1.5,
+                        pb: 0,
+                        flex: 1,
+                        maxHeight: "72vh",
+                        overflowY: "auto",
+                    }}
+                >
+                    {selectedCampus && (
+                        <Box sx={{display: "flex", flexDirection: "column", gap: 3, pb: 2.5}}>
+                            {/* Hero */}
+                            <Box
+                                sx={{
+                                    position: "relative",
+                                    height: {xs: 180, sm: 220},
+                                    borderRadius: 3,
+                                    overflow: "hidden",
+                                    boxShadow: "0 18px 36px rgba(2, 6, 23, 0.12)",
                                     border: "1px solid #e2e8f0",
                                 }}
-                            />
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Tên cơ sở
-                                </Typography>
-                                <Typography variant="h6" sx={{fontWeight: 600}}>
-                                    {selectedCampus.name}
-                                </Typography>
+                            >
+                                <Box
+                                    component="img"
+                                    src={selectedCampus.imageUrl || PLACEHOLDER_IMAGE}
+                                    alt={selectedCampus.name}
+                                    sx={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                                <Box
+                                    sx={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        background:
+                                            "linear-gradient(180deg, rgba(2, 6, 23, 0.10) 0%, rgba(2, 6, 23, 0.58) 100%)",
+                                    }}
+                                />
+
+                                <Box
+                                    sx={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        p: 3,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        justifyContent: "space-between",
+                                    }}
+                                >
+                                    {selectedCampus.isPrimaryBranch && (
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                alignSelf: "flex-start",
+                                                px: 1.5,
+                                                py: 0.75,
+                                                borderRadius: 999,
+                                                background: "rgba(255,255,255,0.92)",
+                                                color: "#0D64DE",
+                                                fontWeight: 900,
+                                                fontSize: 12,
+                                                boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
+                                                border: "1px solid rgba(255,255,255,0.65)",
+                                            }}
+                                        >
+                                            Chi nhánh chính
+                                        </Box>
+                                    )}
+
+                                    <Typography
+                                        sx={{
+                                            color: "white",
+                                            fontSize: {xs: 20, sm: 24},
+                                            fontWeight: 900,
+                                            textShadow: "0 18px 40px rgba(0,0,0,0.5)",
+                                            lineHeight: 1.15,
+                                        }}
+                                    >
+                                        {selectedCampus.name}
+                                    </Typography>
+                                </Box>
                             </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Địa chỉ
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.address || "—"}
-                                </Typography>
-                            </Box>
-                            {(selectedCampus.city || selectedCampus.district) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
+
+                            {/* Info grid */}
+                            <Box
+                                sx={{
+                                    display: "grid",
+                                    gridTemplateColumns: {xs: "1fr", sm: "1fr 1fr"},
+                                    gap: 2,
+                                }}
+                            >
+                                {/** Address */}
+                                <Card
+                                    sx={{
+                                        borderRadius: 3,
+                                        border: "1px solid #e2e8f0",
+                                        p: 2.25,
+                                        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                                        transition: "box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
+                                        "&:hover": {
+                                            boxShadow: "0 16px 34px rgba(2, 6, 23, 0.10)",
+                                            transform: "translateY(-1px)",
+                                            borderColor: "#cbd5e1",
+                                        },
+                                    }}
+                                >
+                                    <Typography sx={{fontSize: 12, color: "#94a3b8", fontWeight: 700}}>
+                                        Địa chỉ
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            mt: 0.6,
+                                            color: "#1e293b",
+                                            fontWeight: 700,
+                                            fontSize: 14,
+                                            wordBreak: "break-word",
+                                        }}
+                                    >
+                                        {selectedCampus.address || "—"}
+                                    </Typography>
+                                </Card>
+
+                                {/** City/District */}
+                                <Card
+                                    sx={{
+                                        borderRadius: 3,
+                                        border: "1px solid #e2e8f0",
+                                        p: 2.25,
+                                        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                                        transition: "box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
+                                        "&:hover": {
+                                            boxShadow: "0 16px 34px rgba(2, 6, 23, 0.10)",
+                                            transform: "translateY(-1px)",
+                                            borderColor: "#cbd5e1",
+                                        },
+                                    }}
+                                >
+                                    <Typography sx={{fontSize: 12, color: "#94a3b8", fontWeight: 700}}>
                                         Thành phố / Quận
                                     </Typography>
-                                    <Typography variant="body1">
+                                    <Typography
+                                        sx={{
+                                            mt: 0.6,
+                                            color: "#1e293b",
+                                            fontWeight: 700,
+                                            fontSize: 14,
+                                            wordBreak: "break-word",
+                                        }}
+                                    >
                                         {[selectedCampus.city, selectedCampus.district].filter(Boolean).join(" / ") || "—"}
                                     </Typography>
-                                </Box>
-                            )}
-                            {(selectedCampus.latitude != null || selectedCampus.longitude != null) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Tọa độ
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {[selectedCampus.latitude, selectedCampus.longitude].filter((v) => v != null && v !== "").join(", ") || "—"}
-                                    </Typography>
-                                </Box>
-                            )}
-                            {(selectedCampus.boardingType || selectedCampus.boardingTypeLabel) && (
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary">
+                                </Card>
+
+                                {/** Boarding type */}
+                                <Card
+                                    sx={{
+                                        borderRadius: 3,
+                                        border: "1px solid #e2e8f0",
+                                        p: 2.25,
+                                        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                                        transition: "box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
+                                        "&:hover": {
+                                            boxShadow: "0 16px 34px rgba(2, 6, 23, 0.10)",
+                                            transform: "translateY(-1px)",
+                                            borderColor: "#cbd5e1",
+                                        },
+                                    }}
+                                >
+                                    <Typography sx={{fontSize: 12, color: "#94a3b8", fontWeight: 700}}>
                                         Loại nội trú
                                     </Typography>
-                                    <Typography variant="body1">
+                                    <Typography
+                                        sx={{
+                                            mt: 0.6,
+                                            color: "#1e293b",
+                                            fontWeight: 700,
+                                            fontSize: 14,
+                                            wordBreak: "break-word",
+                                        }}
+                                    >
                                         {getBoardingTypeLabelVi(
                                             selectedCampus.boardingType,
                                             selectedCampus.boardingTypeLabel
                                         )}
                                     </Typography>
-                                </Box>
-                            )}
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Số điện thoại
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.phone || "—"}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Email
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.email || "—"}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
-                                    Chi nhánh chính
-                                </Typography>
-                                <Typography variant="body1">
-                                    {selectedCampus.isPrimaryBranch ? "Có" : "Không"}
-                                </Typography>
-                            </Box>
-                            <Box sx={{display: "flex", gap: 2, alignItems: "center"}}>
-                                <Typography variant="caption" color="text.secondary">
-                                    Trạng thái cơ sở
-                                </Typography>
-                                <Box
-                                    component="span"
+                                </Card>
+
+                                {/** Coordinates */}
+                                <Card
                                     sx={{
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        bgcolor:
-                                            selectedCampus.status === "active"
-                                                ? "rgba(34, 197, 94, 0.12)"
-                                                : "rgba(148, 163, 184, 0.2)",
-                                        color:
-                                            selectedCampus.status === "active"
-                                                ? "#16a34a"
-                                                : "#64748b",
+                                        borderRadius: 3,
+                                        border: "1px solid #e2e8f0",
+                                        p: 2.25,
+                                        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                                        transition: "box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
+                                        "&:hover": {
+                                            boxShadow: "0 16px 34px rgba(2, 6, 23, 0.10)",
+                                            transform: "translateY(-1px)",
+                                            borderColor: "#cbd5e1",
+                                        },
                                     }}
                                 >
-                                    {selectedCampus.status === "active" ? "Xác thực" : "Chưa xác thực"}
-                                </Box>
+                                    <Typography sx={{fontSize: 12, color: "#94a3b8", fontWeight: 700}}>
+                                        Tọa độ
+                                    </Typography>
+                                    <Box
+                                        sx={{
+                                            mt: 0.8,
+                                            display: "inline-block",
+                                            px: 1.25,
+                                            py: 0.75,
+                                            borderRadius: 2,
+                                            background: "#f1f5f9",
+                                            border: "1px solid #e2e8f0",
+                                        }}
+                                    >
+                                        <Typography
+                                            component="span"
+                                            sx={{
+                                                color: "#1e293b",
+                                                fontWeight: 800,
+                                                fontSize: 13,
+                                                fontFamily:
+                                                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                            }}
+                                        >
+                                            {[selectedCampus.latitude, selectedCampus.longitude]
+                                                .filter((v) => v != null && v !== "")
+                                                .join(", ") || "—"}
+                                        </Typography>
+                                    </Box>
+                                </Card>
                             </Box>
-                            <Box sx={{display: "flex", gap: 2, alignItems: "center"}}>
-                                <Typography variant="caption" color="text.secondary">
-                                    Trạng thái tài khoản
+
+                            {/* Contact */}
+                            <Card
+                                sx={{
+                                    borderRadius: 3,
+                                    background: "#f8fafc",
+                                    border: "1px solid #e2e8f0",
+                                    p: 2.5,
+                                    boxShadow: "none",
+                                }}
+                            >
+                                <Typography sx={{fontSize: 14, fontWeight: 900, color: "#1e293b", mb: 2}}>
+                                    Thông tin liên hệ
                                 </Typography>
+
                                 <Box
-                                    component="span"
                                     sx={{
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 999,
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        bgcolor:
-                                            selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                                ? "rgba(34, 197, 94, 0.12)"
-                                                : "rgba(148, 163, 184, 0.2)",
-                                        color:
-                                            selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                                ? "#16a34a"
-                                                : "#64748b",
+                                        display: "grid",
+                                        gridTemplateColumns: {xs: "1fr", sm: "1fr 1fr"},
+                                        gap: 2,
                                     }}
                                 >
-                                    {selectedCampus.accountStatus === "ACCOUNT_ACTIVE"
-                                        ? "Hoạt động"
-                                        : "Ngưng hoạt động"}
+                                    <Box
+                                        sx={{
+                                            p: 1.75,
+                                            borderRadius: 2,
+                                            background: "white",
+                                            border: "1px solid #e2e8f0",
+                                        }}
+                                    >
+                                        <Typography
+                                            sx={{
+                                                fontSize: 12,
+                                                color: "#94a3b8",
+                                                fontWeight: 800,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <Box component="span" sx={{display: "inline-flex", alignItems: "center"}}>
+                                                <PhoneIcon sx={{fontSize: 18, color: "inherit"}}/>
+                                            </Box>
+                                            Phone
+                                        </Typography>
+                                        <Typography
+                                            sx={{
+                                                mt: 0.6,
+                                                color: "#1e293b",
+                                                fontWeight: 700,
+                                                fontSize: 14,
+                                                wordBreak: "break-word",
+                                            }}
+                                        >
+                                            {selectedCampus.phone || "—"}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box
+                                        sx={{
+                                            p: 1.75,
+                                            borderRadius: 2,
+                                            background: "white",
+                                            border: "1px solid #e2e8f0",
+                                        }}
+                                    >
+                                        <Typography
+                                            sx={{
+                                                fontSize: 12,
+                                                color: "#94a3b8",
+                                                fontWeight: 800,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <Box component="span" sx={{display: "inline-flex", alignItems: "center"}}>
+                                                <MailOutlineIcon sx={{fontSize: 18, color: "inherit"}}/>
+                                            </Box>
+                                            Email
+                                        </Typography>
+                                        <Typography
+                                            sx={{
+                                                mt: 0.6,
+                                                color: "#1e293b",
+                                                fontWeight: 700,
+                                                fontSize: 14,
+                                                wordBreak: "break-word",
+                                            }}
+                                        >
+                                            {selectedCampus.email || "—"}
+                                        </Typography>
+                                    </Box>
                                 </Box>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" color="text.secondary">
+                            </Card>
+
+                            {/* Date */}
+                            <Card
+                                sx={{
+                                    borderRadius: 3,
+                                    border: "1px solid #e2e8f0",
+                                    p: 2.25,
+                                    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                                    transition: "box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease",
+                                    "&:hover": {
+                                        boxShadow: "0 16px 34px rgba(2, 6, 23, 0.10)",
+                                        transform: "translateY(-1px)",
+                                        borderColor: "#cbd5e1",
+                                    },
+                                }}
+                            >
+                                <Typography
+                                    sx={{
+                                        fontSize: 12,
+                                        color: "#94a3b8",
+                                        fontWeight: 800,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                >
+                                    <Box component="span" sx={{display: "inline-flex", alignItems: "center"}}>
+                                        <CalendarTodayIcon sx={{fontSize: 18, color: "inherit"}}/>
+                                    </Box>
                                     Ngày đăng ký tài khoản
                                 </Typography>
-                                <Typography variant="body1">
+                                <Typography
+                                    sx={{
+                                        mt: 0.7,
+                                        color: "#1e293b",
+                                        fontWeight: 800,
+                                        fontSize: 15,
+                                        lineHeight: 1.2,
+                                    }}
+                                >
                                     {formatDate(selectedCampus.accountRegisterDate)}
                                 </Typography>
-                            </Box>
-                        </Stack>
+                            </Card>
+                        </Box>
                     )}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setViewModalOpen(false)} color="inherit">
+
+                <DialogActions
+                    sx={{
+                        position: "sticky",
+                        bottom: 0,
+                        zIndex: 2,
+                        bgcolor: "white",
+                        borderTop: "1px solid #e2e8f0",
+                        px: 3,
+                        py: 2.25,
+                        gap: 2,
+                        justifyContent: "space-between",
+                    }}
+                >
+                    <Button
+                        onClick={() => setViewModalOpen(false)}
+                        variant="text"
+                        color="inherit"
+                        sx={{textTransform: "none", fontWeight: 700, px: 1.25}}
+                    >
                         Đóng
                     </Button>
                     <Button
@@ -1070,6 +1434,13 @@ export default function SchoolCampus() {
                         sx={{
                             background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                             textTransform: "none",
+                            fontWeight: 800,
+                            borderRadius: 2,
+                            px: 2.75,
+                            boxShadow: "0 10px 24px rgba(13, 100, 222, 0.28)",
+                            "&:hover": {
+                                boxShadow: "0 16px 34px rgba(13, 100, 222, 0.34)",
+                            },
                         }}
                     >
                         Sửa

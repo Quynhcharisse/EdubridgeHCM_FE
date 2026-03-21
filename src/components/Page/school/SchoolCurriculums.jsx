@@ -38,6 +38,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import SchoolIcon from "@mui/icons-material/School";
 import DescriptionIcon from "@mui/icons-material/Description";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { enqueueSnackbar } from "notistack";
 
 import { activateCurriculum, getCurriculumList, saveCurriculum } from "../../../services/CurriculumService.jsx";
@@ -109,12 +110,34 @@ const emptyForm = () => ({
     subjectOptions: [subjectEmpty()],
 });
 
+/**
+ * BE generateName() luôn prefix "Hệ " + subTypeName. Nếu BE trả nhầm "Hệ ..." trong field subTypeName
+ * thì cần bỏ các tiền tố "Hệ " lặp ở đầu để tránh "Hệ Hệ ..." khi submit.
+ */
+function stripLeadingHePrefix(value) {
+    let s = String(value ?? "").trim();
+    while (s.length > 0) {
+        const m = s.match(/^Hệ\s+/u);
+        if (!m) break;
+        s = s.slice(m[0].length).trim();
+    }
+    return s;
+}
+
+function mapSubTypeNameForForm(item) {
+    const raw = item?.subTypeName;
+    if (raw != null && String(raw).trim() !== "") {
+        return stripLeadingHePrefix(raw);
+    }
+    return item?.name ?? "";
+}
+
 function mapCurriculumFromApi(item) {
     if (!item) return null;
     return {
         id: item.id,
         name: item.name,
-        subTypeName: item.subTypeName ?? item.name,
+        subTypeName: mapSubTypeNameForForm(item),
         description: item.description || "",
         curriculumType: item.curriculumType,
         methodLearning: item.methodLearning,
@@ -203,6 +226,7 @@ export default function SchoolCurriculums() {
 
     const [submitLoading, setSubmitLoading] = useState(false);
     const [evolveLoading, setEvolveLoading] = useState(false);
+    const [publishLoading, setPublishLoading] = useState(false);
     const [confirmEvolveOpen, setConfirmEvolveOpen] = useState(false);
     const [curriculumToEditAfterConfirm, setCurriculumToEditAfterConfirm] = useState(null);
     const [pendingScrollSubjectIndex, setPendingScrollSubjectIndex] = useState(null);
@@ -274,7 +298,12 @@ export default function SchoolCurriculums() {
     const filteredCurriculums = useMemo(() => {
         let list = curriculums;
         const q = search.trim().toLowerCase();
-        if (q) list = list.filter((c) => String(c.subTypeName || "").toLowerCase().includes(q));
+        if (q) {
+            list = list.filter((c) => {
+                const hay = `${c.name || ""} ${c.subTypeName || ""}`.toLowerCase();
+                return hay.includes(q);
+            });
+        }
 
         if (curriculumTypeFilter !== "all") {
             list = list.filter((c) => c.curriculumType === curriculumTypeFilter);
@@ -455,6 +484,28 @@ export default function SchoolCurriculums() {
     const handleOpenView = (curriculum) => {
         setViewCurriculum(curriculum);
         setViewModalOpen(true);
+    };
+
+    const handlePublishFromView = async () => {
+        if (!viewCurriculum) return;
+        if (publishLoading) return;
+
+        const statusKey = normalizeStatus(viewCurriculum?.curriculumStatus);
+        if (statusKey !== "CUR_DRAFT") return;
+
+        setPublishLoading(true);
+        try {
+            const actRes = await activateCurriculum(viewCurriculum.id);
+            enqueueSnackbar(actRes?.data?.message || "Curriculum đã được công bố", { variant: "success" });
+            setViewModalOpen(false);
+            setViewCurriculum(null);
+            await loadData(page, rowsPerPage);
+        } catch (err) {
+            console.error("Publish curriculum error:", err);
+            enqueueSnackbar(err?.response?.data?.message || "Lỗi khi công bố curriculum", { variant: "error" });
+        } finally {
+            setPublishLoading(false);
+        }
     };
 
     const handleCreateSubmit = async (shouldActivate) => {
@@ -746,7 +797,6 @@ export default function SchoolCurriculums() {
                         <TableHead>
                             <TableRow sx={{ bgcolor: "#f1f5f9" }}>
                                 <TableCell sx={{ fontWeight: 700, color: "#1e293b", py: 2 }}>Tên chương trình</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#1e293b", py: 2 }}>Mô tả</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: "#1e293b", py: 2 }}>Loại chương trình</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: "#1e293b", py: 2 }}>Phương pháp học</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: "#1e293b", py: 2 }}>Năm tuyển sinh</TableCell>
@@ -763,7 +813,6 @@ export default function SchoolCurriculums() {
                                     <TableRow key={i}>
                                         <TableCell><Skeleton variant="text" width="60%" /></TableCell>
                                         <TableCell><Skeleton variant="text" width="40%" /></TableCell>
-                                        <TableCell><Skeleton variant="text" width="40%" /></TableCell>
                                         <TableCell><Skeleton variant="text" width="50%" /></TableCell>
                                         <TableCell><Skeleton variant="text" width={60} /></TableCell>
                                         <TableCell><Skeleton variant="text" width={40} /></TableCell>
@@ -773,7 +822,7 @@ export default function SchoolCurriculums() {
                                 ))
                             ) : paginatedCurriculums.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                                         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5 }}>
                                             <SchoolIcon sx={{ fontSize: 56, color: "#cbd5e1" }} />
                                             <Typography variant="h6" sx={{ color: "#64748b", fontWeight: 700 }}>
@@ -838,9 +887,6 @@ export default function SchoolCurriculums() {
                                                     )}
                                                 </Box>
                                             </Stack>
-                                        </TableCell>
-                                        <TableCell sx={{ color: "#64748b", maxWidth: 200 }} title={row.description}>
-                                            <Typography noWrap variant="body2">{row.description || "—"}</Typography>
                                         </TableCell>
                                         <TableCell sx={{ color: "#64748b" }}>
                                             {toCurriculumTypeLabel(row.curriculumType)}
@@ -975,127 +1021,309 @@ export default function SchoolCurriculums() {
             <Dialog
                 open={viewModalOpen}
                 onClose={() => setViewModalOpen(false)}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
                 slotProps={{ backdrop: { sx: modalBackdropSx } }}
             >
-                <DialogTitle sx={{ fontWeight: 800, color: "#1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Box>Chi tiết chương trình</Box>
-                    <IconButton size="small" onClick={() => setViewModalOpen(false)} sx={{ bgcolor: "#f1f5f9", "&:hover": { bgcolor: "#e2e8f0" } }}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ px: 3, py: 2.5 }}>
-                    {viewCurriculum && (
-                        <Stack spacing={2.2}>
-                            <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                                <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                                    {viewCurriculum.name || viewCurriculum.subTypeName}
-                                </Typography>
-                                <ChipStatus status={viewCurriculum.curriculumStatus} />
-                            </Stack>
-                            {viewCurriculum.versionDisplay && (
-                                <Typography variant="body2" sx={{ color: "#64748b" }}>
-                                    Phiên bản: {viewCurriculum.versionDisplay} {viewCurriculum.isLatest ? "(Mới nhất)" : ""}
-                                </Typography>
-                            )}
-                            {normalizeStatus(viewCurriculum.curriculumStatus) === "CUR_DRAFT" && (
-                                <Typography variant="caption" sx={{ color: "#64748b", fontStyle: "italic" }}>
-                                    Bản nháp - chưa công bố
-                                </Typography>
-                            )}
-                            <Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6 }}>
-                                    Mã nhóm (groupCode)
-                                </Typography>
-                                <Typography sx={{ fontWeight: 650, color: "#1e293b" }}>
-                                    {viewCurriculum.groupCode || "—"}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6 }}>
-                                    Loại chương trình
-                                </Typography>
-                                <Typography sx={{ fontWeight: 650, color: "#1e293b" }}>
-                                    {toCurriculumTypeLabel(viewCurriculum.curriculumType)}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6 }}>
-                                    Phương pháp học
-                                </Typography>
-                                <Typography sx={{ fontWeight: 650, color: "#1e293b" }}>
-                                    {toMethodLearningLabel(viewCurriculum.methodLearning)}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6 }}>
-                                    Năm tuyển sinh
-                                </Typography>
-                                <Typography sx={{ fontWeight: 650, color: "#1e293b" }}>{viewCurriculum.enrollmentYear}</Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6 }}>
-                                    Mô tả
-                                </Typography>
-                                <Typography sx={{ color: "#374151", whiteSpace: "pre-wrap" }}>
-                                    {viewCurriculum.description || "—"}
-                                </Typography>
-                            </Box>
+                <DialogTitle sx={{ px: 3, pt: 2.5, pb: 1.5 }}>
+                    {viewCurriculum && (() => {
+                        return (
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+                                <Box>
+                                    <Typography sx={{ fontWeight: 900, color: "#1e293b", fontSize: 22, lineHeight: 1.2 }}>
+                                        Chi tiết chương trình
+                                    </Typography>
+                                </Box>
 
-                            <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#1e293b", mb: 1 }}>
-                                    Môn học
-                                </Typography>
-                                <Stack spacing={1.2}>
-                                    {(viewCurriculum.subjects || []).map((s, idx) => (
-                                        <Box
-                                            key={`${s.name}-${idx}`}
-                                            sx={{
-                                                border: "1px solid #e2e8f0",
-                                                borderRadius: 2,
-                                                bgcolor: "#f8fafc",
-                                                px: 1.5,
-                                                py: 1.2,
-                                            }}
-                                        >
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
-                                                <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
-                                                    {s.name}
-                                                </Typography>
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    {s.isMandatory ? (
-                                                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.7 }}>
-                                                            <DoneAllIcon fontSize="small" sx={{ color: "#16a34a" }} />
-                                                            <Typography variant="caption" sx={{ color: "#16a34a", fontWeight: 700 }}>
-                                                                Bắt buộc
-                                                            </Typography>
-                                                        </Box>
-                                                    ) : (
-                                                        <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 700 }}>
-                                                            Không bắt buộc
-                                                        </Typography>
-                                                    )}
-                                                </Stack>
-                                            </Stack>
-                                            <Typography variant="body2" sx={{ color: "#64748b", mt: 0.7 }}>
-                                                {s.description || "—"}
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setViewModalOpen(false)}
+                                        sx={{
+                                            bgcolor: "#f1f5f9",
+                                            "&:hover": { bgcolor: "#e2e8f0", boxShadow: "0 8px 16px rgba(2, 6, 23, 0.06)" },
+                                        }}
+                                    >
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                </Box>
+                            </Box>
+                        );
+                    })()}
+                </DialogTitle>
+
+                <DialogContent
+                    dividers={false}
+                    sx={{
+                        px: 3,
+                        py: 2.5,
+                        maxHeight: "calc(100vh - 220px)",
+                        overflow: "auto",
+                        scrollBehavior: "smooth",
+                    }}
+                >
+                    {viewCurriculum && (() => {
+                        const statusKey = normalizeStatus(viewCurriculum.curriculumStatus);
+                        const statusLabel = statusKey === "CUR_DRAFT" ? "Bản nháp" : statusKey === "CUR_ACTIVE" ? "Hoạt động" : "Lưu trữ";
+
+                        return (
+                            <Stack spacing={2.5}>
+                                {/* Hero section */}
+                                <Box
+                                    sx={{
+                                        borderRadius: 3,
+                                        bgcolor: "linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(15,23,42,0.03) 100%)",
+                                        border: "1px solid rgba(148, 163, 184, 0.35)",
+                                        p: 3,
+                                    }}
+                                >
+                                    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 3, flexWrap: "wrap" }}>
+                                        <Box sx={{ minWidth: 260 }}>
+                                            <Typography sx={{ fontWeight: 950, color: "#1e293b", fontSize: 24, lineHeight: 1.25 }}>
+                                                {viewCurriculum.name || viewCurriculum.subTypeName}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: "#64748b", mt: 1.1, lineHeight: 1.6, maxWidth: 620 }}>
+                                                {viewCurriculum.description || "—"}
                                             </Typography>
                                         </Box>
+
+                                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1.2 }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                                <Box
+                                                    sx={{
+                                                        px: 1.6,
+                                                        py: 0.7,
+                                                        borderRadius: 999,
+                                                        bgcolor:
+                                                            statusKey === "CUR_DRAFT"
+                                                                ? "rgba(245, 158, 11, 0.16)"
+                                                                : statusKey === "CUR_ACTIVE"
+                                                                    ? "rgba(37, 99, 235, 0.14)"
+                                                                    : "rgba(100, 116, 139, 0.16)",
+                                                        color:
+                                                            statusKey === "CUR_DRAFT"
+                                                                ? "#d97706"
+                                                                : statusKey === "CUR_ACTIVE"
+                                                                    ? "#2563eb"
+                                                                    : "#475569",
+                                                        fontWeight: 900,
+                                                        fontSize: 12,
+                                                        border: "1px solid rgba(148, 163, 184, 0.35)",
+                                                    }}
+                                                >
+                                                    {statusLabel}
+                                                </Box>
+                                            </Box>
+
+                                            <Typography variant="caption" sx={{ color: "#64748b" }}>
+                                                {viewCurriculum.versionDisplay ? `${viewCurriculum.versionDisplay}` : "Phiên bản: —"}
+                                                {viewCurriculum.isLatest ? " • Mới nhất" : ""}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Box>
+
+                                {/* Detail section */}
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                                        gap: 2,
+                                    }}
+                                >
+                                    {[
+                                        {
+                                            label: "Mã nhóm",
+                                            value: viewCurriculum.groupCode || "—",
+                                        },
+                                        {
+                                            label: "Loại chương trình",
+                                            value: toCurriculumTypeLabel(viewCurriculum.curriculumType),
+                                        },
+                                        {
+                                            label: "Phương pháp học",
+                                            value: toMethodLearningLabel(viewCurriculum.methodLearning),
+                                        },
+                                        {
+                                            label: "Năm tuyển sinh",
+                                            value: viewCurriculum.enrollmentYear ?? "—",
+                                        },
+                                    ].map((item, idx) => (
+                                        <Box
+                                            key={`${item.label}-${idx}`}
+                                            sx={{
+                                                border: "1px solid rgba(226, 232, 240, 1)",
+                                                borderRadius: 3,
+                                                bgcolor: "#ffffff",
+                                                px: 2.2,
+                                                py: 1.6,
+                                                transition: "box-shadow 180ms ease, border-color 180ms ease",
+                                                "&:hover": {
+                                                    boxShadow: "0 14px 30px rgba(2, 6, 23, 0.08)",
+                                                    borderColor: "rgba(148, 163, 184, 0.8)",
+                                                },
+                                            }}
+                                        >
+                                            <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.7 }}>
+                                                {item.label}
+                                            </Typography>
+                                            <Typography sx={{ fontWeight: 800, color: "#1e293b" }}>{item.value}</Typography>
+                                        </Box>
                                     ))}
-                                    {(viewCurriculum.subjects || []).length === 0 && (
-                                        <Typography variant="body2" sx={{ color: "#94a3b8" }}>
-                                            Chưa có môn học.
+                                </Box>
+
+                                {/* Description card */}
+                                <Card
+                                    elevation={0}
+                                    sx={{
+                                        bgcolor: "#f8fafc",
+                                        border: "1px solid rgba(226, 232, 240, 1)",
+                                        borderRadius: 3,
+                                    }}
+                                >
+                                    <CardContent sx={{ p: 2.7 }}>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, mb: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 34,
+                                                    height: 34,
+                                                    borderRadius: 2,
+                                                    bgcolor: "rgba(13, 100, 222, 0.10)",
+                                                    color: "#0D64DE",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                }}
+                                            >
+                                                <DescriptionIcon sx={{ fontSize: 18 }} />
+                                            </Box>
+                                            <Typography sx={{ fontWeight: 900, color: "#1e293b" }}>Mô tả</Typography>
+                                        </Box>
+                                        <Typography sx={{ color: "#374151", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                                            {viewCurriculum.description || "—"}
                                         </Typography>
-                                    )}
-                                </Stack>
-                            </Box>
-                        </Stack>
-                    )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Subjects */}
+                                <Card
+                                    elevation={0}
+                                    sx={{
+                                        bgcolor: "#ffffff",
+                                        border: "1px solid rgba(226, 232, 240, 1)",
+                                        borderRadius: 3,
+                                    }}
+                                >
+                                    <CardContent sx={{ p: 2.5 }}>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.4 }}>
+                                            <MenuBookIcon sx={{ fontSize: 18, color: "#0D64DE" }} />
+                                            <Typography sx={{ fontWeight: 950, color: "#1e293b", fontSize: 16 }}>Môn học</Typography>
+                                        </Box>
+
+                                        <Stack spacing={1.2}>
+                                            {(viewCurriculum.subjects || []).map((s, idx) => (
+                                                <Box
+                                                    key={`${s.name}-${idx}`}
+                                                    sx={{
+                                                        border: "1px solid rgba(226, 232, 240, 1)",
+                                                        borderRadius: 3,
+                                                        bgcolor: "#ffffff",
+                                                        px: 1.8,
+                                                        py: 1.4,
+                                                        transition:
+                                                            "box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease",
+                                                        "&:hover": {
+                                                            boxShadow: "0 16px 34px rgba(2, 6, 23, 0.08)",
+                                                            borderColor: "rgba(148, 163, 184, 0.85)",
+                                                            transform: "translateY(-1px)",
+                                                        },
+                                                    }}
+                                                >
+                                                    <Stack
+                                                        direction="row"
+                                                        justifyContent="space-between"
+                                                        alignItems="center"
+                                                        spacing={2}
+                                                    >
+                                                        <Typography sx={{ fontWeight: 850, color: "#1e293b" }}>{s.name}</Typography>
+                                                        <Box
+                                                            sx={{
+                                                                px: 1.2,
+                                                                py: 0.55,
+                                                                borderRadius: 999,
+                                                                fontSize: 12,
+                                                                fontWeight: 900,
+                                                                border: "1px solid rgba(226, 232, 240, 1)",
+                                                                bgcolor: s.isMandatory
+                                                                    ? "rgba(34, 197, 94, 0.14)"
+                                                                    : "rgba(148, 163, 184, 0.18)",
+                                                                color: s.isMandatory ? "#16a34a" : "#64748b",
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                gap: 0.6,
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            {s.isMandatory ? (
+                                                                <>
+                                                                    <DoneAllIcon fontSize="small" sx={{ color: "#16a34a" }} />
+                                                                    Bắt buộc
+                                                                </>
+                                                            ) : (
+                                                                "Không bắt buộc"
+                                                            )}
+                                                        </Box>
+                                                    </Stack>
+                                                    <Typography sx={{ color: "#64748b", mt: 1, lineHeight: 1.6 }}>
+                                                        {s.description || "—"}
+                                                    </Typography>
+                                                </Box>
+                                            ))}
+                                            {(viewCurriculum.subjects || []).length === 0 && (
+                                                <Typography variant="body2" sx={{ color: "#94a3b8", px: 0.5 }}>
+                                                    Chưa có môn học.
+                                                </Typography>
+                                            )}
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
+                            </Stack>
+                        );
+                    })()}
                 </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2 }}>
-                    <Button onClick={() => setViewModalOpen(false)} sx={{ textTransform: "none", fontWeight: 600, color: "#64748b" }}>
+
+                <DialogActions
+                    sx={{
+                        px: 3,
+                        py: 2,
+                        borderTop: "1px solid #e2e8f0",
+                        position: "sticky",
+                        bottom: 0,
+                        backgroundColor: "white",
+                        zIndex: 1,
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 1,
+                    }}
+                >
+                    {normalizeStatus(viewCurriculum?.curriculumStatus) === "CUR_DRAFT" && (
+                        <Button
+                            onClick={handlePublishFromView}
+                            variant="contained"
+                            disabled={publishLoading}
+                            sx={{
+                                textTransform: "none",
+                                fontWeight: 900,
+                                borderRadius: 2,
+                                px: 3,
+                                background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            }}
+                        >
+                            {publishLoading ? "Đang công bố..." : "Công bố"}
+                        </Button>
+                    )}
+                    <Button onClick={() => setViewModalOpen(false)} sx={{ textTransform: "none", fontWeight: 700, color: "#475569" }}>
                         Đóng
                     </Button>
                 </DialogActions>
@@ -1315,20 +1543,6 @@ export default function SchoolCurriculums() {
                         sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 3 }}
                     >
                         {submitLoading ? "Đang lưu..." : "Lưu nháp"}
-                    </Button>
-                    <Button
-                        onClick={() => handleCreateSubmit(true)}
-                        variant="contained"
-                        disabled={submitLoading}
-                        sx={{
-                            textTransform: "none",
-                            fontWeight: 900,
-                            borderRadius: 2,
-                            px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
-                        }}
-                    >
-                        {submitLoading ? "Đang tạo..." : "Công bố"}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1551,20 +1765,6 @@ export default function SchoolCurriculums() {
                         sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 3 }}
                     >
                         {submitLoading ? "Đang lưu..." : "Lưu nháp"}
-                    </Button>
-                    <Button
-                        onClick={() => handleEditSubmit(true)}
-                        variant="contained"
-                        disabled={submitLoading}
-                        sx={{
-                            textTransform: "none",
-                            fontWeight: 900,
-                            borderRadius: 2,
-                            px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
-                        }}
-                    >
-                        {submitLoading ? "Đang cập nhật..." : "Công bố"}
                     </Button>
                 </DialogActions>
             </Dialog>
