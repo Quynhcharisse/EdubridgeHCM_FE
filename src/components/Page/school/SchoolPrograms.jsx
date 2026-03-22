@@ -130,6 +130,7 @@ function mapCurriculumForProgramSelect(item) {
 }
 
 const MAX_TEXT_FIELD_LEN = 2000;
+const MAX_PROGRAM_NAME_LEN = 100;
 
 function tuitionFeeToDigitString(value) {
     if (value === "" || value == null) return "";
@@ -152,6 +153,7 @@ function mapProgramFromApi(item) {
 
     return {
         id: item.id,
+        name: item.name != null ? String(item.name) : "",
         curriculumId:
             item.curriculumId ??
             item.curriculumID ??
@@ -255,6 +257,7 @@ export default function SchoolPrograms() {
 
     const [formErrors, setFormErrors] = useState({});
     const [formValues, setFormValues] = useState({
+        name: "",
         baseTuitionFee: "",
         graduationStandard: "",
         targetStudentDescription: "",
@@ -278,7 +281,11 @@ export default function SchoolPrograms() {
         let list = programs;
         const q = search.trim().toLowerCase();
         if (q) {
-            list = list.filter((p) => safeString(p.curriculumName).toLowerCase().includes(q));
+            list = list.filter((p) => {
+                const inCurriculum = safeString(p.curriculumName).toLowerCase().includes(q);
+                const inName = safeString(p.name).toLowerCase().includes(q);
+                return inCurriculum || inName;
+            });
         }
         if (enrollmentYearFilter !== "all") {
             const y = Number(enrollmentYearFilter);
@@ -300,7 +307,7 @@ export default function SchoolPrograms() {
         setLoading(true);
         try {
             const res = await getProgramList(pageParam, pageSizeParam);
-            const raw = res?.data?.body ?? res?.data ?? res;
+            const raw = res?.data?.body ?? res?.body ?? res?.data ?? res;
             const items = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : [];
             const mapped = items.map(mapProgramFromApi).filter(Boolean);
             mapped.sort((a, b) => {
@@ -408,6 +415,7 @@ export default function SchoolPrograms() {
         setSelectedCurriculum(null);
         setFormErrors({});
         setFormValues({
+            name: "",
             baseTuitionFee: "",
             graduationStandard: "",
             targetStudentDescription: "",
@@ -433,6 +441,7 @@ export default function SchoolPrograms() {
         setSelectedCurriculum(null);
         setFormErrors({});
         setFormValues({
+            name: program.name ?? "",
             baseTuitionFee: tuitionFeeToDigitString(program.baseTuitionFee),
             graduationStandard: program.graduationStandard ?? "",
             targetStudentDescription: program.targetStudentDescription ?? "",
@@ -453,6 +462,7 @@ export default function SchoolPrograms() {
         setSelectedCurriculum(null);
         setFormErrors({});
         setFormValues({
+            name: program.name ?? "",
             baseTuitionFee: tuitionFeeToDigitString(program.baseTuitionFee),
             graduationStandard: program.graduationStandard ?? "",
             targetStudentDescription: program.targetStudentDescription ?? "",
@@ -472,6 +482,7 @@ export default function SchoolPrograms() {
         setSelectedCurriculum(null);
         setFormErrors({});
         setFormValues({
+            name: "",
             baseTuitionFee: "",
             graduationStandard: "",
             targetStudentDescription: "",
@@ -490,6 +501,10 @@ export default function SchoolPrograms() {
 
     const validateStep2 = () => {
         const errors = {};
+        const nm = safeString(formValues.name).trim();
+        if (!nm) errors.name = "Tên program là bắt buộc.";
+        else if (nm.length > MAX_PROGRAM_NAME_LEN)
+            errors.name = `Tối đa ${MAX_PROGRAM_NAME_LEN} ký tự.`;
         const feeDigits = safeString(formValues.baseTuitionFee).replace(/\D/g, "");
         const fee = feeDigits === "" ? NaN : Number(feeDigits);
         if (feeDigits === "" || !Number.isFinite(fee)) errors.baseTuitionFee = "Học phí gốc là bắt buộc.";
@@ -524,6 +539,7 @@ export default function SchoolPrograms() {
         const feeDigits = safeString(formValues.baseTuitionFee).replace(/\D/g, "");
         const payload = {
             curriculumId,
+            name: safeString(formValues.name).trim(),
             graduationStandard: safeString(formValues.graduationStandard).trim(),
             targetStudentDescription: safeString(formValues.targetStudentDescription).trim(),
             baseTuitionFee: feeDigits === "" ? 0 : Number(feeDigits),
@@ -694,7 +710,7 @@ export default function SchoolPrograms() {
                 <CardContent sx={{ p: 2.5 }}>
                     <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
                         <TextField
-                            placeholder="Tìm theo tên khung chương trình..."
+                            placeholder="Tìm theo tên program hoặc khung chương trình..."
                             value={search}
                             onChange={(e) => {
                                 setSearch(e.target.value);
@@ -779,7 +795,7 @@ export default function SchoolPrograms() {
                     <Table>
                         <TableHead>
                             <TableRow sx={{ bgcolor: "#f1f5f9" }}>
-                                <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Tên khung chương trình</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Program / Khung CT</TableCell>
                                 <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Năm tuyển sinh</TableCell>
                                 <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Loại khung chương trình</TableCell>
                                 <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Học phí gốc</TableCell>
@@ -863,10 +879,23 @@ export default function SchoolPrograms() {
                                         }}
                                     >
                                         <TableCell>
-                                            <Tooltip title={row.curriculumName}>
-                                                <Typography sx={{ fontWeight: 800, color: "#1e293b" }} noWrap>
-                                                    {row.curriculumName || "—"}
-                                                </Typography>
+                                            <Tooltip
+                                                title={
+                                                    [safeString(row.name).trim(), safeString(row.curriculumName).trim()]
+                                                        .filter(Boolean)
+                                                        .join(" • ") || "—"
+                                                }
+                                            >
+                                                <Box>
+                                                    <Typography sx={{ fontWeight: 800, color: "#1e293b" }} noWrap>
+                                                        {safeString(row.name).trim() || row.curriculumName || "—"}
+                                                    </Typography>
+                                                    {safeString(row.name).trim() && row.curriculumName ? (
+                                                        <Typography variant="caption" sx={{ color: "#64748b", display: "block" }} noWrap>
+                                                            {row.curriculumName}
+                                                        </Typography>
+                                                    ) : null}
+                                                </Box>
                                             </Tooltip>
                                         </TableCell>
                                         <TableCell sx={{ color: "#64748b" }}>{row.enrollmentYear || "—"}</TableCell>
@@ -982,6 +1011,15 @@ export default function SchoolPrograms() {
                                         </Box>
 
                                         <Divider />
+
+                                        <Box>
+                                            <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6, fontWeight: 900 }}>
+                                                Tên program
+                                            </Typography>
+                                            <Typography sx={{ fontWeight: 900, color: "#1e293b" }}>
+                                                {safeString(formValues.name).trim() || "—"}
+                                            </Typography>
+                                        </Box>
 
                                         <Box>
                                             <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6, fontWeight: 900 }}>
@@ -1199,6 +1237,22 @@ export default function SchoolPrograms() {
                                 )}
 
                                 <TextField
+                                    label="Tên program"
+                                    fullWidth
+                                    required
+                                    value={formValues.name}
+                                    onChange={(e) => {
+                                        setFormValues((prev) => ({ ...prev, name: e.target.value }));
+                                        setFormErrors((prev) => ({ ...prev, name: undefined }));
+                                    }}
+                                    inputProps={{ maxLength: MAX_PROGRAM_NAME_LEN }}
+                                    error={!!formErrors.name}
+                                    helperText={
+                                        formErrors.name || `Tên hiển thị của program. Tối đa ${MAX_PROGRAM_NAME_LEN} ký tự.`
+                                    }
+                                />
+
+                                <TextField
                                     label="Học phí gốc"
                                     fullWidth
                                     value={
@@ -1332,6 +1386,15 @@ export default function SchoolPrograms() {
                                             </Box>
 
                                             <Divider />
+
+                                            <Box>
+                                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6, fontWeight: 900 }}>
+                                                    Tên program
+                                                </Typography>
+                                                <Typography sx={{ fontWeight: 900, color: "#1e293b" }}>
+                                                    {safeString(formValues.name).trim() || "—"}
+                                                </Typography>
+                                            </Box>
 
                                             <Box>
                                                 <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mb: 0.6, fontWeight: 900 }}>
