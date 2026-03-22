@@ -19,6 +19,7 @@ export const getProgramList = async (page = 0, pageSize = 10) => {
 export const saveProgram = async ({
     programId,
     curriculumId,
+    name,
     graduationStandard,
     targetStudentDescription,
     baseTuitionFee,
@@ -26,6 +27,7 @@ export const saveProgram = async ({
 }) => {
     const body = {
         curriculumId,
+        name: name != null ? String(name).trim() : "",
         graduationStandard,
         targetStudentDescription,
         baseTuitionFee: Number(baseTuitionFee),

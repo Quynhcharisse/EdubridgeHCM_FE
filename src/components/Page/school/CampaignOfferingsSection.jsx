@@ -136,12 +136,16 @@ export default function CampaignOfferingsSection({
         getProgramList(0, 200)
             .then((res) => {
                 if (cancelled) return;
-                const body = res?.data?.body ?? res?.data;
+                const body = res?.data?.body ?? res?.body ?? res?.data;
                 const list = body?.items ?? body;
                 const arr = Array.isArray(list)
                     ? list.map((p) => ({
                           id: p.id ?? p.programId,
-                          name: p.programName ?? p.name ?? `Chương trình #${p.id}`,
+                          name:
+                              p.programName ??
+                              (p.name != null && String(p.name).trim() !== "" ? p.name : null) ??
+                              p.curriculumName ??
+                              `Chương trình #${p.id}`,
                       }))
                     : [];
                 setPrograms(arr.filter((p) => p.id != null));
