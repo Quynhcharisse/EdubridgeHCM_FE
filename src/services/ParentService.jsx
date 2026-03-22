@@ -1,0 +1,26 @@
+import axiosClient from '../configs/APIConfig.jsx';
+
+export const getParentStudent = async () => {
+    const response = await axiosClient.get('/parent/student');
+    return response || null;
+};
+
+export const postParentStudent = async (payload) => {
+    const response = await axiosClient.post('/parent/student', payload);
+    return response || null;
+};
+
+export const getParentPersonalityTypes = async () => {
+    const response = await axiosClient.get('/parent/personality/type');
+    return response || null;
+};
+
+export const getParentMajors = async () => {
+    const response = await axiosClient.get('/parent/major');
+    return response || null;
+};
+
+export const getParentSubjects = async () => {
+    const response = await axiosClient.get('/parent/subject');
+    return response || null;
+};
