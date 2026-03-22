@@ -44,7 +44,7 @@ function MainHeader() {
     const [anchorEl, setAnchorEl] = useState(null);
     const [messageAnchorEl, setMessageAnchorEl] = useState(null);
     const [profileData, setProfileData] = useState(null);
-    const [loadingProfile, setLoadingProfile] = useState(false);
+    const [_loadingProfile, setLoadingProfile] = useState(false);
     const [conversationItems, setConversationItems] = useState([]);
     const [conversationLoading, setConversationLoading] = useState(false);
     const [conversationError, setConversationError] = useState('');
@@ -59,6 +59,8 @@ function MainHeader() {
     const [chatInput, setChatInput] = useState('');
     const [chatWindowOpen, setChatWindowOpen] = useState(false);
     const [chatWindowMinimized, setChatWindowMinimized] = useState(false);
+    /** Trên Home: header trong suốt lúc đầu; kéo xuống → thanh trắng nổi (đồng bộ landing) */
+    const [headerScrolled, setHeaderScrolled] = useState(false);
 
     const chatListRef = React.useRef(null);
     const loadingMoreRef = React.useRef(false);
@@ -69,12 +71,14 @@ function MainHeader() {
     const navigate = useNavigate();
     const isHomePage = location.pathname === '/home' || location.pathname === '/';
     const isSignedIn = typeof window !== 'undefined' && localStorage.getItem('user');
+    const headerElevated = headerScrolled || !isHomePage;
+    const isHomeHeroTransparent = isHomePage && !headerElevated;
 
     const getUserInfo = () => {
         if (localStorage.getItem('user')) {
             try {
                 return JSON.parse(localStorage.getItem('user'));
-            } catch (e) {
+            } catch {
                 return null;
             }
         }
@@ -305,6 +309,15 @@ function MainHeader() {
     };
 
     useEffect(() => {
+        const onScroll = () => {
+            setHeaderScrolled(window.scrollY > 32);
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive: true});
+        return () => window.removeEventListener('scroll', onScroll);
+    }, [location.pathname]);
+
+    useEffect(() => {
         const fetchProfile = async () => {
             if (isSignedIn) {
                 setLoadingProfile(true);
@@ -421,52 +434,11 @@ function MainHeader() {
         }
     };
 
-    const buttonText = isSignedIn ? 'Khám Phá' : 'Đăng Nhập';
-
     const handleButtonClick = (event) => {
         if (!isSignedIn) {
             navigate('/login');
         } else {
             handleUserMenuClick(event);
-        }
-    };
-
-    const smoothScrollToSection = (sectionId) => {
-        if (isHomePage) {
-            const element = document.getElementById(sectionId);
-            if (element) {
-                const headerHeight = 80;
-                const elementTop = element.offsetTop;
-                const offsetPosition = elementTop - headerHeight;
-
-                window.history.pushState(null, '', `#${sectionId}`);
-                
-                const startPosition = window.pageYOffset;
-                const distance = offsetPosition - startPosition;
-                const duration = Math.min(Math.abs(distance) * 0.8, 1200); // Max 1.2 seconds, smoother
-                let start = null;
-
-                const easeInOutCubic = (t) => {
-                    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                };
-
-                const step = (timestamp) => {
-                    if (!start) start = timestamp;
-                    const progress = timestamp - start;
-                    const progressPercent = Math.min(progress / duration, 1);
-                    const eased = easeInOutCubic(progressPercent);
-                    
-                    window.scrollTo(0, startPosition + distance * eased);
-                    
-                    if (progress < duration) {
-                        requestAnimationFrame(step);
-                    }
-                };
-
-                requestAnimationFrame(step);
-            }
-        } else {
-            navigate(`/home#${sectionId}`);
         }
     };
 
@@ -489,76 +461,130 @@ function MainHeader() {
     const displayEmail = profileBody?.email || userInfo?.email || '';
     const avatarUrl = profileBody?.picture || userInfo?.picture || null;
     const isActivePath = (path) => location.pathname === path;
-    const navButtonSx = (path) => ({
-        fontWeight: 600,
-        color: isActivePath(path) ? '#0f4fbf' : '#334155',
-        fontSize: 16,
-        textTransform: 'none',
-        px: 2,
-        py: 1,
-        borderRadius: 999,
-        border: isActivePath(path) ? '1px solid rgba(25,118,210,0.35)' : '1px solid transparent',
-        bgcolor: isActivePath(path)
-            ? 'linear-gradient(135deg, rgba(227,242,253,1) 0%, rgba(219,234,254,1) 100%)'
-            : 'transparent',
-        boxShadow: isActivePath(path)
-            ? '0 6px 16px rgba(25,118,210,0.18), inset 0 1px 0 rgba(255,255,255,0.75)'
-            : 'none',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        '&:hover': {
-            color: '#1976d2',
-            bgcolor: 'rgba(25,118,210,0.08)',
-            borderColor: 'rgba(25,118,210,0.25)',
-            boxShadow: '0 4px 12px rgba(25,118,210,0.14)',
-            transform: 'translateY(-1px)'
-        }
-    });
+    const brandIndigo = '#4f46e5';
+
+    const navButtonSx = (path) => {
+        const active = isActivePath(path);
+        return {
+            fontWeight: 700,
+            color: active ? brandIndigo : '#475569',
+            fontSize: 15,
+            textTransform: 'none',
+            px: 2,
+            py: 1,
+            borderRadius: 0,
+            minWidth: 'auto',
+            bgcolor: 'transparent',
+            position: 'relative',
+            transition: 'color 0.25s ease, opacity 0.25s ease, transform 0.25s ease',
+            '&::after': {
+                content: '""',
+                position: 'absolute',
+                left: 10,
+                right: 10,
+                bottom: 6,
+                height: 3,
+                borderRadius: 2,
+                bgcolor: '#6366f1',
+                opacity: active ? 1 : 0,
+                transform: active ? 'scaleX(1)' : 'scaleX(0.3)',
+                transition: 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 0.61, 0.36, 1)'
+            },
+            '&:hover': {
+                color: brandIndigo,
+                bgcolor: 'transparent',
+                backgroundColor: 'transparent',
+                '&::after': {
+                    opacity: 1,
+                    transform: 'scaleX(1)'
+                }
+            }
+        };
+    };
+
     const navMobileItemSx = (path) => ({
         cursor: 'pointer',
-        bgcolor: isActivePath(path)
-            ? 'linear-gradient(135deg, rgba(227,242,253,1) 0%, rgba(219,234,254,1) 100%)'
-            : 'transparent',
-        border: isActivePath(path) ? '1px solid rgba(25,118,210,0.28)' : '1px solid transparent',
-        borderRadius: 2
+        bgcolor: isActivePath(path) ? 'rgba(99,102,241,0.1)' : 'transparent',
+        border: isActivePath(path) ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+        borderRadius: 2,
+        borderLeft: isActivePath(path) ? '3px solid #6366f1' : '3px solid transparent'
     });
     const navMobileTextSx = (path) => ({
-        color: isActivePath(path) ? '#0f4fbf' : '#334155',
+        color: isActivePath(path) ? brandIndigo : '#334155',
         fontWeight: isActivePath(path) ? 700 : 600
     });
 
     return (
-        <AppBar position="fixed" elevation={0}
-                sx={{
-                    bgcolor: 'white', 
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)', 
-                    zIndex: 1000,
-                    top: 0,
-                    left: 0,
-                    right: 0
-                }}>
-            <Container maxWidth={false} sx={{px: {xs: 2, md: 8}}}>
+        <AppBar
+            position="fixed"
+            elevation={0}
+            sx={{
+                zIndex: 1000,
+                top: 0,
+                left: 0,
+                right: 0,
+                bgcolor: isHomeHeroTransparent
+                    ? 'transparent'
+                    : headerElevated
+                        ? 'rgba(255,255,255,0.97)'
+                        : 'rgba(255,255,255,0.22)',
+                backdropFilter: isHomeHeroTransparent ? 'none' : headerElevated ? 'none' : 'blur(16px)',
+                WebkitBackdropFilter: isHomeHeroTransparent ? 'none' : headerElevated ? 'none' : 'blur(16px)',
+                boxShadow: isHomeHeroTransparent
+                    ? 'none'
+                    : headerElevated
+                        ? '0 1px 0 rgba(15,23,42,0.06), 0 12px 40px rgba(15,23,42,0.07)'
+                        : '0 1px 0 rgba(255,255,255,0.55)',
+                borderBottom: isHomeHeroTransparent
+                    ? 'none'
+                    : headerElevated
+                        ? '1px solid rgba(226,232,240,0.95)'
+                        : '1px solid rgba(255,255,255,0.45)',
+                transition: 'background-color 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease, backdrop-filter 0.35s ease'
+            }}
+        >
+            <Container maxWidth="lg" sx={{px: {xs: 2, md: 4}}}>
                 <Box sx={{
-                    py: 2,
+                    py: {xs: 1.5, md: 1.75},
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                 }}>
                     <Box sx={{display: 'flex', alignItems: 'center', gap: 2}}>
-                        <Box component="img"
-                             src={logo}
-                             alt="EduBridgeHCM"
-                             onClick={() => goTo('/home')}
-                             sx={{
-                                 cursor: "pointer",
-                                 height: 50,
-                                 width: 50,
-                                 borderRadius: '50%',
-                                 p: 1,
-                                 boxShadow: '0 4px 12px rgba(25,118,210,0.3)'
-                             }}
+                        <Box
+                            component="img"
+                            src={logo}
+                            alt="EduBridgeHCM"
+                            onClick={() => goTo('/home')}
+                            sx={{
+                                cursor: 'pointer',
+                                height: 48,
+                                width: 48,
+                                borderRadius: '50%',
+                                p: 0.75,
+                                boxShadow: isHomeHeroTransparent
+                                    ? '0 4px 16px rgba(15,23,42,0.1)'
+                                    : headerElevated
+                                        ? '0 4px 18px rgba(79,70,229,0.22)'
+                                        : '0 6px 22px rgba(79,70,229,0.28)',
+                                border: '2px solid rgba(255,255,255,0.95)',
+                                transition: 'box-shadow 0.35s ease'
+                            }}
                         />
-                        <Typography onClick={() => goTo('/home')} variant="h5"
-                                    sx={{cursor: "pointer", fontWeight: 800, color: '#1976d2', letterSpacing: 1}}>
+                        <Typography
+                            onClick={() => goTo('/home')}
+                            variant="h5"
+                            sx={{
+                                cursor: 'pointer',
+                                fontWeight: 800,
+                                letterSpacing: 0.4,
+                                fontSize: {xs: '1.15rem', sm: '1.35rem'},
+                                background: 'linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #a855f7 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text'
+                            }}
+                        >
                             EduBridgeHCM
                         </Typography>
                     </Box>
@@ -579,67 +605,13 @@ function MainHeader() {
                             >
                                 Tìm trường
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/login')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/saved-schools')} onClick={() => goTo('/saved-schools')}>
                                 Trường đã lưu
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/login')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/consultation-requests')} onClick={() => goTo('/consultation-requests')}>
                                 So sánh trường
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/admission-news')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/admission-news')} onClick={() => goTo('/admission-news')}>
                                 Tin tuyển sinh
                             </Button>
                         </Box>
@@ -660,67 +632,13 @@ function MainHeader() {
                             >
                                 Tìm trường
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/saved-schools')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/saved-schools')} onClick={() => goTo('/saved-schools')}>
                                 Trường đã lưu
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/consultation-requests')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/consultation-requests')} onClick={() => goTo('/consultation-requests')}>
                                 So sánh trường
                             </Button>
-                            <Button
-                                color="inherit"
-                                sx={{
-                                    fontWeight: 600,
-                                    color: '#333',
-                                    fontSize: 16,
-                                    textTransform: 'none',
-                                    px: 2,
-                                    py: 1,
-                                    borderRadius: 2,
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    '&:hover': {
-                                        color: '#1976d2',
-                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                        transform: 'translateY(-1px)',
-                                    }
-                                }}
-                                onClick={() => goTo('/admission-news')}
-                            >
+                            <Button color="inherit" sx={navButtonSx('/admission-news')} onClick={() => goTo('/admission-news')}>
                                 Tin tuyển sinh
                             </Button>
                         </Box>
@@ -784,15 +702,15 @@ function MainHeader() {
                                             sx={{
                                                 width: 42,
                                                 height: 42,
-                                                bgcolor: 'rgba(25,118,210,0.14)',
-                                                color: '#1976d2',
-                                                border: '1px solid rgba(25,118,210,0.22)',
+                                                bgcolor: 'rgba(99,102,241,0.14)',
+                                                color: '#4f46e5',
+                                                border: '1px solid rgba(99,102,241,0.28)',
                                                 transition: 'all 0.2s ease',
                                                 '&:hover': {
-                                                    bgcolor: 'rgba(25,118,210,0.2)',
-                                                    color: '#1565c0',
+                                                    bgcolor: 'rgba(99,102,241,0.22)',
+                                                    color: '#4338ca',
                                                     transform: 'translateY(-1px)',
-                                                    boxShadow: '0 4px 10px rgba(25,118,210,0.22)'
+                                                    boxShadow: '0 4px 14px rgba(79,70,229,0.25)'
                                                 }
                                             }}
                                         >
@@ -895,7 +813,7 @@ function MainHeader() {
                                                                 cursor: 'pointer',
                                                                 transition: 'background-color 0.2s ease',
                                                                 '&:hover': {
-                                                                    bgcolor: 'rgba(25,118,210,0.08)'
+                                                                    bgcolor: 'rgba(79,70,229,0.08)'
                                                                 }
                                                             }}
                                                         >
@@ -939,9 +857,9 @@ function MainHeader() {
                                                     sx={{
                                                         textTransform: 'none',
                                                         fontWeight: 600,
-                                                        color: '#1976d2',
+                                                        color: '#4f46e5',
                                                         '&:hover': {
-                                                            bgcolor: 'rgba(25,118,210,0.08)'
+                                                            bgcolor: 'rgba(79,70,229,0.08)'
                                                         }
                                                     }}
                                                 >
@@ -1170,7 +1088,7 @@ function MainHeader() {
                                         borderRadius: '50%',
                                         transition: 'background 0.2s',
                                         '&:hover': {
-                                            bgcolor: 'rgba(25,118,210,0.08)'
+                                            bgcolor: 'rgba(99,102,241,0.1)'
                                         }
                                     }}
                                 >
@@ -1179,8 +1097,8 @@ function MainHeader() {
                                         sx={{
                                             width: 40,
                                             height: 40,
-                                            bgcolor: '#1976d2',
-                                            boxShadow: '0 2px 8px rgba(25,118,210,0.3)'
+                                            bgcolor: '#4f46e5',
+                                            boxShadow: '0 4px 14px rgba(79,70,229,0.35)'
                                         }}
                                     >
                                         {!avatarUrl && (displayName.charAt(0).toUpperCase())}
@@ -1223,7 +1141,7 @@ function MainHeader() {
                                                 sx={{
                                                     width: 48,
                                                     height: 48,
-                                                    bgcolor: '#1976d2'
+                                                    bgcolor: '#4f46e5'
                                                 }}
                                             >
                                                 {!avatarUrl && (displayName.charAt(0).toUpperCase())}
@@ -1238,7 +1156,7 @@ function MainHeader() {
                                                     </Typography>
                                                 )}
                                                 {userInfo?.role && (
-                                                    <Typography sx={{fontSize: 11, color: '#1976d2', mt: 0.5}}>
+                                                    <Typography sx={{fontSize: 11, color: '#4f46e5', mt: 0.5}}>
                                                         {userInfo.role === 'STUDENT' ? 'Học sinh' :
                                                          userInfo.role === 'SCHOOL' ? 'Trường học' :
                                                          userInfo.role === 'ADMIN' ? 'Quản trị viên' :
@@ -1258,18 +1176,18 @@ function MainHeader() {
                                                 sx={{
                                                     fontSize: 15,
                                                     fontWeight: 500,
-                                                    color: '#1976d2',
+                                                    color: '#4f46e5',
                                                     borderRadius: 1,
                                                     gap: 1.5,
                                                     mt: 0.5,
                                                     '&:hover': {
-                                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                                        color: '#1565c0',
+                                                        bgcolor: 'rgba(79,70,229,0.08)',
+                                                        color: '#4338ca',
                                                     },
                                                     transition: 'background 0.2s, color 0.2s',
                                                 }}
                                             >
-                                                <PersonIcon sx={{color: '#1976d2', fontSize: 20}}/> Hồ sơ cá nhân
+                                                <PersonIcon sx={{color: '#4f46e5', fontSize: 20}}/> Hồ sơ cá nhân
                                             </MenuItem>
                                             <MenuItem
                                                 onClick={() => {
@@ -1279,18 +1197,18 @@ function MainHeader() {
                                                 sx={{
                                                     fontSize: 15,
                                                     fontWeight: 500,
-                                                    color: '#1976d2',
+                                                    color: '#4f46e5',
                                                     borderRadius: 1,
                                                     gap: 1.5,
                                                     mt: 0.5,
                                                     '&:hover': {
-                                                        bgcolor: 'rgba(25,118,210,0.08)',
-                                                        color: '#1565c0',
+                                                        bgcolor: 'rgba(79,70,229,0.08)',
+                                                        color: '#4338ca',
                                                     },
                                                     transition: 'background 0.2s, color 0.2s',
                                                 }}
                                             >
-                                                <AccountCircleIcon sx={{color: '#1976d2', fontSize: 20}}/> Thông tin con
+                                                <AccountCircleIcon sx={{color: '#4f46e5', fontSize: 20}}/> Thông tin con
                                             </MenuItem>
                                         </>
                                     ) : (
@@ -1314,18 +1232,18 @@ function MainHeader() {
                                         sx={{
                                             fontSize: 15,
                                             fontWeight: 500,
-                                            color: '#1976d2',
+                                            color: '#4f46e5',
                                             borderRadius: 1,
                                             gap: 1.5,
                                             mt: 0.5,
                                             '&:hover': {
-                                                bgcolor: 'rgba(25,118,210,0.08)',
-                                                color: '#1565c0',
+                                                bgcolor: 'rgba(79,70,229,0.08)',
+                                                color: '#4338ca',
                                             },
                                             transition: 'background 0.2s, color 0.2s',
                                         }}
                                     >
-                                        <DashboardIcon sx={{color: '#1976d2', fontSize: 20}}/> Bảng Điều Khiển
+                                        <DashboardIcon sx={{color: '#4f46e5', fontSize: 20}}/> Bảng Điều Khiển
                                     </MenuItem>
                                     )}
                                     <MenuItem
@@ -1355,19 +1273,19 @@ function MainHeader() {
                             <Button
                                 variant="contained"
                                 sx={{
-                                    background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 100%)',
-                                    marginLeft: '1vw',
-                                    color: 'white',
+                                    ml: {xs: 0, sm: 1},
+                                    color: '#fff',
                                     fontWeight: 700,
-                                    borderRadius: 3,
-                                    px: 4,
-                                    py: 1.5,
-                                    fontSize: 16,
-                                    boxShadow: '0 4px 12px rgba(25,118,210,0.3)',
+                                    borderRadius: 999,
+                                    px: {xs: 3, sm: 3.5},
+                                    py: 1.15,
+                                    fontSize: 15,
                                     textTransform: 'none',
+                                    background: 'linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%)',
+                                    boxShadow: '0 8px 24px rgba(79, 70, 229, 0.38)',
                                     '&:hover': {
-                                        background: 'linear-gradient(90deg, #1565c0 0%, #1976d2 100%)',
-                                        boxShadow: '0 6px 16px rgba(25,118,210,0.4)'
+                                        background: 'linear-gradient(90deg, #4338ca 0%, #6d28d9 100%)',
+                                        boxShadow: '0 12px 32px rgba(79, 70, 229, 0.45)'
                                     }
                                 }}
                                 onClick={handleButtonClick}
@@ -1378,7 +1296,13 @@ function MainHeader() {
                     </Box>
                     <IconButton
                         color="inherit"
-                        sx={{display: {md: 'none'}, color: '#1976d2'}}
+                        sx={{
+                            display: {md: 'none'},
+                            color: '#4f46e5',
+                            border: '1px solid rgba(99,102,241,0.35)',
+                            bgcolor: 'rgba(255,255,255,0.6)',
+                            '&:hover': {bgcolor: 'rgba(99,102,241,0.1)'}
+                        }}
                         onClick={handleMobileMenuToggle}
                     >
                         <MenuIcon/>
@@ -1386,10 +1310,10 @@ function MainHeader() {
                 </Box>
                 <Collapse in={mobileMenuOpen}>
                     <Box sx={{
-                        bgcolor: 'white',
-                        borderTop: '1px solid #e0e0e0',
+                        bgcolor: 'rgba(255,255,255,0.98)',
+                        borderTop: '1px solid rgba(226,232,240,0.95)',
                         py: 2,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        boxShadow: '0 12px 32px rgba(15,23,42,0.06)'
                     }}>
                         <List>
                             {isSignedIn && isParent ? (
@@ -1454,7 +1378,7 @@ function MainHeader() {
                                                 sx={{
                                                     width: 48,
                                                     height: 48,
-                                                    bgcolor: '#1976d2'
+                                                    bgcolor: '#4f46e5'
                                                 }}
                                             >
                                                 {!avatarUrl && (displayName.charAt(0).toUpperCase())}
@@ -1469,7 +1393,7 @@ function MainHeader() {
                                                     </Typography>
                                                 )}
                                                 {userInfo?.role && (
-                                                    <Typography sx={{fontSize: 11, color: '#1976d2', mt: 0.5}}>
+                                                    <Typography sx={{fontSize: 11, color: '#4f46e5', mt: 0.5}}>
                                                         {userInfo.role === 'STUDENT' ? 'Học sinh' : 
                                                          userInfo.role === 'SCHOOL' ? 'Trường học' : 
                                                          userInfo.role === 'ADMIN' ? 'Quản trị viên' :
@@ -1488,7 +1412,7 @@ function MainHeader() {
                                             >
                                                 <ListItemText 
                                                     primary="Hồ sơ cá nhân"
-                                                    sx={{color: '#1976d2', fontWeight: 600}}
+                                                    sx={{color: '#4f46e5', fontWeight: 600}}
                                                 />
                                             </ListItem>
                                             <ListItem 
@@ -1497,7 +1421,7 @@ function MainHeader() {
                                             >
                                                 <ListItemText 
                                                     primary="Thông tin con"
-                                                    sx={{color: '#1976d2', fontWeight: 600}}
+                                                    sx={{color: '#4f46e5', fontWeight: 600}}
                                                 />
                                             </ListItem>
                                         </>
@@ -1522,7 +1446,7 @@ function MainHeader() {
                                     >
                                         <ListItemText 
                                             primary="Bảng Điều Khiển"
-                                            sx={{color: '#1976d2', fontWeight: 600}}
+                                            sx={{color: '#4f46e5', fontWeight: 600}}
                                         />
                                     </ListItem>
                                     )}

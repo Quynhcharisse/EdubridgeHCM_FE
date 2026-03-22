@@ -1,5 +1,5 @@
 import React, {useEffect} from "react";
-import {Box, Fade} from "@mui/material";
+import {Box} from "@mui/material";
 import {Outlet, useLocation, useNavigate} from "react-router-dom";
 import Header, {ScrollTopButton} from "../partials/Header.jsx";
 import Footer from "../partials/Footer.jsx";
@@ -9,6 +9,7 @@ export default function WebAppLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+    const isHomeRoute = location.pathname === '/' || location.pathname === '/home';
 
     useEffect(() => {
         if (isAuthPage) {
@@ -48,35 +49,36 @@ export default function WebAppLayout() {
                 }
             }
         } catch {
+            /* ignore invalid stored user JSON */
         }
     }, [location.pathname, navigate]);
 
     return (
-            <Box
-                sx={{
-            minHeight: '100vh',
-            bgcolor: '#f8fafc',
-            display: 'flex',
-            flexDirection: 'column',
+        <Box
+            sx={{
+                minHeight: '100vh',
+                bgcolor: '#f8fafc',
+                display: 'flex',
+                flexDirection: 'column',
                 overflowX: 'hidden',
-            overflowY: isAuthPage ? 'hidden' : 'auto',
+                ...(isAuthPage
+                    ? {overflowY: 'hidden', height: '100vh'}
+                    : {})
             }}
         >
             {isAuthPage ? <AuthHeader/> : <Header/>}
-            <Fade in key={location.pathname} timeout={{ enter: 250, exit: 150 }}>
-                <Box
-                    component="main"
-                    sx={{
-                        flex: 1,
-                        width: '100vw',
-                        minHeight: '60vh',
-                        bgcolor: '#f8fafc',
-                        overflow: isAuthPage ? 'hidden' : 'auto'
-                    }}
-                >
-                    <Outlet/>
-                </Box>
-            </Fade>
+            <Box
+                component="main"
+                sx={{
+                    flex: 1,
+                    width: '100%',
+                    maxWidth: '100vw',
+                    minHeight: '60vh',
+                    bgcolor: isHomeRoute && !isAuthPage ? 'transparent' : '#f8fafc'
+                }}
+            >
+                <Outlet/>
+            </Box>
             {!isAuthPage && <Footer/>}
             {!isAuthPage && <ScrollTopButton/>}
         </Box>
