@@ -50,18 +50,25 @@ export default function AuthHeader({showSidebarToggle = false, onToggleSidebar, 
     };
 
     const handleLogout = async () => {
-        const response = await signout()
-        if (response && response.status === 200) {
-            if (localStorage.length > 0) {
-                localStorage.clear();
+        try {
+            const response = await signout();
+            if (response && response.status === 200) {
+                if (localStorage.length > 0) {
+                    localStorage.clear();
+                }
+                if (sessionStorage.length > 0) {
+                    sessionStorage.clear();
+                }
+                enqueueSnackbar('Đăng xuất thành công.', {variant: 'success', autoHideDuration: 5000});
+                setTimeout(() => {
+                    window.location.href = '/home';
+                }, 1000);
+            } else {
+                enqueueSnackbar('Không thể đăng xuất.', {variant: 'error'});
             }
-            if (sessionStorage.length > 0) {
-                sessionStorage.clear()
-            }
-            enqueueSnackbar(response.data.message, { variant: 'success', autoHideDuration: 5000 })
-            setTimeout(() => {
-                window.location.href = '/home';
-            }, 1000)
+        } catch (error) {
+            console.error('Logout error:', error);
+            enqueueSnackbar('Không thể đăng xuất.', {variant: 'error'});
         }
     };
 

@@ -69,7 +69,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
             if (response && response.status === 200) {
                 if (localStorage.length > 0) localStorage.clear();
                 if (sessionStorage.length > 0) sessionStorage.clear();
-                enqueueSnackbar(response.data?.message || "Đã đăng xuất", {
+                enqueueSnackbar("Đăng xuất thành công.", {
                     variant: "success",
                     autoHideDuration: 1000,
                 });
@@ -79,7 +79,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
             }
         } catch (err) {
             console.error(err);
-            enqueueSnackbar("Lỗi đăng xuất", { variant: "error" });
+            enqueueSnackbar("Không thể đăng xuất.", { variant: "error" });
         }
     };
 
