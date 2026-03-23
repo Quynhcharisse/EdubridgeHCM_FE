@@ -10,6 +10,7 @@ import {
     CircularProgress,
     Grid,
     IconButton,
+    InputAdornment,
     Divider,
 } from '@mui/material';
 import {ArrowBack} from '@mui/icons-material';
@@ -18,6 +19,8 @@ import backgroundLogin from '../../assets/backgroundLogin.png';
 import {useNavigate} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
 import {showErrorSnackbar, showSuccessSnackbar} from '../ui/AppSnackbar.jsx';
+import CloudinaryUpload from '../ui/CloudinaryUpload.jsx';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const SchoolRegistrationForm = ({email, onBack}) => {
     const navigate = useNavigate();
@@ -25,7 +28,6 @@ const SchoolRegistrationForm = ({email, onBack}) => {
     const [taxCode, setTaxCode] = useState('');
     const [taxCodeError, setTaxCodeError] = useState('');
     const [isCheckingTaxCode, setIsCheckingTaxCode] = useState(false);
-    const [taxCodeData, setTaxCodeData] = useState(null);
     
     const [formData, setFormData] = useState({
         schoolName: '',
@@ -57,7 +59,6 @@ const SchoolRegistrationForm = ({email, onBack}) => {
             const data = await checkTaxCode(taxCode.trim());
             
             if (data.code === '00' && data.data) {
-                setTaxCodeData(data.data);
                 setFormData(prev => ({
                     ...prev,
                     taxCode: taxCode.trim(),
@@ -528,36 +529,114 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                         />
                                     </Grid>
                                         <Grid size={6}>
-                                        <TextField
-                                            label="Logo URL"
-                                            name="logoUrl"
-                                            value={formData.logoUrl}
-                                            onChange={handleInputChange}
-                                            fullWidth
-                                            size="small"
-                                            placeholder="https://example.com/logo.png"
-                                                sx={{
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2,
-                                                    },
-                                            }}
-                                        />
-                                    </Grid>
-                                        <Grid size={6}>
-                                        <TextField
-                                            label="URL giấy phép kinh doanh"
-                                            name="businessLicenseUrl"
-                                            value={formData.businessLicenseUrl}
-                                            onChange={handleInputChange}
-                                            fullWidth
-                                            size="small"
-                                            placeholder="https://example.com/license.pdf"
+                                            <TextField
+                                                label="Logo URL"
+                                                name="logoUrl"
+                                                value={formData.logoUrl}
+                                                onChange={handleInputChange}
+                                                fullWidth
+                                                size="small"
+                                                placeholder="https://example.com/logo.png"
                                                 sx={{
                                                     '& .MuiOutlinedInput-root': {
                                                         borderRadius: 2,
                                                     },
                                                 }}
-                                        />
+                                                InputProps={{
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <CloudinaryUpload
+                                                                inputId="school-registration-logo"
+                                                                accept="image/*"
+                                                                multiple={false}
+                                                                onSuccess={([f]) => {
+                                                                    if (f?.url) {
+                                                                        setFormData((p) => ({...p, logoUrl: f.url}));
+                                                                        enqueueSnackbar("Đã tải logo lên Cloudinary", {variant: "success"});
+                                                                    }
+                                                                }}
+                                                                onError={(m) => enqueueSnackbar(m, {variant: "error"})}
+                                                            >
+                                                                {({inputId, loading}) => (
+                                                                    <IconButton
+                                                                        component="label"
+                                                                        htmlFor={inputId}
+                                                                        disabled={loading}
+                                                                        size="small"
+                                                                        sx={{
+                                                                            borderRadius: 1,
+                                                                            bgcolor: loading ? "rgba(25, 118, 210, 0.08)" : "transparent",
+                                                                        }}
+                                                                    >
+                                                                        <CloudUploadIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                )}
+                                                            </CloudinaryUpload>
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                            />
+                                    </Grid>
+                                        <Grid size={6}>
+                                            <TextField
+                                                label="URL giấy phép kinh doanh"
+                                                name="businessLicenseUrl"
+                                                value={formData.businessLicenseUrl}
+                                                onChange={handleInputChange}
+                                                fullWidth
+                                                size="small"
+                                                placeholder="https://example.com/license.pdf"
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 2,
+                                                    },
+                                                }}
+                                                InputProps={{
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <CloudinaryUpload
+                                                                inputId="school-registration-business-license"
+                                                                accept="image/*,application/pdf"
+                                                                multiple={false}
+                                                                onSuccess={([f]) => {
+                                                                    if (f?.url) {
+                                                                        setFormData((p) => ({...p, businessLicenseUrl: f.url}));
+                                                                        enqueueSnackbar("Đã tải giấy phép lên Cloudinary", {variant: "success"});
+                                                                    }
+                                                                }}
+                                                                onError={(m) => enqueueSnackbar(m, {variant: "error"})}
+                                                            >
+                                                                {({inputId, loading}) => (
+                                                                    <IconButton
+                                                                        component="label"
+                                                                        htmlFor={inputId}
+                                                                        disabled={loading}
+                                                                        size="small"
+                                                                        sx={{
+                                                                            borderRadius: 1,
+                                                                            bgcolor: loading ? "rgba(25, 118, 210, 0.08)" : "transparent",
+                                                                        }}
+                                                                    >
+                                                                        <CloudUploadIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                )}
+                                                            </CloudinaryUpload>
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                            />
+                                            {formData.businessLicenseUrl ? (
+                                                <Typography variant="caption" sx={{display: "block", mt: 0.75}}>
+                                                    <a
+                                                        href={formData.businessLicenseUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        style={{color: "#1976d2", textDecoration: "none"}}
+                                                    >
+                                                        Mở giấy phép
+                                                    </a>
+                                                </Typography>
+                                            ) : null}
                                     </Grid>
                                 </Grid>
                                 </Box>
