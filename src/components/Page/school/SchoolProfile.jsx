@@ -10,6 +10,7 @@ import {
     DialogContent,
     DialogTitle,
     IconButton,
+    InputAdornment,
     Skeleton,
     Stack,
     TextField,
@@ -561,94 +562,130 @@ export default function SchoolProfile() {
                                 fullWidth
                                 size="small"
                                 placeholder="https://... hoặc file PDF"
-                            />
-                            <CloudinaryUpload
-                                inputId="school-profile-business-license"
-                                accept="image/*,application/pdf"
-                                multiple={false}
-                                onSuccess={([f]) => {
-                                    if (f?.url) {
-                                        setFormValues((p) => ({ ...p, businessLicenseUrl: f.url }));
-                                        enqueueSnackbar("Đã tải giấy phép lên Cloudinary", { variant: "success" });
-                                    }
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <CloudinaryUpload
+                                                inputId="school-profile-business-license"
+                                                accept="image/*,application/pdf"
+                                                multiple={false}
+                                                onSuccess={([f]) => {
+                                                    if (f?.url) {
+                                                        setFormValues((p) => ({ ...p, businessLicenseUrl: f.url }));
+                                                        enqueueSnackbar("Đã tải giấy phép lên Cloudinary", { variant: "success" });
+                                                    }
+                                                }}
+                                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
+                                            >
+                                                {({ inputId, loading }) => (
+                                                    <IconButton
+                                                        component="label"
+                                                        htmlFor={inputId}
+                                                        disabled={loading}
+                                                        size="small"
+                                                        sx={{
+                                                            borderRadius: 1,
+                                                            bgcolor: loading ? "rgba(25, 118, 210, 0.08)" : "transparent",
+                                                        }}
+                                                    >
+                                                        <CloudUploadIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </CloudinaryUpload>
+                                        </InputAdornment>
+                                    ),
                                 }}
-                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
-                            >
-                                {({ inputId, loading }) => (
-                                    <Button
-                                        component="label"
-                                        htmlFor={inputId}
-                                        disabled={loading}
-                                        size="small"
-                                        variant="outlined"
-                                        sx={{ mt: 1, textTransform: "none" }}
-                                    >
-                                        {loading ? "Đang tải..." : "Tải giấy phép (Cloudinary)"}
-                                    </Button>
-                                )}
-                            </CloudinaryUpload>
+                            />
                         </Box>
                         <Box>
-                            <TextField label="URL logo" value={formValues.logoUrl} onChange={(e) => setFormValues((p) => ({ ...p, logoUrl: e.target.value }))} fullWidth size="small" placeholder="https://..." />
-                            <CloudinaryUpload
-                                inputId="school-profile-logo"
-                                accept="image/*"
-                                multiple={false}
-                                onSuccess={([f]) => {
-                                    if (f?.url) {
-                                        setFormValues((p) => ({ ...p, logoUrl: f.url }));
-                                        enqueueSnackbar("Đã tải logo lên Cloudinary", { variant: "success" });
-                                    }
+                            <TextField
+                                label="URL logo"
+                                value={formValues.logoUrl}
+                                onChange={(e) => setFormValues((p) => ({ ...p, logoUrl: e.target.value }))}
+                                fullWidth
+                                size="small"
+                                placeholder="https://..."
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <CloudinaryUpload
+                                                inputId="school-profile-logo"
+                                                accept="image/*"
+                                                multiple={false}
+                                                onSuccess={([f]) => {
+                                                    if (f?.url) {
+                                                        setFormValues((p) => ({ ...p, logoUrl: f.url }));
+                                                        enqueueSnackbar("Đã tải logo lên Cloudinary", { variant: "success" });
+                                                    }
+                                                }}
+                                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
+                                            >
+                                                {({ inputId, loading }) => (
+                                                    <IconButton
+                                                        component="label"
+                                                        htmlFor={inputId}
+                                                        disabled={loading}
+                                                        size="small"
+                                                        sx={{
+                                                            borderRadius: 1,
+                                                            bgcolor: loading ? "rgba(25, 118, 210, 0.08)" : "transparent",
+                                                        }}
+                                                    >
+                                                        <CloudUploadIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </CloudinaryUpload>
+                                        </InputAdornment>
+                                    ),
                                 }}
-                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
-                            >
-                                {({ inputId, loading }) => (
-                                    <Button
-                                        component="label"
-                                        htmlFor={inputId}
-                                        disabled={loading}
-                                        size="small"
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon />}
-                                        sx={{ mt: 1, textTransform: "none" }}
-                                    >
-                                        {loading ? "Đang tải..." : "Tải logo (Cloudinary)"}
-                                    </Button>
-                                )}
-                            </CloudinaryUpload>
+                            />
                         </Box>
 
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1e293b", pt: 1 }}>
                             Hình ảnh (imageJson)
                         </Typography>
                         <Box>
-                            <TextField label="URL ảnh bìa (coverUrl)" value={formValues.coverUrl} onChange={(e) => setFormValues((p) => ({ ...p, coverUrl: e.target.value }))} fullWidth size="small" placeholder="https://..." />
-                            <CloudinaryUpload
-                                inputId="school-profile-cover"
-                                accept="image/*"
-                                multiple={false}
-                                onSuccess={([f]) => {
-                                    if (f?.url) {
-                                        setFormValues((p) => ({ ...p, coverUrl: f.url }));
-                                        enqueueSnackbar("Đã tải ảnh bìa lên Cloudinary", { variant: "success" });
-                                    }
+                            <TextField
+                                label="URL ảnh bìa (coverUrl)"
+                                value={formValues.coverUrl}
+                                onChange={(e) => setFormValues((p) => ({ ...p, coverUrl: e.target.value }))}
+                                fullWidth
+                                size="small"
+                                placeholder="https://..."
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <CloudinaryUpload
+                                                inputId="school-profile-cover"
+                                                accept="image/*"
+                                                multiple={false}
+                                                onSuccess={([f]) => {
+                                                    if (f?.url) {
+                                                        setFormValues((p) => ({ ...p, coverUrl: f.url }));
+                                                        enqueueSnackbar("Đã tải ảnh bìa lên Cloudinary", { variant: "success" });
+                                                    }
+                                                }}
+                                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
+                                            >
+                                                {({ inputId, loading }) => (
+                                                    <IconButton
+                                                        component="label"
+                                                        htmlFor={inputId}
+                                                        disabled={loading}
+                                                        size="small"
+                                                        sx={{
+                                                            borderRadius: 1,
+                                                            bgcolor: loading ? "rgba(25, 118, 210, 0.08)" : "transparent",
+                                                        }}
+                                                    >
+                                                        <CloudUploadIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </CloudinaryUpload>
+                                        </InputAdornment>
+                                    ),
                                 }}
-                                onError={(m) => enqueueSnackbar(m, { variant: "error" })}
-                            >
-                                {({ inputId, loading }) => (
-                                    <Button
-                                        component="label"
-                                        htmlFor={inputId}
-                                        disabled={loading}
-                                        size="small"
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon />}
-                                        sx={{ mt: 1, textTransform: "none" }}
-                                    >
-                                        {loading ? "Đang tải..." : "Tải ảnh bìa (Cloudinary)"}
-                                    </Button>
-                                )}
-                            </CloudinaryUpload>
+                            />
                         </Box>
 
                         <Box>
