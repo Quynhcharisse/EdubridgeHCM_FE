@@ -19,12 +19,14 @@ import {
     RadioGroup,
     Select,
     Stack,
+    Tab,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
+    Tabs,
     TextField,
     Typography,
 } from '@mui/material';
@@ -70,6 +72,11 @@ export default function ChildrenInfoPage() {
         regularGrades,
         foreignRows,
         foreignGrades,
+        studentRecords,
+        activeStudentTab,
+        creatingNewStudent,
+        handleSelectStudentTab,
+        handleAddStudentTab,
         handleChange,
         handlePersonalityListScroll,
         handlePersonalityChange,
@@ -137,11 +144,96 @@ export default function ChildrenInfoPage() {
                     </Box>
                     {!loading && !editMode && (
                         <Button variant="contained" onClick={enterEditMode} sx={editSaveButtonSx}>
-                            Thêm
+                            Chỉnh sửa
                         </Button>
                     )}
                 </Box>
                 <Divider sx={{mb: 2, borderColor: 'rgba(148, 163, 184, 0.35)'}}/>
+                {!loading && (
+                    <Box sx={{mb: 2, overflowX: 'auto'}}>
+                        <Tabs
+                            value={creatingNewStudent ? 'add' : activeStudentTab}
+                            onChange={(_, value) => {
+                                if (value === 'add') handleAddStudentTab();
+                                else handleSelectStudentTab(Number(value));
+                            }}
+                            variant="scrollable"
+                            scrollButtons="auto"
+                            sx={{
+                                minHeight: 44,
+                                px: 0.5,
+                                '& .MuiTabs-flexContainer': {
+                                    gap: 0.6,
+                                },
+                                '& .MuiTabs-indicator': {
+                                    display: 'none',
+                                },
+                            }}
+                        >
+                            {studentRecords.map((s, idx) => (
+                                <Tab
+                                    key={s?.id ?? `student-${idx}`}
+                                    value={idx}
+                                    label={s?.studentName || s?.name || `Con ${idx + 1}`}
+                                    sx={{
+                                        minHeight: 44,
+                                        minWidth: 130,
+                                        px: 2,
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        borderRadius: '14px 14px 0 0',
+                                        bgcolor: 'rgba(226, 232, 240, 0.75)',
+                                        color: '#475569',
+                                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                                        borderBottom: 'none',
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                            bgcolor: 'rgba(219, 234, 254, 0.58)',
+                                            color: '#1e3a8a',
+                                        },
+                                        '&.Mui-selected': {
+                                            bgcolor: '#f8fbff',
+                                            color: '#0f172a',
+                                            fontWeight: 700,
+                                            borderColor: 'rgba(59, 130, 246, 0.35)',
+                                            boxShadow:
+                                                '0 -2px 12px rgba(37, 99, 235, 0.16), 0 0 0 1px rgba(191, 219, 254, 0.7) inset',
+                                        },
+                                    }}
+                                />
+                            ))}
+                            <Tab
+                                value="add"
+                                icon={<Add fontSize="small"/>}
+                                iconPosition="start"
+                                label="Thêm"
+                                sx={{
+                                    minHeight: 44,
+                                    minWidth: 110,
+                                    px: 1.8,
+                                    textTransform: 'none',
+                                    fontWeight: 700,
+                                    borderRadius: '14px 14px 0 0',
+                                    background:
+                                        'linear-gradient(180deg, rgba(224, 242, 254, 0.95) 0%, rgba(219, 234, 254, 0.95) 100%)',
+                                    color: '#1d4ed8',
+                                    border: '1px dashed rgba(37, 99, 235, 0.5)',
+                                    borderBottom: 'none',
+                                    '&:hover': {
+                                        background:
+                                            'linear-gradient(180deg, rgba(219, 234, 254, 1) 0%, rgba(191, 219, 254, 0.95) 100%)',
+                                        color: '#1e40af',
+                                    },
+                                    '&.Mui-selected': {
+                                        background:
+                                            'linear-gradient(180deg, rgba(191, 219, 254, 0.95) 0%, rgba(147, 197, 253, 0.9) 100%)',
+                                        color: '#1e3a8a',
+                                    },
+                                }}
+                            />
+                        </Tabs>
+                    </Box>
+                )}
 
                 {loading ? (
                     <Box sx={{display: 'flex', justifyContent: 'center', py: 8}}>

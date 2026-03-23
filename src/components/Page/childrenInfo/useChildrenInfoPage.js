@@ -49,6 +49,9 @@ export function useChildrenInfoPage() {
     const [foreignGrades, setForeignGrades] = useState({});
     const [pendingAcademicInfos, setPendingAcademicInfos] = useState(null);
     const [pendingFavouriteJobLabel, setPendingFavouriteJobLabel] = useState(null);
+    const [studentRecords, setStudentRecords] = useState([]);
+    const [activeStudentTab, setActiveStudentTab] = useState(0);
+    const [creatingNewStudent, setCreatingNewStudent] = useState(false);
 
     const setters = {
         setForm,
@@ -61,6 +64,19 @@ export function useChildrenInfoPage() {
         setPendingFavouriteJobLabel,
     };
 
+    const extractStudentRecords = (body) => {
+        if (Array.isArray(body)) return body;
+        if (Array.isArray(body?.students)) return body.students;
+        if (Array.isArray(body?.data)) return body.data;
+        if (body && typeof body === 'object') return [body];
+        return [];
+    };
+
+    const applyStudentRecordToEditor = (record) => {
+        const mapped = applyStudentBodyToState(record);
+        setStudentState(setters, mapped);
+    };
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -69,15 +85,30 @@ export function useChildrenInfoPage() {
                 const res = await getParentStudent();
                 if (cancelled) return;
                 if (res?.status === 200) {
-                    const mapped = applyStudentBodyToState(parseBody(res));
-                    setStudentState(setters, mapped);
+                    const body = parseBody(res);
+                    const records = extractStudentRecords(body);
+                    setStudentRecords(records);
+                    if (records.length > 0) {
+                        setActiveStudentTab(0);
+                        setCreatingNewStudent(false);
+                        applyStudentRecordToEditor(records[0]);
+                    } else {
+                        setActiveStudentTab(0);
+                        setCreatingNewStudent(true);
+                        setEditMode(true);
+                        setStudentState(setters, getEmptyStudentState());
+                    }
                 } else {
+                    setStudentRecords([]);
+                    setCreatingNewStudent(true);
                     setStudentState(setters, getEmptyStudentState());
                 }
             } catch (e) {
                 console.error('ChildrenInfoPage load error:', e);
                 if (!cancelled) {
                     enqueueSnackbar('Không thể tải thông tin học sinh.', {variant: 'error'});
+                    setStudentRecords([]);
+                    setCreatingNewStudent(true);
                     setStudentState(setters, getEmptyStudentState());
                 }
             } finally {
@@ -319,6 +350,21 @@ export function useChildrenInfoPage() {
 
     const fieldsDisabled = !editMode;
 
+    const handleSelectStudentTab = (idx) => {
+        if (idx < 0 || idx >= studentRecords.length) return;
+        setActiveStudentTab(idx);
+        setCreatingNewStudent(false);
+        setEditMode(false);
+        applyStudentRecordToEditor(studentRecords[idx]);
+    };
+
+    const handleAddStudentTab = () => {
+        setCreatingNewStudent(true);
+        setActiveStudentTab(studentRecords.length);
+        setEditMode(true);
+        setStudentState(setters, getEmptyStudentState());
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -359,21 +405,40 @@ export function useChildrenInfoPage() {
                 try {
                     const getRes = await getParentStudent();
                     if (getRes?.status === 200) {
-                        const mapped = applyStudentBodyToState(parseBody(getRes));
-                        setStudentState(setters, mapped);
-                        if (
-                            mapped.pendingAcademicInfos?.length &&
-                            (regularSubjects.length > 0 || foreignSubjects.length > 0)
-                        ) {
-                            const merged = mergeAcademicInfosIntoGrades(
-                                mapped.pendingAcademicInfos,
-                                regularSubjects,
-                                foreignSubjects,
-                            );
-                            setRegularGrades(merged.regularGrades);
-                            setForeignRows(merged.foreignRows);
-                            setForeignGrades(merged.foreignGrades);
-                            setPendingAcademicInfos(null);
+                        const body = parseBody(getRes);
+                        const records = extractStudentRecords(body);
+                        setStudentRecords(records);
+
+                        let nextIndex = activeStudentTab;
+                        if (creatingNewStudent) {
+                            nextIndex = Math.max(0, records.length - 1);
+                        } else if (nextIndex >= records.length) {
+                            nextIndex = Math.max(0, records.length - 1);
+                        }
+
+                        if (records.length > 0) {
+                            setActiveStudentTab(nextIndex);
+                            setCreatingNewStudent(false);
+                            const mapped = applyStudentBodyToState(records[nextIndex]);
+                            setStudentState(setters, mapped);
+                            if (
+                                mapped.pendingAcademicInfos?.length &&
+                                (regularSubjects.length > 0 || foreignSubjects.length > 0)
+                            ) {
+                                const merged = mergeAcademicInfosIntoGrades(
+                                    mapped.pendingAcademicInfos,
+                                    regularSubjects,
+                                    foreignSubjects,
+                                );
+                                setRegularGrades(merged.regularGrades);
+                                setForeignRows(merged.foreignRows);
+                                setForeignGrades(merged.foreignGrades);
+                                setPendingAcademicInfos(null);
+                            }
+                        } else {
+                            setActiveStudentTab(0);
+                            setCreatingNewStudent(true);
+                            setStudentState(setters, getEmptyStudentState());
                         }
                         reloadOk = true;
                     }
@@ -442,6 +507,11 @@ export function useChildrenInfoPage() {
         handleForeignSubjectChange,
         addForeignLanguageRow,
         foreignOptionsForRow,
+        studentRecords,
+        activeStudentTab,
+        creatingNewStudent,
+        handleSelectStudentTab,
+        handleAddStudentTab,
         enterEditMode,
         handleSave,
     };
