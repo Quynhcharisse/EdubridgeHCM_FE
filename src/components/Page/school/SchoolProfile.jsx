@@ -229,10 +229,9 @@ export default function SchoolProfile() {
                 campusData: {
                     name: formValues.campusName?.trim() || "",
                     phoneNumber: formValues.phoneNumber?.trim() || "",
-                    policyDetail: policyDetailProvided ? formValues.policyDetail?.trim() || "" : undefined,
+                    policyDetail: policyDetailProvided ? formValues.policyDetail?.trim() || "" : "",
                     address: formValues.address?.trim() || "",
                     schoolData: {
-                        name: formValues.schoolName?.trim() || "",
                         description: formValues.schoolDescription?.trim() || "",
                         logoUrl: formValues.logoUrl?.trim() || "",
                         websiteUrl: formValues.websiteUrl?.trim() || "",
@@ -589,7 +588,14 @@ export default function SchoolProfile() {
                 </DialogTitle>
                 <DialogContent dividers sx={{ maxHeight: "85vh" }}>
                     <Stack spacing={2.5} sx={{ pt: 1 }}>
-                        <TextField label="Tên trường" value={formValues.schoolName} onChange={(e) => setFormValues((p) => ({ ...p, schoolName: e.target.value }))} fullWidth size="small" />
+                        <TextField
+                            label="Tên trường"
+                            value={formValues.schoolName}
+                            onChange={(e) => setFormValues((p) => ({ ...p, schoolName: e.target.value }))}
+                            fullWidth
+                            size="small"
+                            disabled
+                        />
                         <TextField label="Tên cơ sở" value={formValues.campusName} onChange={(e) => setFormValues((p) => ({ ...p, campusName: e.target.value }))} fullWidth size="small" />
                         <TextField label="Số điện thoại" value={formValues.phoneNumber} onChange={(e) => setFormValues((p) => ({ ...p, phoneNumber: e.target.value }))} fullWidth size="small" />
                         <TextField label="Địa chỉ" value={formValues.address} onChange={(e) => setFormValues((p) => ({ ...p, address: e.target.value }))} fullWidth size="small" multiline rows={2} />
