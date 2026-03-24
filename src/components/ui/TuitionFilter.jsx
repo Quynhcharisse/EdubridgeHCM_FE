@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Box, Slider, Typography} from '@mui/material';
+import {BRAND_NAVY} from '../../constants/homeLandingTheme';
 
 export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChange }) {
     const [value, setValue] = useState([0, tuitionMax]);
@@ -47,7 +48,7 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                 sx={{
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    color: '#334155',
+                    color: '#64748b',
                     mb: 1,
                 }}
             >
@@ -64,20 +65,20 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                 marks={marks}
                 disableSwap
                 sx={{
-                    color: '#4f46e5',
+                    color: BRAND_NAVY,
                     height: 6,
                     mb: 1,
                     '& .MuiSlider-thumb': {
                         width: 18,
                         height: 18,
-                        backgroundColor: '#4f46e5',
+                        backgroundColor: BRAND_NAVY,
                         border: '2px solid white',
-                        boxShadow: '0 2px 8px rgba(79,70,229,0.35)',
+                        boxShadow: '0 2px 8px rgba(45,95,115,0.3)',
                         '&:hover': {
-                            boxShadow: '0 4px 12px rgba(79,70,229,0.45)',
+                            boxShadow: '0 4px 12px rgba(45,95,115,0.4)',
                         },
                         '&.Mui-active': {
-                            boxShadow: '0 4px 16px rgba(79,70,229,0.5)',
+                            boxShadow: '0 4px 16px rgba(45,95,115,0.45)',
                         },
                         '&:first-of-type': {
                             cursor: 'not-allowed',
@@ -85,15 +86,15 @@ export default function TuitionFilter({ tuitionMin = 0, tuitionMax = 30, onChang
                         },
                     },
                     '& .MuiSlider-track': {
-                        backgroundColor: '#4f46e5',
+                        backgroundColor: BRAND_NAVY,
                         border: 'none',
                     },
                     '& .MuiSlider-rail': {
-                        backgroundColor: '#e0e7ff',
+                        backgroundColor: 'rgba(184, 232, 247, 0.65)',
                         opacity: 1,
                     },
                     '& .MuiSlider-mark': {
-                        backgroundColor: '#e0e7ff',
+                        backgroundColor: 'rgba(184, 232, 247, 0.9)',
                         width: 2,
                         height: 8,
                         borderRadius: 1,
