@@ -9,6 +9,11 @@ import {
     getSavedSchools,
     setSavedSchools
 } from "../../utils/savedSchoolsStorage";
+import {
+    BRAND_NAVY,
+    HOME_PAGE_SURFACE_GRADIENT,
+    landingSectionShadow
+} from "../../constants/homeLandingTheme";
 
 export default function SavedSchoolsPage() {
     const navigate = useNavigate();
@@ -40,8 +45,21 @@ export default function SavedSchoolsPage() {
         enqueueSnackbar("Đã xóa khỏi trường đã lưu.", {autoHideDuration: 2000});
     };
 
+    const cardSurface = {
+        bgcolor: "#fff",
+        borderRadius: 3,
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: landingSectionShadow(2)
+    };
+
     return (
-        <Box sx={{pt: "90px", minHeight: "100vh", bgcolor: "#f7fbff"}}>
+        <Box
+            sx={{
+                pt: "90px",
+                minHeight: "100vh",
+                background: HOME_PAGE_SURFACE_GRADIENT
+            }}
+        >
             <Box sx={{maxWidth: 1200, mx: "auto", px: {xs: 2, md: 3}, pb: 5}}>
                 <Box sx={{display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2}}>
                     <Typography sx={{fontWeight: 800, fontSize: 20, color: "#0f172a"}}>
@@ -51,7 +69,12 @@ export default function SavedSchoolsPage() {
                         <Button
                             variant="contained"
                             onClick={() => navigate("/login")}
-                            sx={{textTransform: "none"}}
+                            sx={{
+                                textTransform: "none",
+                                fontWeight: 600,
+                                bgcolor: BRAND_NAVY,
+                                "&:hover": {bgcolor: "#265a6b"}
+                            }}
                         >
                             Đăng nhập
                         </Button>
@@ -59,16 +82,16 @@ export default function SavedSchoolsPage() {
                 </Box>
 
                 {!isParent ? (
-                    <Card sx={{p: 3, borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(15,23,42,0.05)"}}>
-                        <Typography sx={{color: "#334155", fontWeight: 600}}>
+                    <Card sx={{p: 3, ...cardSurface}}>
+                        <Typography sx={{color: "#64748b", fontWeight: 600}}>
                             Bạn cần đăng nhập với vai trò Phụ huynh để xem và lưu danh sách trường.
                         </Typography>
                     </Card>
                 ) : (
                     <>
-                        <Divider sx={{mb: 2}}/>
+                        <Divider sx={{mb: 2, borderColor: "rgba(15,23,42,0.08)"}}/>
                         {savedSchools.length === 0 ? (
-                            <Card sx={{p: 3, borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(15,23,42,0.05)"}}>
+                            <Card sx={{p: 3, ...cardSurface}}>
                                 <Typography sx={{color: "#64748b"}}>
                                     Chưa có trường nào được lưu.
                                 </Typography>
@@ -84,9 +107,13 @@ export default function SavedSchoolsPage() {
                                             gridTemplateColumns: {xs: "1fr", sm: "280px 1fr"},
                                             gap: 2,
                                             p: 2,
-                                            borderRadius: 3,
-                                            border: "1px solid #e2e8f0",
-                                            boxShadow: "0 2px 10px rgba(15,23,42,0.05)"
+                                            ...cardSurface,
+                                            transition: "transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease",
+                                            "&:hover": {
+                                                transform: "translateY(-4px)",
+                                                boxShadow: "0 18px 36px rgba(15,23,42,0.14)",
+                                                borderColor: "rgba(45,95,115,0.28)"
+                                            }
                                         }}
                                     >
                                         <CardMedia
@@ -99,7 +126,7 @@ export default function SavedSchoolsPage() {
                                             <Typography sx={{fontWeight: 800, fontSize: 18, color: "#0f172a"}}>
                                                 {item?.schoolName}
                                             </Typography>
-                                            <Typography sx={{mt: 0.5, color: "#475569"}}>
+                                            <Typography sx={{mt: 0.5, color: "#64748b", fontSize: "0.88rem"}}>
                                                 {item?.province} - {item?.ward}
                                             </Typography>
 
@@ -107,7 +134,8 @@ export default function SavedSchoolsPage() {
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => onRemove(item)}
-                                                    sx={{color: "#f59e0b"}}
+                                                    sx={{color: BRAND_NAVY, "&:hover": {bgcolor: "rgba(45,95,115,0.08)"}}}
+                                                    title="Bỏ lưu"
                                                 >
                                                     <BookmarkIcon fontSize="small"/>
                                                 </IconButton>

@@ -5,7 +5,6 @@ import {SnackbarProvider} from 'notistack';
 import {createTheme, CssBaseline, Slide, ThemeProvider} from '@mui/material';
 import {GlobalLoadingOverlay, LoadingProvider} from './contexts/LoadingContext.jsx';
 
-// Lazy load components
 const WebAppLayout = lazy(() => import("./components/ui/WebAppLayout.jsx"));
 const HomePage = lazy(() => import("./components/Page/HomePage.jsx"));
 const SchoolSearchPage = lazy(() => import("./components/Page/SchoolSearchPage.jsx"));
@@ -42,6 +41,7 @@ const SchoolCurriculums = lazy(() => import("./components/Page/school/SchoolCurr
 const SchoolPrograms = lazy(() => import("./components/Page/school/SchoolPrograms.jsx"));
 const ParentProfile = lazy(() => import("./components/auth/ParentProfile.jsx"));
 const SavedSchoolsPage = lazy(() => import("./components/Page/SavedSchoolsPage.jsx"));
+const CompareSchoolsPage = lazy(() => import("./components/Page/CompareSchoolsPage.jsx"));
 const ChildrenInfoPage = lazy(() => import("./components/Page/ChildrenInfoPage.jsx"));
 
 const LoadingFallback = () => {
@@ -176,6 +176,14 @@ const router = createBrowserRouter([
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
                         <SavedSchoolsPage/>
+                    </Suspense>
+                )
+            },
+            {
+                path: 'compare-schools',
+                element: (
+                    <Suspense fallback={<LoadingFallback/>}>
+                        <CompareSchoolsPage/>
                     </Suspense>
                 )
             },
