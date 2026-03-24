@@ -10,6 +10,7 @@ export default function WebAppLayout() {
     const navigate = useNavigate();
     const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
     const isHomeRoute = location.pathname === '/' || location.pathname === '/home';
+    const isParentFirstLoginRoute = location.pathname === '/parent-first-login';
 
     useEffect(() => {
         if (isAuthPage) {
@@ -79,7 +80,7 @@ export default function WebAppLayout() {
             >
                 <Outlet/>
             </Box>
-            {!isAuthPage && <Footer/>}
+            {!isAuthPage && !isParentFirstLoginRoute && <Footer/>}
             {!isAuthPage && <ScrollTopButton/>}
         </Box>
     );
