@@ -39,11 +39,7 @@ export default function AdminSchoolVerification() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [selectedRegistration, setSelectedRegistration] = useState(null);
     const getVerifyRequestId = (registration) => {
-        const rawId =
-            registration?.requestId ??
-            registration?.registrationRequestId ??
-            registration?.schoolRegistrationId ??
-            registration?.id;
+        const rawId = registration?.id;
         if (rawId === undefined || rawId === null || rawId === "") return null;
         const parsed = Number(rawId);
         return Number.isNaN(parsed) ? null : parsed;
@@ -83,7 +79,11 @@ export default function AdminSchoolVerification() {
     const handleVerify = async () => {
         const requestId = getVerifyRequestId(selectedRegistration);
         if (verifyingId) return;
-        setVerifyingId(requestId ?? -1);
+        if (requestId === null) {
+            enqueueSnackbar("Không tìm thấy id hồ sơ để xác thực.", {variant: "error"});
+            return;
+        }
+        setVerifyingId(requestId);
         try {
             const res = await verifySchoolRegistration(requestId);
             if (res && res.status === 200) {
