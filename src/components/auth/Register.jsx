@@ -62,15 +62,7 @@ const Register = () => {
         }
 
         if (selectedRole === ROLES.SCHOOL) {
-            showSuccessSnackbar(
-                'Bạn đã chọn vai trò Nhà trường. Vui lòng tiếp tục bằng cách xác thực mã số thuế của trường.',
-                {
-                    onClose: (event, reason) => {
-                        if (reason === 'clickaway') return;
-                        setStep(3);
-                    }
-                }
-            );
+            setStep(3);
             return;
         }
 
