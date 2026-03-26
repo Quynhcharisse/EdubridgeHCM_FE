@@ -14,6 +14,7 @@ import {
     Divider,
 } from '@mui/material';
 import {ArrowBack, CalendarMonth} from '@mui/icons-material';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import {checkTaxCode, registerSchool} from '../../services/AuthService';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import {useNavigate} from 'react-router-dom';
@@ -25,11 +26,7 @@ import {BRAND_NAVY, BRAND_SKY, BRAND_SKY_LIGHT} from '../../constants/homeLandin
 
 const SchoolRegistrationForm = ({email, onBack}) => {
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);
-    const [taxCode, setTaxCode] = useState('');
-    const [taxCodeError, setTaxCodeError] = useState('');
-    const [isCheckingTaxCode, setIsCheckingTaxCode] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         description: '',
         schoolName: '',
@@ -48,6 +45,16 @@ const SchoolRegistrationForm = ({email, onBack}) => {
     const [formErrors, setFormErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const foundingDatePickerRef = useRef(null);
+    const taxCodeRequestIdRef = useRef(0);
+    const lastCheckedTaxCodeRef = useRef('');
+    const taxCodeCacheRef = useRef(new Map());
+    const taxCodeCooldownUntilRef = useRef(0);
+    const [isCheckingTaxCode, setIsCheckingTaxCode] = useState(false);
+    const [taxCodeLookupMessage, setTaxCodeLookupMessage] = useState('');
+    const [lastTaxCodeCheckResult, setLastTaxCodeCheckResult] = useState({
+        taxCode: '',
+        isValid: false
+    });
 
     const formatDisplayDate = (value) => {
         if (!value) return '';
@@ -67,17 +74,9 @@ const SchoolRegistrationForm = ({email, onBack}) => {
 
     const formatFoundingDateInput = (value) => {
         const digits = value.replace(/\D/g, '').slice(0, 8);
-        const day = digits.slice(0, 2);
-        const month = digits.slice(2, 4);
-        const year = digits.slice(4, 8);
-
-        let result = '';
-        if (digits.length > 0) result += day;
-        if (digits.length > 0) result += '/';
-        if (digits.length > 2) result += month;
-        if (digits.length > 2) result += '/';
-        if (digits.length > 4) result += year;
-        return result;
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+        return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
     };
 
     const openFoundingDatePicker = () => {
@@ -90,46 +89,6 @@ const SchoolRegistrationForm = ({email, onBack}) => {
         picker.click();
     };
 
-    const handleTaxCodeCheck = async () => {
-        if (!taxCode.trim()) {
-            setTaxCodeError('Vui lòng nhập mã số thuế');
-            return;
-        }
-
-        setIsCheckingTaxCode(true);
-        setTaxCodeError('');
-
-        try {
-            const data = await checkTaxCode(taxCode.trim());
-            
-            if (data.code === '00' && data.data) {
-                setFormData(prev => ({
-                    ...prev,
-                    taxCode: taxCode.trim(),
-                    schoolName: data.data.name || data.data.companyName || prev.schoolName,
-                    campusAddress: data.data.address || data.data.companyAddress || prev.campusAddress,
-                    representativeName: data.data.representative || data.data.representativeName || prev.representativeName,
-                    campusPhone: data.data.phone || data.data.phoneNumber || prev.campusPhone,
-                }));
-
-                showSuccessSnackbar('Mã số thuế hợp lệ! Hệ thống sẽ chuyển sang bước tiếp theo sau khi thông báo đóng.', {
-                    onClose: (event, reason) => {
-                        if (reason === 'clickaway') return;
-                        setStep(2);
-                    },
-                });
-            } else {
-                setTaxCodeError(data.desc || 'Mã số thuế không hợp lệ');
-            }
-        } catch (error) {
-            console.error('Error checking tax code:', error);
-            setTaxCodeError('Có lỗi xảy ra khi kiểm tra mã số thuế. Vui lòng thử lại.');
-            showErrorSnackbar('Có lỗi xảy ra khi kiểm tra mã số thuế. Vui lòng thử lại.');
-        } finally {
-            setIsCheckingTaxCode(false);
-        }
-    };
-
     const handleInputChange = (e) => {
         const {name} = e.target;
         const value = name === 'foundingDate' ? formatFoundingDateInput(e.target.value) : e.target.value;
@@ -137,11 +96,138 @@ const SchoolRegistrationForm = ({email, onBack}) => {
             ...prev,
             [name]: value
         }));
+        if (name === 'taxCode') {
+            const normalizedTaxCode = value.trim();
+            setTaxCodeLookupMessage('');
+            setLastTaxCodeCheckResult({taxCode: normalizedTaxCode, isValid: false});
+        }
         if (formErrors[name]) {
             setFormErrors(prev => ({
                 ...prev,
                 [name]: ''
             }));
+        }
+    };
+
+    const isTaxCodeFormatValid = (taxCode) => /^\d{10}(\d{3})?$/.test(taxCode);
+
+    const getAutoFillDataFromTaxCode = (taxCodeData) => ({
+        schoolName: taxCodeData?.name || taxCodeData?.companyName || '',
+        campusAddress: taxCodeData?.address || taxCodeData?.companyAddress || '',
+        campusPhone: taxCodeData?.phone || taxCodeData?.phoneNumber || '',
+        representativeName: taxCodeData?.representative || taxCodeData?.representativeName || '',
+    });
+
+    const handleTaxCodeCheck = async () => {
+        const taxCodeValue = formData.taxCode.trim();
+
+        if (!taxCodeValue) {
+            setFormErrors((prev) => ({...prev, taxCode: 'Mã số thuế là bắt buộc'}));
+            setTaxCodeLookupMessage('');
+            setLastTaxCodeCheckResult({taxCode: '', isValid: false});
+            return;
+        }
+
+        if (!isTaxCodeFormatValid(taxCodeValue)) {
+            setFormErrors((prev) => ({...prev, taxCode: 'Mã số thuế gồm 10 hoặc 13 chữ số'}));
+            setTaxCodeLookupMessage('');
+            setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: false});
+            return;
+        }
+
+        const cachedResult = taxCodeCacheRef.current.get(taxCodeValue);
+        if (cachedResult) {
+            if (cachedResult.isValid) {
+                setTaxCodeLookupMessage('Mã số thuế hợp lệ');
+                setFormErrors((prev) => ({...prev, taxCode: ''}));
+                setFormData((prev) => ({
+                    ...prev,
+                    schoolName: cachedResult.schoolName || prev.schoolName,
+                    campusAddress: cachedResult.campusAddress || prev.campusAddress,
+                    campusPhone: cachedResult.campusPhone || prev.campusPhone,
+                    representativeName: cachedResult.representativeName || prev.representativeName,
+                }));
+                enqueueSnackbar('Mã số thuế hợp lệ', {variant: 'success'});
+            } else {
+                setTaxCodeLookupMessage('');
+                setFormErrors((prev) => ({...prev, taxCode: cachedResult.message || 'Mã số thuế không hợp lệ'}));
+                enqueueSnackbar(cachedResult.message || 'Mã số thuế không hợp lệ', {variant: 'error'});
+            }
+            lastCheckedTaxCodeRef.current = taxCodeValue;
+            setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: cachedResult.isValid});
+            return;
+        }
+
+        if (Date.now() < taxCodeCooldownUntilRef.current) {
+            setTaxCodeLookupMessage('');
+            setFormErrors((prev) => ({
+                ...prev,
+                taxCode: 'Đang quá nhiều lượt kiểm tra. Vui lòng thử lại sau ít giây.'
+            }));
+            setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: false});
+            enqueueSnackbar('Hệ thống tra cứu đang quá tải, vui lòng thử lại sau.', {variant: 'warning'});
+            return;
+        }
+
+        const requestId = taxCodeRequestIdRef.current + 1;
+        taxCodeRequestIdRef.current = requestId;
+        setIsCheckingTaxCode(true);
+        setTaxCodeLookupMessage('Đang kiểm tra mã số thuế...');
+
+        try {
+            const taxCodeCheck = await checkTaxCode(taxCodeValue);
+            if (taxCodeRequestIdRef.current !== requestId) return;
+
+            if (taxCodeCheck?.code === '00' && taxCodeCheck?.data) {
+                lastCheckedTaxCodeRef.current = taxCodeValue;
+                setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: true});
+                setTaxCodeLookupMessage('Mã số thuế hợp lệ');
+                setFormErrors((prev) => ({...prev, taxCode: ''}));
+
+                const autoFillData = getAutoFillDataFromTaxCode(taxCodeCheck.data);
+                taxCodeCacheRef.current.set(taxCodeValue, {
+                    isValid: true,
+                    ...autoFillData
+                });
+                setFormData((prev) => ({
+                    ...prev,
+                    schoolName: autoFillData.schoolName || prev.schoolName,
+                    campusAddress: autoFillData.campusAddress || prev.campusAddress,
+                    campusPhone: autoFillData.campusPhone || prev.campusPhone,
+                    representativeName: autoFillData.representativeName || prev.representativeName,
+                }));
+                enqueueSnackbar('Mã số thuế hợp lệ, đã tự động điền thông tin liên quan.', {variant: 'success'});
+            } else {
+                const errorMessage = taxCodeCheck?.desc || 'Mã số thuế không hợp lệ';
+                taxCodeCacheRef.current.set(taxCodeValue, {
+                    isValid: false,
+                    message: errorMessage
+                });
+                setTaxCodeLookupMessage('');
+                setFormErrors((prev) => ({...prev, taxCode: errorMessage}));
+                setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: false});
+                enqueueSnackbar(errorMessage, {variant: 'error'});
+            }
+        } catch (error) {
+            if (taxCodeRequestIdRef.current !== requestId) return;
+            setTaxCodeLookupMessage('');
+            const isTooManyRequests = error?.status === 429 || error?.response?.status === 429;
+            if (isTooManyRequests) {
+                taxCodeCooldownUntilRef.current = Date.now() + 15000;
+            }
+            const errorMessage = isTooManyRequests
+                ? 'Hệ thống tra cứu đang quá tải (429). Vui lòng thử lại sau 15 giây.'
+                : 'Có lỗi khi kiểm tra mã số thuế. Vui lòng thử lại.';
+            setFormErrors((prev) => ({
+                ...prev,
+                taxCode: errorMessage
+            }));
+            setLastTaxCodeCheckResult({taxCode: taxCodeValue, isValid: false});
+            enqueueSnackbar(errorMessage, {variant: 'error'});
+        } finally {
+            if (taxCodeRequestIdRef.current === requestId) {
+                setIsCheckingTaxCode(false);
+            }
         }
     };
 
@@ -172,7 +258,8 @@ const SchoolRegistrationForm = ({email, onBack}) => {
         if (!formData.hotline.trim()) {
             errors.hotline = 'Hotline là bắt buộc';
         }
-        if (formData.foundingDate.trim() && !normalizeFoundingDate(formData.foundingDate)) {
+        const hasFoundingDateInput = /\d/.test(formData.foundingDate);
+        if (hasFoundingDateInput && !normalizeFoundingDate(formData.foundingDate)) {
             errors.foundingDate = 'Ngày thành lập phải đúng định dạng dd/mm/yyyy';
         }
 
@@ -190,6 +277,27 @@ const SchoolRegistrationForm = ({email, onBack}) => {
         setIsSubmitting(true);
 
         try {
+            const taxCodeValue = formData.taxCode.trim();
+
+            if (!isTaxCodeFormatValid(taxCodeValue)) {
+                setFormErrors((prev) => ({
+                    ...prev,
+                    taxCode: 'Mã số thuế gồm 10 hoặc 13 chữ số',
+                }));
+                setIsSubmitting(false);
+                return;
+            }
+
+            if (!(lastTaxCodeCheckResult.taxCode === taxCodeValue && lastTaxCodeCheckResult.isValid)) {
+                setFormErrors((prev) => ({
+                    ...prev,
+                    taxCode: 'Vui lòng chờ hệ thống xác thực mã số thuế hợp lệ trước khi đăng ký.',
+                }));
+                showErrorSnackbar('Vui lòng nhập mã số thuế hợp lệ và chờ hệ thống kiểm tra xong.');
+                setIsSubmitting(false);
+                return;
+            }
+
             const registerPayload = {
                 email: email,
                 role: 'SCHOOL',
@@ -199,7 +307,7 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                     campusName: formData.campusName.trim(),
                     campusAddress: formData.campusAddress.trim(),
                     campusPhone: formData.campusPhone.trim(),
-                    taxCode: formData.taxCode.trim(),
+                    taxCode: taxCodeValue,
                     websiteUrl: formData.websiteUrl.trim() || null,
                     logoUrl: formData.logoUrl.trim() || null,
                     foundingDate: normalizeFoundingDate(formData.foundingDate),
@@ -240,25 +348,31 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 'calc(100vh - 64px)',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
-                py: {xs: 1, md: 1.5},
+                py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
                 backgroundImage: `linear-gradient(135deg, rgba(45,95,115,0.46), rgba(45,95,115,0.26)), url(${backgroundLogin})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundAttachment: 'fixed',
-                overflow: 'auto',
+                overflow: 'hidden',
             }}
         >
-            <Container maxWidth="lg" sx={{maxWidth: '960px !important'}}>
+            <Container maxWidth="lg" sx={{maxWidth: '960px !important', mb: {xs: 2, md: 3}}}>
                 <Paper
                     elevation={8}
                     sx={{
                         p: {xs: 1, sm: 1.25, md: 1.5},
+                        maxHeight: {
+                            xs: 'calc(100vh - 64px - 16px)',
+                            sm: 'calc(100vh - 64px - 24px)',
+                            md: 'calc(100vh - 64px - 48px)',
+                        },
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
                         borderRadius: 2.5,
                         background: '#ffffff',
                         border: '1px solid rgba(85,179,217,0.28)',
@@ -288,82 +402,11 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                         },
                     }}
                 >
-                    {step === 1 ? (
-                        <Stack spacing={1.5}>
-                            <Box sx={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '32px'}}>
-                                <IconButton
-                                    onClick={onBack}
-                                    sx={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        color: '#475569',
-                                        '&:hover': {
-                                            bgcolor: 'rgba(85,179,217,0.12)',
-                                            color: BRAND_NAVY,
-                                        },
-                                    }}
-                                >
-                                    <ArrowBack />
-                                </IconButton>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: '#0f172a',
-                                        textAlign: 'center',
-                                    }}
-                                >
-                                    Nhập mã số thuế
-                                </Typography>
-                            </Box>
-
-                            <Stack spacing={1.2}>
-                                <TextField
-                                    label="Mã số thuế"
-                                    value={taxCode}
-                                    onChange={(e) => {
-                                        setTaxCode(e.target.value);
-                                        setTaxCodeError('');
-                                    }}
-                                    fullWidth
-                                    size="small"
-                                    error={!!taxCodeError}
-                                    helperText={taxCodeError}
-                                    placeholder="Nhập mã số thuế"
-                                />
-
-                                <Button
-                                    variant="contained"
-                                    onClick={handleTaxCodeCheck}
-                                    disabled={isCheckingTaxCode}
-                                    fullWidth
-                                    sx={{
-                                        py: 0.85,
-                                        textTransform: 'none',
-                                        fontWeight: 700,
-                                        borderRadius: 2,
-                                        background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
-                                        boxShadow: '0 8px 18px rgba(45,95,115,0.24)',
-                                        '&:hover': {
-                                            background: `linear-gradient(90deg, #265a6b 0%, ${BRAND_NAVY} 100%)`,
-                                            boxShadow: '0 10px 20px rgba(45,95,115,0.3)',
-                                        },
-                                    }}
-                                >
-                                    {isCheckingTaxCode ? (
-                                        <CircularProgress size={24} color="inherit" />
-                                    ) : (
-                                        'Kiểm tra mã số thuế'
-                                    )}
-                                </Button>
-                            </Stack>
-                        </Stack>
-                    ) : (
-                        <Box component="form" onSubmit={handleSubmit}>
+                    <Box component="form" onSubmit={handleSubmit}>
                             <Stack spacing={1.2}>
                                 <Box sx={{position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '32px'}}>
                                     <IconButton
-                                        onClick={() => setStep(1)}
+                                        onClick={onBack}
                                         sx={{
                                             position: 'absolute',
                                             left: 0,
@@ -390,6 +433,86 @@ const SchoolRegistrationForm = ({email, onBack}) => {
 
                                 {/* Section 1: Basic School Information */}
                                 <Box>
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                            fontWeight: 700,
+                                            color: '#0f172a',
+                                            mb: 0.55,
+                                            fontSize: '0.84rem',
+                                            letterSpacing: '0.2px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            px: 1,
+                                            py: 0.35,
+                                            borderRadius: 999,
+                                            bgcolor: 'rgba(85,179,217,0.14)',
+                                            border: `1px solid ${BRAND_SKY_LIGHT}`,
+                                            lineHeight: 1.2,
+                                        }}
+                                    >
+                                        Mã số thuế
+                                    </Typography>
+                                    <Divider sx={{mb: 0.85, borderColor: '#e2e8f0'}} />
+                                    <Grid
+                                        container
+                                        rowSpacing={1}
+                                        columnSpacing={{xs: 1, sm: 1.25, md: 2}}
+                                        sx={{
+                                            p: {xs: 0.8, sm: 0.95},
+                                            borderRadius: 2,
+                                            bgcolor: 'rgba(214,244,252,0.35)',
+                                            border: '1px solid rgba(136,232,242,0.45)',
+                                            mb: 0.95,
+                                        }}
+                                    >
+                                        <Grid size={{xs: 12}}>
+                                            <TextField
+                                                label="Mã số thuế"
+                                                required
+                                                name="taxCode"
+                                                value={formData.taxCode}
+                                                onChange={handleInputChange}
+                                                fullWidth
+                                                size="small"
+                                                error={!!formErrors.taxCode}
+                                                helperText={formErrors.taxCode || taxCodeLookupMessage || 'Nhập mã số thuế rồi bấm Kiểm tra'}
+                                                FormHelperTextProps={{sx: {minHeight: 20}}}
+                                                InputProps={{
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={handleTaxCodeCheck}
+                                                                disabled={isCheckingTaxCode}
+                                                                sx={{
+                                                                    color: BRAND_NAVY,
+                                                                    bgcolor: 'rgba(85,179,217,0.14)',
+                                                                    borderRadius: 1.5,
+                                                                    '&:hover': {
+                                                                        bgcolor: 'rgba(85,179,217,0.24)',
+                                                                    },
+                                                                }}
+                                                                aria-label="Kiểm tra mã số thuế"
+                                                            >
+                                                                {isCheckingTaxCode ? (
+                                                                    <CircularProgress size={14} color="inherit" />
+                                                                ) : (
+                                                                    <CheckCircleOutlineIcon fontSize="small" />
+                                                                )}
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 2,
+                                                    },
+                                                }}
+                                            />
+                                        </Grid>
+                                    </Grid>
+
                                     <Typography 
                                         variant="subtitle1" 
                                         sx={{
@@ -423,77 +546,33 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                         }}
                                     >
                                         <Grid size={{xs: 12, md: 6}}>
-                                        <TextField
-                                            label="Tên trường"
-                                            required
-                                            name="schoolName"
-                                            value={formData.schoolName}
-                                            onChange={handleInputChange}
-                                            fullWidth
-                                            size="small"
-                                            error={!!formErrors.schoolName}
-                                            helperText={formErrors.schoolName}
-                                                sx={{
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2,
-                                                    },
-                                                }}
-                                        />
-                                    </Grid>
-                                        <Grid size={{xs: 12, md: 6}}>
-                                        <TextField
-                                            label="Tên cơ sở"
-                                            required
-                                            name="campusName"
-                                            value={formData.campusName}
-                                            onChange={handleInputChange}
-                                            fullWidth
-                                            size="small"
-                                            error={!!formErrors.campusName}
-                                            helperText={formErrors.campusName}
-                                                sx={{
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2,
-                                                    },
-                                                }}
-                                        />
-                                    </Grid>
-                                        <Grid size={{xs: 12, md: 6}} sx={{display: 'flex'}}>
-                                            <TextField
-                                                label="Mô tả trường"
-                                                required
-                                                name="description"
-                                                value={formData.description}
-                                                onChange={handleInputChange}
-                                                fullWidth
-                                                size="small"
-                                                multiline
-                                                rows={2}
-                                                error={!!formErrors.description}
-                                                helperText={formErrors.description}
-                                                FormHelperTextProps={{sx: {minHeight: 20}}}
-                                                sx={{
-                                                    height: '100%',
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2,
-                                                    },
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid size={{xs: 12, md: 6}}>
                                             <Stack spacing={1.2}>
                                                 <TextField
-                                                    label="Mã số thuế"
+                                                    label="Tên trường"
                                                     required
-                                                    name="taxCode"
-                                                    value={formData.taxCode}
+                                                    name="schoolName"
+                                                    value={formData.schoolName}
                                                     onChange={handleInputChange}
                                                     fullWidth
                                                     size="small"
-                                                    error={!!formErrors.taxCode}
-                                                    helperText={formErrors.taxCode}
-                                                    FormHelperTextProps={{sx: {minHeight: 20}}}
-                                                    disabled
+                                                    error={!!formErrors.schoolName}
+                                                    helperText={formErrors.schoolName}
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            borderRadius: 2,
+                                                        },
+                                                    }}
+                                                />
+                                                <TextField
+                                                    label="Tên cơ sở"
+                                                    required
+                                                    name="campusName"
+                                                    value={formData.campusName}
+                                                    onChange={handleInputChange}
+                                                    fullWidth
+                                                    size="small"
+                                                    error={!!formErrors.campusName}
+                                                    helperText={formErrors.campusName}
                                                     sx={{
                                                         '& .MuiOutlinedInput-root': {
                                                             borderRadius: 2,
@@ -549,6 +628,28 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                                     tabIndex={-1}
                                                 />
                                             </Stack>
+                                        </Grid>
+                                        <Grid size={{xs: 12, md: 6}} sx={{display: 'flex'}}>
+                                            <TextField
+                                                label="Mô tả trường"
+                                                required
+                                                name="description"
+                                                value={formData.description}
+                                                onChange={handleInputChange}
+                                                fullWidth
+                                                size="small"
+                                                multiline
+                                                rows={4}
+                                                error={!!formErrors.description}
+                                                helperText={formErrors.description}
+                                                FormHelperTextProps={{sx: {minHeight: 20}}}
+                                                sx={{
+                                                    height: '100%',
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 2,
+                                                    },
+                                                }}
+                                            />
                                         </Grid>
                                     </Grid>
                                 </Box>
@@ -864,7 +965,6 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                 </Box>
                             </Stack>
                         </Box>
-                    )}
                 </Paper>
             </Container>
         </Box>

@@ -47,6 +47,15 @@ export const checkTaxCode = async (taxCode) => {
     try {
         const response = await fetch(`https://api.vietqr.io/v2/business/${taxCode}`);
         const data = await response.json();
+        if (!response.ok) {
+            const error = new Error(data?.desc || 'Tax code lookup failed');
+            error.status = response.status;
+            error.response = {
+                status: response.status,
+                data,
+            };
+            throw error;
+        }
         return data;
     } catch (error) {
         console.error('Error checking tax code:', error);
