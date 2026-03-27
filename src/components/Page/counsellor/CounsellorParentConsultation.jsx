@@ -18,8 +18,6 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import SearchIcon from "@mui/icons-material/Search";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import CallOutlinedIcon from "@mui/icons-material/CallOutlined";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import MoodRoundedIcon from "@mui/icons-material/MoodRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
@@ -760,20 +758,6 @@ export default function CounsellorParentConsultation() {
                       {selectedConversation.name}
                     </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                      <Tooltip title="Bạn đang dùng tư cách tư vấn viên">
-                        <Chip
-                          size="small"
-                          label="Bạn · Tư vấn"
-                          sx={{
-                            height: 20,
-                            borderRadius: 2,
-                            fontSize: 11,
-                            bgcolor: "rgba(79,70,229,0.14)",
-                            color: "#4338ca",
-                            fontWeight: 600,
-                          }}
-                        />
-                      </Tooltip>
                       <Tooltip title="Tài khoản đối phương trong cuộc trò chuyện này">
                         <Chip
                           size="small"
@@ -788,35 +772,10 @@ export default function CounsellorParentConsultation() {
                           }}
                         />
                       </Tooltip>
-                      <Typography sx={{ fontSize: 12, color: "#22c55e" }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 7,
-                            height: 7,
-                            borderRadius: "50%",
-                            bgcolor: "#22c55e",
-                            display: "inline-block",
-                            mr: 0.6,
-                            boxShadow: "0 0 0 3px rgba(34,197,94,0.2)",
-                          }}
-                        />
-                        Online
-                      </Typography>
                     </Box>
                   </Box>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                  <Tooltip title="Gọi thoại">
-                    <IconButton size="small" sx={{ color: "#4F46E5", bgcolor: "rgba(79,70,229,0.08)" }}>
-                      <CallOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Gọi video">
-                    <IconButton size="small" sx={{ color: "#4F46E5", bgcolor: "rgba(79,70,229,0.08)" }}>
-                      <VideocamOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
                   <Tooltip title="Tuỳ chọn thêm">
                     <IconButton size="small">
                       <MoreVertIcon fontSize="small" />
