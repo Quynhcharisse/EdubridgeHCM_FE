@@ -30,7 +30,7 @@ import { enqueueSnackbar } from "notistack";
 import { signout } from "../../services/AccountService.jsx";
 
 const menuItems = [
-    { text: "Bảng điều khiển", icon: <DashboardIcon />, path: "/school/dashboard" },
+    { text: "Bảng thống kê", icon: <DashboardIcon />, path: "/school/dashboard" },
     { text: "Cơ sở", icon: <ApartmentIcon />, path: "/school/campus" },
     { text: "Tư vấn viên", icon: <SupportAgentIcon />, path: "/school/counselors" },
     { text: "Chiến dịch tuyển sinh", icon: <CampaignIcon />, path: "/school/campaigns" },
