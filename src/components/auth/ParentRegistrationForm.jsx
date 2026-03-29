@@ -18,7 +18,6 @@ import {updateProfile, signout} from '../../services/AccountService';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import {useNavigate} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
-import {getStoredGooglePictureUrl, GOOGLE_AVATAR_IMG_PROPS} from '../../utils/storedUserPicture';
 
 const genderOptions = [
     {value: 'MALE', label: 'Nam'},
@@ -129,7 +128,6 @@ const ParentRegistrationForm = ({email, name: initialName, onBack, isFirstLogin 
         setIsSubmitting(true);
 
         try {
-            const googleAvatar = getStoredGooglePictureUrl();
             const profilePayload = {
                 parentData: {
                     gender: formData.gender,
@@ -140,7 +138,6 @@ const ParentRegistrationForm = ({email, name: initialName, onBack, isFirstLogin 
                     occupation: formData.occupation.trim(),
                     currentAddress: formData.currentAddress.trim(),
                     idCardNumber: formData.idCardNumber.trim(),
-                    ...(googleAvatar ? {avatar: googleAvatar} : {}),
                 },
             };
 
@@ -261,8 +258,6 @@ const ParentRegistrationForm = ({email, name: initialName, onBack, isFirstLogin 
 
                             <Box sx={{display: 'flex', justifyContent: 'center', py: 0.5}}>
                                 <Avatar
-                                    src={getStoredGooglePictureUrl() || undefined}
-                                    imgProps={GOOGLE_AVATAR_IMG_PROPS}
                                     alt={formData.name || 'Phụ huynh'}
                                     sx={{width: 88, height: 88, boxShadow: '0 8px 24px rgba(51,65,85,0.12)'}}
                                 >

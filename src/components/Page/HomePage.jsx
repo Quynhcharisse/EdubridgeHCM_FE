@@ -25,7 +25,6 @@ import {
 } from "@mui/material";
 import {useTheme} from "@mui/material/styles";
 import {updateProfile} from "../../services/AccountService";
-import {getStoredGooglePictureUrl} from "../../utils/storedUserPicture";
 import {enqueueSnackbar} from "notistack";
 import {
     Chat as ChatIcon,
@@ -1035,11 +1034,9 @@ export default function HomePage() {
         setIsSubmittingParentForm(true);
 
         try {
-            const googleAvatar = getStoredGooglePictureUrl();
             const profilePayload = {
                 parentData: {
                     idCardNumber: parentFormData.idCardNumber.trim(),
-                    ...(googleAvatar ? {avatar: googleAvatar} : {}),
                 },
                 gender: parentFormData.gender,
                 name: parentFormData.name.trim(),

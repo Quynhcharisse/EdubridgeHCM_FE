@@ -58,7 +58,6 @@ import {
     HEADER_HOME_BAR_BG
 } from "../../constants/homeLandingTheme";
 import {OPEN_PARENT_CHAT_EVENT} from "../../constants/parentChatEvents";
-import {GOOGLE_AVATAR_IMG_PROPS, getStoredGooglePictureUrl} from "../../utils/storedUserPicture";
 import {GRADE_LEVELS} from "../Page/childrenInfo/childrenInfoHelpers.js";
 
 const PARENT_CHAT_POLL_INTERVAL_MS = 3500;
@@ -1058,12 +1057,7 @@ function MainHeader() {
     }, [profileData]);
     const displayName = profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
     const displayEmail = profileBody?.email || userInfo?.email || '';
-    const avatarUrl =
-        profileBody?.parent?.avatar ||
-        profileBody?.picture ||
-        userInfo?.picture ||
-        getStoredGooglePictureUrl() ||
-        null;
+    const avatarUrl = profileBody?.picture || userInfo?.picture || null;
     const isActivePath = (path) => location.pathname === path;
     const brandIndigo = BRAND_NAVY;
 
@@ -1928,7 +1922,7 @@ function MainHeader() {
                                 >
                                     <Avatar
                                         src={avatarUrl}
-                                        imgProps={GOOGLE_AVATAR_IMG_PROPS}
+                                        imgProps={{referrerPolicy: 'no-referrer'}}
                                         sx={{
                                             width: 40,
                                             height: 40,
@@ -1973,7 +1967,7 @@ function MainHeader() {
                                         <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
                                             <Avatar
                                                 src={avatarUrl}
-                                                imgProps={GOOGLE_AVATAR_IMG_PROPS}
+                                                imgProps={{referrerPolicy: 'no-referrer'}}
                                                 sx={{
                                                     width: 48,
                                                     height: 48,
@@ -2226,7 +2220,7 @@ function MainHeader() {
                                         <Box sx={{display: 'flex', alignItems: 'center', gap: 2, width: '100%'}}>
                                             <Avatar
                                                 src={avatarUrl}
-                                                imgProps={GOOGLE_AVATAR_IMG_PROPS}
+                                                imgProps={{referrerPolicy: 'no-referrer'}}
                                                 sx={{
                                                     width: 48,
                                                     height: 48,

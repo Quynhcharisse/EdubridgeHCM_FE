@@ -13,7 +13,6 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import {enqueueSnackbar} from "notistack";
 import {signout, getProfile} from "../../services/AccountService.jsx";
-import {GOOGLE_AVATAR_IMG_PROPS, getStoredGooglePictureUrl} from "../../utils/storedUserPicture";
 import logo from "../../assets/logo.png";
 
 export default function AuthHeader({showSidebarToggle = false, onToggleSidebar, logoAlignLeft = false, headerLeftOffset}) {
@@ -86,15 +85,21 @@ export default function AuthHeader({showSidebarToggle = false, onToggleSidebar, 
     };
 
     const userInfo = getUserInfo();
-    const profileBody = profileData?.body ? (typeof profileData.body === 'string' ? JSON.parse(profileData.body) : profileData.body) : null;
-    const displayName = profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
+    const profileBody = profileData?.body
+        ? typeof profileData.body === 'string'
+            ? (() => {
+                  try {
+                      return JSON.parse(profileData.body);
+                  } catch {
+                      return null;
+                  }
+              })()
+            : profileData.body
+        : null;
+    const displayName =
+        profileBody?.name || profileBody?.email || userInfo?.name || userInfo?.email || 'Người dùng';
     const displayEmail = profileBody?.email || userInfo?.email || '';
-    const avatarUrl =
-        profileBody?.parent?.avatar ||
-        profileBody?.picture ||
-        userInfo?.picture ||
-        getStoredGooglePictureUrl() ||
-        null;
+    const avatarUrl = profileBody?.picture || userInfo?.picture || null;
     const isAdmin = userInfo?.role === 'ADMIN';
 
     const handleGoHome = () => {
@@ -203,7 +208,7 @@ export default function AuthHeader({showSidebarToggle = false, onToggleSidebar, 
                             >
                                 <Avatar
                                     src={avatarUrl}
-                                    imgProps={GOOGLE_AVATAR_IMG_PROPS}
+                                    imgProps={{referrerPolicy: 'no-referrer'}}
                                     sx={{
                                         width: 40,
                                         height: 40,
@@ -248,7 +253,7 @@ export default function AuthHeader({showSidebarToggle = false, onToggleSidebar, 
                                     <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5}}>
                                         <Avatar
                                             src={avatarUrl}
-                                            imgProps={GOOGLE_AVATAR_IMG_PROPS}
+                                            imgProps={{referrerPolicy: 'no-referrer'}}
                                             sx={{
                                                 width: 48,
                                                 height: 48,

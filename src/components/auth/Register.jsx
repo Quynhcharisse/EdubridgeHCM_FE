@@ -18,7 +18,6 @@ import {
 import {ArrowBack} from '@mui/icons-material';
 import backgroundLogin from '../../assets/backgroundLogin.png';
 import SchoolRegistrationForm from './SchoolRegistrationForm';
-import ParentRegistrationForm from './ParentRegistrationForm';
 import {Link as RouterLink, useNavigate} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
 import {showSuccessSnackbar} from '../ui/AppSnackbar.jsx';
@@ -35,16 +34,12 @@ const Register = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
-    const [picture, setPicture] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleGoogleSuccess = (data) => {
         setEmail(data.email);
-        setName(data.name || '');
-        setPicture(data.picture || '');
         setIsEmailVerified(true);
         showSuccessSnackbar('Xác thực email thành công. Vui lòng chọn vai trò để tiếp tục đăng ký.');
         setStep(2);
