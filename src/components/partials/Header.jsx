@@ -2074,7 +2074,7 @@ function MainHeader() {
                                             transition: 'background 0.2s, color 0.2s',
                                         }}
                                     >
-                                        <DashboardIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Bảng Điều Khiển
+                                        <DashboardIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Bảng Thống Kê
                                     </MenuItem>
                                     )}
                                     <MenuItem
@@ -2291,7 +2291,7 @@ function MainHeader() {
                                         sx={{cursor: 'pointer'}}
                                     >
                                         <ListItemText 
-                                            primary="Bảng Điều Khiển"
+                                            primary="Bảng Thống Kê"
                                             sx={{color: BRAND_NAVY, fontWeight: 600}}
                                         />
                                     </ListItem>

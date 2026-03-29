@@ -26,7 +26,7 @@ import { enqueueSnackbar } from "notistack";
 import { signout } from "../../services/AccountService.jsx";
 
 const menuItems = [
-  { text: "Bảng điều khiển", icon: <DashboardIcon />, path: "/counsellor/dashboard" },
+  { text: "Bảng thống kê", icon: <DashboardIcon />, path: "/counsellor/dashboard" },
   { text: "Tư vấn Phụ Huynh", icon: <GroupsIcon />, path: "/counsellor/parent-consultation" },
 ];
 

@@ -992,9 +992,18 @@ export default function AdminUsersManagement() {
                                             {roleTab === "PARENT" && (
                                                 <>
                                                     <TableCell align="center">
-                                                        <Typography sx={{fontSize: 14, fontWeight: 700, color: "#1e293b"}}>
-                                                            {user.name || "-"}
-                                                        </Typography>
+                                                        <Stack direction="row" alignItems="center" justifyContent="center" spacing={1.25}>
+                                                            <Avatar
+                                                                src={user.avatar || undefined}
+                                                                alt={user.name || ""}
+                                                                sx={{width: 34, height: 34, bgcolor: "#e2e8f0", flexShrink: 0}}
+                                                            >
+                                                                {(user.name || "?").charAt(0).toUpperCase()}
+                                                            </Avatar>
+                                                            <Typography sx={{fontSize: 14, fontWeight: 700, color: "#1e293b"}}>
+                                                                {user.name || "-"}
+                                                            </Typography>
+                                                        </Stack>
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         <Typography sx={{fontSize: 14, color: "#334155"}}>
@@ -1131,8 +1140,32 @@ export default function AdminUsersManagement() {
                                     Thông tin cơ bản
                                 </Typography>
                             </Stack>
+                            <Box
+                                sx={{
+                                    border: "1px solid #bfdbfe",
+                                    borderRadius: 2.25,
+                                    bgcolor: "#ffffff",
+                                    px: 1.4,
+                                    py: 1.25,
+                                    mb: 1,
+                                    boxShadow: "0 5px 12px rgba(37,99,235,0.08)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1.5,
+                                }}
+                            >
+                                <Avatar
+                                    src={selectedParent?.avatar || undefined}
+                                    alt={selectedParent?.name || ""}
+                                    sx={{width: 56, height: 56, flexShrink: 0}}
+                                >
+                                    {(selectedParent?.name || "?").charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Typography sx={{fontSize: 18, color: "#1e293b", fontWeight: 700, lineHeight: 1.25}}>
+                                    {selectedParent?.name || "-"}
+                                </Typography>
+                            </Box>
                             <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
-                                {renderDetailField("Họ và tên", selectedParent?.name)}
                                 {renderDetailField("Giới tính", getGenderLabel(selectedParent?.gender))}
                                 {renderDetailField("Vai trò", getRoleLabel(selectedParent?.role))}
                                 {renderDetailField("Mối quan hệ", getRelationshipLabel(selectedParent?.relationship))}
