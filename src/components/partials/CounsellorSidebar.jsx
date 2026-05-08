@@ -124,10 +124,15 @@ const rebuildUnreadConversationIdSet = (activeItems, pendingItems) => {
 
 const menuGroups = [
   {
+    title: "THỜI KHÓA BIỂU",
+    items: [
+      { text: "Lịch tư vấn viên", icon: <CalendarMonthIcon />, path: "/counsellor/calendar" },
+    ],
+  },
+  {
     title: "TƯ VẤN",
     items: [
-      { text: "Lịch tư vấn trực tiếp", icon: <CalendarMonthIcon />, path: "/counsellor/calendar" },
-      { text: "Quản lý tư vấn", icon: <ListAltIcon />, path: "/counsellor/consultation-management" },
+      { text: "Quản lý lịch hẹn", icon: <ListAltIcon />, path: "/counsellor/consultation-management" },
       { text: "Tư vấn Phụ Huynh", icon: <GroupsIcon />, path: "/counsellor/parent-consultation" },
     ],
   },

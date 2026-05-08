@@ -1051,6 +1051,14 @@ export default function CounsellorConsultationManagement() {
   const [editSaveLoading, setEditSaveLoading] = useState(false);
   const [confirmingRowId, setConfirmingRowId] = useState(null);
 
+  const currentUserEmail = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null")?.email ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!editOpen || !editRow) return;
     const bounds = weekBoundsFromRow(editRow, String(editRow?.appointmentDate ?? "").trim().slice(0, 10));
@@ -1562,7 +1570,22 @@ export default function CounsellorConsultationManagement() {
 <TableCell align="center" sx={{ verticalAlign: "middle" }}>
                             <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
                               {row.confirmingBy != null ? (
-                                <ConfirmingStatusCell row={row} onExpire={() => void load(page)} />
+                                <ConfirmingStatusCell
+                                  row={row}
+                                  onExpire={() => {
+                                    if (detailOpen && detailRow?.id === row.id) {
+                                      setDetailOpen(false);
+                                      setDetailRow(null);
+                                    }
+                                    if (editOpen && editRow?.id === row.id) {
+                                      closeEdit();
+                                    }
+                                    enqueueSnackbar("Bạn đã hết thời gian tiếp nhận xử lý lịch hẹn này.", {
+                                      variant: "warning",
+                                    });
+                                    void load(page);
+                                  }}
+                                />
                               ) : (
                                 statusTag(row)
                               )}
@@ -1771,7 +1794,13 @@ export default function CounsellorConsultationManagement() {
         >
           {activeListStatus === "pending" && (
             <Tooltip
-              title={detailRow?.confirmingBy == null ? "Tiếp nhận lịch hẹn trước khi được phép chỉnh sửa" : ""}
+              title={
+                detailRow?.confirmingBy == null
+                  ? "Tiếp nhận lịch hẹn trước khi được phép chỉnh sửa"
+                  : detailRow.confirmingBy !== currentUserEmail
+                  ? "Lịch hẹn đang được tiếp nhận bởi tư vấn viên khác"
+                  : ""
+              }
               placement="top"
             >
               <span>
@@ -1779,7 +1808,7 @@ export default function CounsellorConsultationManagement() {
                   variant="contained"
                   startIcon={<EditOutlinedIcon />}
                   onClick={() => void openEditFromDetail()}
-                  disabled={detailRow?.confirmingBy == null}
+                  disabled={!detailRow?.confirmingBy || detailRow.confirmingBy !== currentUserEmail}
                   sx={{
                     textTransform: "none",
                     fontWeight: 700,
