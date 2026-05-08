@@ -714,7 +714,7 @@ export default function SchoolSearchPage() {
                             </Box>
                             <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
                             <Box>
-                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Khu vực (Phường/Xã)</Typography>
+                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Phường</Typography>
                                 <TextField
                                     select
                                     size="small"
@@ -776,7 +776,7 @@ export default function SchoolSearchPage() {
                                     }}
                                 >
                                     <MenuItem value="">
-                                        <Typography sx={{fontSize: 13, color: '#64748b'}}>Chọn khu vực</Typography>
+                                        <Typography sx={{fontSize: 13, color: '#64748b'}}>Chọn phường</Typography>
                                     </MenuItem>
                                     {availableDistricts.map((district) => (
                                         <MenuItem key={district} value={district}>
