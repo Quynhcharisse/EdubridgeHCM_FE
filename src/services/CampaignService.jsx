@@ -178,14 +178,13 @@ export const createCampaignOffering = async (body) => {
     return response || null;
 };
 
-/** PUT /campus/offering — cập nhật chỉ tiêu (học phí qua % điều chỉnh, kèm ngày mở/đóng) */
+/** PUT /campus/offering — cập nhật chỉ tiêu */
 export const updateCampaignOffering = async (body) => {
     const response = await axiosClient.put("/campus/offering", {
         id: Number(body.id),
+        quota: Number(body.quota),
         learningMode: body.learningMode ?? "DAY_SCHOOL",
         priceAdjustmentPercentage: Number(body.priceAdjustmentPercentage) || 0,
-        openDate: String(body.openDate ?? "").trim(),
-        closeDate: String(body.closeDate ?? "").trim(),
     });
     return response || null;
 };

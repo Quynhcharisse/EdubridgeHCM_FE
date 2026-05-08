@@ -203,9 +203,12 @@ function getOfferingActionState(row, campaignPaused) {
     const active = !inactive;
     const campaignOpen = !campaignPaused;
     const hideAll = inactive || !active;
-    const canPause = !hideAll && app !== "PAUSED" && app !== "FULL";
-    const canClose = !hideAll && app !== "CLOSED" && app !== "FULL";
-    const canPublish = !hideAll && (app === "PAUSED" || app === "CLOSED");
+    const isClosed = app === "CLOSED";
+    const isFull = app === "FULL";
+    const isPaused = app === "PAUSED";
+    const canPause = !hideAll && !isPaused && !isClosed && !isFull;
+    const canClose = !hideAll && !isPaused && !isClosed && !isFull;
+    const canPublish = !hideAll && isPaused;
     const canUpdate = !hideAll && campaignOpen && app === "PAUSED";
     return {
         hideAll,
@@ -638,6 +641,21 @@ export default function CampaignOfferingsSection({
             } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
                 errors.quota = `Chỉ tiêu không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
             }
+        } else {
+            const quota = Number(formValues.quota);
+            const currentQuota = Number(editingRow?.quota);
+            const remaining = Number(editingRow?.remainingQuota);
+            const usedQuota = Math.max(
+                0,
+                (Number.isFinite(currentQuota) ? currentQuota : 0) - (Number.isFinite(remaining) ? remaining : 0)
+            );
+            if (!Number.isFinite(quota) || quota <= 0) {
+                errors.quota = "Vui lòng nhập chỉ tiêu mới hợp lệ";
+            } else if (quota < usedQuota) {
+                errors.quota = `Chỉ tiêu mới không được nhỏ hơn số đã dùng (${usedQuota})`;
+            } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
+                errors.quota = `Chỉ tiêu mới không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
+            }
         }
         if (!editingRow) {
             if (!String(formValues.openDate || "").trim()) errors.openDate = "Vui lòng chọn ngày mở nhận hồ sơ";
@@ -665,6 +683,10 @@ export default function CampaignOfferingsSection({
     };
 
     const openEdit = (row) => {
+        if (normalizeApplicationStatus(row?.applicationStatus) !== "PAUSED") {
+            enqueueSnackbar("Chỉ được sửa chỉ tiêu khi trạng thái hồ sơ là PAUSED", { variant: "warning" });
+            return;
+        }
         const resolvedCampusId =
             row?.campusId != null && String(row.campusId).trim() !== ""
                 ? String(row.campusId)
@@ -686,7 +708,7 @@ export default function CampaignOfferingsSection({
             campusId: resolvedCampusId,
             methodCode: String(row.admissionMethod ?? ""),
             programId: String(row.programId ?? ""),
-            quota: "",
+            quota: String(row.quota ?? ""),
             learningMode: row.learningMode || "DAY_SCHOOL",
             priceAdjustmentPercentage: String(Number.isFinite(derivedPct) ? Math.round(derivedPct * 1000) / 1000 : 0),
             openDate: row.openDate?.slice(0, 10) || "",
@@ -722,10 +744,7 @@ export default function CampaignOfferingsSection({
             if (editingRow) {
                 const payload = {
                     id: Number(editingRow.id),
-                    admissionCampaignId: Number(editingRow.admissionCampaignId ?? editingRow.campaignId ?? campaignId),
-                    campusId: Number(editingRow.campusId ?? formValues.campusId),
-                    programId: Number(editingRow.programId ?? formValues.programId),
-                    quota: Number(editingRow.quota ?? formValues.quota ?? 0),
+                    quota: Number(formValues.quota ?? editingRow.quota ?? 0),
                     learningMode: formValues.learningMode || "DAY_SCHOOL",
                     priceAdjustmentPercentage: priceAdjustmentToApiFraction(formValues.priceAdjustmentPercentage),
                 };
@@ -828,6 +847,8 @@ export default function CampaignOfferingsSection({
             setConfirmActionType(null);
             setConfirmTargetStatus(null);
             setConfirmRow(null);
+            setDetailOpen(false);
+            setDetailRow(null);
             setListNonce((n) => n + 1);
         } catch (err) {
             enqueueSnackbar(err?.response?.data?.message || "Thao tác thất bại", { variant: "error" });
@@ -1258,19 +1279,6 @@ export default function CampaignOfferingsSection({
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, flexWrap: "wrap", gap: 1 }}>
-                    {detailRow ? (
-                        <Button
-                            variant="outlined"
-                            disabled={normalizeApplicationStatus(detailRow?.applicationStatus) !== "OPEN"}
-                            onClick={() => {
-                                if (normalizeApplicationStatus(detailRow?.applicationStatus) !== "OPEN") return;
-                                navigate("/school/dashboard");
-                            }}
-                            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
-                        >
-                            Nộp hồ sơ
-                        </Button>
-                    ) : null}
                     {canMutate && detailRow && getOfferingActionState(detailRow, campaignPaused).canPause ? (
                         <Button
                             variant="outlined"
@@ -1300,7 +1308,7 @@ export default function CampaignOfferingsSection({
                             }}
                             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                         >
-                            Công bố
+                            Mở lại
                         </Button>
                     ) : null}
                     {canMutate && detailRow && getOfferingActionState(detailRow, campaignPaused).canClose ? (
@@ -1470,6 +1478,37 @@ export default function CampaignOfferingsSection({
                                 </Typography>
                             </Box>
                         ) : null}
+                        {editingRow && (
+                            <TextField
+                                label="Chỉ tiêu mới *"
+                                name="quota"
+                                type="number"
+                                fullWidth
+                                size="small"
+                                value={formValues.quota}
+                                onChange={handleChange}
+                                placeholder={String(editingRow.quota ?? "")}
+                                inputProps={{
+                                    min: Math.max(
+                                        0,
+                                        (Number(editingRow?.quota) || 0) - (Number(editingRow?.remainingQuota) || 0)
+                                    ),
+                                    step: 1,
+                                }}
+                                error={!!formErrors.quota}
+                                helperText={
+                                    formErrors.quota ||
+                                    `${
+                                        Number.isFinite(selectedMethodQuota)
+                                            ? `Chỉ tiêu tối đa theo phương thức đang chọn: ${selectedMethodQuota} · `
+                                            : ""
+                                    }Đã dùng: ${Math.max(
+                                        0,
+                                        (Number(editingRow?.quota) || 0) - (Number(editingRow?.remainingQuota) || 0)
+                                    )} · Còn lại có thể dùng: ${Number(editingRow?.remainingQuota) || 0}`
+                                }
+                            />
+                        )}
                         <TextField
                             label="Điều chỉnh học phí (%)"
                             name="priceAdjustmentPercentage"
@@ -1561,7 +1600,7 @@ export default function CampaignOfferingsSection({
                             }}
                             disabled={confirmActionLoading}
                         >
-                            Công bố
+                            Mở lại
                         </MenuItem>
                     )}
 
