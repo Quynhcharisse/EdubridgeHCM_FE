@@ -232,6 +232,19 @@ function normalizeOfferingRow(row) {
     };
 }
 
+function normalizeQuotaBreakdownMethod(item) {
+    const code = String(item?.methodCode ?? "").trim();
+    if (!code) return null;
+    return {
+        methodCode: code,
+        totalMethodQuota: Number(item?.totalMethodQuota ?? 0),
+        totalUsedQuota: Number(item?.totalUsedQuota ?? 0),
+        remainingQuota: Number(item?.remainingQuota ?? 0),
+        isFull: Boolean(item?.isFull),
+        campusBreakdown: Array.isArray(item?.campusBreakdown) ? item.campusBreakdown : [],
+    };
+}
+
 function getOfferingActionState(row, campaignPaused) {
     const app = normalizeApplicationStatus(row?.applicationStatus ?? "");
     const inactive = String(row?.status ?? "").trim().toUpperCase() === "OFFERING_INACTIVE";
@@ -315,6 +328,22 @@ function getListItemDisplayLabel(item) {
         item.code,
     ].find((v) => typeof v === "string" || typeof v === "number");
     return candidate == null ? "" : String(candidate).trim();
+}
+
+function formatQuotaNumber(value) {
+    if (value === null || value === undefined || value === "") return "—";
+    const n = Number(value);
+    return Number.isFinite(n) ? String(n) : "—";
+}
+
+function getQuotaBreakdownCampusLabel(item) {
+    return (
+        String(item?.campusName ?? "").trim() ||
+        String(item?.name ?? "").trim() ||
+        String(item?.campusCode ?? "").trim() ||
+        String(item?.campusId ?? "").trim() ||
+        "—"
+    );
 }
 
 /** Nhóm nội dung trong dialog chi tiết (theo domain). */
@@ -505,17 +534,12 @@ export default function CampaignOfferingsSection({
         getCampusOfferingQuotaBreakdown(Number(campaignId))
             .then((res) => {
                 if (cancelled) return;
-                const body = res?.data?.body ?? {};
-                const methods = Array.isArray(body?.methods) ? body.methods : [];
+                const body = res?.data?.body ?? res?.body ?? {};
+                const methods = Array.isArray(body?.methods) ? body.methods : Array.isArray(body) ? body : [];
                 const nextMap = methods.reduce((acc, item) => {
-                    const code = String(item?.methodCode ?? "").trim();
-                    if (!code) return acc;
-                    acc[code] = {
-                        methodCode: code,
-                        totalMethodQuota: Number(item?.totalMethodQuota ?? 0),
-                        totalUsedQuota: Number(item?.totalUsedQuota ?? 0),
-                        remainingQuota: Number(item?.remainingQuota ?? 0),
-                    };
+                    const normalized = normalizeQuotaBreakdownMethod(item);
+                    if (!normalized) return acc;
+                    acc[normalized.methodCode] = normalized;
                     return acc;
                 }, {});
                 setQuotaBreakdownByMethod(nextMap);
@@ -548,6 +572,14 @@ export default function CampaignOfferingsSection({
         if (!method) return null;
         return quotaBreakdownByMethod?.[method] ?? null;
     }, [formValues.methodCode, quotaBreakdownByMethod]);
+
+    const detailMethodQuotaBreakdown = useMemo(() => {
+        const method = String(
+            detailRow?.admissionMethod ?? detailRow?.methodCode ?? detailRow?.admissionMethodCode ?? ""
+        ).trim();
+        if (!method) return null;
+        return quotaBreakdownByMethod?.[method] ?? null;
+    }, [detailRow, quotaBreakdownByMethod]);
 
     useEffect(() => {
         if (schoolCtxLoading) return;
@@ -1389,6 +1421,136 @@ export default function CampaignOfferingsSection({
                             </Card>
                             );
                         })}
+                        {detailMethodQuotaBreakdown ? (
+                            <Card
+                                elevation={0}
+                                sx={{
+                                    borderRadius: "14px",
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                    boxShadow: "0 1px 3px rgba(51,65,85,0.06)",
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        px: 2,
+                                        py: 1.25,
+                                        borderBottom: "1px solid #e2e8f0",
+                                        bgcolor: "rgba(13, 100, 222, 0.06)",
+                                    }}
+                                >
+                                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                width: 44,
+                                                height: 44,
+                                                borderRadius: "12px",
+                                                bgcolor: "rgba(13, 100, 222, 0.14)",
+                                                color: "#0D64DE",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <AssignmentTurnedInIcon sx={{ fontSize: 26 }} aria-hidden />
+                                        </Box>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1e293b", minWidth: 0 }}>
+                                            Phân bổ quota theo cơ sở
+                                        </Typography>
+                                    </Stack>
+                                </Box>
+                                <CardContent sx={{ pt: 2, "&:last-child": { pb: 2 } }}>
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: {
+                                                xs: "1fr",
+                                                sm: "repeat(4, minmax(0, 1fr))",
+                                            },
+                                            gap: 1.25,
+                                            mb: 2,
+                                        }}
+                                    >
+                                        {[
+                                            { label: "Tổng quota", value: detailMethodQuotaBreakdown.totalMethodQuota },
+                                            { label: "Đã dùng", value: detailMethodQuotaBreakdown.totalUsedQuota },
+                                            { label: "Còn lại", value: detailMethodQuotaBreakdown.remainingQuota },
+                                            { label: "Đầy", value: detailMethodQuotaBreakdown.isFull },
+                                        ].map((stat) => (
+                                            <Box
+                                                key={stat.label}
+                                                sx={{
+                                                    border: "1px solid #e8eef5",
+                                                    borderRadius: "12px",
+                                                    p: 1.5,
+                                                    bgcolor: "#f8fafc",
+                                                }}
+                                            >
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                                                    {stat.label}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b" }}>
+                                                    {typeof stat.value === "boolean"
+                                                        ? stat.value
+                                                            ? "Có"
+                                                            : "Không"
+                                                        : formatQuotaNumber(stat.value)}
+                                                </Typography>
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                    {Array.isArray(detailMethodQuotaBreakdown.campusBreakdown) &&
+                                    detailMethodQuotaBreakdown.campusBreakdown.length > 0 ? (
+                                        <TableContainer sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                                                        <TableCell sx={{ fontWeight: 700 }}>Cơ sở</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Đã dùng</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Còn lại có thể thêm</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }} align="center">Đầy</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {detailMethodQuotaBreakdown.campusBreakdown.map((item, index) => (
+                                                        <TableRow key={`${getQuotaBreakdownCampusLabel(item)}-${index}`}>
+                                                            <TableCell sx={{ py: 1.25 }}>{getQuotaBreakdownCampusLabel(item)}</TableCell>
+                                                            <TableCell sx={{ py: 1.25 }} align="right">
+                                                                {formatQuotaNumber(
+                                                                    item?.usedQuota ?? item?.totalUsedQuota ?? item?.used
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.25 }} align="right">
+                                                                {formatQuotaNumber(
+                                                                    item?.maxAdditionalQuota ?? item?.remainingQuota
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.25 }} align="center">
+                                                                {item?.isFull ? "Có" : "Không"}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    ) : (
+                                        <Box
+                                            sx={{
+                                                border: "1px dashed #cbd5e1",
+                                                borderRadius: "12px",
+                                                p: 2,
+                                                bgcolor: "#f8fafc",
+                                            }}
+                                        >
+                                            <Typography variant="body2" color="text.secondary">
+                                                Chưa có phân bổ quota theo cơ sở cho phương thức này.
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ) : null}
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, flexWrap: "wrap", gap: 1 }}>

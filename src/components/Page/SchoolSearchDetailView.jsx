@@ -953,6 +953,34 @@ const detailSchoolMethodTileSx = {
     boxShadow: "none"
 };
 
+function buildPublicOfferingGroupKey(offering) {
+    const program = offering?.program || {};
+    const curriculum = offering?.curriculum || program?.curriculum || {};
+    const campusId = offering?.campusId != null ? String(offering.campusId) : "";
+    const programId = program?.id != null ? String(program.id) : String(offering?.programId ?? "");
+    const curriculumId = curriculum?.id != null ? String(curriculum.id) : String(offering?.curriculumId ?? "");
+    const groupCode = String(curriculum?.groupCode ?? "").trim();
+    const fallbackName = String(offering?.programName || program?.name || curriculum?.name || "").trim().toLowerCase();
+    return [campusId, programId, curriculumId, groupCode || fallbackName].join("::");
+}
+
+function groupCampusProgramOfferingsForPublicDetail(offerings) {
+    if (!Array.isArray(offerings) || offerings.length === 0) return [];
+    const map = new Map();
+    for (const o of offerings) {
+        const k = buildPublicOfferingGroupKey(o);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(o);
+    }
+    return [...map.values()].map((items) =>
+        [...items].sort((a, b) =>
+            String(a?.admissionMethod || "").localeCompare(String(b?.admissionMethod || ""), "vi", {
+                sensitivity: "base"
+            })
+        )
+    );
+}
+
 function SchoolGeneralInfoCard({school}) {
     const rep = (school?.representativeName || "").trim() || "Chưa cập nhật";
     const dateStr = formatFoundingDate(school?.foundingDate) || "Chưa cập nhật";
@@ -1960,11 +1988,12 @@ function SchoolCampaignEnrollmentCard({
                                             gap: 1.2
                                         }}
                                     >
-                                        {campusProgramOfferings.map((offering, offerIdx) => {
-                                            const program = offering?.program || {};
-                                            const curriculum = offering?.curriculum || program?.curriculum || {};
+                                        {groupCampusProgramOfferingsForPublicDetail(campusProgramOfferings).map((offerGroup, groupIdx) => {
+                                            const primaryOffering = offerGroup[0];
+                                            const program = primaryOffering?.program || {};
+                                            const curriculum = primaryOffering?.curriculum || program?.curriculum || {};
                                             const normalizedCampaignName = String(campaign?.name || "").trim().toLowerCase();
-                                            const rawProgramName = String(offering?.programName || program?.name || "").trim();
+                                            const rawProgramName = String(primaryOffering?.programName || program?.name || "").trim();
                                             const normalizedProgramName = rawProgramName.toLowerCase();
                                             const displayProgramName =
                                                 rawProgramName && normalizedProgramName !== normalizedCampaignName
@@ -1979,18 +2008,6 @@ function SchoolCampaignEnrollmentCard({
                                                 });
                                                 return ["Tiếng Việt", ...labelsWithoutVietnamese];
                                             })();
-                                            const quota = Number(offering?.quota);
-                                            const remainingQuota = Number(offering?.remainingQuota);
-                                            const hasQuota = Number.isFinite(quota) && quota > 0;
-                                            const hasRemaining = Number.isFinite(remainingQuota);
-                                            const filledRatio = hasQuota && hasRemaining
-                                                ? Math.max(0, Math.min(1, (quota - remainingQuota) / quota))
-                                                : 0;
-                                            const filledPercent = Math.round(filledRatio * 100);
-                                            const isLowQuota = hasRemaining && remainingQuota < 50;
-                                            const quotaTone = isLowQuota
-                                                ? {main: "#c2410c", soft: "#9a3412"}
-                                                : {main: "#047857", soft: "#065f46"};
                                             const previewDescription = curriculumDescriptionPreview(
                                                 curriculum?.description || program?.targetStudentDescription || program?.graduationStandard
                                             );
@@ -2020,34 +2037,29 @@ function SchoolCampaignEnrollmentCard({
                                                     icon: <SchoolIcon/>
                                                 };
                                             }).filter((item) => item.label);
-                                            const offeringMethodCode = String(offering?.admissionMethod || "").trim().toUpperCase();
-                                            const matchedMethod = admissionMethodDetails.find((method) => {
-                                                const methodCode = String(method?.methodCode || method?.code || "").trim().toUpperCase();
-                                                return methodCode === offeringMethodCode;
-                                            }) || null;
-                                            const methodDocs = Array.isArray(matchedMethod?.methodDocumentRequirements)
-                                                ? matchedMethod.methodDocumentRequirements
-                                                : [];
-                                            const methodSteps = Array.isArray(matchedMethod?.admissionProcessSteps)
-                                                ? [...matchedMethod.admissionProcessSteps]
-                                                    .sort((a, b) => Number(a?.stepOrder || 0) - Number(b?.stepOrder || 0))
-                                                : [];
-                                            const submitTarget = {campaign, offering};
-                                            const canSubmit = String(offering?.applicationStatus || "").toUpperCase() === "OPEN";
+                                            const tuitionNums = offerGroup.map((o) => Number(o?.tuitionFee)).filter((n) => Number.isFinite(n));
+                                            const tuitionUniq = [...new Set(tuitionNums)];
+                                            const tuitionMainLine =
+                                                tuitionUniq.length === 0
+                                                    ? `${formatVnd(primaryOffering?.tuitionFee)}${feeUnitSuffix(program?.feeUnit)}`
+                                                    : tuitionUniq.length === 1
+                                                      ? `${formatVnd(tuitionUniq[0])}${feeUnitSuffix(program?.feeUnit)}`
+                                                      : `${formatVnd(Math.min(...tuitionUniq))} – ${formatVnd(Math.max(...tuitionUniq))}${feeUnitSuffix(program?.feeUnit)}`;
                                             return (
                                                 <Box
-                                                    key={`${offering?.id ?? offerIdx}-${offering?.campusId ?? "campus"}`}
+                                                    key={`${buildPublicOfferingGroupKey(primaryOffering)}-${groupIdx}`}
                                                     sx={detailOfferingCardSx}
                                                 >
                                                     <Box
                                                         sx={{
-                                                            display: "grid",
-                                                            gridTemplateColumns: {xs: "1fr", lg: "minmax(0,2fr) minmax(300px,1fr)"},
-                                                            gap: {xs: 1.9, lg: 2.4},
-                                                            alignItems: "start"
+                                                            width: "100%",
+                                                            minWidth: 0,
+                                                            display: "flex",
+                                                            flexDirection: "column",
+                                                            gap: {xs: 2, sm: 2.25}
                                                         }}
                                                     >
-                                                        <Box sx={{minWidth: 0, pr: {xs: 0, lg: 0.5}}}>
+                                                        <Box sx={{minWidth: 0, width: "100%"}}>
                                                             <Typography
                                                                 sx={{
                                                                     fontSize: {xs: "1.35rem", sm: "1.55rem"},
@@ -2079,204 +2091,373 @@ function SchoolCampaignEnrollmentCard({
                                                                 </Typography>
                                                             ) : null}
                                                             {methodLearningMeta.length > 0 ? (
-                                                                <Stack direction="row" spacing={1.1} useFlexGap flexWrap="wrap" sx={{mb: 1.5}}>
+                                                                <Stack
+                                                                    direction="row"
+                                                                    spacing={1.1}
+                                                                    useFlexGap
+                                                                    flexWrap="wrap"
+                                                                    sx={{mb: offerGroup.length > 1 ? 1.85 : 1.5}}
+                                                                >
                                                                     {methodLearningMeta.slice(0, 3).map((method) => (
                                                                         <Chip key={method.key} icon={method.icon} size="small" label={method.label} sx={{borderRadius: 999}}/>
                                                                     ))}
                                                                 </Stack>
                                                             ) : null}
 
-                                                            {matchedMethod ? (
-                                                                <Box
+                                                            {offerGroup.length > 1 ? (
+                                                                <Typography
                                                                     sx={{
-                                                                        mb: 1.4,
-                                                                        p: 1.1,
-                                                                        borderRadius: 1.5,
-                                                                        bgcolor: "rgba(239,246,255,0.8)",
-                                                                        border: "1px solid rgba(191,219,254,0.7)"
+                                                                        fontSize: "0.92rem",
+                                                                        fontWeight: 800,
+                                                                        color: "#334155",
+                                                                        mb: 1.15,
+                                                                        letterSpacing: "0.02em"
                                                                     }}
                                                                 >
-                                                                    <Typography sx={{fontSize: "0.8rem", color: "#475569", fontWeight: 800, mb: 0.55, letterSpacing: "0.01em"}}>
-                                                                        Phương thức xét tuyển
-                                                                    </Typography>
-                                                                    <Box sx={detailSchoolMethodTileSx}>
-                                                                        <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 700}}>
-                                                                            {matchedMethod?.displayName || admissionMethodLabel(offering?.admissionMethod)}
-                                                                        </Typography>
-                                                                        <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.55}}>
-                                                                            {String(matchedMethod?.description || "").trim() || "—"}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                </Box>
-                                                            ) : null}
-
-                                                            {methodDocs.length > 0 ? (
-                                                                <Box
-                                                                    sx={{
-                                                                        mb: 1.4,
-                                                                        p: 1.1,
-                                                                        borderRadius: 1.5,
-                                                                        bgcolor: "rgba(248,250,252,0.92)",
-                                                                        border: "1px solid rgba(226,232,240,0.9)"
-                                                                    }}
-                                                                >
-                                                                    <Typography sx={{fontSize: "0.8rem", color: "#475569", fontWeight: 800, mb: 0.6, letterSpacing: "0.01em"}}>
-                                                                        Hồ sơ cần nộp
-                                                                    </Typography>
-                                                                    <Box
-                                                                        sx={{
-                                                                            display: "grid",
-                                                                            gridTemplateColumns: {xs: "1fr", sm: "repeat(2, minmax(0, 1fr))"},
-                                                                            gap: 0.7
-                                                                        }}
-                                                                    >
-                                                                        {methodDocs.map((doc, reqIdx) => (
-                                                                            <Stack key={`${doc?.code || reqIdx}-${reqIdx}`} direction="row" alignItems="center" spacing={0.55} sx={{minWidth: 0}}>
-                                                                                <CheckCircleIcon sx={{fontSize: 15, color: "#16a34a", flexShrink: 0}}/>
-                                                                                <Typography sx={{fontSize: "0.92rem", color: "#334155", lineHeight: 1.58}}>
-                                                                                    {doc?.name || doc?.code || `Hồ sơ ${reqIdx + 1}`}
-                                                                                    {doc?.required ? (
-                                                                                        <Box component="span" sx={{color: "#dc2626", fontWeight: 800, fontSize: "0.72rem", ml: 0.28}}>
-                                                                                            *
-                                                                                        </Box>
-                                                                                    ) : null}
-                                                                                </Typography>
-                                                                            </Stack>
-                                                                        ))}
-                                                                    </Box>
-                                                                </Box>
-                                                            ) : null}
-
-                                                            {methodSteps.length > 0 ? (
-                                                                <Box
-                                                                    sx={{
-                                                                        mb: 1.45,
-                                                                        p: 1.1,
-                                                                        borderRadius: 1.5,
-                                                                        bgcolor: "rgba(255,255,255,0.95)",
-                                                                        border: "1px solid rgba(226,232,240,0.92)"
-                                                                    }}
-                                                                >
-                                                                    <Typography sx={{fontSize: "0.8rem", color: "#475569", fontWeight: 800, mb: 0.7, letterSpacing: "0.01em"}}>
-                                                                        Các bước thực hiện
-                                                                    </Typography>
-                                                                    <Stack spacing={1}>
-                                                                        {methodSteps.map((step, stepIdx) => {
-                                                                            const isLast = stepIdx === methodSteps.length - 1;
-                                                                            const stepNumber = Number(step?.stepOrder);
-                                                                            const stepName = String(step?.stepName || "").trim() || `Bước ${stepIdx + 1}`;
-                                                                            const stepDescription = String(step?.description || "").trim();
-                                                                            return (
-                                                                                <Box key={`${stepName}-${stepIdx}`} sx={{display: "flex", gap: 0.9, alignItems: "flex-start"}}>
-                                                                                    <Box sx={{position: "relative", pt: 0.05}}>
-                                                                                        <Box
-                                                                                            sx={{
-                                                                                                width: 22,
-                                                                                                height: 22,
-                                                                                                borderRadius: "50%",
-                                                                                                bgcolor: "rgba(59,130,246,0.14)",
-                                                                                                border: "1px solid rgba(59,130,246,0.36)",
-                                                                                                display: "inline-flex",
-                                                                                                alignItems: "center",
-                                                                                                justifyContent: "center",
-                                                                                                color: "#1d4ed8",
-                                                                                                fontSize: "0.72rem",
-                                                                                                fontWeight: 800
-                                                                                            }}
-                                                                                        >
-                                                                                            {Number.isFinite(stepNumber) && stepNumber > 0 ? stepNumber : stepIdx + 1}
-                                                                                        </Box>
-                                                                                        {!isLast ? (
-                                                                                            <Box
-                                                                                                sx={{
-                                                                                                    position: "absolute",
-                                                                                                    left: "50%",
-                                                                                                    top: 23,
-                                                                                                    transform: "translateX(-50%)",
-                                                                                                    width: 1.5,
-                                                                                                    height: 20,
-                                                                                                    bgcolor: "rgba(148,163,184,0.35)",
-                                                                                                    borderRadius: 999
-                                                                                                }}
-                                                                                            />
-                                                                                        ) : null}
-                                                                                    </Box>
-                                                                                    <Box sx={{pt: 0.03, minWidth: 0, pb: isLast ? 0 : 0.15}}>
-                                                                                        <Typography sx={{fontSize: "0.95rem", color: "#0f172a", fontWeight: 800, lineHeight: 1.45}}>
-                                                                                            {stepName}
-                                                                                        </Typography>
-                                                                                        {stepDescription ? (
-                                                                                            <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}>
-                                                                                                {stepDescription}
-                                                                                            </Typography>
-                                                                                        ) : null}
-                                                                                    </Box>
-                                                                                </Box>
-                                                                            );
-                                                                        })}
-                                                                    </Stack>
-                                                                </Box>
+                                                                    Phương thức tuyển sinh
+                                                                </Typography>
                                                             ) : null}
                                                         </Box>
+
                                                         <Box
                                                             sx={{
+                                                                width: "100%",
+                                                                alignSelf: "stretch",
                                                                 borderRadius: 2,
                                                                 border: "1px solid rgba(251,146,60,0.4)",
                                                                 bgcolor: "#fff7ed",
-                                                                p: {xs: 1.15, sm: 1.3},
+                                                                p: {xs: 1.25, sm: 1.45},
                                                                 boxShadow: "0 10px 22px rgba(249,115,22,0.12)",
-                                                                alignSelf: "start"
+                                                                display: "flex",
+                                                                flexDirection: {xs: "column", sm: "row"},
+                                                                alignItems: {xs: "flex-start", sm: "center"},
+                                                                justifyContent: "space-between",
+                                                                gap: {xs: 0.75, sm: 2}
                                                             }}
                                                         >
                                                             <Typography sx={{fontSize: "0.78rem", color: "#9a3412", fontWeight: 700}}>Học phí</Typography>
-                                                            <Typography sx={{fontSize: "1.45rem", color: "#c2410c", fontWeight: 900, lineHeight: 1.16, mb: 0.8}}>
-                                                                {`${formatVnd(offering?.tuitionFee)}${feeUnitSuffix(program?.feeUnit)}`}
-                                                            </Typography>
-
-                                                            <Typography sx={{fontSize: "0.88rem", color: quotaTone.main, fontWeight: 800, mb: 0.45}}>
-                                                                Chỉ còn lại {offering?.remainingQuota ?? "—"} suất
-                                                            </Typography>
-                                                            <LinearProgress
-                                                                variant="determinate"
-                                                                value={hasQuota && hasRemaining ? Math.max(0, Math.min(100, ((quota - remainingQuota) / quota) * 100)) : 0}
+                                                            <Typography
                                                                 sx={{
-                                                                    height: 9,
-                                                                    borderRadius: 999,
-                                                                    bgcolor: "rgba(148,163,184,0.22)",
-                                                                    mb: 0.5,
-                                                                    "& .MuiLinearProgress-bar": {borderRadius: 999, bgcolor: "#f97316"}
-                                                                }}
-                                                            />
-                                                            <Typography sx={{fontSize: "0.78rem", color: quotaTone.soft, fontWeight: 600, mb: 0.75}}>
-                                                                Đã tuyển {filledPercent}% • Tổng {offering?.quota ?? "—"}
-                                                            </Typography>
-                                                            <Typography sx={{fontSize: "0.84rem", color: "#7c2d12", fontWeight: 700, mb: 0.95}}>
-                                                                Hạn đăng ký: {formatIsoDate(offering?.openDate)} - {formatIsoDate(offering?.closeDate)}
-                                                            </Typography>
-                                                            <Button
-                                                                variant="contained"
-                                                                fullWidth
-                                                                disableElevation
-                                                                disabled={admissionSubmissionLocked || !canSubmit}
-                                                                onClick={() => handleSubmitApplication(submitTarget)}
-                                                                sx={{
-                                                                    borderRadius: 1.6,
-                                                                    py: 0.95,
+                                                                    fontSize: {xs: "1.28rem", sm: "1.45rem"},
+                                                                    color: "#c2410c",
                                                                     fontWeight: 900,
-                                                                    letterSpacing: "0.01em",
-                                                                    fontSize: "0.9rem",
-                                                                    bgcolor: "#ea580c",
-                                                                    color: "#fff",
-                                                                    "&:hover": {bgcolor: "#c2410c"},
-                                                                    "&.Mui-disabled": {bgcolor: "#fed7aa", color: "#9a3412"}
+                                                                    lineHeight: 1.16,
+                                                                    mb: 0,
+                                                                    textAlign: {xs: "left", sm: "right"},
+                                                                    width: {xs: "100%", sm: "auto"}
                                                                 }}
                                                             >
-                                                                {admissionSubmissionLocked
-                                                                    ? "ĐÃ NỘP HỒ SƠ"
-                                                                    : String(offering?.applicationStatus || "").toUpperCase() === "PAUSED"
-                                                                        ? "TẠM DỪNG NHẬN HỒ SƠ"
-                                                                        : "NỘP HỒ SƠ"}
-                                                            </Button>
+                                                                {tuitionMainLine}
+                                                            </Typography>
+                                                        </Box>
+
+                                                        <Box sx={{width: "100%", minWidth: 0}}>
+                                                            {offerGroup.map((offering, methodIdx) => {
+                                                                const quota = Number(offering?.quota);
+                                                                const remainingQuota = Number(offering?.remainingQuota);
+                                                                const hasQuota = Number.isFinite(quota) && quota > 0;
+                                                                const hasRemaining = Number.isFinite(remainingQuota);
+                                                                const filledRatio =
+                                                                    hasQuota && hasRemaining
+                                                                        ? Math.max(0, Math.min(1, (quota - remainingQuota) / quota))
+                                                                        : 0;
+                                                                const filledPercent = Math.round(filledRatio * 100);
+                                                                const isLowQuota = hasRemaining && remainingQuota < 50;
+                                                                const quotaTone = isLowQuota
+                                                                    ? {main: "#c2410c", soft: "#9a3412"}
+                                                                    : {main: "#047857", soft: "#065f46"};
+                                                                const offeringMethodCode = String(offering?.admissionMethod || "").trim().toUpperCase();
+                                                                const matchedMethod =
+                                                                    admissionMethodDetails.find((method) => {
+                                                                        const methodCode = String(method?.methodCode || method?.code || "")
+                                                                            .trim()
+                                                                            .toUpperCase();
+                                                                        return methodCode === offeringMethodCode;
+                                                                    }) || null;
+                                                                const methodDocs = Array.isArray(matchedMethod?.methodDocumentRequirements)
+                                                                    ? matchedMethod.methodDocumentRequirements
+                                                                    : [];
+                                                                const methodSteps = Array.isArray(matchedMethod?.admissionProcessSteps)
+                                                                    ? [...matchedMethod.admissionProcessSteps].sort(
+                                                                          (a, b) => Number(a?.stepOrder || 0) - Number(b?.stepOrder || 0)
+                                                                      )
+                                                                    : [];
+                                                                const submitTarget = {campaign, offering};
+                                                                const canSubmit = String(offering?.applicationStatus || "").toUpperCase() === "OPEN";
+                                                                const methodAllowsReservation = Boolean(
+                                                                    matchedMethod?.allowReservationSubmission ||
+                                                                        offering?.allowReservationSubmission
+                                                                );
+                                                                return (
+                                                                    <Box
+                                                                        key={`${offering?.id ?? `${groupIdx}-${methodIdx}`}-${offering?.admissionMethod ?? "method"}`}
+                                                                        sx={{
+                                                                            mt: methodIdx > 0 ? 2.25 : 0
+                                                                        }}
+                                                                    >
+                                                                        <Box
+                                                                            sx={{
+                                                                                p: {xs: 1.15, sm: 1.35},
+                                                                                borderRadius: 2,
+                                                                                border: "1px solid rgba(226,232,240,0.95)",
+                                                                                bgcolor: "rgba(255,255,255,0.96)",
+                                                                                boxShadow: "0 1px 0 rgba(15,23,42,0.04)"
+                                                                            }}
+                                                                        >
+                                                                            {matchedMethod ? (
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        mb: 1.4,
+                                                                                        p: 1.1,
+                                                                                        borderRadius: 1.5,
+                                                                                        bgcolor: "rgba(239,246,255,0.8)",
+                                                                                        border: "1px solid rgba(191,219,254,0.7)"
+                                                                                    }}
+                                                                                >
+                                                                                    <Typography
+                                                                                        sx={{
+                                                                                            fontSize: "0.8rem",
+                                                                                            color: "#475569",
+                                                                                            fontWeight: 800,
+                                                                                            mb: 0.55,
+                                                                                            letterSpacing: "0.01em"
+                                                                                        }}
+                                                                                    >
+                                                                                        Phương thức xét tuyển
+                                                                                    </Typography>
+                                                                                    <Box sx={detailSchoolMethodTileSx}>
+                                                                                        <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 700}}>
+                                                                                            {matchedMethod?.displayName || admissionMethodLabel(offering?.admissionMethod)}
+                                                                                        </Typography>
+                                                                                        <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.55}}>
+                                                                                            {String(matchedMethod?.description || "").trim() || "—"}
+                                                                                        </Typography>
+                                                                                    </Box>
+                                                                                </Box>
+                                                                            ) : (
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        mb: 1.4,
+                                                                                        p: 1.1,
+                                                                                        borderRadius: 1.5,
+                                                                                        bgcolor: "rgba(248,250,252,0.95)",
+                                                                                        border: "1px solid rgba(226,232,240,0.9)"
+                                                                                    }}
+                                                                                >
+                                                                                    <Typography
+                                                                                        sx={{
+                                                                                            fontSize: "0.8rem",
+                                                                                            color: "#475569",
+                                                                                            fontWeight: 800,
+                                                                                            mb: 0.55,
+                                                                                            letterSpacing: "0.01em"
+                                                                                        }}
+                                                                                    >
+                                                                                        Phương thức xét tuyển
+                                                                                    </Typography>
+                                                                                    <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 700}}>
+                                                                                        {admissionMethodLabel(offering?.admissionMethod)}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                            )}
+
+                                                                            <Box sx={{mb: 1.35}}>
+                                                                                <Typography sx={{fontSize: "0.88rem", color: quotaTone.main, fontWeight: 800, mb: 0.45}}>
+                                                                                    Chỉ còn lại {offering?.remainingQuota ?? "—"} suất
+                                                                                </Typography>
+                                                                                <LinearProgress
+                                                                                    variant="determinate"
+                                                                                    value={
+                                                                                        hasQuota && hasRemaining
+                                                                                            ? Math.max(
+                                                                                                  0,
+                                                                                                  Math.min(100, ((quota - remainingQuota) / quota) * 100)
+                                                                                              )
+                                                                                            : 0
+                                                                                    }
+                                                                                    sx={{
+                                                                                        height: 9,
+                                                                                        borderRadius: 999,
+                                                                                        bgcolor: "rgba(148,163,184,0.22)",
+                                                                                        mb: 0.5,
+                                                                                        "& .MuiLinearProgress-bar": {borderRadius: 999, bgcolor: "#f97316"}
+                                                                                    }}
+                                                                                />
+                                                                                <Typography sx={{fontSize: "0.78rem", color: quotaTone.soft, fontWeight: 600, mb: 0.55}}>
+                                                                                    Đã tuyển {filledPercent}% • Tổng {offering?.quota ?? "—"}
+                                                                                </Typography>
+                                                                                <Typography sx={{fontSize: "0.84rem", color: "#7c2d12", fontWeight: 700, mb: 0}}>
+                                                                                    Hạn đăng ký: {formatIsoDate(offering?.openDate)} -{" "}
+                                                                                    {formatIsoDate(offering?.closeDate)}
+                                                                                </Typography>
+                                                                            </Box>
+
+                                                                            {methodDocs.length > 0 ? (
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        mb: 1.4,
+                                                                                        p: 1.1,
+                                                                                        borderRadius: 1.5,
+                                                                                        bgcolor: "rgba(248,250,252,0.92)",
+                                                                                        border: "1px solid rgba(226,232,240,0.9)"
+                                                                                    }}
+                                                                                >
+                                                                                    <Typography
+                                                                                        sx={{
+                                                                                            fontSize: "0.8rem",
+                                                                                            color: "#475569",
+                                                                                            fontWeight: 800,
+                                                                                            mb: 0.6,
+                                                                                            letterSpacing: "0.01em"
+                                                                                        }}
+                                                                                    >
+                                                                                        Hồ sơ cần nộp
+                                                                                    </Typography>
+                                                                                    <Box
+                                                                                        sx={{
+                                                                                            display: "grid",
+                                                                                            gridTemplateColumns: {xs: "1fr", sm: "repeat(2, minmax(0, 1fr))"},
+                                                                                            gap: 0.7
+                                                                                        }}
+                                                                                    >
+                                                                                        {methodDocs.map((doc, reqIdx) => (
+                                                                                            <Stack
+                                                                                                key={`${doc?.code || reqIdx}-${reqIdx}`}
+                                                                                                direction="row"
+                                                                                                alignItems="center"
+                                                                                                spacing={0.55}
+                                                                                                sx={{minWidth: 0}}
+                                                                                            >
+                                                                                                <CheckCircleIcon sx={{fontSize: 15, color: "#16a34a", flexShrink: 0}}/>
+                                                                                                <Typography sx={{fontSize: "0.92rem", color: "#334155", lineHeight: 1.58}}>
+                                                                                                    {doc?.name || doc?.code || `Hồ sơ ${reqIdx + 1}`}
+                                                                                                    {doc?.required ? (
+                                                                                                        <Box
+                                                                                                            component="span"
+                                                                                                            sx={{color: "#dc2626", fontWeight: 800, fontSize: "0.72rem", ml: 0.28}}
+                                                                                                        >
+                                                                                                            *
+                                                                                                        </Box>
+                                                                                                    ) : null}
+                                                                                                </Typography>
+                                                                                            </Stack>
+                                                                                        ))}
+                                                                                    </Box>
+                                                                                </Box>
+                                                                            ) : null}
+
+                                                                            {methodSteps.length > 0 ? (
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        mb: methodAllowsReservation ? 1.25 : 1.45,
+                                                                                        p: 1.1,
+                                                                                        borderRadius: 1.5,
+                                                                                        bgcolor: "rgba(255,255,255,0.95)",
+                                                                                        border: "1px solid rgba(226,232,240,0.92)"
+                                                                                    }}
+                                                                                >
+                                                                                    <Typography
+                                                                                        sx={{
+                                                                                            fontSize: "0.8rem",
+                                                                                            color: "#475569",
+                                                                                            fontWeight: 800,
+                                                                                            mb: 0.7,
+                                                                                            letterSpacing: "0.01em"
+                                                                                        }}
+                                                                                    >
+                                                                                        Các bước thực hiện
+                                                                                    </Typography>
+                                                                                    <Stack spacing={1}>
+                                                                                        {methodSteps.map((step, stepIdx) => {
+                                                                                            const isLast = stepIdx === methodSteps.length - 1;
+                                                                                            const stepNumber = Number(step?.stepOrder);
+                                                                                            const stepName =
+                                                                                                String(step?.stepName || "").trim() || `Bước ${stepIdx + 1}`;
+                                                                                            const stepDescription = String(step?.description || "").trim();
+                                                                                            return (
+                                                                                                <Box key={`${stepName}-${stepIdx}`} sx={{display: "flex", gap: 0.9, alignItems: "flex-start"}}>
+                                                                                                    <Box sx={{position: "relative", pt: 0.05}}>
+                                                                                                        <Box
+                                                                                                            sx={{
+                                                                                                                width: 22,
+                                                                                                                height: 22,
+                                                                                                                borderRadius: "50%",
+                                                                                                                bgcolor: "rgba(59,130,246,0.14)",
+                                                                                                                border: "1px solid rgba(59,130,246,0.36)",
+                                                                                                                display: "inline-flex",
+                                                                                                                alignItems: "center",
+                                                                                                                justifyContent: "center",
+                                                                                                                color: "#1d4ed8",
+                                                                                                                fontSize: "0.72rem",
+                                                                                                                fontWeight: 800
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            {Number.isFinite(stepNumber) && stepNumber > 0 ? stepNumber : stepIdx + 1}
+                                                                                                        </Box>
+                                                                                                        {!isLast ? (
+                                                                                                            <Box
+                                                                                                                sx={{
+                                                                                                                    position: "absolute",
+                                                                                                                    left: "50%",
+                                                                                                                    top: 23,
+                                                                                                                    transform: "translateX(-50%)",
+                                                                                                                    width: 1.5,
+                                                                                                                    height: 20,
+                                                                                                                    bgcolor: "rgba(148,163,184,0.35)",
+                                                                                                                    borderRadius: 999
+                                                                                                                }}
+                                                                                                            />
+                                                                                                        ) : null}
+                                                                                                    </Box>
+                                                                                                    <Box sx={{pt: 0.03, minWidth: 0, pb: isLast ? 0 : 0.15}}>
+                                                                                                        <Typography sx={{fontSize: "0.95rem", color: "#0f172a", fontWeight: 800, lineHeight: 1.45}}>
+                                                                                                            {stepName}
+                                                                                                        </Typography>
+                                                                                                        {stepDescription ? (
+                                                                                                            <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}>
+                                                                                                                {stepDescription}
+                                                                                                            </Typography>
+                                                                                                        ) : null}
+                                                                                                    </Box>
+                                                                                                </Box>
+                                                                                            );
+                                                                                        })}
+                                                                                    </Stack>
+                                                                                </Box>
+                                                                            ) : null}
+
+                                                                            {methodAllowsReservation ? (
+                                                                                <Box sx={{mt: 0.25}}>
+                                                                                    <Button
+                                                                                        variant="contained"
+                                                                                        fullWidth
+                                                                                        disableElevation
+                                                                                        disabled={admissionSubmissionLocked || !canSubmit}
+                                                                                        onClick={() => handleSubmitApplication(submitTarget)}
+                                                                                        sx={{
+                                                                                            borderRadius: 1.6,
+                                                                                            py: 0.95,
+                                                                                            fontWeight: 900,
+                                                                                            letterSpacing: "0.01em",
+                                                                                            fontSize: "0.9rem",
+                                                                                            bgcolor: "#ea580c",
+                                                                                            color: "#fff",
+                                                                                            "&:hover": {bgcolor: "#c2410c"},
+                                                                                            "&.Mui-disabled": {bgcolor: "#fed7aa", color: "#9a3412"}
+                                                                                        }}
+                                                                                    >
+                                                                                        {admissionSubmissionLocked
+                                                                                            ? "ĐÃ NỘP HỒ SƠ"
+                                                                                            : String(offering?.applicationStatus || "").toUpperCase() === "PAUSED"
+                                                                                              ? "TẠM DỪNG NHẬN HỒ SƠ"
+                                                                                              : "NỘP HỒ SƠ"}
+                                                                                    </Button>
+                                                                                </Box>
+                                                                            ) : null}
+                                                                        </Box>
+                                                                    </Box>
+                                                                );
+                                                            })}
                                                         </Box>
                                                     </Box>
                                                     <Box sx={{mt: 1.2}}>
@@ -2286,7 +2467,6 @@ function SchoolCampaignEnrollmentCard({
                                                             focusSubjectsOnly
                                                         />
                                                     </Box>
-
                                                 </Box>
                                             );
                                         })}
