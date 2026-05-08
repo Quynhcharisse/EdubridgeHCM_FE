@@ -123,6 +123,15 @@ function normalizeApplicationStatus(raw) {
     return String(raw || "").trim().toUpperCase();
 }
 
+function getCampaignStatusLabel(rawStatus) {
+    const status = String(rawStatus || "").trim().toUpperCase();
+    if (!status) return "—";
+    if (status === "OPEN_ADMISSION_CAMPAIGN" || status === "OPEN") return "Đang mở";
+    if (status === "CANCELLED_ADMISSION_CAMPAIGN" || status === "CANCELLED") return "Đã hủy";
+    if (status === "DRAFT_ADMISSION_CAMPAIGN" || status === "DRAFT") return "Bản nháp";
+    return status;
+}
+
 /** API: phân số (0.1) hoặc phần trăm (10) → % hiển thị */
 function priceAdjustmentToDisplayPercent(raw) {
     const n = Number(String(raw ?? "").replace(",", "."));
@@ -1011,7 +1020,7 @@ export default function CampaignOfferingsSection({
                                 >
                                     {campaignOptions.map((c) => (
                                         <MenuItem key={String(c.id)} value={String(c.id)}>
-                                            {c.name} {c.year != null ? `(${c.year})` : ""} {c.status ? `· ${c.status}` : ""}
+                                            {c.name} {c.year != null ? `(${c.year})` : ""} {c.status ? `· ${getCampaignStatusLabel(c.status)}` : ""}
                                         </MenuItem>
                                     ))}
                                 </Select>
