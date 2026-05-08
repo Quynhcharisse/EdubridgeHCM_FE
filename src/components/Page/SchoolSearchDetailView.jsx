@@ -2994,8 +2994,9 @@ export default function SchoolSearchDetailView({
     const mapCampuses = nearbyCampusesOfCurrentSchool.length > 0 ? nearbyCampusesOfCurrentSchool : schoolCampusMarkers;
 
     React.useEffect(() => {
+        if (typeof onSearchNearbyCampuses !== "function") return;
         requestUserLocation();
-    }, [detailKeyRaw, requestUserLocation]);
+    }, [detailKeyRaw, onSearchNearbyCampuses, requestUserLocation]);
 
     const userLat = userLocation?.lat ?? null;
     const userLng = userLocation?.lng ?? null;
