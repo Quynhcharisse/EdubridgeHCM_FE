@@ -142,7 +142,19 @@ export const uploadSchoolBusinessLicensePdf = async (file) => {
     return uploadedUrl;
 };
 
-export const checkTaxCode = async (taxCode) => {
+const TAX_CODE_LOOKUP_RETRY_ATTEMPTS = 3;
+const TAX_CODE_LOOKUP_RETRY_DELAY_MS = 400;
+
+const shouldRetryTaxCodeLookup = (error) => {
+    const status = Number(error?.status ?? error?.response?.status);
+    if (!Number.isFinite(status)) return true;
+    if (status === 429) return true;
+    return status >= 500;
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const checkTaxCodeOnce = async (taxCode) => {
     const response = await fetch(`https://api.vietqr.io/v2/business/${encodeURIComponent(taxCode)}`);
     const status = response.status;
     const contentType = response.headers.get('content-type') || '';
@@ -176,4 +188,21 @@ export const checkTaxCode = async (taxCode) => {
         throw error;
     }
     return data;
+};
+
+export const checkTaxCode = async (taxCode) => {
+    let lastError = null;
+    for (let attempt = 1; attempt <= TAX_CODE_LOOKUP_RETRY_ATTEMPTS; attempt += 1) {
+        try {
+            return await checkTaxCodeOnce(taxCode);
+        } catch (error) {
+            lastError = error;
+            const shouldRetry = shouldRetryTaxCodeLookup(error);
+            if (!shouldRetry || attempt >= TAX_CODE_LOOKUP_RETRY_ATTEMPTS) {
+                throw error;
+            }
+            await delay(TAX_CODE_LOOKUP_RETRY_DELAY_MS);
+        }
+    }
+    throw lastError || new Error('Tax code lookup failed');
 };

@@ -257,6 +257,7 @@ const SchoolRegistrationForm = ({email, onBack}) => {
 
         try {
             const taxCodeCheck = await checkTaxCode(taxCodeValue);
+
             if (taxCodeRequestIdRef.current !== requestId) return;
 
             if (taxCodeCheck?.code === '00' && taxCodeCheck?.data) {

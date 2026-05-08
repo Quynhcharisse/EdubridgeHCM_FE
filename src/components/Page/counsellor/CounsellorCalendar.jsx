@@ -13,8 +13,15 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Pagination,
+  Select,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -24,10 +31,16 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import TodayIcon from "@mui/icons-material/Today";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import { enqueueSnackbar } from "notistack";
-import { getCounsellorCalendar, parseCounsellorCalendarBody } from "../../../services/CounsellorCalendarService.jsx";
+import {
+  getCounsellorAdmissionCampaigns,
+  getCounsellorAppointmentsByCampaign,
+  getCounsellorCalendar,
+  parseCounsellorCalendarBody,
+} from "../../../services/CounsellorCalendarService.jsx";
 import { putCounsellorOfflineConsultation } from "../../../services/CounsellorOfflineConsultationService.jsx";
 import {
   counsellorGradientHeaderCardSx,
@@ -296,6 +309,26 @@ function slotWindowSortKey(startTime, endTime) {
   return `${startTime}\0${endTime}`;
 }
 
+function getEarlyStartWarningMessage(slotDate, slotTime) {
+  const startTimeStr = String(slotTime || "").split(" - ")[0]?.trim();
+  if (!slotDate || !startTimeStr) return null;
+  const [y, mo, d] = String(slotDate).split("-").map(Number);
+  const [hh, mm] = startTimeStr.split(":").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d) || !Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  const apptDateTime = new Date(y, mo - 1, d, hh, mm, 0);
+  const now = new Date();
+  if (now >= apptDateTime) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const apptDay = new Date(y, mo - 1, d);
+  if (apptDay > today) {
+    const days = Math.round((apptDay - today) / (1000 * 60 * 60 * 24));
+    return `Cuộc họp bắt đầu sớm hơn dự tính ${days} ngày`;
+  }
+  const mins = Math.ceil((apptDateTime - now) / 60000);
+  return `Cuộc họp bắt đầu sớm hơn dự tính ${mins} phút`;
+}
+
 export default function CounsellorCalendar() {
   const [anchorDate, setAnchorDate] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
@@ -305,6 +338,16 @@ export default function CounsellorCalendar() {
   const [appointmentFlowStep, setAppointmentFlowStep] = useState("initial");
   const [completionNote, setCompletionNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [earlyStartWarning, setEarlyStartWarning] = useState({ open: false, message: "", onConfirm: null });
+
+  const [activeTab, setActiveTab] = useState(0);
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const [campaignAppointments, setCampaignAppointments] = useState([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState("");
+  const [apptPage, setApptPage] = useState(1);
 
   const weekDays = useMemo(() => {
     const monday = startOfWeekMonday(anchorDate);
@@ -412,9 +455,51 @@ export default function CounsellorCalendar() {
     }
   }, [weekDays]);
 
+  const loadCampaigns = useCallback(async () => {
+    setCampaignsLoading(true);
+    try {
+      const res = await getCounsellorAdmissionCampaigns();
+      const list = Array.isArray(res?.data?.body) ? res.data.body : [];
+      setCampaigns(list);
+      const active = list.find((c) => c.isActive);
+      setSelectedCampaignId((active ?? list[0])?.id ?? null);
+    } catch {
+      setCampaigns([]);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }, []);
+
+  const loadCampaignAppointments = useCallback(async (campaignId) => {
+    if (!campaignId) return;
+    setAppointmentsLoading(true);
+    setAppointmentsError("");
+    try {
+      const res = await getCounsellorAppointmentsByCampaign(campaignId);
+      const list = Array.isArray(res?.data?.body) ? res.data.body : [];
+      setCampaignAppointments(list);
+    } catch {
+      setAppointmentsError("Không thể tải danh sách lịch hẹn. Vui lòng thử lại.");
+      setCampaignAppointments([]);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadCalendar();
   }, [loadCalendar]);
+
+  useEffect(() => {
+    void loadCampaigns();
+  }, [loadCampaigns]);
+
+  useEffect(() => {
+    if (selectedCampaignId != null) {
+      setApptPage(1);
+      void loadCampaignAppointments(selectedCampaignId);
+    }
+  }, [selectedCampaignId, loadCampaignAppointments]);
 
   return (
     <Box
@@ -457,7 +542,7 @@ export default function CounsellorCalendar() {
                   variant="h6"
                   sx={{ fontWeight: 800, lineHeight: 1.2, textShadow: "0 1px 3px rgba(15,23,42,0.12)" }}
                 >
-                  Lịch tư vấn trực tiếp
+                  Lịch tư vấn viên
                 </Typography>
                 <Typography
                   variant="body2"
@@ -476,7 +561,47 @@ export default function CounsellorCalendar() {
           </CardContent>
         </Card>
 
-        <Card elevation={0} sx={{ ...counsellorInnerCardSx, borderRadius: 2 }}>
+        <Box
+          sx={{
+            borderBottom: "1px solid rgba(100,116,139,0.16)",
+            bgcolor: "rgba(255,255,255,0.96)",
+            borderRadius: "8px 8px 0 0",
+            mt: 1.5,
+          }}
+        >
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => setActiveTab(v)}
+            sx={{
+              minHeight: 44,
+              px: 1,
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: "0.875rem",
+                minHeight: 44,
+                color: "#64748b",
+                gap: 0.75,
+              },
+              "& .MuiTabs-indicator": { bgcolor: CAL_BRAND, height: 3, borderRadius: "3px 3px 0 0" },
+              "& .Mui-selected": { color: `${CAL_BRAND} !important` },
+            }}
+          >
+            <Tab
+              icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Lưới lịch"
+            />
+            <Tab
+              icon={<FormatListBulletedOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Danh sách lịch hẹn"
+            />
+          </Tabs>
+        </Box>
+
+        {activeTab === 0 && (
+        <Card elevation={0} sx={{ ...counsellorInnerCardSx, borderRadius: "0 0 8px 8px" }}>
           <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
             <Stack spacing={2}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5}>
@@ -699,7 +824,7 @@ export default function CounsellorCalendar() {
                           py: 0.5,
                           borderLeft: CAL_GRID_LINE_COL,
                           display: "flex",
-                          alignItems: "center",
+                          alignItems: "flex-start",
                           justifyContent: "center",
                           minHeight: 44,
                         }}
@@ -707,61 +832,88 @@ export default function CounsellorCalendar() {
                         {slots.length === 0 ? (
                           <Box sx={{ minHeight: 22, width: "100%" }} aria-hidden />
                         ) : (
-                          <Stack spacing={0.45} alignItems="center" sx={{ width: "100%", py: 0.15 }}>
+                          <Stack spacing={0.5} sx={{ width: "100%", py: 0.25 }}>
                             {slots.map((slot, slotIdx) => {
-                              const hasOffline = hasOfflineAppointment(slot);
-                              const detail = hasOffline ? pickFirstOfflineAppointment(slot) : null;
-                              const offlineStatus = detail?.status;
-                              const label = hasOffline
-                                ? String(offlineStatus || "")
-                                        .toUpperCase()
-                                        .includes("CONFIRM")
-                                  ? "Có lịch hẹn"
-                                  : consultationStatusLabel(offlineStatus)
-                                : slot.statusLabel || slot.status;
-                              const baseSx = calendarSlotChipSx(slot.status, slot.statusLabel);
-                              const statusSx =
-                                hasOffline && String(offlineStatus || "").toUpperCase().includes("CONFIRM")
-                                  ? {
-                                      bgcolor: "rgba(192,132,252,0.16)",
-                                      color: "#7c3aed",
-                                      border: "1px solid rgba(124,58,237,0.45)",
-                                      fontWeight: 700,
-                                    }
-                                  : hasOffline
-                                  ? consultationStatusChipSx(offlineStatus)
-                                  : {};
-                              const color =
-                                !hasOffline && !slotLooksCompleted(slot.status, slot.statusLabel)
-                                  ? STATUS_COLOR[slot.status] || "default"
-                                  : undefined;
+                              const appointments = slot.consultationOfflineRequest || [];
+                              const hasOffline = appointments.length > 0;
+
+                              const CARD_SX = {
+                                width: "100%",
+                                minHeight: 54,
+                                boxSizing: "border-box",
+                                borderRadius: 1.5,
+                                px: 0.75,
+                                py: 0.6,
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                              };
+
+                              if (!hasOffline) {
+                                const s = String(slot.status || "").toUpperCase();
+                                const isCompleted = slotLooksCompleted(s, slot.statusLabel);
+                                const isOngoing = s === "ONGOING";
+                                const colorSx = isCompleted
+                                  ? { bgcolor: "rgba(148,163,184,0.12)", border: "1px solid rgba(148,163,184,0.32)", color: "#64748b" }
+                                  : isOngoing
+                                  ? { bgcolor: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.32)", color: "#15803d" }
+                                  : { bgcolor: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.32)", color: "#1d4ed8" };
+                                return (
+                                  <Box key={`${cellKey}-${slotIdx}-empty`} sx={{ ...CARD_SX, ...colorSx, justifyContent: "center", alignItems: "center" }}>
+                                    <Typography sx={{ fontSize: "0.69rem", fontWeight: 700, color: colorSx.color, lineHeight: 1.3, textAlign: "center" }} noWrap>
+                                      {slot.statusLabel || slot.status}
+                                    </Typography>
+                                  </Box>
+                                );
+                              }
+
                               return (
-                                <Chip
-                                  key={`${cellKey}-${slotIdx}-${slot.status}`}
-                                  label={label}
-                                  color={color}
-                                  size="small"
-                                  onClick={() => {
-                                    if (!hasOffline || !detail) return;
-                                    setSelectedAppointment({
-                                      ...detail,
-                                      slotDate: slot.date,
-                                      slotTime: `${slot.startTime} - ${slot.endTime}`,
-                                      counsellorSlotId: slot.counsellorSlotId,
-                                    });
-                                    setAppointmentFlowStep(consultationIsInProgress(detail?.status) ? "in_progress" : "initial");
-                                    setCompletionNote("");
-                                  }}
-                                  sx={{
-                                    ...baseSx,
-                                    ...statusSx,
-                                    ...(hasOffline
-                                      ? {
-                                          cursor: "pointer",
-                                        }
-                                      : null),
-                                  }}
-                                />
+                                <Stack key={`${cellKey}-${slotIdx}-appts`} spacing={0.4} sx={{ width: "100%" }}>
+                                  {appointments.map((appt, apptIdx) => (
+                                    <Box
+                                      key={appt.id ?? apptIdx}
+                                      onClick={() => {
+                                        setSelectedAppointment({
+                                          ...appt,
+                                          slotDate: slot.date,
+                                          slotTime: `${slot.startTime} - ${slot.endTime}`,
+                                          counsellorSlotId: slot.counsellorSlotId,
+                                        });
+                                        setAppointmentFlowStep(
+                                          consultationIsInProgress(appt.status) ? "in_progress" : "initial"
+                                        );
+                                        setCompletionNote("");
+                                      }}
+                                      sx={{
+                                        ...CARD_SX,
+                                        cursor: "pointer",
+                                        bgcolor: "rgba(124,58,237,0.07)",
+                                        border: "1px solid rgba(124,58,237,0.28)",
+                                        transition: "background 0.15s",
+                                        "&:hover": { bgcolor: "rgba(124,58,237,0.15)" },
+                                      }}
+                                    >
+                                      <Typography
+                                        sx={{ fontSize: "0.69rem", fontWeight: 800, color: "#5b21b6", lineHeight: 1.3 }}
+                                        noWrap
+                                      >
+                                        {appt.phone ? String(appt.phone).trim() : `Lịch hẹn #${apptIdx + 1}`}
+                                      </Typography>
+                                      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                                        <Chip
+                                          label={consultationStatusLabel(appt.status)}
+                                          size="small"
+                                          sx={{
+                                            ...consultationStatusChipSx(appt.status),
+                                            height: 17,
+                                            fontSize: "0.58rem",
+                                            "& .MuiChip-label": { px: 0.7, lineHeight: 1 },
+                                          }}
+                                        />
+                                      </Box>
+                                    </Box>
+                                  ))}
+                                </Stack>
                               );
                             })}
                           </Stack>
@@ -853,6 +1005,152 @@ export default function CounsellorCalendar() {
             </Stack>
           </CardContent>
         </Card>
+        )}
+
+        {activeTab === 1 && (
+          <Card elevation={0} sx={{ ...counsellorInnerCardSx, borderRadius: "0 0 8px 8px" }}>
+            <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
+              <Stack spacing={2.5}>
+                <FormControl size="small" sx={{ maxWidth: 380 }}>
+                  <InputLabel>Chiến dịch tuyển sinh</InputLabel>
+                  <Select
+                    value={selectedCampaignId ?? ""}
+                    label="Chiến dịch tuyển sinh"
+                    onChange={(e) => setSelectedCampaignId(e.target.value)}
+                    disabled={campaignsLoading}
+                    sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                  >
+                    {campaigns.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.isActive ? " (Đang hoạt động)" : ""}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {appointmentsLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                    <CircularProgress size={28} sx={{ color: CAL_BRAND }} />
+                  </Box>
+                ) : appointmentsError ? (
+                  <Alert severity="error">{appointmentsError}</Alert>
+                ) : campaignAppointments.length === 0 && selectedCampaignId != null ? (
+                  <Alert severity="info">Không có lịch hẹn nào trong chiến dịch này.</Alert>
+                ) : (() => {
+                  const DAYS_PER_PAGE = 3;
+                  const totalPages = Math.ceil(campaignAppointments.length / DAYS_PER_PAGE);
+                  const pagedGroups = campaignAppointments.slice(
+                    (apptPage - 1) * DAYS_PER_PAGE,
+                    apptPage * DAYS_PER_PAGE
+                  );
+                  return (
+                    <Stack spacing={2.5}>
+                      <Stack direction="row" alignItems="center" justifyContent="flex-end" flexWrap="wrap" gap={1}>
+                        {totalPages > 1 && (
+                          <Pagination
+                            count={totalPages}
+                            page={apptPage}
+                            onChange={(_, p) => setApptPage(p)}
+                            size="small"
+                            sx={{
+                              "& .MuiPaginationItem-root": { fontWeight: 700 },
+                              "& .Mui-selected": {
+                                bgcolor: `${CAL_BRAND} !important`,
+                                color: "#fff",
+                              },
+                            }}
+                          />
+                        )}
+                      </Stack>
+
+                      {pagedGroups.map((group) => {
+                        const [y, mo, d] = String(group.date).split("-").map(Number);
+                        return (
+                          <Box key={group.date}>
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                              <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#1e293b" }}>
+                                {formatDateVi(new Date(y, mo - 1, d))}
+                              </Typography>
+                              <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>
+                                ({group.totalCount} lịch hẹn)
+                              </Typography>
+                            </Stack>
+                            <Stack spacing={1}>
+                              {group.appointments.map((appt) => (
+                                <Box
+                                  key={appt.id}
+                                  sx={{
+                                    p: 1.75,
+                                    borderRadius: 2,
+                                    bgcolor: "rgba(255,255,255,0.96)",
+                                    border: "1px solid rgba(148,163,184,0.28)",
+                                    boxShadow: "0 1px 4px rgba(15,23,42,0.05)",
+                                  }}
+                                >
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    spacing={1}
+                                    sx={{ mb: 0.75 }}
+                                  >
+                                    <Stack direction="row" spacing={1.25} alignItems="center">
+                                      <Typography sx={{ fontSize: 14.5, fontWeight: 800, color: "#0d47a1" }}>
+                                        {String(appt.parentName || "—").trim()}
+                                      </Typography>
+                                      <Typography
+                                        sx={{ fontSize: 13, color: "#64748b", fontVariantNumeric: "tabular-nums" }}
+                                      >
+                                        {normalizeTime(appt.appointmentTime)}
+                                      </Typography>
+                                    </Stack>
+                                    <Chip
+                                      label={consultationStatusLabel(appt.status)}
+                                      size="small"
+                                      sx={consultationStatusChipSx(appt.status)}
+                                    />
+                                  </Stack>
+                                  {appt.phone ? (
+                                    <Typography sx={{ fontSize: 13, color: "#475569", mb: appt.question ? 0.4 : 0 }}>
+                                      {String(appt.phone).trim()}
+                                    </Typography>
+                                  ) : null}
+                                  {appt.question ? (
+                                    <Typography sx={{ fontSize: 13, color: "#334155", fontStyle: "italic" }} noWrap>
+                                      {String(appt.question).trim()}
+                                    </Typography>
+                                  ) : null}
+                                </Box>
+                              ))}
+                            </Stack>
+                          </Box>
+                        );
+                      })}
+
+                      {totalPages > 1 && (
+                        <Box sx={{ display: "flex", justifyContent: "center", pt: 0.5 }}>
+                          <Pagination
+                            count={totalPages}
+                            page={apptPage}
+                            onChange={(_, p) => setApptPage(p)}
+                            sx={{
+                              "& .MuiPaginationItem-root": { fontWeight: 700 },
+                              "& .Mui-selected": {
+                                bgcolor: `${CAL_BRAND} !important`,
+                                color: "#fff",
+                              },
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </Stack>
+                  );
+                })()}
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
       </Box>
       <Dialog
         open={Boolean(selectedAppointment)}
@@ -1039,7 +1337,17 @@ export default function CounsellorCalendar() {
                     <Button
                       variant="contained"
                       disabled={actionLoading}
-                      onClick={() => void callUpdateAction("start")}
+                      onClick={() => {
+                        const msg = getEarlyStartWarningMessage(
+                          selectedAppointment?.slotDate || String(selectedAppointment?.appointmentDate || "").slice(0, 10),
+                          selectedAppointment?.slotTime
+                        );
+                        if (msg) {
+                          setEarlyStartWarning({ open: true, message: msg, onConfirm: () => void callUpdateAction("start") });
+                        } else {
+                          void callUpdateAction("start");
+                        }
+                      }}
                       sx={{
                         textTransform: "none",
                         fontWeight: 700,
@@ -1098,6 +1406,51 @@ export default function CounsellorCalendar() {
               );
             })()
           ) : null}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={earlyStartWarning.open}
+        onClose={() => setEarlyStartWarning({ open: false, message: "", onConfirm: null })}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 800, color: "#b45309" }}>
+            Cảnh báo thời gian
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            {earlyStartWarning.message}. Bạn có chắc muốn bắt đầu không?
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setEarlyStartWarning({ open: false, message: "", onConfirm: null })}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, minWidth: 90 }}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              earlyStartWarning.onConfirm?.();
+              setEarlyStartWarning({ open: false, message: "", onConfirm: null });
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              minWidth: 90,
+              bgcolor: "#1565c0",
+              "&:hover": { bgcolor: "#0d47a1" },
+            }}
+          >
+            Bắt đầu
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
