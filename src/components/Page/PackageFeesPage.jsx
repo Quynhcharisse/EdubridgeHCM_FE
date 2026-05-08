@@ -63,6 +63,11 @@ function formatDateDDMMYYYY(iso) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
+const FEATURE_LABELS = {
+    aiAssistantFee: "Phí trợ lý AI",
+    premiumSupportFee: "Phí hỗ trợ cao cấp",
+};
+
 function PreviewModalSkeleton() {
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -194,14 +199,14 @@ function SubscriptionPreviewModal({
                                         <Typography sx={{ color: "#334155", fontSize: "0.875rem" }}>
                                             Thời hạn: {previewData?.target?.durationDays ?? 0} ngày
                                         </Typography>
+                                        {previewData?.target?.newStartDate ? (
+                                            <Typography sx={{ color: "#334155", fontSize: "0.875rem" }}>
+                                                Hiệu lực từ: {formatDateDDMMYYYY(previewData?.target?.newStartDate)}
+                                            </Typography>
+                                        ) : null}
                                         <Typography sx={{ color: "#334155", fontSize: "0.875rem" }}>
                                             Hết hạn mới: {formatDateDDMMYYYY(previewData?.target?.newExpiryDate)}
                                         </Typography>
-                                        {previewData?.target?.newStartDate ? (
-                                            <Typography sx={{ color: "#334155", fontSize: "0.875rem" }}>
-                                                Bắt đầu: {formatDateDDMMYYYY(previewData?.target?.newStartDate)}
-                                            </Typography>
-                                        ) : null}
                                     </Box>
                                 ) : (
                                     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr auto 1fr" }, alignItems: "stretch" }}>
@@ -267,46 +272,68 @@ function SubscriptionPreviewModal({
                                             <InfoOutlinedIcon sx={{ fontSize: 17, color: "#64748b", cursor: "help" }} />
                                         </Tooltip>
                                     </Box>
-                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.9 }}>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>Giá gói cơ bản</Typography>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
-                                                {formatVnd(previewData?.breakdown?.basePrice)}
-                                            </Typography>
+                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.2 }}>
+                                        {/* Giá cơ bản */}
+                                        <Box sx={{ p: 1.25, borderRadius: "10px", bgcolor: "rgba(13,100,222,0.05)", border: "1px solid rgba(13,100,222,0.15)" }}>
+                                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                                                <Typography sx={{ color: "#334155", fontSize: "0.9rem", fontWeight: 600 }}>Giá gói gốc</Typography>
+                                                <Typography sx={{ color: "#0f172a", fontSize: "0.95rem", fontWeight: 700 }}>
+                                                    {formatVnd(previewData?.breakdown?.basePrice)}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>Phụ phí tính năng</Typography>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
-                                                {formatVnd(previewData?.breakdown?.totalFeatureAmount)}
-                                            </Typography>
+
+                                        {/* Phí tính năng */}
+                                        {Number(previewData?.features?.amount) > 0 && (
+                                            <Box sx={{ p: 1.25, borderRadius: "10px", bgcolor: "rgba(168,85,247,0.05)", border: "1px solid rgba(168,85,247,0.15)" }}>
+                                                <Typography sx={{ color: "#6b21a8", fontSize: "0.9rem", fontWeight: 600, mb: 0.75 }}>Phí tính năng</Typography>
+                                                {Object.entries(previewData?.features?.details ?? {}).map(([key, amount]) => (
+                                                    <Box key={key} sx={{ display: "flex", justifyContent: "space-between", gap: 1, pl: 1, ml: 0.5, borderLeft: "2px solid rgba(168,85,247,0.3)", py: 0.5 }}>
+                                                        <Typography sx={{ color: "#64748b", fontSize: "0.85rem" }}>
+                                                            {FEATURE_LABELS[key] ?? key}
+                                                        </Typography>
+                                                        <Typography sx={{ color: "#475569", fontSize: "0.85rem", fontWeight: 600 }}>
+                                                            {formatVnd(amount)}
+                                                        </Typography>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        )}
+
+                                        <Divider sx={{ my: 0.25 }} />
+
+                                        {/* Tạm tính */}
+                                        <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)" }}>
+                                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, mb: 1 }}>
+                                                <Typography sx={{ color: "#b45309", fontSize: "0.95rem", fontWeight: 700 }}>Tạm tính</Typography>
+                                                <Typography sx={{ color: "#b45309", fontSize: "1rem", fontWeight: 800 }}>
+                                                    {formatVnd(previewData?.breakdown?.netPrice)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, pt: 1, borderTop: "1px solid rgba(251,191,36,0.2)" }}>
+                                                <Typography sx={{ color: "#334155", fontSize: "0.85rem" }}>Phí dịch vụ</Typography>
+                                                <Typography sx={{ color: "#0f172a", fontSize: "0.85rem", fontWeight: 600 }}>
+                                                    {formatVnd(previewData?.breakdown?.serviceFee)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, pt: 0.75 }}>
+                                                <Typography sx={{ color: "#334155", fontSize: "0.85rem" }}>Thuế VAT</Typography>
+                                                <Typography sx={{ color: "#0f172a", fontSize: "0.85rem", fontWeight: 600 }}>
+                                                    {formatVnd(previewData?.breakdown?.taxFee)}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>Tạm tính</Typography>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
-                                                {formatVnd(previewData?.breakdown?.netPrice ?? previewData?.netAmount)}
-                                            </Typography>
-                                        </Box>
-                                        <Divider sx={{ my: 0.5 }} />
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>Phí dịch vụ</Typography>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
-                                                {formatVnd(previewData?.breakdown?.serviceFee)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>VAT</Typography>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
-                                                {formatVnd(previewData?.breakdown?.taxFee)}
-                                            </Typography>
-                                        </Box>
-                                        <Divider sx={{ my: 0.5 }} />
-                                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, alignItems: "flex-end" }}>
-                                            <Typography sx={{ color: "#0f172a", fontSize: "1rem", fontWeight: 800 }}>Tổng thanh toán</Typography>
-                                            <Typography sx={{ color: "#0D64DE", fontSize: { xs: "1.18rem", sm: "1.35rem" }, fontWeight: 900 }}>
+
+                                        <Divider sx={{ my: 0.25 }} />
+
+                                        {/* Tổng cộng */}
+                                        <Box sx={{ p: 1.75, borderRadius: "12px", bgcolor: "#0D64DE", display: "flex", justifyContent: "space-between", gap: 1, alignItems: "center" }}>
+                                            <Typography sx={{ color: "#ffffff", fontSize: "1.05rem", fontWeight: 800 }}>Tổng phải trả</Typography>
+                                            <Typography sx={{ color: "#ffffff", fontSize: { xs: "1.3rem", sm: "1.5rem" }, fontWeight: 900 }}>
                                                 {formatVnd(totalAmount)}
                                             </Typography>
                                         </Box>
-                                        <Typography sx={{ color: "#64748b", fontSize: "0.8rem", textAlign: "right" }}>
+                                        <Typography sx={{ color: "#64748b", fontSize: "0.8rem", textAlign: "center", mt: 0.5 }}>
                                             Đây là số tiền bạn cần thanh toán
                                         </Typography>
                                     </Box>
@@ -366,22 +393,24 @@ function SubscriptionPreviewModal({
                             >
                                 Đóng
                             </Button>
-                            <Button
-                                variant="contained"
-                                onClick={onConfirm}
-                                disabled={!canConfirm}
-                                sx={{
-                                    textTransform: "none",
-                                    fontWeight: 700,
-                                    borderRadius: "10px",
-                                    bgcolor: "#0D64DE",
-                                    boxShadow: "0 6px 18px rgba(13,100,222,0.28)",
-                                    width: { xs: "100%", sm: "auto" },
-                                    "&:hover": { bgcolor: "#0b5ad1" },
-                                }}
-                            >
-                                {submitLoading ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Xác nhận & Thanh toán"}
-                            </Button>
+                            {!previewError && (
+                                <Button
+                                    variant="contained"
+                                    onClick={onConfirm}
+                                    disabled={!canConfirm}
+                                    sx={{
+                                        textTransform: "none",
+                                        fontWeight: 700,
+                                        borderRadius: "10px",
+                                        bgcolor: "#0D64DE",
+                                        boxShadow: "0 6px 18px rgba(13,100,222,0.28)",
+                                        width: { xs: "100%", sm: "auto" },
+                                        "&:hover": { bgcolor: "#0b5ad1" },
+                                    }}
+                                >
+                                    {submitLoading ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Xác nhận & Thanh toán"}
+                                </Button>
+                            )}
                         </Box>
                     </Box>
                 )}
