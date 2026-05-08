@@ -1820,7 +1820,15 @@ function SchoolPolicyInfoCard({school, activeCampusIndex, embedded = false}) {
     );
 }
 
-function SchoolCampaignEnrollmentCard({campaignTemplates, campaignLoading, campaignError, curriculumList, curriculumSectionRef, onSubmitApplication}) {
+function SchoolCampaignEnrollmentCard({
+    campaignTemplates,
+    campaignLoading,
+    campaignError,
+    curriculumList,
+    curriculumSectionRef,
+    onSubmitApplication,
+    admissionSubmissionLocked = false
+}) {
     const handleSubmitApplication = React.useCallback(
         (campaign) => {
             if (typeof onSubmitApplication === "function") {
@@ -1850,6 +1858,17 @@ function SchoolCampaignEnrollmentCard({campaignTemplates, campaignLoading, campa
         }
         return [];
     })();
+    const primarySubmitTarget = React.useMemo(() => {
+        for (const campaign of list) {
+            const offerings = Array.isArray(campaign?.campusProgramOfferings)
+                ? campaign.campusProgramOfferings
+                : [];
+            if (offerings.length > 0) {
+                return {campaign, offering: offerings[0]};
+            }
+        }
+        return null;
+    }, [list]);
 
     return (
         <Box sx={{minWidth: 0}}>
@@ -2126,21 +2145,24 @@ function SchoolCampaignEnrollmentCard({campaignTemplates, campaignLoading, campa
                                                         </Box>
                                                     ) : null}
 
-                                                    <Stack direction="row" justifyContent="flex-end" sx={{mt: 2}}>
-                                                        <Button
-                                                            variant="contained"
-                                                            disableElevation
-                                                            onClick={() => handleSubmitApplication({campaign, offering})}
-                                                            startIcon={<AssignmentTurnedInIcon/>}
-                                                            sx={detailSubmitApplicationButtonSx}
-                                                        >
-                                                            Nộp hồ sơ
-                                                        </Button>
-                                                    </Stack>
                                                 </Box>
                                             );
                                         })}
                                     </Box>
+                                    {primarySubmitTarget ? (
+                                        <Stack direction="row" justifyContent="flex-end" sx={{mt: 2}}>
+                                            <Button
+                                                variant="contained"
+                                                disableElevation
+                                                disabled={admissionSubmissionLocked}
+                                                onClick={() => handleSubmitApplication(primarySubmitTarget)}
+                                                startIcon={<AssignmentTurnedInIcon/>}
+                                                sx={detailSubmitApplicationButtonSx}
+                                            >
+                                                {admissionSubmissionLocked ? "Đã nộp hồ sơ" : "Nộp hồ sơ"}
+                                            </Button>
+                                        </Stack>
+                                    ) : null}
                                     {attachCurriculumCampaignIdx === idx && curriculumDataList.length > 0 ? (
                                         <>
                                             {campusProgramOfferings.length > 0 ? (
@@ -2929,6 +2951,7 @@ export default function SchoolSearchDetailView({
     const [bookingSubmitting, setBookingSubmitting] = React.useState(false);
     const [admissionDialogOpen, setAdmissionDialogOpen] = React.useState(false);
     const [admissionDialogContext, setAdmissionDialogContext] = React.useState(null);
+    const [admissionSubmissionLocked, setAdmissionSubmissionLocked] = React.useState(false);
 
     const handleOpenAdmissionDialog = React.useCallback(
         (ctx) => {
@@ -2942,22 +2965,31 @@ export default function SchoolSearchDetailView({
                 showWarningSnackbar("Không xác định được gói tuyển sinh để nộp đơn.");
                 return;
             }
+            if (admissionSubmissionLocked) {
+                showWarningSnackbar("Bạn đã nộp hồ sơ thành công. Không thể tạo thêm đơn mới.");
+                return;
+            }
             setAdmissionDialogContext({
                 campaign: ctx?.campaign || null,
                 offering,
             });
             setAdmissionDialogOpen(true);
         },
-        [isParent]
+        [admissionSubmissionLocked, isParent]
     );
 
     const handleCloseAdmissionDialog = React.useCallback(() => {
         setAdmissionDialogOpen(false);
-    }, []);
-
-    const handleAdmissionDialogExited = React.useCallback(() => {
         setAdmissionDialogContext(null);
     }, []);
+
+    const handleAdmissionSubmitted = React.useCallback(() => {
+        setAdmissionSubmissionLocked(true);
+    }, []);
+
+    React.useEffect(() => {
+        setAdmissionSubmissionLocked(false);
+    }, [school?.id]);
 
     React.useEffect(() => {
         setCampusDetailTabIndex(0);
@@ -3840,7 +3872,7 @@ export default function SchoolSearchDetailView({
             <AdmissionReservationDialog
                 open={admissionDialogOpen}
                 onClose={handleCloseAdmissionDialog}
-                onSubmitted={handleAdmissionDialogExited}
+                onSubmitted={handleAdmissionSubmitted}
                 offering={admissionDialogContext?.offering}
                 campaign={admissionDialogContext?.campaign}
                 school={school}
@@ -4314,6 +4346,7 @@ export default function SchoolSearchDetailView({
                                         curriculumList={school?.curriculumList}
                                         curriculumSectionRef={detailCurriculumRef}
                                         onSubmitApplication={handleOpenAdmissionDialog}
+                                        admissionSubmissionLocked={admissionSubmissionLocked}
                                     />
                                 </Box>
                             </Box>
