@@ -216,6 +216,12 @@ const Chatbot = () => {
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const handler = (e) => { if (e.detail !== 'ai') setIsOpen(false); };
+        window.addEventListener('app-chat-opened', handler);
+        return () => window.removeEventListener('app-chat-opened', handler);
+    }, []);
+
     const handleSendMessage = async (messageOverride) => {
         const resolvedMessage = typeof messageOverride === 'string' ? messageOverride : inputMessage;
         if (resolvedMessage.trim() === '' || isSending || !sessionId) return;
@@ -299,7 +305,7 @@ const Chatbot = () => {
     return (
         <>
             <Box
-                onClick={() => setIsOpen(true)}
+                onClick={() => { setIsOpen(true); window.dispatchEvent(new CustomEvent('app-chat-opened', { detail: 'ai' })); }}
                 sx={{
                     position: 'fixed',
                     bottom: 24,
