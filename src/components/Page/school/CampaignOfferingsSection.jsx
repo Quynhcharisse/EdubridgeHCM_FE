@@ -76,6 +76,30 @@ const APPLICATION_STATUS_BADGES = {
 
 const BADGE_EMPTY = { badgeBg: "rgba(241, 245, 249, 0.95)", badgeColor: "#94a3b8" };
 
+const ENUM_LABEL_VI = {
+    UR_DRAFT: "Bản nháp",
+    CUR_DRAFT: "Bản nháp",
+    CUR_ACTIVE: "Đang áp dụng",
+    CUR_ARCHIVED: "Lưu trữ",
+    PRO_ACTIVE: "Đang áp dụng",
+    PRO_DRAFT: "Bản nháp",
+    PRO_INACTIVE: "Không áp dụng",
+    NATIONAL: "Quốc gia",
+    INTERNATIONAL: "Quốc tế",
+    YEAR: "Theo năm",
+    SEMESTER: "Theo học kỳ",
+    QUARTER: "Theo quý",
+    MONTH: "Theo tháng",
+    PROJECT_BASED: "Dạy học dựa trên dự án",
+    COOPERATIVE: "Dạy học hợp tác",
+    EXPERIENTIAL: "Dạy học qua trải nghiệm",
+    PROBLEM_BASED: "Dạy học giải quyết vấn đề",
+    PERSONALIZED: "Cá nhân hóa học tập",
+    BLENDED: "Dạy học tích hợp/Trực tuyến",
+    VISUAL_PRACTICE: "Dạy học trực quan và thực hành",
+    STEM_STEAM: "Tích hợp STEM/STEAM",
+};
+
 const DETAIL_BADGE_FIELD_KEYS = new Set([
     "applicationStatus",
     "status",
@@ -86,8 +110,8 @@ const DETAIL_BADGE_FIELD_KEYS = new Set([
 
 /** Trạng thái offering từ API list */
 const OFFERING_STATUS_LABELS = {
-    OFFERING_ACTIVE: "Còn hiệu lực quản trị",
-    OFFERING_INACTIVE: "Đã ngừng vòng đời",
+    OFFERING_ACTIVE: "Còn hiệu lực",
+    OFFERING_INACTIVE: "Đã ngừng",
 };
 
 function getOfferingStatusLabel(status) {
@@ -259,6 +283,8 @@ function formatCurrency(n) {
 function formatEnumLabel(v) {
     const s = String(v || "").trim();
     if (!s) return "—";
+    const code = s.toUpperCase();
+    if (ENUM_LABEL_VI[code]) return ENUM_LABEL_VI[code];
     return s.replaceAll("_", " ");
 }
 
@@ -275,7 +301,7 @@ const DETAIL_SECTIONS = [
         Icon: AssignmentTurnedInIcon,
         fields: [
             { key: "applicationStatus", label: "Trạng thái hồ sơ" },
-            { key: "status", label: "Trạng thái offering" },
+            { key: "status", label: "Trạng thái chỉ tiêu" },
             { key: "allowReservationSubmission", label: "Cho phép nộp hồ sơ đặt chỗ" },
             { key: "learningMode", label: "Hình thức học" },
             { key: "quota", label: "Chỉ tiêu" },
