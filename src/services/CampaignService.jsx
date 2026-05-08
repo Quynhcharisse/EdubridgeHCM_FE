@@ -197,6 +197,14 @@ export const getCampusOfferingQuotaSummary = async (campaignId) => {
     return response || null;
 };
 
+/** GET /campus/offering/quota-breakdown?campaignId= */
+export const getCampusOfferingQuotaBreakdown = async (campaignId) => {
+    const response = await axiosClient.get("/campus/offering/quota-breakdown", {
+        params: { campaignId: Number(campaignId) },
+    });
+    return response || null;
+};
+
 /**
  * PUT /campus/{offeringId}/offering/status
  * @param {number} offeringId
