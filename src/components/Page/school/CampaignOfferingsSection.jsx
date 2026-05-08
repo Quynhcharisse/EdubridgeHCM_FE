@@ -1463,7 +1463,7 @@ export default function CampaignOfferingsSection({
                                             { label: "Tổng quota", value: detailMethodQuotaBreakdown.totalMethodQuota },
                                             { label: "Đã dùng", value: detailMethodQuotaBreakdown.totalUsedQuota },
                                             { label: "Còn lại", value: detailMethodQuotaBreakdown.remainingQuota },
-                                            { label: "Đầy", value: detailMethodQuotaBreakdown.isFull ? "Có" : "Không" },
+                                            { label: "Đầy", value: detailMethodQuotaBreakdown.isFull },
                                         ].map((stat) => (
                                             <Box
                                                 key={stat.label}
@@ -1478,7 +1478,11 @@ export default function CampaignOfferingsSection({
                                                     {stat.label}
                                                 </Typography>
                                                 <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b" }}>
-                                                    {typeof stat.value === "boolean" ? (stat.value ? "Có" : "Không") : formatQuotaNumber(stat.value)}
+                                                    {typeof stat.value === "boolean"
+                                                        ? stat.value
+                                                            ? "Có"
+                                                            : "Không"
+                                                        : formatQuotaNumber(stat.value)}
                                                 </Typography>
                                             </Box>
                                         ))}
@@ -1490,9 +1494,8 @@ export default function CampaignOfferingsSection({
                                                 <TableHead>
                                                     <TableRow sx={{ bgcolor: "#f8fafc" }}>
                                                         <TableCell sx={{ fontWeight: 700 }}>Cơ sở</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Tổng</TableCell>
                                                         <TableCell sx={{ fontWeight: 700 }} align="right">Đã dùng</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Còn lại</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Còn lại có thể thêm</TableCell>
                                                         <TableCell sx={{ fontWeight: 700 }} align="center">Đầy</TableCell>
                                                     </TableRow>
                                                 </TableHead>
@@ -1502,16 +1505,13 @@ export default function CampaignOfferingsSection({
                                                             <TableCell sx={{ py: 1.25 }}>{getQuotaBreakdownCampusLabel(item)}</TableCell>
                                                             <TableCell sx={{ py: 1.25 }} align="right">
                                                                 {formatQuotaNumber(
-                                                                    item?.totalQuota ?? item?.quota ?? item?.totalMethodQuota
+                                                                    item?.usedQuota ?? item?.totalUsedQuota ?? item?.used
                                                                 )}
                                                             </TableCell>
                                                             <TableCell sx={{ py: 1.25 }} align="right">
                                                                 {formatQuotaNumber(
-                                                                    item?.totalUsedQuota ?? item?.usedQuota ?? item?.used
+                                                                    item?.maxAdditionalQuota ?? item?.remainingQuota
                                                                 )}
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.25 }} align="right">
-                                                                {formatQuotaNumber(item?.remainingQuota)}
                                                             </TableCell>
                                                             <TableCell sx={{ py: 1.25 }} align="center">
                                                                 {item?.isFull ? "Có" : "Không"}
