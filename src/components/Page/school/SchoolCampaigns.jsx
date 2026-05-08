@@ -55,6 +55,7 @@ import {
     cloneCampaignTemplate,
     cancelCampaignTemplate,
 } from "../../../services/CampaignService.jsx";
+import { getSystemConfigByKey } from "../../../services/SystemConfigService.jsx";
 import CreatePostRichTextEditor from "../../ui/CreatePostRichTextEditor.jsx";
 import { ConfirmHighlight } from "../../ui/ConfirmDialog.jsx";
 
@@ -385,6 +386,49 @@ function getCampaignSuccessMessage(backendMessage, fallback) {
     return trimmed || fallback;
 }
 
+function readSchoolIdentityFromStorage() {
+    try {
+        const raw = localStorage.getItem("user");
+        if (!raw) return { schoolId: null, schoolName: "" };
+        const user = JSON.parse(raw);
+        const schoolIdRaw =
+            user?.schoolId ??
+            user?.school?.id ??
+            user?.school?.schoolId ??
+            user?.schoolInfo?.id ??
+            user?.schoolInfo?.schoolId;
+        const schoolName = String(
+            user?.schoolName ??
+            user?.school?.name ??
+            user?.school?.schoolName ??
+            user?.schoolInfo?.name ??
+            user?.schoolInfo?.schoolName ??
+            ""
+        ).trim();
+        const schoolIdNum = Number(schoolIdRaw);
+        return {
+            schoolId: Number.isFinite(schoolIdNum) ? schoolIdNum : null,
+            schoolName,
+        };
+    } catch {
+        return { schoolId: null, schoolName: "" };
+    }
+}
+
+function extractSchoolQuotaValue(configBody, schoolId, schoolName) {
+    const quotas = configBody?.admissionQuota?.quotas;
+    if (!Array.isArray(quotas) || quotas.length === 0) return 0;
+    const byId = Number.isFinite(Number(schoolId))
+        ? quotas.find((q) => Number(q?.schoolId) === Number(schoolId))
+        : null;
+    const byName = !byId && schoolName
+        ? quotas.find((q) => String(q?.schoolName || "").trim().toLowerCase() === schoolName.toLowerCase())
+        : null;
+    const picked = byId || byName || quotas[0];
+    const quota = Number(picked?.value);
+    return Number.isFinite(quota) && quota > 0 ? quota : 0;
+}
+
 export default function SchoolCampaigns() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -424,6 +468,7 @@ export default function SchoolCampaigns() {
     const [cancelBlockedMessage, setCancelBlockedMessage] = useState("");
     const [cancelBlockedCampaigns, setCancelBlockedCampaigns] = useState({});
     const [totalConfiguredQuota, setTotalConfiguredQuota] = useState(0);
+    const [schoolAdmissionQuota, setSchoolAdmissionQuota] = useState(0);
 
     useEffect(() => {
         setExportYear(
@@ -463,6 +508,24 @@ export default function SchoolCampaigns() {
             cancelled = true;
         };
     }, [formValues.year]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const { schoolId, schoolName } = readSchoolIdentityFromStorage();
+        getSystemConfigByKey("admissionQuota")
+            .then((res) => {
+                if (cancelled) return;
+                const body = res?.data?.body ?? res?.data?.data ?? res?.data;
+                const value = extractSchoolQuotaValue(body, schoolId, schoolName);
+                setSchoolAdmissionQuota(value);
+            })
+            .catch(() => {
+                if (!cancelled) setSchoolAdmissionQuota(0);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -2080,7 +2143,8 @@ export default function SchoolCampaigns() {
                     {(() => {
                         const allocated = (Array.isArray(formValues.admissionMethodTimelines) ? formValues.admissionMethodTimelines : [])
                             .reduce((s, t) => s + (Number(t?.quota) || 0), 0);
-                        const max = totalConfiguredQuota;
+                        const schoolQuota = Number(schoolAdmissionQuota) || 0;
+                        const max = schoolQuota > 0 ? schoolQuota : totalConfiguredQuota;
                         const pct = max > 0 ? Math.min((allocated / max) * 100, 100) : 0;
                         const color = max === 0 ? "#0D64DE" : allocated === max ? "#16a34a" : allocated < max ? "#d97706" : "#dc2626";
                         const textColor = max === 0 ? "#64748b" : allocated === max ? "#16a34a" : allocated < max ? "#d97706" : "#dc2626";
@@ -2088,7 +2152,7 @@ export default function SchoolCampaigns() {
                             <Box sx={{ flex: 1, mr: 1 }}>
                                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                                     <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-                                        Chỉ tiêu đã phân bổ
+                                        Chỉ tiêu đã phân bổ / chỉ tiêu tổng của trường
                                     </Typography>
                                     <Typography variant="caption" sx={{ fontWeight: 700, color: textColor }}>
                                         {allocated.toLocaleString("vi-VN")}{max > 0 ? ` / ${max.toLocaleString("vi-VN")}` : ""}

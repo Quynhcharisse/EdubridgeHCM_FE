@@ -43,6 +43,7 @@ import {
     parseSchoolConfigResponseBody,
     SCHOOL_CONFIG_KEY,
 } from "../../../services/SchoolFacilityService.jsx";
+import { getSystemConfigByKey as getSystemConfigByKeyGlobal } from "../../../services/SystemConfigService.jsx";
 import CreatePostRichTextEditor from "../../ui/CreatePostRichTextEditor.jsx";
 
 const HEADER_ACCENT = "#0D64DE";
@@ -207,6 +208,46 @@ function getTimelineProgress(startDate, endDate) {
     return Math.min(100, Math.round((elapsed / total) * 100));
 }
 
+function readSchoolIdentityFromStorage() {
+    try {
+        const raw = localStorage.getItem("user");
+        if (!raw) return { schoolId: null, schoolName: "" };
+        const user = JSON.parse(raw);
+        const schoolIdRaw =
+            user?.schoolId ??
+            user?.school?.id ??
+            user?.school?.schoolId ??
+            user?.schoolInfo?.id ??
+            user?.schoolInfo?.schoolId;
+        const schoolName = String(
+            user?.schoolName ??
+            user?.school?.name ??
+            user?.school?.schoolName ??
+            user?.schoolInfo?.name ??
+            user?.schoolInfo?.schoolName ??
+            ""
+        ).trim();
+        const schoolIdNum = Number(schoolIdRaw);
+        return { schoolId: Number.isFinite(schoolIdNum) ? schoolIdNum : null, schoolName };
+    } catch {
+        return { schoolId: null, schoolName: "" };
+    }
+}
+
+function extractSchoolQuotaValue(configBody, schoolId, schoolName) {
+    const quotas = configBody?.admissionQuota?.quotas;
+    if (!Array.isArray(quotas) || quotas.length === 0) return 0;
+    const byId = Number.isFinite(Number(schoolId))
+        ? quotas.find((q) => Number(q?.schoolId) === Number(schoolId))
+        : null;
+    const byName = !byId && schoolName
+        ? quotas.find((q) => String(q?.schoolName || "").trim().toLowerCase() === schoolName.toLowerCase())
+        : null;
+    const picked = byId || byName || quotas[0];
+    const quota = Number(picked?.value);
+    return Number.isFinite(quota) && quota > 0 ? quota : 0;
+}
+
 const CAMPAIGN_ERROR_VI = {
     "No school campus account found": "Không tìm thấy tài khoản cơ sở trường học",
     "Request is required": "Yêu cầu không được để trống",
@@ -363,6 +404,7 @@ export default function SchoolCampaignDetail() {
     const [descriptionFieldKey, setDescriptionFieldKey] = useState(0);
     const [admissionMethodOptions, setAdmissionMethodOptions] = useState([]);
     const [configuredTotalQuota, setConfiguredTotalQuota] = useState(0);
+    const [schoolAdmissionQuota, setSchoolAdmissionQuota] = useState(0);
     const clonedFromYear = location.state?.clonedFrom;
     const openEditAfterClone = !!location.state?.openEdit;
 
@@ -635,6 +677,24 @@ export default function SchoolCampaignDetail() {
             .catch(() => {
                 if (cancelled) return;
                 setAdmissionMethodOptions([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const { schoolId, schoolName } = readSchoolIdentityFromStorage();
+        getSystemConfigByKeyGlobal("admissionQuota")
+            .then((res) => {
+                if (cancelled) return;
+                const body = res?.data?.body ?? res?.data?.data ?? res?.data;
+                const value = extractSchoolQuotaValue(body, schoolId, schoolName);
+                setSchoolAdmissionQuota(value);
+            })
+            .catch(() => {
+                if (!cancelled) setSchoolAdmissionQuota(0);
             });
         return () => {
             cancelled = true;
@@ -1495,7 +1555,9 @@ export default function SchoolCampaignDetail() {
                         {!formLocked && (() => {
                             const allocated = (Array.isArray(formValues.admissionMethodTimelines) ? formValues.admissionMethodTimelines : [])
                                 .reduce((s, t) => s + (Number(t?.quota) || 0), 0);
-                            const max = configuredTotalQuota;
+                            const max = (Number(schoolAdmissionQuota) || 0) > 0
+                                ? Number(schoolAdmissionQuota)
+                                : configuredTotalQuota;
                             const pct = max > 0 ? Math.min((allocated / max) * 100, 100) : 0;
                             const barColor = max === 0 ? HEADER_ACCENT : allocated === max ? "#16a34a" : allocated < max ? "#d97706" : "#dc2626";
                             const textColor = max === 0 ? HEADER_ACCENT : allocated === max ? "#16a34a" : allocated < max ? "#d97706" : "#dc2626";
@@ -1503,7 +1565,7 @@ export default function SchoolCampaignDetail() {
                                 <Box sx={{ mt: 2.5, p: 2, borderRadius: 2, bgcolor: "rgba(13, 100, 222, 0.06)", border: "1px solid #dbeafe" }}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: max > 0 ? 1 : 0.5 }}>
                                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1e293b" }}>
-                                            Tổng chỉ tiêu đã phân bổ
+                                            Chỉ tiêu đã phân bổ / Chỉ tiêu tổng của trường
                                         </Typography>
                                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: textColor }}>
                                             {allocated.toLocaleString("vi-VN")}{max > 0 ? ` / ${max.toLocaleString("vi-VN")}` : ""}
@@ -1516,7 +1578,7 @@ export default function SchoolCampaignDetail() {
                                     )}
                                     <Typography variant="caption" sx={{ color: textColor, display: "block" }}>
                                         {max === 0
-                                            ? "Tổng chỉ tiêu từ tất cả phương thức phải bằng tổng chỉ tiêu hệ thống"
+                                            ? "Tổng chỉ tiêu từ tất cả phương thức nên bằng chỉ tiêu tổng của trường"
                                             : allocated === max
                                             ? "✓ Đã phân bổ đủ chỉ tiêu"
                                             : allocated < max
@@ -1662,12 +1724,19 @@ export default function SchoolCampaignDetail() {
                         <Box sx={{ mt: 2.5, p: 1.5, borderRadius: 1.5, bgcolor: "rgba(13, 100, 222, 0.06)", border: "1px solid #dbeafe" }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                 <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e293b" }}>
-                                    Tổng chỉ tiêu tuyển sinh:
+                                    Chỉ tiêu đã phân bổ / chỉ tiêu tổng của trường:
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: HEADER_ACCENT }}>
-                                    {(Array.isArray(formValues.admissionMethodTimelines) ? formValues.admissionMethodTimelines : [])
-                                        .reduce((sum, t) => sum + (Number(t?.quota) || 0), 0)
-                                        .toLocaleString("vi-VN")}
+                                    {(() => {
+                                        const allocated = (Array.isArray(formValues.admissionMethodTimelines)
+                                            ? formValues.admissionMethodTimelines
+                                            : []
+                                        ).reduce((sum, t) => sum + (Number(t?.quota) || 0), 0);
+                                        const schoolMax = (Number(schoolAdmissionQuota) || 0) > 0
+                                            ? Number(schoolAdmissionQuota)
+                                            : configuredTotalQuota;
+                                        return `${allocated.toLocaleString("vi-VN")}${schoolMax > 0 ? ` / ${schoolMax.toLocaleString("vi-VN")}` : ""}`;
+                                    })()}
                                 </Typography>
                             </Stack>
                         </Box>
