@@ -109,6 +109,8 @@ const curriculumTypeI18N = {
 };
 
 const PROGRAM_VIEW_HEADER_ACCENT = "#0D64DE";
+const UI_ONLY_DEFAULT_LANGUAGE_ID = "ui-only-vietnamese";
+const UI_ONLY_DEFAULT_LANGUAGE_LABEL = "Tiếng Việt";
 
 /** Đồng bộ nhãn / icon phương pháp học với SchoolCurriculums (Chi tiết chương trình). */
 const methodLearningI18N = {
@@ -171,7 +173,15 @@ function normalizeLanguageId(value) {
     return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+function ensureUiDefaultLanguage(list) {
+    const nextList = Array.isArray(list) ? list : [];
+    return nextList.includes(UI_ONLY_DEFAULT_LANGUAGE_ID)
+        ? nextList
+        : [UI_ONLY_DEFAULT_LANGUAGE_ID, ...nextList];
+}
+
 function getLanguageInstructionDisplayLabel(value, options = []) {
+    if (value === UI_ONLY_DEFAULT_LANGUAGE_ID) return UI_ONLY_DEFAULT_LANGUAGE_LABEL;
     if (value && typeof value === "object") {
         const fromObject = safeString(value.name).trim();
         if (fromObject) return fromObject;
@@ -444,6 +454,7 @@ function ProgramRichTextDisplay({value, emptyLabel = "—", sx}) {
 const FEE_UNIT_VALUES = FEE_UNIT_OPTIONS.map((o) => String(o.value).toUpperCase());
 
 function isValidLanguageOfInstruction(lang, languageOptions = []) {
+    if (lang === UI_ONLY_DEFAULT_LANGUAGE_ID) return true;
     const id = normalizeLanguageId(lang);
     if (id != null) return languageOptions.some((item) => item.id === id);
     const s = safeString(lang).trim();
@@ -987,7 +998,7 @@ export default function SchoolPrograms() {
 
     const [formValues, setFormValues] = useState({
         name: "",
-        languageOfInstructionList: [],
+        languageOfInstructionList: [UI_ONLY_DEFAULT_LANGUAGE_ID],
         baseTuitionFee: "",
         feeUnit: "",
         graduationStandard: "",
@@ -1204,7 +1215,7 @@ export default function SchoolPrograms() {
         setImportExtraSubjectLoading(false);
         setFormValues({
             name: "",
-            languageOfInstructionList: [],
+            languageOfInstructionList: [UI_ONLY_DEFAULT_LANGUAGE_ID],
             baseTuitionFee: "",
             graduationStandard: "",
             targetStudentDescription: "",
@@ -1251,9 +1262,11 @@ export default function SchoolPrograms() {
         setImportExtraSubjectLoading(false);
         setFormValues({
             name: program.name ?? "",
-            languageOfInstructionList: Array.isArray(program.languageOfInstructionList)
-                ? program.languageOfInstructionList
-                : [],
+            languageOfInstructionList: ensureUiDefaultLanguage(
+                Array.isArray(program.languageOfInstructionList)
+                    ? program.languageOfInstructionList
+                    : []
+            ),
             baseTuitionFee: tuitionFeeToDigitString(program.baseTuitionFee),
             feeUnit: program.feeUnit ?? "",
             graduationStandard: program.graduationStandard ?? "",
@@ -1288,9 +1301,11 @@ export default function SchoolPrograms() {
         setImportExtraSubjectLoading(false);
         setFormValues({
             name: program.name ?? "",
-            languageOfInstructionList: Array.isArray(program.languageOfInstructionList)
-                ? program.languageOfInstructionList
-                : [],
+            languageOfInstructionList: ensureUiDefaultLanguage(
+                Array.isArray(program.languageOfInstructionList)
+                    ? program.languageOfInstructionList
+                    : []
+            ),
             baseTuitionFee: tuitionFeeToDigitString(program.baseTuitionFee),
             feeUnit: program.feeUnit ?? "",
             graduationStandard: program.graduationStandard ?? "",
@@ -1324,7 +1339,7 @@ export default function SchoolPrograms() {
         setImportExtraSubjectLoading(false);
         setFormValues({
             name: "",
-            languageOfInstructionList: [],
+            languageOfInstructionList: [UI_ONLY_DEFAULT_LANGUAGE_ID],
             baseTuitionFee: "",
             graduationStandard: "",
             targetStudentDescription: "",
@@ -1525,6 +1540,7 @@ export default function SchoolPrograms() {
             curriculumId,
             name: safeString(formValues.name).trim(),
             languageOfInstructionList: (formValues.languageOfInstructionList || [])
+                .filter((item) => item !== UI_ONLY_DEFAULT_LANGUAGE_ID)
                 .map((item) => normalizeLanguageId(item))
                 .filter((item) => item != null),
             graduationStandard: safeString(formValues.graduationStandard).trim(),
@@ -3344,11 +3360,26 @@ function SelectLike({value, options, onChange, label, error, helperText, disable
 
 function LanguageInstructionSelector({value, options, loading = false, onChange, error, disabled = false}) {
     const selectedValues = Array.isArray(value) ? value : [];
+    const languageOptions = React.useMemo(() => {
+        const base = Array.isArray(options) ? options : [];
+        const hasVietnamese = base.some((item) => {
+            const name = safeString(item?.name).trim().toLowerCase();
+            return name === "tiếng việt" || name === "vietnamese";
+        });
+        return hasVietnamese
+            ? base
+            : [{id: UI_ONLY_DEFAULT_LANGUAGE_ID, name: UI_ONLY_DEFAULT_LANGUAGE_LABEL}, ...base];
+    }, [options]);
 
     const toggleValue = (nextValue) => {
         if (disabled) return;
+        if (nextValue === UI_ONLY_DEFAULT_LANGUAGE_ID) return;
         const exists = selectedValues.includes(nextValue);
-        onChange(exists ? selectedValues.filter((v) => v !== nextValue) : [...selectedValues, nextValue]);
+        const nextSelections = exists ? selectedValues.filter((v) => v !== nextValue) : [...selectedValues, nextValue];
+        const ensuredSelections = nextSelections.includes(UI_ONLY_DEFAULT_LANGUAGE_ID)
+            ? nextSelections
+            : [UI_ONLY_DEFAULT_LANGUAGE_ID, ...nextSelections];
+        onChange(ensuredSelections);
     };
 
     return (
@@ -3366,7 +3397,7 @@ function LanguageInstructionSelector({value, options, loading = false, onChange,
                         <Chip
                             key={item}
                             label={getLanguageInstructionDisplayLabel(item, options)}
-                            onDelete={disabled ? undefined : () => toggleValue(item)}
+                            onDelete={disabled || item === UI_ONLY_DEFAULT_LANGUAGE_ID ? undefined : () => toggleValue(item)}
                             sx={{
                                 borderRadius: 2,
                                 bgcolor: disabled ? "rgba(148, 163, 184, 0.18)" : "rgba(13, 100, 222, 0.1)",
@@ -3389,8 +3420,9 @@ function LanguageInstructionSelector({value, options, loading = false, onChange,
                     gap: 1.75,
                 }}
             >
-                {(options || []).map((item) => {
+                {languageOptions.map((item) => {
                     const selected = selectedValues.includes(item.id);
+                    const isLockedDefault = item.id === UI_ONLY_DEFAULT_LANGUAGE_ID;
                     return (
                         <Tooltip key={item.id} title={item.name} arrow placement="top">
                             <Box
@@ -3414,7 +3446,7 @@ function LanguageInstructionSelector({value, options, loading = false, onChange,
                                     border: selected ? "1.5px solid #0D64DE" : "1px solid #e2e8f0",
                                     bgcolor: selected ? "rgba(13, 100, 222, 0.07)" : "rgba(255,255,255,0.8)",
                                     boxShadow: selected ? "0 8px 20px rgba(13, 100, 222, 0.16)" : "0 4px 12px rgba(15, 23, 42, 0.06)",
-                                    cursor: disabled ? "not-allowed" : "pointer",
+                                    cursor: disabled || isLockedDefault ? "not-allowed" : "pointer",
                                     transition: "all 180ms ease",
                                     "&:hover": {
                                         borderColor: disabled ? (selected ? "#0D64DE" : "#e2e8f0") : "#0D64DE",
@@ -3445,13 +3477,18 @@ function LanguageInstructionSelector({value, options, loading = false, onChange,
                                 <Typography sx={{mt: 0.1, fontWeight: 800, color: "#1e293b", fontSize: 13}}>
                                     {item.name}
                                 </Typography>
+                                {isLockedDefault ? (
+                                    <Typography variant="caption" sx={{display: "block", mt: 0.35, color: "#64748b", fontWeight: 700}}>
+                                        Mặc định
+                                    </Typography>
+                                ) : null}
                             </Box>
                         </Tooltip>
                     );
                 })}
             </Box>
 
-            {!loading && (options || []).length === 0 ? (
+            {!loading && languageOptions.length === 0 ? (
                 <Typography variant="caption" sx={{color: "#94a3b8", mt: 1, display: "block"}}>
                     Chưa có dữ liệu ngôn ngữ giảng dạy.
                 </Typography>

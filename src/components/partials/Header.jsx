@@ -2409,7 +2409,18 @@ function MainHeader() {
                 detail: {open: Boolean(chatWindowOpen)}
             })
         );
+        if (chatWindowOpen) {
+            window.dispatchEvent(new CustomEvent("app-chat-opened", {detail: "parent"}));
+        }
     }, [chatWindowOpen]);
+
+    React.useEffect(() => {
+        const handler = (e) => {
+            if (e.detail !== "parent") setChatWindowOpen(false);
+        };
+        window.addEventListener("app-chat-opened", handler);
+        return () => window.removeEventListener("app-chat-opened", handler);
+    }, []);
 
     const handleSelectStudentForConsult = async (student) => {
         if (!pendingChatTarget || studentSelectLoading) return;
@@ -3967,7 +3978,7 @@ function MainHeader() {
                                                     transition: 'background 0.2s, color 0.2s',
                                                 }}
                                             >
-                                                <EventAvailableIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Lịch tư vấn trực tiếp
+                                                <EventAvailableIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Lịch tư vấn viên
                                             </MenuItem>
                                         </>
                                     ) : (
@@ -4245,7 +4256,7 @@ function MainHeader() {
                                                 sx={{cursor: 'pointer'}}
                                             >
                                                 <ListItemText
-                                                    primary="Lịch tư vấn trực tiếp"
+                                                    primary="Lịch tư vấn viên"
                                                     sx={{color: BRAND_NAVY, fontWeight: 600}}
                                                 />
                                             </ListItem>

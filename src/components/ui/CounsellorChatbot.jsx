@@ -228,7 +228,7 @@ const CounsellorChatbot = () => {
                 onClick={() => setIsOpen(true)}
                 sx={{
                     position: 'fixed',
-                    bottom: 24,
+                    bottom: 90,
                     right: 24,
                     zIndex: 1000,
                     cursor: 'pointer',

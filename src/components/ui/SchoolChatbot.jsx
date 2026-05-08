@@ -159,6 +159,12 @@ const SchoolChatbot = () => {
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const handler = (e) => { if (e.detail !== 'school') setIsOpen(false); };
+        window.addEventListener('app-chat-opened', handler);
+        return () => window.removeEventListener('app-chat-opened', handler);
+    }, []);
+
     const handleSendMessage = async (messageOverride) => {
         const resolvedMessage = typeof messageOverride === 'string' ? messageOverride : inputMessage;
         if (resolvedMessage.trim() === '' || isSending) return;
@@ -225,7 +231,7 @@ const SchoolChatbot = () => {
     return (
         <>
             <Box
-                onClick={() => setIsOpen(true)}
+                onClick={() => { setIsOpen(true); window.dispatchEvent(new CustomEvent('app-chat-opened', { detail: 'school' })); }}
                 sx={{
                     position: 'fixed',
                     bottom: 24,

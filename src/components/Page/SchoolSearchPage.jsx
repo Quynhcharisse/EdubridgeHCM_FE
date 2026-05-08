@@ -229,6 +229,7 @@ export default function SchoolSearchPage() {
     const [selectedBoardingType, setSelectedBoardingType] = React.useState(null);
     const [selectedCurriculumType, setSelectedCurriculumType] = React.useState(null);
     const [tuitionRange, setTuitionRange] = React.useState([0, 0]);
+    const [isTuitionFilterActive, setIsTuitionFilterActive] = React.useState(false);
 
     const provinces = React.useMemo(
         () =>
@@ -375,6 +376,7 @@ export default function SchoolSearchPage() {
     }, [schools]);
     React.useEffect(() => {
         setTuitionRange([tuitionBounds.min, tuitionBounds.max]);
+        setIsTuitionFilterActive(false);
     }, [tuitionBounds.min, tuitionBounds.max]);
     const normalizedKeyword = searchKeyword.trim().toLowerCase();
     const filteredSchools = schools.filter((s) => {
@@ -406,7 +408,7 @@ export default function SchoolSearchPage() {
             normalizedFeeMin > 0 &&
             Number.isFinite(normalizedFeeMax) &&
             normalizedFeeMax > 0;
-        const matchTuition = tuitionBounds.max > 0
+        const matchTuition = isTuitionFilterActive && tuitionBounds.max > 0
             ? hasFee && normalizedFeeMin <= tuitionRange[1] && normalizedFeeMax >= tuitionRange[0]
             : true;
         return matchProvince && matchWard && matchKeyword && matchBoardingType && matchCurriculumType && matchTuition;
@@ -945,7 +947,31 @@ export default function SchoolSearchPage() {
                             </Box>
                             <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
                             <Box>
-                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Học phí (VND)</Typography>
+                                <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1}}>
+                                    <Typography sx={{fontWeight: 700, fontSize: 13, color: BRAND_NAVY, letterSpacing: '0.02em'}}>
+                                        Học phí (VND)
+                                    </Typography>
+                                    <Button
+                                        size="small"
+                                        variant="text"
+                                        onClick={() => {
+                                            setTuitionRange([tuitionBounds.min, tuitionBounds.max]);
+                                            setIsTuitionFilterActive(false);
+                                        }}
+                                        disabled={!isTuitionFilterActive}
+                                        sx={{
+                                            minWidth: 'auto',
+                                            textTransform: 'none',
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            px: 1,
+                                            py: 0.25,
+                                            color: BRAND_NAVY
+                                        }}
+                                    >
+                                        Đặt lại
+                                    </Button>
+                                </Box>
                                 {tuitionBounds.max > 0 ? (
                                     <Box sx={{px: 3}}>
                                         <Slider
@@ -953,11 +979,12 @@ export default function SchoolSearchPage() {
                                             onChange={(_, value) => {
                                                 if (Array.isArray(value) && value.length === 2) {
                                                     setTuitionRange([Number(value[0]), Number(value[1])]);
+                                                    setIsTuitionFilterActive(true);
                                                 }
                                             }}
                                             min={tuitionBounds.min}
                                             max={tuitionBounds.max}
-                                            step={10_000_000}
+                                            step={1_000_000}
                                             valueLabelDisplay="auto"
                                             valueLabelFormat={(value) => formatVndCompact(value)}
                                             sx={{
