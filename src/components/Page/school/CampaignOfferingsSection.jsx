@@ -1373,7 +1373,7 @@ export default function CampaignOfferingsSection({
                                 value={formValues.campusId}
                                 label="Cơ sở"
                                 onChange={handleChange}
-                                disabled={!!editingRow}
+                                disabled
                                 sx={{ borderRadius: 2 }}
                             >
                                 {campuses.map((c) => (
