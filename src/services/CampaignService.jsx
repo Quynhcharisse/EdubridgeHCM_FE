@@ -178,14 +178,13 @@ export const createCampaignOffering = async (body) => {
     return response || null;
 };
 
-/** PUT /campus/offering — cập nhật chỉ tiêu (học phí qua % điều chỉnh, kèm ngày mở/đóng) */
+/** PUT /campus/offering — cập nhật chỉ tiêu */
 export const updateCampaignOffering = async (body) => {
     const response = await axiosClient.put("/campus/offering", {
         id: Number(body.id),
+        quota: Number(body.quota),
         learningMode: body.learningMode ?? "DAY_SCHOOL",
         priceAdjustmentPercentage: Number(body.priceAdjustmentPercentage) || 0,
-        openDate: String(body.openDate ?? "").trim(),
-        closeDate: String(body.closeDate ?? "").trim(),
     });
     return response || null;
 };
@@ -193,6 +192,14 @@ export const updateCampaignOffering = async (body) => {
 /** GET /campus/offering/quota-summary?campaignId= */
 export const getCampusOfferingQuotaSummary = async (campaignId) => {
     const response = await axiosClient.get("/campus/offering/quota-summary", {
+        params: { campaignId: Number(campaignId) },
+    });
+    return response || null;
+};
+
+/** GET /campus/offering/quota-breakdown?campaignId= */
+export const getCampusOfferingQuotaBreakdown = async (campaignId) => {
+    const response = await axiosClient.get("/campus/offering/quota-breakdown", {
         params: { campaignId: Number(campaignId) },
     });
     return response || null;

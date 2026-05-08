@@ -13,6 +13,7 @@ import {
     Link,
     MenuItem,
     Pagination,
+    Slider,
     Stack,
     TextField,
     Typography,
@@ -52,7 +53,11 @@ import {
     getSchoolStorageKey,
     getUserIdentity
 } from "../../utils/savedSchoolsStorage";
-import {getPublicSchoolDetail, getPublicSchoolList, searchNearbyCampuses} from "../../services/SchoolPublicService.jsx";
+import {
+    getPublicSchoolCampaignTemplates,
+    getPublicSchoolDetail,
+    getPublicSchoolList
+} from "../../services/SchoolPublicService.jsx";
 import {
     deleteParentFavouriteSchool,
     getParentFavouriteSchools,
@@ -66,6 +71,7 @@ const LOCATION_FALLBACK_WARD = "Tất cả";
 const FAVOURITE_SYNC_PAGE_SIZE = 200;
 const SEARCH_SCHOOLS_LIST_PATH = "/search-schools";
 const SEARCH_SCHOOLS_DETAIL_PATH = "/search-schools/detail";
+const TUITION_FILTER_MAX = 100_000_000;
 
 function getSchoolUrlName(school) {
     return String(school?.school ?? school?.name ?? "").trim();
@@ -127,6 +133,73 @@ function mapPublicSchoolToRow(api) {
     };
 }
 
+function mergeCurriculumList(baseList, campaignList) {
+    const merged = [];
+    const seen = new Set();
+    const pushCurriculum = (curriculum) => {
+        if (!curriculum || typeof curriculum !== "object") return;
+        const idPart = curriculum?.id != null ? String(curriculum.id) : "";
+        const namePart = String(curriculum?.name || "").trim().toLowerCase();
+        const typePart = String(curriculum?.curriculumType || "").trim().toUpperCase();
+        const key = `${idPart}|${namePart}|${typePart}`;
+        if (!idPart && !namePart) return;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(curriculum);
+    };
+    (Array.isArray(baseList) ? baseList : []).forEach(pushCurriculum);
+    (Array.isArray(campaignList) ? campaignList : []).forEach(pushCurriculum);
+    return merged;
+}
+
+function pickCurriculumListFromCampaignTemplates(templates) {
+    const out = [];
+    const campaigns = Array.isArray(templates) ? templates : [];
+    for (const campaign of campaigns) {
+        const offerings = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
+        for (const offering of offerings) {
+            const curriculumFromOffering = offering?.curriculum;
+            if (curriculumFromOffering && typeof curriculumFromOffering === "object") {
+                out.push(curriculumFromOffering);
+            }
+            const curriculumFromProgram = offering?.program?.curriculum;
+            if (curriculumFromProgram && typeof curriculumFromProgram === "object") {
+                out.push(curriculumFromProgram);
+            }
+        }
+    }
+    return out;
+}
+
+function pickTuitionFeesFromCampaignTemplates(templates) {
+    const fees = [];
+    const campaigns = Array.isArray(templates) ? templates : [];
+    for (const campaign of campaigns) {
+        const offerings = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
+        for (const offering of offerings) {
+            const feeCandidates = [
+                offering?.tuitionFee,
+                offering?.baseTuitionFee,
+                offering?.program?.tuitionFee,
+                offering?.program?.baseTuitionFee
+            ];
+            for (const fee of feeCandidates) {
+                const feeNumber = Number(fee);
+                if (Number.isFinite(feeNumber) && feeNumber > 0) {
+                    fees.push(feeNumber);
+                    break;
+                }
+            }
+        }
+    }
+    return fees;
+}
+
+function formatVndCompact(value) {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "0 VND";
+    return `${Math.round(amount).toLocaleString("vi-VN")} VND`;
+}
 
 export default function SchoolSearchPage() {
     const navigate = useNavigate();
@@ -154,6 +227,8 @@ export default function SchoolSearchPage() {
     const [selectedDistrict, setSelectedDistrict] = React.useState("");
     const [selectedProvince, setSelectedProvince] = React.useState("");
     const [selectedBoardingType, setSelectedBoardingType] = React.useState(null);
+    const [selectedCurriculumType, setSelectedCurriculumType] = React.useState(null);
+    const [tuitionRange, setTuitionRange] = React.useState([0, 0]);
 
     const provinces = React.useMemo(
         () =>
@@ -203,12 +278,22 @@ export default function SchoolSearchPage() {
                     rows.map(async (row) => {
                         if (!row?.id) return row;
                         try {
-                            const detailBody = await getPublicSchoolDetail(row.id);
+                            const [detailBody, campaignTemplates] = await Promise.all([
+                                getPublicSchoolDetail(row.id),
+                                getPublicSchoolCampaignTemplates(row.id, 0).catch(() => [])
+                            ]);
                             const mappedDetail = mapPublicSchoolDetailToRow(detailBody);
                             if (!mappedDetail) return row;
+                            const campaignCurriculumList = pickCurriculumListFromCampaignTemplates(campaignTemplates);
+                            const tuitionFeeList = pickTuitionFeesFromCampaignTemplates(campaignTemplates);
+                            const tuitionFeeMin = tuitionFeeList.length > 0 ? Math.min(...tuitionFeeList) : null;
+                            const tuitionFeeMax = tuitionFeeList.length > 0 ? Math.max(...tuitionFeeList) : null;
                             return {
                                 ...row,
-                                ...mappedDetail
+                                ...mappedDetail,
+                                curriculumList: mergeCurriculumList(mappedDetail?.curriculumList, campaignCurriculumList),
+                                tuitionFeeMin,
+                                tuitionFeeMax
                             };
                         } catch {
                             return row;
@@ -281,6 +366,16 @@ export default function SchoolSearchPage() {
     }, [userIdentity]);
 
     const availableDistricts = selectedProvince ? (wardsByProvince[selectedProvince] ?? []) : allWards;
+    const tuitionBounds = React.useMemo(() => {
+        const fees = schools
+            .flatMap((s) => [Number(s?.tuitionFeeMin), Number(s?.tuitionFeeMax)])
+            .filter((value) => Number.isFinite(value) && value > 0);
+        if (fees.length === 0) return {min: 0, max: TUITION_FILTER_MAX};
+        return {min: 0, max: TUITION_FILTER_MAX};
+    }, [schools]);
+    React.useEffect(() => {
+        setTuitionRange([tuitionBounds.min, tuitionBounds.max]);
+    }, [tuitionBounds.min, tuitionBounds.max]);
     const normalizedKeyword = searchKeyword.trim().toLowerCase();
     const filteredSchools = schools.filter((s) => {
         const matchProvince = selectedProvince ? normalizeProvinceName(s.province) === selectedProvince : true;
@@ -296,7 +391,25 @@ export default function SchoolSearchPage() {
                         ? campusBoardingType === "BOTH"
                         : true
             : true;
-        return matchProvince && matchWard && matchKeyword && matchBoardingType;
+        const curriculumList = Array.isArray(s?.curriculumList) ? s.curriculumList : [];
+        const hasCurriculumType = curriculumList.some((curriculum) => {
+            const curriculumType = String(curriculum?.curriculumType || "").trim().toUpperCase();
+            return curriculumType === selectedCurriculumType;
+        });
+        const matchCurriculumType = selectedCurriculumType ? hasCurriculumType : true;
+        const schoolFeeMin = Number(s?.tuitionFeeMin);
+        const schoolFeeMax = Number(s?.tuitionFeeMax);
+        const normalizedFeeMin = Number.isFinite(schoolFeeMin) && schoolFeeMin > 0 ? schoolFeeMin : schoolFeeMax;
+        const normalizedFeeMax = Number.isFinite(schoolFeeMax) && schoolFeeMax > 0 ? schoolFeeMax : schoolFeeMin;
+        const hasFee =
+            Number.isFinite(normalizedFeeMin) &&
+            normalizedFeeMin > 0 &&
+            Number.isFinite(normalizedFeeMax) &&
+            normalizedFeeMax > 0;
+        const matchTuition = tuitionBounds.max > 0
+            ? hasFee && normalizedFeeMin <= tuitionRange[1] && normalizedFeeMax >= tuitionRange[0]
+            : true;
+        return matchProvince && matchWard && matchKeyword && matchBoardingType && matchCurriculumType && matchTuition;
     });
     const shownSchools = filteredSchools.slice(0, 20);
     const totalCount = filteredSchools.length;
@@ -714,7 +827,7 @@ export default function SchoolSearchPage() {
                             </Box>
                             <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
                             <Box>
-                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Khu vực (Phường/Xã)</Typography>
+                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Phường</Typography>
                                 <TextField
                                     select
                                     size="small"
@@ -776,7 +889,7 @@ export default function SchoolSearchPage() {
                                     }}
                                 >
                                     <MenuItem value="">
-                                        <Typography sx={{fontSize: 13, color: '#64748b'}}>Chọn khu vực</Typography>
+                                        <Typography sx={{fontSize: 13, color: '#64748b'}}>Chọn phường</Typography>
                                     </MenuItem>
                                     {availableDistricts.map((district) => (
                                         <MenuItem key={district} value={district}>
@@ -805,6 +918,62 @@ export default function SchoolSearchPage() {
                                         />
                                     ))}
                                 </Box>
+                            </Box>
+                            <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
+                            <Box>
+                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Loại khung chương trình</Typography>
+                                <Box sx={{display: 'flex', gap: 1, flexWrap: 'wrap'}}>
+                                    <Chip
+                                        label="Tất cả"
+                                        size="small"
+                                        onClick={() => setSelectedCurriculumType(null)}
+                                        sx={filterChipSx(!selectedCurriculumType)}
+                                    />
+                                    <Chip
+                                        label="Quốc gia"
+                                        size="small"
+                                        onClick={() => toggleSingleSelection("NATIONAL", setSelectedCurriculumType)}
+                                        sx={filterChipSx(selectedCurriculumType === "NATIONAL")}
+                                    />
+                                    <Chip
+                                        label="Quốc tế"
+                                        size="small"
+                                        onClick={() => toggleSingleSelection("INTERNATIONAL", setSelectedCurriculumType)}
+                                        sx={filterChipSx(selectedCurriculumType === "INTERNATIONAL")}
+                                    />
+                                </Box>
+                            </Box>
+                            <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
+                            <Box>
+                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Học phí (VND)</Typography>
+                                {tuitionBounds.max > 0 ? (
+                                    <Box sx={{px: 3}}>
+                                        <Slider
+                                            value={tuitionRange}
+                                            onChange={(_, value) => {
+                                                if (Array.isArray(value) && value.length === 2) {
+                                                    setTuitionRange([Number(value[0]), Number(value[1])]);
+                                                }
+                                            }}
+                                            min={tuitionBounds.min}
+                                            max={tuitionBounds.max}
+                                            step={10_000_000}
+                                            valueLabelDisplay="auto"
+                                            valueLabelFormat={(value) => formatVndCompact(value)}
+                                            sx={{
+                                                color: BRAND_NAVY,
+                                                px: 0.2,
+                                                '& .MuiSlider-thumb': {width: 16, height: 16},
+                                                '& .MuiSlider-rail': {opacity: 0.24}
+                                            }}
+                                        />
+                                        <Typography sx={{fontSize: 12, color: '#475569', mt: 0.3, textAlign: 'center', fontWeight: 600}}>
+                                            {formatVndCompact(tuitionRange[0])} - {formatVndCompact(tuitionRange[1])}
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <Typography sx={{fontSize: 12, color: '#64748b'}}>Chưa có dữ liệu học phí để lọc.</Typography>
+                                )}
                             </Box>
                         </Stack>
                     </Card>
@@ -1283,7 +1452,6 @@ export default function SchoolSearchPage() {
                     detailLoading={detailLoading}
                     detailError={detailError}
                     maptilerApiKey={maptilerApiKey}
-                    onSearchNearbyCampuses={searchNearbyCampuses}
                     onOpenSchoolById={(schoolId) => {
                         const target = schools.find((s) => Number(s?.id) === Number(schoolId));
                         if (target) {

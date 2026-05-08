@@ -33,11 +33,12 @@ import CallIcon from "@mui/icons-material/Call";
 import BadgeIcon from "@mui/icons-material/Badge";
 import LockIcon from "@mui/icons-material/Lock";
 import CloseIcon from "@mui/icons-material/Close";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import {useNavigate} from "react-router-dom";
 import {enqueueSnackbar} from "notistack";
 import {showSuccessSnackbar} from "../../ui/AppSnackbar.jsx";
@@ -55,7 +56,6 @@ import {
 export default function AdminSchoolVerification() {
     const navigate = useNavigate();
     const [registrations, setRegistrations] = useState([]);
-    const [sortBy, setSortBy] = useState("newest");
     const [loading, setLoading] = useState(false);
     const [verifyingId, setVerifyingId] = useState(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -149,7 +149,16 @@ export default function AdminSchoolVerification() {
                 const schoolEmail = verifiedEmail || fallbackSchoolEmail;
                 showSuccessSnackbar("Xác thực trường học thành công!");
 
-                setRegistrations((prev) => prev.filter((item) => getVerifyRequestId(item) !== requestId));
+                setRegistrations((prev) =>
+                    prev.map((item) =>
+                        getVerifyRequestId(item) === requestId
+                            ? {
+                                  ...item,
+                                  status: "VERIFIED",
+                              }
+                            : item
+                    )
+                );
 
                 if (schoolEmail) {
                     enqueueSnackbar(`Đã xác thực "${schoolName}". Hệ thống đang gửi email kích hoạt...`, {
@@ -173,8 +182,14 @@ export default function AdminSchoolVerification() {
                     );
                 }
 
-                void fetchRegistrations();
-                closeDetail();
+                setDetailItem((prev) =>
+                    prev && getVerifyRequestId(prev) === requestId
+                        ? {
+                              ...prev,
+                              status: "VERIFIED",
+                          }
+                        : prev
+                );
             }
         } catch (error) {
             console.error("Verify school registration failed", error);
@@ -249,49 +264,41 @@ export default function AdminSchoolVerification() {
         );
     };
 
-    const displayedRegistrations = [...registrations].sort((a, b) => {
-        if (sortBy === "name") {
-            return (a?.schoolName || "").localeCompare(b?.schoolName || "", "vi");
-        }
-        return new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0);
-    });
+    const displayedRegistrations = [...registrations].sort(
+        (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+    );
 
     const tableColCount = 8;
 
     const detailSectionSx = {
         border: "1px solid #bfdbfe",
         borderRadius: 3,
-        bgcolor: "#eff6ff",
+        bgcolor: "rgba(255,255,255,0.32)",
         p: {xs: 1.4, md: 1.8},
-        boxShadow: "0 10px 24px rgba(37,99,235,0.14)",
-    };
-
-    const fieldBoxSx = {
-        border: "1px solid #bfdbfe",
-        borderRadius: 2.25,
-        bgcolor: "#ffffff",
-        px: 1.3,
-        py: 1.1,
-        boxShadow: "0 5px 12px rgba(37,99,235,0.08)",
+        boxShadow: "none",
     };
 
     const renderDetailField = (label, value, fullWidth = false) => (
         <Box
             sx={{
-                ...fieldBoxSx,
-                gridColumn: fullWidth ? {xs: "auto", md: "1 / span 2"} : "auto",
+                borderBottom: "1px dashed #bfdbfe",
+                px: 0,
+                py: 0.8,
+                gridColumn: fullWidth ? "1 / -1" : "1 / -1",
             }}
         >
             <Typography sx={{fontSize: 12, color: "#2563eb", mb: 0.35, fontWeight: 700}}>{label}</Typography>
-            <Typography sx={{fontSize: 14, color: "#1e293b", fontWeight: 600, wordBreak: "break-all"}}>{value || "-"}</Typography>
+            <Typography sx={{fontSize: 14, color: "#1e293b", fontWeight: 600, wordBreak: "break-word"}}>{value || "-"}</Typography>
         </Box>
     );
 
     const renderDetailLinkField = (label, url, fullWidth = false) => (
         <Box
             sx={{
-                ...fieldBoxSx,
-                gridColumn: fullWidth ? {xs: "auto", md: "1 / span 2"} : "auto",
+                borderBottom: "1px dashed #bfdbfe",
+                px: 0,
+                py: 0.8,
+                gridColumn: fullWidth ? "1 / -1" : "1 / -1",
             }}
         >
             <Typography sx={{fontSize: 12, color: "#2563eb", mb: 0.35, fontWeight: 700}}>{label}</Typography>
@@ -303,14 +310,58 @@ export default function AdminSchoolVerification() {
                     underline="hover"
                     sx={{
                         fontSize: 14,
-                        fontWeight: 400,
+                        fontWeight: 500,
                         wordBreak: "break-all",
                         color: "#2563eb",
                         display: "inline-block",
-                        "&:hover": {color: "#2563eb"},
+                        "&:hover": {color: "#1d4ed8"},
                     }}
                 >
                     {url}
+                </Link>
+            ) : (
+                <Typography sx={{fontSize: 14, color: "#64748b", fontWeight: 400}}>-</Typography>
+            )}
+        </Box>
+    );
+
+    const renderDocumentField = (label, url, fullWidth = false) => (
+        <Box
+            sx={{
+                borderBottom: "1px dashed #bfdbfe",
+                px: 0,
+                py: 0.8,
+                gridColumn: fullWidth ? "1 / -1" : "1 / -1",
+            }}
+        >
+            <Typography sx={{fontSize: 12, color: "#2563eb", mb: 0.35, fontWeight: 700}}>{label}</Typography>
+            {url ? (
+                <Link
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    underline="none"
+                    sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.65,
+                        borderRadius: 999,
+                        px: 1.15,
+                        py: 0.45,
+                        border: "1px solid rgba(59,130,246,0.35)",
+                        bgcolor: "rgba(59,130,246,0.10)",
+                        color: "#1d4ed8",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        "&:hover": {
+                            bgcolor: "rgba(59,130,246,0.16)",
+                            borderColor: "rgba(37,99,235,0.48)",
+                            color: "#1e40af",
+                        },
+                    }}
+                >
+                    <DescriptionOutlinedIcon sx={{fontSize: 16}}/>
+                    Xem tài liệu
                 </Link>
             ) : (
                 <Typography sx={{fontSize: 14, color: "#64748b", fontWeight: 400}}>-</Typography>
@@ -387,34 +438,6 @@ export default function AdminSchoolVerification() {
                         <Typography variant="h6" sx={{fontWeight: 800, color: "#1e293b", fontSize: {xs: 17, sm: 18}}}>
                             Danh sách hồ sơ chờ duyệt
                         </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            <Chip
-                                label="Mới nhất"
-                                clickable
-                                onClick={() => setSortBy("newest")}
-                                sx={{
-                                    height: 34,
-                                    borderRadius: 999,
-                                    border: "1px solid #cbd5e1",
-                                    bgcolor: sortBy === "newest" ? "#ede9fe" : "#ffffff",
-                                    color: sortBy === "newest" ? "#1e293b" : "#64748b",
-                                    fontWeight: 700,
-                                }}
-                            />
-                            <Chip
-                                label="Theo tên"
-                                clickable
-                                onClick={() => setSortBy("name")}
-                                sx={{
-                                    height: 34,
-                                    borderRadius: 999,
-                                    border: "1px solid #cbd5e1",
-                                    bgcolor: sortBy === "name" ? "#ede9fe" : "#ffffff",
-                                    color: sortBy === "name" ? "#1e293b" : "#64748b",
-                                    fontWeight: 700,
-                                }}
-                            />
-                        </Stack>
                     </Box>
 
                     <TableContainer component={Paper} elevation={0} sx={adminTableContainerSx}>
@@ -441,7 +464,7 @@ export default function AdminSchoolVerification() {
                                         Trạng thái
                                     </TableCell>
                                     <TableCell align="center" sx={{...adminTableHeadCellSx, width: 88, px: 0.5}}>
-                                        Xác thực
+                                        Chi tiết
                                     </TableCell>
                                 </TableRow>
                             </TableHead>
@@ -499,20 +522,22 @@ export default function AdminSchoolVerification() {
                                             </TableCell>
                                             <TableCell align="center">{renderStatusChip(item.status)}</TableCell>
                                             <TableCell align="center" sx={{px: 0.5}}>
-                                                <Tooltip title={item.status === "VERIFIED" ? "Đã xác thực" : "Mở hồ sơ để xác thực"}>
+                                                <Tooltip title="Xem chi tiết hồ sơ">
                                                     <span>
                                                         <IconButton
                                                             size="small"
-                                                            disabled={!!verifyingId || item.status === "VERIFIED"}
+                                                            disabled={!!verifyingId}
                                                             onClick={() => openDetail(item)}
-                                                            aria-label="Mở hồ sơ để xác thực"
+                                                            aria-label="Xem chi tiết hồ sơ"
                                                             sx={{
-                                                                background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                                                                color: "#ffffff",
-                                                                boxShadow: "0 4px 14px rgba(22, 163, 74, 0.45)",
+                                                                background: "rgba(37,99,235,0.10)",
+                                                                color: "#3b82f6",
+                                                                border: "1px solid rgba(59,130,246,0.28)",
+                                                                boxShadow: "none",
                                                                 "&:hover": {
-                                                                    background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
-                                                                    boxShadow: "0 6px 18px rgba(22, 163, 74, 0.5)",
+                                                                    background: "rgba(37,99,235,0.16)",
+                                                                    color: "#2563eb",
+                                                                    borderColor: "rgba(37,99,235,0.38)",
                                                                 },
                                                                 "&.Mui-disabled": {
                                                                     background: "#e2e8f0",
@@ -521,7 +546,7 @@ export default function AdminSchoolVerification() {
                                                                 },
                                                             }}
                                                         >
-                                                            <TaskAltIcon fontSize="small"/>
+                                                            <VisibilityRoundedIcon fontSize="small"/>
                                                         </IconButton>
                                                     </span>
                                                 </Tooltip>
@@ -564,7 +589,7 @@ export default function AdminSchoolVerification() {
                     }}
                 >
                     <Typography component="h2" sx={{fontWeight: 800, fontSize: "1.25rem", lineHeight: 1.3, m: 0}}>
-                        Chi tiết hồ sơ đăng ký
+                        Chi tiết nhà trường
                     </Typography>
                     <IconButton
                         onClick={closeDetail}
@@ -581,9 +606,8 @@ export default function AdminSchoolVerification() {
                 <DialogContent
                     dividers
                     sx={{
-                        bgcolor: "#eff6ff",
-                        backgroundImage:
-                            "radial-gradient(circle at top right, rgba(59,130,246,0.24), transparent 45%), radial-gradient(circle at bottom left, rgba(37,99,235,0.2), transparent 42%)",
+                        bgcolor: "#e2e8f0",
+                        backgroundImage: "none",
                     }}
                 >
                     {detailItem && (
@@ -597,12 +621,9 @@ export default function AdminSchoolVerification() {
                                 </Stack>
                                 <Box
                                     sx={{
-                                        border: "1px solid #bfdbfe",
-                                        borderRadius: 2.25,
-                                        bgcolor: "#ffffff",
-                                        px: 1.4,
-                                        py: 1.25,
-                                        boxShadow: "0 5px 12px rgba(37,99,235,0.08)",
+                                        borderBottom: "1px dashed #93c5fd",
+                                        px: 0,
+                                        py: 0.8,
                                         display: "flex",
                                         alignItems: "flex-start",
                                         gap: 1.5,
@@ -633,7 +654,7 @@ export default function AdminSchoolVerification() {
                                         Cơ sở đăng ký
                                     </Typography>
                                 </Stack>
-                                <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
+                                <Box sx={{display: "grid", gridTemplateColumns: "1fr", gap: 1}}>
                                     {renderDetailField("Tên cơ sở", detailItem.campusName)}
                                     {renderDetailField("Số điện thoại", detailItem.campusPhone)}
                                     {renderDetailField("Địa chỉ", detailItem.campusAddress, true)}
@@ -647,7 +668,7 @@ export default function AdminSchoolVerification() {
                                         Thông tin hồ sơ
                                     </Typography>
                                 </Stack>
-                                <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
+                                <Box sx={{display: "grid", gridTemplateColumns: "1fr", gap: 1}}>
                                     {renderDetailField("Mã số thuế", detailItem.taxCode)}
                                     {renderDetailField("Ngày thành lập", formatDate(detailItem.foundingDate))}
                                     {renderDetailField("Ngày nộp hồ sơ", formatDate(detailItem.createdAt))}
@@ -661,10 +682,10 @@ export default function AdminSchoolVerification() {
                                         Liên hệ & liên kết
                                     </Typography>
                                 </Stack>
-                                <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
+                                <Box sx={{display: "grid", gridTemplateColumns: "1fr", gap: 1}}>
                                     {renderDetailField("Hotline", detailItem.hotline)}
                                     {renderDetailLinkField("Website", detailItem.websiteUrl)}
-                                    {renderDetailLinkField("Giấy phép / thông tin pháp lý", detailItem.businessLicenseUrl, true)}
+                                    {renderDocumentField("Giấy phép / thông tin pháp lý", detailItem.businessLicenseUrl, true)}
                                 </Box>
                             </Box>
 
@@ -675,7 +696,7 @@ export default function AdminSchoolVerification() {
                                         Đại diện
                                     </Typography>
                                 </Stack>
-                                <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
+                                <Box sx={{display: "grid", gridTemplateColumns: "1fr", gap: 1}}>
                                     {renderDetailField("Người đại diện", detailItem.representativeName)}
                                 </Box>
                             </Box>
@@ -687,15 +708,12 @@ export default function AdminSchoolVerification() {
                                         Trạng thái
                                     </Typography>
                                 </Stack>
-                                <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", md: "1fr 1fr"}, gap: 1}}>
+                                <Box sx={{display: "grid", gridTemplateColumns: "1fr", gap: 1}}>
                                     <Box
                                         sx={{
-                                            border: "1px solid #bfdbfe",
-                                            borderRadius: 2.25,
-                                            bgcolor: "#ffffff",
-                                            px: 1.3,
-                                            py: 1.1,
-                                            boxShadow: "0 5px 12px rgba(37,99,235,0.08)",
+                                            borderBottom: "1px dashed #bfdbfe",
+                                            px: 0,
+                                            py: 0.8,
                                         }}
                                     >
                                         <Typography sx={{fontSize: 12, color: "#2563eb", mb: 0.5, fontWeight: 700}}>
@@ -708,7 +726,7 @@ export default function AdminSchoolVerification() {
                         </Stack>
                     )}
                 </DialogContent>
-                {detailItem && (
+                {detailItem && detailItem.status !== "VERIFIED" && (
                     <DialogActions
                         sx={{
                             px: 2.5,
@@ -718,11 +736,11 @@ export default function AdminSchoolVerification() {
                             justifyContent: "flex-end",
                         }}
                     >
-                        <Tooltip title={detailItem.status === "VERIFIED" ? "Đã xác thực" : "Xác thực trường học"}>
+                        <Tooltip title="Xác thực trường học">
                             <span>
                                 <Button
                                     variant="contained"
-                                    disabled={!!verifyingId || detailItem.status === "VERIFIED"}
+                                    disabled={!!verifyingId}
                                     onClick={() => openConfirm(detailItem)}
                                     aria-label="Xác thực trường học"
                                     sx={{

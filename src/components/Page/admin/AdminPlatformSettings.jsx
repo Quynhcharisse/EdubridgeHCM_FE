@@ -123,6 +123,7 @@ function getBusinessConfig(cfg) {
 const TRIAL_RATIO_CAP_INFO_TOOLTIP = "Tỉ lệ này xác định quy mô của gói Dùng thử so với gói Tiêu chuẩn. Giúp tự động cân đối hạn mức vận hành (tư vấn viên, bài đăng) để bảo vệ quyền lợi của các gói trả phí.";
 
 const TRIAL_RATIO_CAP_INPUT_HINT = "15%: ít tính năng • 30%: vừa đủ • 40%: nhiều tính năng";
+const TRIAL_PACKAGE_DEFAULT_TOOLTIP = "Gói dùng thử luôn miễn phí theo chính sách nền tảng";
 
 function trialRatioCapDecimalToFormPctString(cap) {
     if (cap == null || cap === "") return "";
@@ -345,7 +346,7 @@ export default function AdminPlatformSettings() {
             maxPay: maxPay === "" ? "" : String(maxPay),
             taxRatePct: String(Math.round(taxRatePct * 100) / 100),
             serviceRatePct: String(Math.round(serviceRatePct * 100) / 100),
-            baseTrialPrice: basePrices.trial == null ? "" : String(basePrices.trial),
+            baseTrialPrice: "0",
             baseStandardPrice: basePrices.standard == null ? "" : String(basePrices.standard),
             baseEnterprisePrice: basePrices.enterprise == null ? "" : String(basePrices.enterprise),
             aiChatbotMonthlyFee: featureUnitPrices.aiChatbotMonthlyFee == null ? "" : String(featureUnitPrices.aiChatbotMonthlyFee),
@@ -366,7 +367,7 @@ export default function AdminPlatformSettings() {
         maxPay: "",
         taxRatePct: "0",
         serviceRatePct: "0",
-        baseTrialPrice: "",
+        baseTrialPrice: "0",
         baseStandardPrice: "",
         baseEnterprisePrice: "",
         aiChatbotMonthlyFee: "",
@@ -1375,7 +1376,7 @@ export default function AdminPlatformSettings() {
                     serviceRate,
                     subscriptionPricing: {
                         basePrices: {
-                            trial: Math.trunc(parseFinite(businessForm.baseTrialPrice) ?? 0),
+                            trial: 0,
                             standard: Math.trunc(parseFinite(businessForm.baseStandardPrice) ?? 0),
                             enterprise: Math.trunc(parseFinite(businessForm.baseEnterprisePrice) ?? 0),
                         },
@@ -1462,6 +1463,15 @@ export default function AdminPlatformSettings() {
     const handleSelectAdmissionTemplateFile = () => {
         if (saving || importingAdmissionTemplate || confirmingAdmissionImport) return;
         admissionImportInputRef.current?.click();
+    };
+
+    const exportAdmissionTemplateFile = (fileName) => {
+        const anchor = document.createElement("a");
+        anchor.href = encodeURI(`/templates/${fileName}`);
+        anchor.setAttribute("download", fileName);
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
     };
 
     const getAdmissionImportRowTemplate = (type) => {
@@ -1930,29 +1940,49 @@ export default function AdminPlatformSettings() {
                                 Phương thức tuyển sinh
                             </Typography>
                             {admissionTemplateEditing ? (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                    disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
-                                    onClick={() => {
-                                        setImportType("ALLOWED_METHODS");
-                                        setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                    }}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tải lên
-                                </Button>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                        disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
+                                        onClick={() => {
+                                            setImportType("ALLOWED_METHODS");
+                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                        }}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tải lên
+                                    </Button>
+                                </Stack>
                             ) : (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={saving}
-                                    onClick={() => setAdmissionTemplateEditing(true)}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                >
-                                    Chỉnh sửa
-                                </Button>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={saving}
+                                        onClick={() => setAdmissionTemplateEditing(true)}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
+                                    >
+                                        Chỉnh sửa
+                                    </Button>
+                                </Stack>
                             )}
                         </Box>
                         <Box
@@ -2171,6 +2201,14 @@ export default function AdminPlatformSettings() {
                                                 </Button>
                                             </span>
                                         </Tooltip>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("hồ_sơ_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Mẫu hồ sơ
+                                        </Button>
                                         <Tooltip title={methods.length === 0 ? "Phải upload danh sách phương thức tuyển sinh đầu tiên" : ""} arrow>
                                             <span>
                                                 <Button
@@ -2188,6 +2226,14 @@ export default function AdminPlatformSettings() {
                                                 </Button>
                                             </span>
                                         </Tooltip>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("quy_trình_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Mẫu quy trình
+                                        </Button>
                                     </Stack>
                                 ) : (
                                     <Button
@@ -2803,7 +2849,35 @@ export default function AdminPlatformSettings() {
                                 </Typography>
                                 {businessPricingSubTab === 0 ? (
                                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.5 }}>
-                                        {moneyField("Gói dùng thử", "baseTrialPrice")}
+                                        <Box sx={{ ...settingsFieldCardSx }}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75, flexWrap: "wrap" }}>
+                                                <Typography sx={settingsFieldLabelSx}>Gói dùng thử</Typography>
+                                                <Chip
+                                                    size="small"
+                                                    label="Mặc định"
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        bgcolor: "#dcfce7",
+                                                        color: "#166534",
+                                                    }}
+                                                />
+                                                <Tooltip title={TRIAL_PACKAGE_DEFAULT_TOOLTIP}>
+                                                    <InfoOutlinedIcon sx={{ fontSize: 16, color: "#2563eb" }} />
+                                                </Tooltip>
+                                            </Box>
+                                            <TextField
+                                                size="small"
+                                                type="text"
+                                                fullWidth
+                                                disabled
+                                                value={formatMoneyVN("0")}
+                                                inputProps={{ inputMode: "numeric" }}
+                                                InputProps={{ endAdornment: <InputAdornment position="end">VNĐ</InputAdornment> }}
+                                                sx={settingsInputSx}
+                                            />
+                                        </Box>
                                         {moneyField("Gói tiêu chuẩn", "baseStandardPrice")}
                                         {moneyField("Gói doanh nghiệp", "baseEnterprisePrice")}
                                     </Box>

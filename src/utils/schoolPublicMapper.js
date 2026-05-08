@@ -40,11 +40,79 @@ export const DEFAULT_SCHOOL_IMAGE =
     "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=900&q=80";
 
 const PRIMARY_CAMPUS_KEYWORDS = ["co so chinh", "chinh", "main", "headquarter", "head quarter", "tru so chinh"];
+const WARD_PREFIXES = ["phuong", "phường", "ward", "p."];
+const WARD_STOP_TOKENS = new Set([
+    "quan",
+    "q",
+    "huyen",
+    "h",
+    "thanh pho",
+    "tp",
+    "tinh",
+    "duong",
+    "street"
+]);
 
 function isPrimaryCampusName(value) {
     const token = normalizeLocationToken(value);
     if (!token) return false;
     return PRIMARY_CAMPUS_KEYWORDS.some((keyword) => token.includes(keyword));
+}
+
+function toAddressSegments(value) {
+    return String(value || "")
+        .split(",")
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+}
+
+function stripWardPrefix(value) {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return "";
+    return trimmed
+        .replace(/^(phường|phuong|ward)\s+/i, "")
+        .replace(/^p\.?\s+/i, "")
+        .trim();
+}
+
+function looksLikeWardSegment(value) {
+    const normalized = normalizeLocationToken(value);
+    if (!normalized) return false;
+    return (
+        WARD_PREFIXES.some((prefix) => normalized.startsWith(`${prefix} `) || normalized === prefix) ||
+        /^\s*p\.?\s+/i.test(String(value || ""))
+    );
+}
+
+function sanitizeWardName(value) {
+    const cleaned = stripWardPrefix(value).replace(/[.;]+$/g, "").trim();
+    if (!cleaned) return "";
+    const normalized = normalizeLocationToken(cleaned);
+    if (!normalized || WARD_STOP_TOKENS.has(normalized)) return "";
+    return cleaned;
+}
+
+export function extractWardFromAddress(address) {
+    const segments = toAddressSegments(address);
+    for (const segment of segments) {
+        if (!looksLikeWardSegment(segment)) continue;
+        const wardName = sanitizeWardName(segment);
+        if (wardName) return wardName;
+    }
+    const normalizedAddress = normalizeLocationToken(address);
+    if (!normalizedAddress) return "";
+    const match = normalizedAddress.match(/\b(?:phuong|ward)\s+([a-z0-9]+)/i);
+    if (!match) return "";
+    return sanitizeWardName(match[0]);
+}
+
+function resolveWardFromCampusList(campusList) {
+    if (!Array.isArray(campusList)) return "";
+    for (const campus of campusList) {
+        const wardFromAddress = extractWardFromAddress(campus?.address);
+        if (wardFromAddress) return wardFromAddress;
+    }
+    return "";
 }
 
 export function sortCampusListPrimaryFirst(campusList) {
@@ -78,7 +146,7 @@ export function mapPublicSchoolDetailToRow(api) {
     const primaryConsultantEmail = consultantEmails[0] || "";
     const normalizedProvince = normalizeProvinceName(firstCampus?.city || "");
     const province = normalizedProvince || LOCATION_FALLBACK_PROVINCE;
-    const ward = (firstCampus?.district || "").trim() || LOCATION_FALLBACK_WARD;
+    const ward = resolveWardFromCampusList(campusList) || LOCATION_FALLBACK_WARD;
     return {
         id: api.id,
         school: api.name ?? "",

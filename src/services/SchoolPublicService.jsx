@@ -20,20 +20,7 @@ export async function getPublicSchoolCampaignTemplates(schoolId, year = 0) {
         params: {year: Number(year) || 0}
     });
     const body = response?.data?.body;
-    const normalizeMethodTimeline = (item) => {
-        if (!item || typeof item !== "object") return null;
-        return {
-            ...item,
-            methodCode: item?.methodCode ?? item?.code ?? "",
-            displayName: item?.displayName ?? item?.name ?? item?.methodCode ?? "",
-            description: item?.description ?? "",
-            admissionProcessSteps: Array.isArray(item?.admissionProcessSteps) ? item.admissionProcessSteps : [],
-            methodDocumentRequirements: Array.isArray(item?.methodDocumentRequirements)
-                ? item.methodDocumentRequirements
-                : []
-        };
-    };
-
+    const payload = body?.body && typeof body.body === "object" ? body.body : body;
     const normalizeAllowedMethod = (item) => {
         if (!item || typeof item !== "object") return null;
         const code = String(item?.code ?? item?.methodCode ?? "").trim();
@@ -45,36 +32,112 @@ export async function getPublicSchoolCampaignTemplates(schoolId, year = 0) {
         };
     };
 
+    const normalizeMandatoryDocument = (item) => {
+        if (!item || typeof item !== "object") return null;
+        const code = String(item?.code ?? "").trim();
+        const name = String(item?.name ?? code).trim();
+        if (!code && !name) return null;
+        return {
+            code,
+            name: name || code,
+            required: Boolean(item?.required)
+        };
+    };
+
+    const normalizeMethodTimeline = (item, allowedMethodMap = {}) => {
+        if (!item || typeof item !== "object") return null;
+        const methodCode = String(item?.methodCode ?? item?.code ?? "").trim();
+        const fromAllowed = methodCode ? allowedMethodMap[methodCode] : null;
+        return {
+            ...item,
+            methodCode,
+            displayName: item?.displayName ?? item?.name ?? fromAllowed?.displayName ?? methodCode,
+            description: item?.description ?? fromAllowed?.description ?? "",
+            admissionProcessSteps: Array.isArray(item?.admissionProcessSteps) ? item.admissionProcessSteps : [],
+            methodDocumentRequirements: Array.isArray(item?.methodDocumentRequirements)
+                ? item.methodDocumentRequirements.map(normalizeMandatoryDocument).filter(Boolean)
+                : []
+        };
+    };
+
+    const normalizeProgramOffering = (item) => {
+        if (!item || typeof item !== "object") return null;
+        const program = item?.program && typeof item.program === "object" ? item.program : {};
+        const curriculum =
+            item?.curriculum && typeof item.curriculum === "object"
+                ? item.curriculum
+                : program?.curriculum && typeof program.curriculum === "object"
+                    ? program.curriculum
+                    : {};
+        const tuitionFee =
+            item?.tuitionFee ??
+            item?.netTuitionFee ??
+            program?.tuitionFee ??
+            program?.baseTuitionFee ??
+            null;
+        const baseTuitionFee =
+            item?.baseTuitionFee ??
+            program?.baseTuitionFee ??
+            program?.tuitionFee ??
+            tuitionFee;
+        return {
+            ...item,
+            campusName: String(item?.campusName ?? "").trim(),
+            admissionMethod: String(item?.admissionMethod ?? "").trim(),
+            applicationStatus: String(item?.applicationStatus ?? "").trim(),
+            status: String(item?.status ?? "").trim(),
+            tuitionFee,
+            baseTuitionFee,
+            programName: String(item?.programName ?? program?.name ?? "").trim(),
+            program,
+            curriculum
+        };
+    };
+
     const normalizeCampaign = (campaign, mandatoryAll, allowedMethods) => {
         if (!campaign || typeof campaign !== "object") return null;
+        const allowedMethodMap = Object.fromEntries(
+            (Array.isArray(allowedMethods) ? allowedMethods : [])
+                .map((method) => [String(method?.code || "").trim(), method])
+                .filter(([code]) => Boolean(code))
+        );
         const mappedTimelines = Array.isArray(campaign?.admissionMethodTimelines)
-            ? campaign.admissionMethodTimelines.map(normalizeMethodTimeline).filter(Boolean)
+            ? campaign.admissionMethodTimelines
+                .map((timeline) => normalizeMethodTimeline(timeline, allowedMethodMap))
+                .filter(Boolean)
+            : [];
+        const campusProgramOfferings = Array.isArray(campaign?.campusProgramOfferings)
+            ? campaign.campusProgramOfferings.map(normalizeProgramOffering).filter(Boolean)
             : [];
         return {
             ...campaign,
             admissionMethodDetails: mappedTimelines,
+            campusProgramOfferings,
             mandatoryAll: Array.isArray(campaign?.mandatoryAll)
-                ? campaign.mandatoryAll
+                ? campaign.mandatoryAll.map(normalizeMandatoryDocument).filter(Boolean)
                 : Array.isArray(mandatoryAll)
-                    ? mandatoryAll
+                    ? mandatoryAll.map(normalizeMandatoryDocument).filter(Boolean)
                     : [],
             schoolAllowedMethods: Array.isArray(allowedMethods) ? allowedMethods : []
         };
     };
 
-    if (Array.isArray(body)) {
-        return body.map((campaign) => normalizeCampaign(campaign, campaign?.mandatoryAll, [])).filter(Boolean);
+    if (Array.isArray(payload)) {
+        return payload.map((campaign) => normalizeCampaign(campaign, campaign?.mandatoryAll, [])).filter(Boolean);
     }
-    if (body && typeof body === "object") {
-        const campaigns = Array.isArray(body?.campaigns) ? body.campaigns : [];
-        const mandatoryAll = Array.isArray(body?.campaignConfig?.mandatoryAll)
-            ? body.campaignConfig.mandatoryAll
+    if (payload && typeof payload === "object") {
+        const campaigns = Array.isArray(payload?.campaigns) ? payload.campaigns : [];
+        const mandatoryAll = Array.isArray(payload?.campaignConfig?.mandatoryAll)
+            ? payload.campaignConfig.mandatoryAll
             : [];
-        const allowedMethods = Array.isArray(body?.campaignConfig?.allowedMethods)
-            ? body.campaignConfig.allowedMethods.map(normalizeAllowedMethod).filter(Boolean)
+        const allowedMethods = Array.isArray(payload?.campaignConfig?.allowedMethods)
+            ? payload.campaignConfig.allowedMethods.map(normalizeAllowedMethod).filter(Boolean)
             : [];
         return campaigns
-            .map((campaign) => normalizeCampaign(campaign, mandatoryAll, allowedMethods))
+            .map((campaign) => ({
+                ...normalizeCampaign(campaign, mandatoryAll, allowedMethods),
+                campaignConfig: payload?.campaignConfig || null
+            }))
             .filter(Boolean);
     }
     return [];

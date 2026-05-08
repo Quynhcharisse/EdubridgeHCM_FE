@@ -115,6 +115,7 @@ function packageStatusLabel(status) {
     if (s === "PACKAGE_PUBLISHED" || s === "PUBLISHED") return "Đã phát hành";
     if (s === "PACKAGE_ACTIVE" || s === "ACTIVE") return "Hoạt động";
     if (s === "PACKAGE_PENDING_DEACTIVE" || s === "PENDING_DEACTIVE") return "Chờ ngừng bán";
+    if (s === "PACKAGE_INACTIVE_PENDING" || s === "INACTIVE_PENDING") return "Chờ vô hiệu hóa";
     if (s === "PACKAGE_DEACTIVATED" || s === "DEACTIVATED") return "Đã ngừng bán";
     return status || "Không xác định";
 }
@@ -125,6 +126,7 @@ function packageStatusChipProps(status) {
     if (s === "PACKAGE_ACTIVE" || s === "ACTIVE" || s === "PACKAGE_PUBLISHED" || s === "PUBLISHED")
         return { color: "success", variant: "filled" };
     if (s === "PACKAGE_PENDING_DEACTIVE" || s === "PENDING_DEACTIVE") return { color: "warning", variant: "outlined" };
+    if (s === "PACKAGE_INACTIVE_PENDING" || s === "INACTIVE_PENDING") return { color: "warning", variant: "outlined" };
     if (s === "PACKAGE_DEACTIVATED" || s === "DEACTIVATED") return { color: "error", variant: "outlined" };
     return { color: "default", variant: "outlined" };
 }
@@ -213,6 +215,7 @@ function normalizePackageStatus(status) {
     if (raw === "PACKAGE_ACTIVE" || raw === "ACTIVE") return "ACTIVE";
     if (raw === "PACKAGE_PUBLISHED" || raw === "PUBLISHED") return "PUBLISHED";
     if (raw === "PACKAGE_PENDING_DEACTIVE" || raw === "PENDING_DEACTIVE") return "PENDING_DEACTIVE";
+    if (raw === "PACKAGE_INACTIVE_PENDING" || raw === "INACTIVE_PENDING") return "INACTIVE_PENDING";
     if (raw === "PACKAGE_DEACTIVATED" || raw === "DEACTIVATED") return "DEACTIVATED";
     return raw || "UNKNOWN";
 }
