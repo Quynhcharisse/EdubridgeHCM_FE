@@ -275,7 +275,7 @@ function FeedPostCard({post, onOpen, onDisable, disableLoading = false, canDisab
                 position: "relative",
                 borderRadius: 3,
                 border: "none",
-                background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+                background: "#60A5FA",
                 boxShadow: "0 16px 34px rgba(15,23,42,0.14)",
                 transition: "background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                 "&:hover": {
@@ -607,7 +607,7 @@ export default function PostFeedPage() {
                 minHeight: "100vh",
                 pt: {xs: 10.5, md: 12},
                 pb: {xs: 3, md: 5},
-                background: "linear-gradient(180deg, #e7edf6 0%, #d4deec 100%)"
+                background: "#60A5FA"
             }}
         >
             <Container maxWidth="md">

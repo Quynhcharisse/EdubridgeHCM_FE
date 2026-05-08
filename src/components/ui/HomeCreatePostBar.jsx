@@ -515,7 +515,7 @@ export default function HomeCreatePostBar({
                         p: {xs: 1.35, sm: 1.65},
                         borderRadius: cardRadius,
                         bgcolor: "#ffffff",
-                        background: "linear-gradient(165deg, #ffffff 0%, #f5f9ff 42%, #e8f2ff 100%)",
+                        background: "#60A5FA",
                         border: "1px solid rgba(59, 130, 246, 0.32)",
                         boxShadow: cardShadow,
                         borderBottom: embedded ? `1px solid rgba(59, 130, 246, 0.2)` : "none"

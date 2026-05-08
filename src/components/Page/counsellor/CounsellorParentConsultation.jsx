@@ -1405,7 +1405,7 @@ export default function CounsellorParentConsultation() {
         height: "calc(100vh - 110px)",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "linear-gradient(145deg, #eef2ff 0%, #ecfeff 45%, #f8fafc 100%)",
+        bgcolor: "#60A5FA",
         px: { xs: 0, md: 1 },
       }}
     >
@@ -1438,7 +1438,7 @@ export default function CounsellorParentConsultation() {
             overflow: "hidden",
             bgcolor: {
               xs: "rgba(248,250,252,0.8)",
-              md: "linear-gradient(180deg, rgba(37,99,235,0.07) 0%, rgba(248,250,252,0.98) 48%, #f8fafc 100%)",
+              md: "#60A5FA",
             },
             px: 2,
           }}
@@ -1899,7 +1899,7 @@ export default function CounsellorParentConsultation() {
                 overflowX: "hidden",
                 overflowY: "auto",
                 WebkitOverflowScrolling: "touch",
-                bgcolor: "linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,0.95) 100%)",
+                bgcolor: "#60A5FA",
               }}
               onScroll={handleMessageScroll}
               ref={messageListRef}
@@ -2022,7 +2022,7 @@ export default function CounsellorParentConsultation() {
                 py: 2,
                 bgcolor: shouldShowPendingBlankPanel
                   ? "#ffffff"
-                  : "linear-gradient(135deg, #f8fafc 0, #eef2ff 40%, #e0f2fe 100%)",
+                  : "#60A5FA",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -2162,7 +2162,7 @@ export default function CounsellorParentConsultation() {
                 border: "1px solid rgba(148,163,184,0.4)",
                 boxShadow: "0 22px 48px rgba(30,41,59,0.28)",
                 background:
-                  "linear-gradient(180deg, #f8fbff 0%, #f8fafc 38%, #ffffff 100%)",
+                  "#60A5FA",
                 overflow: "hidden",
               }}
             >

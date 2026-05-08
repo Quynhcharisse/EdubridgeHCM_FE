@@ -111,7 +111,8 @@ export default function Login() {
                 justifyContent: 'center',
                 py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
-                backgroundImage: `linear-gradient(135deg, rgba(51,65,85,0.55), rgba(51,65,85,0.35)), url(${backgroundLogin})`,
+                backgroundImage: `url(${backgroundLogin})`,
+                backgroundColor: 'rgba(96, 165, 250, 0.26)',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -208,10 +209,7 @@ export default function Login() {
                             border: '1px solid rgba(51,65,85,0.08)',
                             boxShadow: landingSectionShadow(4),
                             backdropFilter: 'blur(12px)',
-                            backgroundImage: `
-                                radial-gradient(ellipse 120% 80% at 0% 0%, rgba(85,179,217,0.08) 0%, transparent 55%),
-                                radial-gradient(ellipse 90% 70% at 100% 100%, rgba(59,130,246,0.06) 0%, transparent 50%)
-                            `,
+                            backgroundImage: 'none',
                         }}
                     >
                         <Stack spacing={3}>

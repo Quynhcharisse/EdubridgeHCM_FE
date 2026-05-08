@@ -648,9 +648,9 @@ export default function VnpayPaymentResultPage() {
         boxShadow: "0 8px 24px rgba(13, 100, 222, 0.28)",
         ...(primaryIsSchool
             ? {
-                  background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                  background: "#60A5FA",
                   "&:hover": {
-                      background: "linear-gradient(135deg, #6b9be6 0%, #0b5ad1 100%)",
+                      background: "#60A5FA",
                       boxShadow: "0 10px 28px rgba(13, 100, 222, 0.35)",
                   },
               }
@@ -684,7 +684,7 @@ export default function VnpayPaymentResultPage() {
                 pt: `${LAYOUT_HEADER_OFFSET_PX}px`,
                 pb: showStickyFooter ? {xs: 10, sm: 11} : {xs: 4, sm: 5},
                 px: {xs: 2, sm: 3},
-                background: "linear-gradient(165deg, #f8fafc 0%, #e8f0fe 38%, #dbeafe 72%, #f1f5f9 100%)",
+                background: "#60A5FA",
                 fontFamily: FONT_UI,
             }}
         >
@@ -1031,7 +1031,7 @@ export default function VnpayPaymentResultPage() {
                         pb: "max(12px, env(safe-area-inset-bottom))",
                         pt: 1.5,
                         background:
-                            "linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.92) 28%, #f8fafc 100%)",
+                            "#60A5FA",
                         backdropFilter: "blur(8px)",
                     }}
                 >

@@ -80,7 +80,7 @@ const counsellorDetailModalSx = {
   titleColor: "#0d47a1",
   valueColor: "#1e293b",
   fieldBorder: "1px solid #cfe8f8",
-  headerBar: "linear-gradient(180deg, #dceef9 0%, #c9e3f5 100%)",
+  headerBar: "#60A5FA",
 };
 
 const counsellorDialogPaperProps = {

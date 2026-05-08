@@ -182,7 +182,7 @@ export default function CampusConsultationStats() {
             title: "Tổng lịch hẹn",
             value: cards.total ?? 0,
             icon: <EventNoteRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 55%, #60a5fa 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(37,99,235,0.35)",
         },
         {
@@ -190,7 +190,7 @@ export default function CampusConsultationStats() {
             title: "Chờ xác nhận",
             value: cards.pending ?? 0,
             icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #d97706 0%, #f59e0b 55%, #fbbf24 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(217,119,6,0.32)",
         },
         {
@@ -198,7 +198,7 @@ export default function CampusConsultationStats() {
             title: "Đã xác nhận",
             value: cards.confirmed ?? 0,
             icon: <VerifiedRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #0369a1 0%, #0ea5e9 55%, #38bdf8 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(3,105,161,0.3)",
         },
         {
@@ -206,7 +206,7 @@ export default function CampusConsultationStats() {
             title: "Đang diễn ra",
             value: cards.inProgress ?? 0,
             icon: <PlayCircleRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #6d28d9 0%, #8b5cf6 55%, #a78bfa 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(109,40,217,0.3)",
         },
         {
@@ -214,7 +214,7 @@ export default function CampusConsultationStats() {
             title: "Hoàn thành",
             value: cards.completed ?? 0,
             icon: <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #15803d 0%, #22c55e 55%, #4ade80 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(21,128,61,0.3)",
         },
         {
@@ -222,7 +222,7 @@ export default function CampusConsultationStats() {
             title: "Đã huỷ",
             value: cards.cancelled ?? 0,
             icon: <CancelRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #b91c1c 0%, #ef4444 55%, #f87171 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(185,28,28,0.3)",
         },
         {
@@ -230,7 +230,7 @@ export default function CampusConsultationStats() {
             title: "Bỏ hẹn",
             value: cards.noShow ?? 0,
             icon: <PersonOffRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #374151 0%, #6b7280 55%, #9ca3af 100%)",
+            gradient: "#60A5FA",
             glow: "0 12px 28px rgba(55,65,81,0.3)",
         },
     ];

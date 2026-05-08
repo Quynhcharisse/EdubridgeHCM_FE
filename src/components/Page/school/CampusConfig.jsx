@@ -105,10 +105,10 @@ const DAY_CODES = [
 
 /** Luân phiên theo chỉ số nhóm — tab Vận hành (quy trình theo phương thức) & tab Tài chính (các khoản phí). */
 const METHOD_PROCESS_VISUAL_ACCENTS = [
-  {bar: "#2563eb", border: "rgba(37, 99, 235, 0.42)", headerBg: "linear-gradient(100deg, rgba(37,99,235,0.16) 0%, rgba(37,99,235,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(37, 99, 235, 0.06)", stepsBorder: "rgba(37, 99, 235, 0.22)"},
-  {bar: "#7c3aed", border: "rgba(124, 58, 237, 0.4)", headerBg: "linear-gradient(100deg, rgba(124,58,237,0.16) 0%, rgba(124,58,237,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(124, 58, 237, 0.07)", stepsBorder: "rgba(124, 58, 237, 0.22)"},
-  {bar: "#0d9488", border: "rgba(13, 148, 136, 0.42)", headerBg: "linear-gradient(100deg, rgba(13,148,136,0.15) 0%, rgba(13,148,136,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(13, 148, 136, 0.07)", stepsBorder: "rgba(13, 148, 136, 0.22)"},
-  {bar: "#c2410c", border: "rgba(194, 65, 12, 0.4)", headerBg: "linear-gradient(100deg, rgba(194,65,12,0.14) 0%, rgba(194,65,12,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(194, 65, 12, 0.06)", stepsBorder: "rgba(194, 65, 12, 0.22)"},
+  {bar: "#2563eb", border: "rgba(37, 99, 235, 0.42)", headerBg: "#60A5FA", stepsBg: "rgba(37, 99, 235, 0.06)", stepsBorder: "rgba(37, 99, 235, 0.22)"},
+  {bar: "#7c3aed", border: "rgba(124, 58, 237, 0.4)", headerBg: "#60A5FA", stepsBg: "rgba(124, 58, 237, 0.07)", stepsBorder: "rgba(124, 58, 237, 0.22)"},
+  {bar: "#0d9488", border: "rgba(13, 148, 136, 0.42)", headerBg: "#60A5FA", stepsBg: "rgba(13, 148, 136, 0.07)", stepsBorder: "rgba(13, 148, 136, 0.22)"},
+  {bar: "#c2410c", border: "rgba(194, 65, 12, 0.4)", headerBg: "#60A5FA", stepsBg: "rgba(194, 65, 12, 0.06)", stepsBorder: "rgba(194, 65, 12, 0.22)"},
 ];
 
 /** Khớp enum BE `ResourceType`: value JSON `counsellor` (COUNSELLOR). */
@@ -2257,7 +2257,7 @@ export default function CampusConfig() {
           borderRadius: 3,
           mb: 2.5,
           color: "white",
-          background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+          background: "#60A5FA",
           boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",
         }}
       >
