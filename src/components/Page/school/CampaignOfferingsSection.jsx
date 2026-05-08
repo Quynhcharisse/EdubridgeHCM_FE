@@ -293,6 +293,21 @@ function stripHtmlTags(html) {
     return text.replace(/\s+/g, " ").trim();
 }
 
+function getListItemDisplayLabel(item) {
+    if (item === null || item === undefined) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item !== "object") return String(item).trim();
+    const candidate = [
+        item.label,
+        item.name,
+        item.languageName,
+        item.displayName,
+        item.value,
+        item.code,
+    ].find((v) => typeof v === "string" || typeof v === "number");
+    return candidate == null ? "" : String(candidate).trim();
+}
+
 /** Nhóm nội dung trong dialog chi tiết (theo domain). */
 const DETAIL_SECTIONS = [
     {
@@ -687,7 +702,13 @@ export default function CampaignOfferingsSection({
             key === "programExtraSubjectList"
         ) {
             if (!Array.isArray(value) || value.length === 0) return "—";
-            return value.map((x) => formatEnumLabel(x)).join(", ");
+            return value
+                .map((x) => {
+                    const label = getListItemDisplayLabel(x);
+                    return label ? formatEnumLabel(label) : "";
+                })
+                .filter(Boolean)
+                .join(", ") || "—";
         }
         if (key === "programGraduationStandard" || key === "programTargetStudentDescription") {
             return stripHtmlTags(value) || "—";
