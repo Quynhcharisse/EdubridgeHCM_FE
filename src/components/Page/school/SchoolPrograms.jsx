@@ -571,7 +571,7 @@ function ProgramCurriculumDetailPanel({curriculum, isPrimaryBranch}) {
             <Box
                 sx={{
                     borderRadius: 3,
-                    background: "linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(51,65,85,0.03) 100%)",
+                    background: "#60A5FA",
                     border: "1px solid rgba(148, 163, 184, 0.35)",
                     p: 3,
                 }}
@@ -712,7 +712,7 @@ function ProgramCurriculumDetailPanel({curriculum, isPrimaryBranch}) {
                                                 minHeight: 120,
                                                 borderRadius: 3,
                                                 border: "1px solid rgba(226, 232, 240, 1)",
-                                                background: "linear-gradient(145deg, #ffffff 0%, #f8fbff 100%)",
+                                                background: "#60A5FA",
                                                 px: 1.6,
                                                 py: 1.4,
                                                 boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
@@ -1687,7 +1687,7 @@ export default function SchoolPrograms() {
             {/* Header */}
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60A5FA",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1899,7 +1899,7 @@ export default function SchoolPrograms() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 700,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60A5FA",
                                                     }}
                                                 >
                                                     Tạo chương trình đào tạo
@@ -2154,7 +2154,7 @@ export default function SchoolPrograms() {
                                         px: {xs: 1.5, sm: 2},
                                         pt: {xs: 1.75, sm: 2},
                                         pb: 0,
-                                        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%)",
+                                        background: "#60A5FA",
                                         borderBottom: "1px solid rgba(226, 232, 240, 0.95)",
                                     }}
                                 >
@@ -2837,7 +2837,7 @@ export default function SchoolPrograms() {
                                                     px: {xs: 1.5, sm: 2},
                                                     pt: {xs: 1.75, sm: 2},
                                                     pb: 0,
-                                                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%)",
+                                                    background: "#60A5FA",
                                                     borderBottom: "1px solid rgba(226, 232, 240, 0.95)",
                                                 }}
                                             >
@@ -3131,7 +3131,7 @@ export default function SchoolPrograms() {
                                             fontWeight: 950,
                                             borderRadius: 2,
                                             px: 3,
-                                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                            background: "#60A5FA",
                                         }}
                                     >
                                         Công bố
@@ -3199,7 +3199,7 @@ export default function SchoolPrograms() {
                                         fontWeight: 950,
                                         borderRadius: 2,
                                         px: 3,
-                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                        background: "#60A5FA",
                                     }}
                                 >
                                     Tiếp tục
@@ -3214,7 +3214,7 @@ export default function SchoolPrograms() {
                                         fontWeight: 950,
                                         borderRadius: 2,
                                         px: 3,
-                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                        background: "#60A5FA",
                                     }}
                                 >
                                     {submitLoading
@@ -3324,7 +3324,7 @@ export default function SchoolPrograms() {
                             fontWeight: 950,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60A5FA",
                         }}
                     >
                         Xác nhận

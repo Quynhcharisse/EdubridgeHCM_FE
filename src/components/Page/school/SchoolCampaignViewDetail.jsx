@@ -414,7 +414,7 @@ export default function SchoolCampaignViewDetail() {
             >
                 <Box
                     sx={{
-                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                        background: "#60A5FA",
                         px: { xs: 2.5, md: 3 },
                         py: { xs: 2.2, md: 2.6 },
                         color: "#fff",

@@ -577,7 +577,7 @@ export default function PackageFeesPage() {
                     minHeight: "60vh",
                     pt: LAYOUT_HEADER_TOP_PX,
                     pb: { xs: 5, md: 7 },
-                    background: "linear-gradient(180deg, #f8fafc 0%, #f0f9ff 100%)",
+                    background: "#60A5FA",
                 }}
             >
                 <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>

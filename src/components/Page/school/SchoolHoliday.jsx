@@ -674,7 +674,7 @@ export default function SchoolHoliday() {
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60A5FA",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -863,7 +863,7 @@ export default function SchoolHoliday() {
                                                         textTransform: "none",
                                                         whiteSpace: "nowrap",
                                                         fontWeight: 600,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60A5FA",
                                                     }}
                                                 >
                                                     Tạo ngày nghỉ
@@ -1228,7 +1228,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60A5FA",
                         }}
                     >
                         {submitting ? "Đang tạo…" : "Tạo"}
@@ -1371,7 +1371,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 2.5,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60A5FA",
                         }}
                     >
                         Chỉnh sửa
@@ -1592,7 +1592,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60A5FA",
                         }}
                     >
                         {submitting ? "Đang lưu…" : "Cập nhật"}

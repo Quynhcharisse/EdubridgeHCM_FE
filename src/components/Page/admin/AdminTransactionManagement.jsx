@@ -290,7 +290,7 @@ export default function AdminTransactionManagement() {
             value: formatCurrency(summary.totalRevenue),
             icon: <WalletRoundedIcon />,
             color: "#2563eb",
-            bg: "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)",
+            bg: "#60A5FA",
             textColor: "#ffffff",
         },
         {
@@ -299,7 +299,7 @@ export default function AdminTransactionManagement() {
             value: summary.totalTransactions.toLocaleString("vi-VN"),
             icon: <ReceiptLongRoundedIcon />,
             color: "#7c3aed",
-            bg: "linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)",
+            bg: "#60A5FA",
             textColor: "#ffffff",
         },
         {
@@ -308,7 +308,7 @@ export default function AdminTransactionManagement() {
             value: summary.successTransactions.toLocaleString("vi-VN"),
             icon: <CheckCircleRoundedIcon />,
             color: "#16a34a",
-            bg: "linear-gradient(135deg, #15803d 0%, #22c55e 100%)",
+            bg: "#60A5FA",
             textColor: "#ffffff",
         },
         {
@@ -317,7 +317,7 @@ export default function AdminTransactionManagement() {
             value: summary.failedTransactions.toLocaleString("vi-VN"),
             icon: <ErrorRoundedIcon />,
             color: "#dc2626",
-            bg: "linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)",
+            bg: "#60A5FA",
             textColor: "#ffffff",
         },
     ];
@@ -422,7 +422,7 @@ export default function AdminTransactionManagement() {
                     sx={{
                         borderRadius: 3,
                         border: "1px solid #93c5fd",
-                        background: "linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)",
+                        background: "#60A5FA",
                         boxShadow: "0 14px 30px rgba(37,99,235,0.16)",
                     }}
                 >
@@ -498,7 +498,7 @@ export default function AdminTransactionManagement() {
                     sx={{
                         borderRadius: 3,
                         border: "1px solid #93c5fd",
-                        background: "linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)",
+                        background: "#60A5FA",
                         boxShadow: "0 14px 30px rgba(37,99,235,0.16)",
                     }}
                 >
@@ -671,7 +671,7 @@ export default function AdminTransactionManagement() {
                         fontWeight: 800,
                         color: "#1e293b",
                         pb: 1.2,
-                        background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
+                        background: "#60A5FA",
                         borderBottom: "1px solid #93c5fd",
                     }}
                 >

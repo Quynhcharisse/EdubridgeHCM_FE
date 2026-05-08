@@ -23,7 +23,7 @@ const sectionTitleSx = {
         width: 3,
         height: '1em',
         borderRadius: 1,
-        background: `linear-gradient(180deg, #60a5fa 0%, ${BRAND_AQUA} 100%)`
+        background: BRAND_AQUA
     }
 };
 
@@ -56,7 +56,7 @@ export default function Footer() {
             component="footer"
             sx={{
                 width: '100%',
-                background: `linear-gradient(180deg, rgba(219,234,254,0.96) 0%, rgba(191,219,254,0.96) 100%)`,
+                background: 'rgba(219,234,254,0.96)',
                 borderTop: 'none'
             }}
         >

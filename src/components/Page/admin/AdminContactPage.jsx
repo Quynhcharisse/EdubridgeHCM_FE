@@ -1090,7 +1090,7 @@ export default function AdminContactPage() {
               overflowX: "hidden",
               overflowY: "auto",
               WebkitOverflowScrolling: "touch",
-              bgcolor: "linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,0.95) 100%)",
+              bgcolor: "#60A5FA",
             }}
           >
             {historyLoading ? (

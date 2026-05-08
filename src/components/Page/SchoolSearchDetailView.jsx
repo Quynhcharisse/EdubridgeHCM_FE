@@ -3698,10 +3698,7 @@ export default function SchoolSearchDetailView({
                             inset: 0,
                             pointerEvents: "none",
                             opacity: 0.1,
-                            backgroundImage: `
-                                linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px),
-                                linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px)
-                            `,
+                            backgroundImage: 'none',
                             backgroundSize: "26px 26px"
                         }
                     }}
