@@ -2524,7 +2524,7 @@ export default function SchoolCurriculums() {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 3 } }}
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>Chú ý trước khi import</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>Chú ý trước khi tải</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" sx={{ color: "#475569", lineHeight: 1.65 }}>
                         Vì import file sẽ ghi đè dữ liệu môn học hiện tại bằng dữ liệu mới từ file Excel. Bạn có muốn tiếp tục không?

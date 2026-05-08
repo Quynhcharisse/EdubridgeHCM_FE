@@ -43,7 +43,6 @@ import {
     parseSchoolConfigResponseBody,
     SCHOOL_CONFIG_KEY,
 } from "../../../services/SchoolFacilityService.jsx";
-import { getSystemConfigByKey as getSystemConfigByKeyGlobal } from "../../../services/SystemConfigService.jsx";
 import CreatePostRichTextEditor from "../../ui/CreatePostRichTextEditor.jsx";
 
 const HEADER_ACCENT = "#0D64DE";
@@ -208,43 +207,12 @@ function getTimelineProgress(startDate, endDate) {
     return Math.min(100, Math.round((elapsed / total) * 100));
 }
 
-function readSchoolIdentityFromStorage() {
-    try {
-        const raw = localStorage.getItem("user");
-        if (!raw) return { schoolId: null, schoolName: "" };
-        const user = JSON.parse(raw);
-        const schoolIdRaw =
-            user?.schoolId ??
-            user?.school?.id ??
-            user?.school?.schoolId ??
-            user?.schoolInfo?.id ??
-            user?.schoolInfo?.schoolId;
-        const schoolName = String(
-            user?.schoolName ??
-            user?.school?.name ??
-            user?.school?.schoolName ??
-            user?.schoolInfo?.name ??
-            user?.schoolInfo?.schoolName ??
-            ""
-        ).trim();
-        const schoolIdNum = Number(schoolIdRaw);
-        return { schoolId: Number.isFinite(schoolIdNum) ? schoolIdNum : null, schoolName };
-    } catch {
-        return { schoolId: null, schoolName: "" };
-    }
-}
-
-function extractSchoolQuotaValue(configBody, schoolId, schoolName) {
-    const quotas = configBody?.admissionQuota?.quotas;
-    if (!Array.isArray(quotas) || quotas.length === 0) return 0;
-    const byId = Number.isFinite(Number(schoolId))
-        ? quotas.find((q) => Number(q?.schoolId) === Number(schoolId))
-        : null;
-    const byName = !byId && schoolName
-        ? quotas.find((q) => String(q?.schoolName || "").trim().toLowerCase() === schoolName.toLowerCase())
-        : null;
-    const picked = byId || byName || quotas[0];
-    const quota = Number(picked?.value);
+function extractTotalSystemQuota(configBody) {
+    const quotaConfigData =
+        configBody?.quotaConfigData && typeof configBody.quotaConfigData === "object"
+            ? configBody.quotaConfigData
+            : configBody;
+    const quota = Number(quotaConfigData?.totalSystemQuota);
     return Number.isFinite(quota) && quota > 0 ? quota : 0;
 }
 
@@ -685,12 +653,11 @@ export default function SchoolCampaignDetail() {
 
     useEffect(() => {
         let cancelled = false;
-        const { schoolId, schoolName } = readSchoolIdentityFromStorage();
-        getSystemConfigByKeyGlobal("admissionQuota")
+        getSchoolConfigByKey(SCHOOL_CONFIG_KEY.QUOTA_CONFIG_DATA)
             .then((res) => {
                 if (cancelled) return;
-                const body = res?.data?.body ?? res?.data?.data ?? res?.data;
-                const value = extractSchoolQuotaValue(body, schoolId, schoolName);
+                const body = parseSchoolConfigResponseBody(res);
+                const value = extractTotalSystemQuota(body);
                 setSchoolAdmissionQuota(value);
             })
             .catch(() => {

@@ -207,34 +207,51 @@ export default function SchoolServicePackagesGrid({
                             ))}
                         </Box>
 
-                        {showBuyButton && typeof onBuyNow === "function" ? (
-                            <Button
-                                variant={isHighlighted ? "contained" : "outlined"}
-                                disabled={buyNowLoadingPackageId != null}
-                                onClick={() => onBuyNow(pkg)}
-                                sx={{
-                                    mt: 2.75,
-                                    borderRadius: 999,
-                                    textTransform: "none",
-                                    fontWeight: 800,
-                                    py: 1.1,
-                                    borderColor: isHighlighted ? "rgba(126,34,206,0.35)" : "#cbd5e1",
-                                    color: isHighlighted ? "#7e22ce" : BRAND_NAVY,
-                                    bgcolor: "#ffffff",
-                                    "&:hover": {
-                                        bgcolor: "#f8fafc",
-                                        borderColor: isHighlighted ? "#7e22ce" : BRAND_NAVY,
-                                    },
-                                }}
-                            >
-                                {buyNowLoadingPackageId === pkg?.id ? (
-                                    <CircularProgress size={22} color="inherit" />
-                                ) : isTrialPackage ? (
-                                    "Dùng thử"
-                                ) : (
-                                    "Mua ngay"
-                                )}
-                            </Button>
+                        {showBuyButton ? (
+                            isTrialPackage ? (
+                                <Box sx={{ mt: 2.75, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
+                                    <Chip
+                                        icon={<CheckCircleOutlineIcon sx={{ fontSize: "1.2rem !important" }} />}
+                                        label="Sẵn có ngay"
+                                        size="small"
+                                        sx={{
+                                            bgcolor: "#d1fae5",
+                                            color: "#065f46",
+                                            fontWeight: 700,
+                                            fontSize: "0.9rem",
+                                        }}
+                                    />
+                                    <Typography sx={{ fontSize: "0.85rem", color: "#64748b", fontStyle: "italic" }}>
+                                        Dùng thử miễn phí
+                                    </Typography>
+                                </Box>
+                            ) : typeof onBuyNow === "function" ? (
+                                <Button
+                                    variant={isHighlighted ? "contained" : "outlined"}
+                                    disabled={buyNowLoadingPackageId != null}
+                                    onClick={() => onBuyNow(pkg)}
+                                    sx={{
+                                        mt: 2.75,
+                                        borderRadius: 999,
+                                        textTransform: "none",
+                                        fontWeight: 800,
+                                        py: 1.1,
+                                        borderColor: isHighlighted ? "rgba(126,34,206,0.35)" : "#cbd5e1",
+                                        color: isHighlighted ? "#7e22ce" : BRAND_NAVY,
+                                        bgcolor: "#ffffff",
+                                        "&:hover": {
+                                            bgcolor: "#f8fafc",
+                                            borderColor: isHighlighted ? "#7e22ce" : BRAND_NAVY,
+                                        },
+                                    }}
+                                >
+                                    {buyNowLoadingPackageId === pkg?.id ? (
+                                        <CircularProgress size={22} color="inherit" />
+                                    ) : (
+                                        "Mua ngay"
+                                    )}
+                                </Button>
+                            ) : null
                         ) : null}
                     </Card>
                 );

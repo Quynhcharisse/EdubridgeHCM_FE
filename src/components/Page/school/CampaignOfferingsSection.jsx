@@ -76,6 +76,30 @@ const APPLICATION_STATUS_BADGES = {
 
 const BADGE_EMPTY = { badgeBg: "rgba(241, 245, 249, 0.95)", badgeColor: "#94a3b8" };
 
+const ENUM_LABEL_VI = {
+    UR_DRAFT: "Bản nháp",
+    CUR_DRAFT: "Bản nháp",
+    CUR_ACTIVE: "Đang áp dụng",
+    CUR_ARCHIVED: "Lưu trữ",
+    PRO_ACTIVE: "Đang áp dụng",
+    PRO_DRAFT: "Bản nháp",
+    PRO_INACTIVE: "Không áp dụng",
+    NATIONAL: "Quốc gia",
+    INTERNATIONAL: "Quốc tế",
+    YEAR: "Theo năm",
+    SEMESTER: "Theo học kỳ",
+    QUARTER: "Theo quý",
+    MONTH: "Theo tháng",
+    PROJECT_BASED: "Dạy học dựa trên dự án",
+    COOPERATIVE: "Dạy học hợp tác",
+    EXPERIENTIAL: "Dạy học qua trải nghiệm",
+    PROBLEM_BASED: "Dạy học giải quyết vấn đề",
+    PERSONALIZED: "Cá nhân hóa học tập",
+    BLENDED: "Dạy học tích hợp/Trực tuyến",
+    VISUAL_PRACTICE: "Dạy học trực quan và thực hành",
+    STEM_STEAM: "Tích hợp STEM/STEAM",
+};
+
 const DETAIL_BADGE_FIELD_KEYS = new Set([
     "applicationStatus",
     "status",
@@ -86,8 +110,8 @@ const DETAIL_BADGE_FIELD_KEYS = new Set([
 
 /** Trạng thái offering từ API list */
 const OFFERING_STATUS_LABELS = {
-    OFFERING_ACTIVE: "Còn hiệu lực quản trị",
-    OFFERING_INACTIVE: "Đã ngừng vòng đời",
+    OFFERING_ACTIVE: "Còn hiệu lực",
+    OFFERING_INACTIVE: "Đã ngừng",
 };
 
 function getOfferingStatusLabel(status) {
@@ -97,6 +121,15 @@ function getOfferingStatusLabel(status) {
 
 function normalizeApplicationStatus(raw) {
     return String(raw || "").trim().toUpperCase();
+}
+
+function getCampaignStatusLabel(rawStatus) {
+    const status = String(rawStatus || "").trim().toUpperCase();
+    if (!status) return "—";
+    if (status === "OPEN_ADMISSION_CAMPAIGN" || status === "OPEN") return "Đang mở";
+    if (status === "CANCELLED_ADMISSION_CAMPAIGN" || status === "CANCELLED") return "Đã hủy";
+    if (status === "DRAFT_ADMISSION_CAMPAIGN" || status === "DRAFT") return "Bản nháp";
+    return status;
 }
 
 /** API: phân số (0.1) hoặc phần trăm (10) → % hiển thị */
@@ -259,12 +292,29 @@ function formatCurrency(n) {
 function formatEnumLabel(v) {
     const s = String(v || "").trim();
     if (!s) return "—";
+    const code = s.toUpperCase();
+    if (ENUM_LABEL_VI[code]) return ENUM_LABEL_VI[code];
     return s.replaceAll("_", " ");
 }
 
 function stripHtmlTags(html) {
     const text = String(html || "").replace(/<[^>]*>/g, " ");
     return text.replace(/\s+/g, " ").trim();
+}
+
+function getListItemDisplayLabel(item) {
+    if (item === null || item === undefined) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item !== "object") return String(item).trim();
+    const candidate = [
+        item.label,
+        item.name,
+        item.languageName,
+        item.displayName,
+        item.value,
+        item.code,
+    ].find((v) => typeof v === "string" || typeof v === "number");
+    return candidate == null ? "" : String(candidate).trim();
 }
 
 /** Nhóm nội dung trong dialog chi tiết (theo domain). */
@@ -275,7 +325,7 @@ const DETAIL_SECTIONS = [
         Icon: AssignmentTurnedInIcon,
         fields: [
             { key: "applicationStatus", label: "Trạng thái hồ sơ" },
-            { key: "status", label: "Trạng thái offering" },
+            { key: "status", label: "Trạng thái chỉ tiêu" },
             { key: "allowReservationSubmission", label: "Cho phép nộp hồ sơ đặt chỗ" },
             { key: "learningMode", label: "Hình thức học" },
             { key: "quota", label: "Chỉ tiêu" },
@@ -661,7 +711,13 @@ export default function CampaignOfferingsSection({
             key === "programExtraSubjectList"
         ) {
             if (!Array.isArray(value) || value.length === 0) return "—";
-            return value.map((x) => formatEnumLabel(x)).join(", ");
+            return value
+                .map((x) => {
+                    const label = getListItemDisplayLabel(x);
+                    return label ? formatEnumLabel(label) : "";
+                })
+                .filter(Boolean)
+                .join(", ") || "—";
         }
         if (key === "programGraduationStandard" || key === "programTargetStudentDescription") {
             return stripHtmlTags(value) || "—";
@@ -964,7 +1020,7 @@ export default function CampaignOfferingsSection({
                                 >
                                     {campaignOptions.map((c) => (
                                         <MenuItem key={String(c.id)} value={String(c.id)}>
-                                            {c.name} {c.year != null ? `(${c.year})` : ""} {c.status ? `· ${c.status}` : ""}
+                                            {c.name} {c.year != null ? `(${c.year})` : ""} {c.status ? `· ${getCampaignStatusLabel(c.status)}` : ""}
                                         </MenuItem>
                                     ))}
                                 </Select>
