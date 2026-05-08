@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+    Alert,
     Box,
     Button,
     Card,
@@ -42,6 +43,7 @@ import { getProgramList } from "../../../services/ProgramService.jsx";
 import { useSchool } from "../../../contexts/SchoolContext.jsx";
 import {
     getCampaignOfferingsByCampus,
+    getCampusOfferingQuotaBreakdown,
     createCampaignOffering,
     updateCampaignOffering,
     updateCampusOfferingStatus,
@@ -386,6 +388,7 @@ export default function CampaignOfferingsSection({
     const [confirmActionLoading, setConfirmActionLoading] = useState(false);
     const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState(null);
     const [actionMenuRow, setActionMenuRow] = useState(null);
+    const [quotaBreakdownByMethod, setQuotaBreakdownByMethod] = useState({});
 
     useEffect(() => {
         let cancelled = false;
@@ -443,16 +446,58 @@ export default function CampaignOfferingsSection({
         };
     }, []);
 
+    useEffect(() => {
+        if (!campaignId || !Number.isFinite(Number(campaignId))) {
+            setQuotaBreakdownByMethod({});
+            return;
+        }
+        let cancelled = false;
+        getCampusOfferingQuotaBreakdown(Number(campaignId))
+            .then((res) => {
+                if (cancelled) return;
+                const body = res?.data?.body ?? {};
+                const methods = Array.isArray(body?.methods) ? body.methods : [];
+                const nextMap = methods.reduce((acc, item) => {
+                    const code = String(item?.methodCode ?? "").trim();
+                    if (!code) return acc;
+                    acc[code] = {
+                        methodCode: code,
+                        totalMethodQuota: Number(item?.totalMethodQuota ?? 0),
+                        totalUsedQuota: Number(item?.totalUsedQuota ?? 0),
+                        remainingQuota: Number(item?.remainingQuota ?? 0),
+                    };
+                    return acc;
+                }, {});
+                setQuotaBreakdownByMethod(nextMap);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("Load quota breakdown error:", err);
+                setQuotaBreakdownByMethod({});
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [campaignId, listNonce]);
+
     const selectedMethodQuota = useMemo(() => {
         const method = String(formValues.methodCode ?? "").trim();
         if (!method) return null;
+        const breakdownQuota = Number(quotaBreakdownByMethod?.[method]?.totalMethodQuota);
+        if (Number.isFinite(breakdownQuota) && breakdownQuota > 0) return breakdownQuota;
         const timelines = Array.isArray(selectedCampaign?.admissionMethodTimelines)
             ? selectedCampaign.admissionMethodTimelines
             : [];
         const hit = timelines.find((t) => String(t?.methodCode ?? "").trim() === method);
         const quota = Number(hit?.quota);
         return Number.isFinite(quota) && quota > 0 ? quota : null;
-    }, [selectedCampaign, formValues.methodCode]);
+    }, [selectedCampaign, formValues.methodCode, quotaBreakdownByMethod]);
+
+    const selectedMethodQuotaBreakdown = useMemo(() => {
+        const method = String(formValues.methodCode ?? "").trim();
+        if (!method) return null;
+        return quotaBreakdownByMethod?.[method] ?? null;
+    }, [formValues.methodCode, quotaBreakdownByMethod]);
 
     useEffect(() => {
         if (schoolCtxLoading) return;
@@ -636,8 +681,14 @@ export default function CampaignOfferingsSection({
         if (!formValues.programId) errors.programId = "Vui lòng chọn chương trình";
         if (!editingRow) {
             const quota = Number(formValues.quota);
+            const breakdown = selectedMethodQuotaBreakdown;
             if (!Number.isFinite(quota) || quota <= 0) {
                 errors.quota = "Vui lòng nhập chỉ tiêu hợp lệ";
+            } else if (
+                Number.isFinite(Number(breakdown?.remainingQuota)) &&
+                Number(breakdown?.remainingQuota) <= 0
+            ) {
+                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (remainingQuota = 0).";
             } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
                 errors.quota = `Chỉ tiêu không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
             }
@@ -649,10 +700,16 @@ export default function CampaignOfferingsSection({
                 0,
                 (Number.isFinite(currentQuota) ? currentQuota : 0) - (Number.isFinite(remaining) ? remaining : 0)
             );
+            const breakdown = selectedMethodQuotaBreakdown;
             if (!Number.isFinite(quota) || quota <= 0) {
                 errors.quota = "Vui lòng nhập chỉ tiêu mới hợp lệ";
             } else if (quota < usedQuota) {
                 errors.quota = `Chỉ tiêu mới không được nhỏ hơn số đã dùng (${usedQuota})`;
+            } else if (
+                Number.isFinite(Number(breakdown?.remainingQuota)) &&
+                Number(breakdown?.remainingQuota) <= 0
+            ) {
+                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (remainingQuota = 0).";
             } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
                 errors.quota = `Chỉ tiêu mới không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
             }
@@ -1437,6 +1494,16 @@ export default function CampaignOfferingsSection({
                                 }
                             />
                         )}
+                        {!!selectedMethodQuotaBreakdown &&
+                            (Number(selectedMethodQuotaBreakdown?.remainingQuota) === 0 ||
+                                Number(selectedMethodQuotaBreakdown?.totalUsedQuota) >
+                                    Number(selectedMethodQuotaBreakdown?.totalMethodQuota)) && (
+                                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                                    {Number(selectedMethodQuotaBreakdown?.remainingQuota) === 0
+                                        ? "Cảnh báo: phương thức tuyển sinh đã hết chỉ tiêu còn lại (remainingQuota = 0)."
+                                        : "Cảnh báo: số lượng đã dùng đang vượt quá tổng quota của phương thức tuyển sinh."}
+                                </Alert>
+                            )}
                         <FormControl fullWidth size="small">
                             <InputLabel>Hình thức học</InputLabel>
                             <Select

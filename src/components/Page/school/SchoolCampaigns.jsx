@@ -2084,7 +2084,7 @@ export default function SchoolCampaigns() {
                                                                 }
                                                             />
                                                         }
-                                                        label="Cho phép giữ chỗ"
+                                                        label="Cho phép nộp hồ sơ"
                                                     />
                                                 </Stack>
 

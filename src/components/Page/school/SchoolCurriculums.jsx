@@ -1389,6 +1389,16 @@ export default function SchoolCurriculums() {
         setInternationalImportConfirmOpen(true);
     };
 
+    const exportInternationalSubjectsTemplate = () => {
+        const fileName = "môn_học_quốc_tế.xlsx";
+        const anchor = document.createElement("a");
+        anchor.href = encodeURI(`/templates/${fileName}`);
+        anchor.setAttribute("download", fileName);
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+    };
+
     const closeInternationalImportConfirm = () => {
         setInternationalImportConfirmOpen(false);
     };
@@ -2658,7 +2668,17 @@ export default function SchoolCurriculums() {
                                                     disabled={internationalImportLoading}
                                                     sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                                 >
-                                                    {internationalImportLoading ? "Đang import..." : "Import file Excel"}
+                                                    {internationalImportLoading ? "Đang tải..." : "Tải tệp lên"}
+                                                </Button>
+                                            ) : null}
+                                            {formValues.curriculumType === "INTERNATIONAL" ? (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    onClick={exportInternationalSubjectsTemplate}
+                                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                >
+                                                    Tài liệu mẫu
                                                 </Button>
                                             ) : null}
                                             {formValues.curriculumType !== "NATIONAL" ? (
@@ -3005,6 +3025,16 @@ export default function SchoolCurriculums() {
                                             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                         >
                                             {internationalImportLoading ? "Đang import..." : "Import file Excel"}
+                                        </Button>
+                                    ) : null}
+                                    {formValues.curriculumType === "INTERNATIONAL" ? (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={exportInternationalSubjectsTemplate}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Tài liệu mẫu
                                         </Button>
                                     ) : null}
                                     {formValues.curriculumType !== "NATIONAL" ? (
