@@ -1970,7 +1970,15 @@ function SchoolCampaignEnrollmentCard({
                                                 rawProgramName && normalizedProgramName !== normalizedCampaignName
                                                     ? rawProgramName
                                                     : String(curriculum?.name || "").trim() || rawProgramName || "—";
-                                            const languageLabels = toLanguageLabelList(program?.languageOfInstructionList);
+                                            const languageLabels = (() => {
+                                                const labels = toLanguageLabelList(program?.languageOfInstructionList);
+                                                const normalizedLabels = labels.map((label) => String(label || "").trim());
+                                                const labelsWithoutVietnamese = normalizedLabels.filter((label) => {
+                                                    const normalized = label.toLowerCase();
+                                                    return normalized !== "tiếng việt" && normalized !== "vietnamese";
+                                                });
+                                                return ["Tiếng Việt", ...labelsWithoutVietnamese];
+                                            })();
                                             const quota = Number(offering?.quota);
                                             const remainingQuota = Number(offering?.remainingQuota);
                                             const hasQuota = Number.isFinite(quota) && quota > 0;
@@ -2055,7 +2063,7 @@ function SchoolCampaignEnrollmentCard({
                                                                 <Chip
                                                                     size="small"
                                                                     icon={<LanguageIcon sx={{fontSize: "0.95rem !important"}}/>}
-                                                                    label={`Dạy bằng ${languageLabels[0] || "Tiếng Việt"}`}
+                                                                    label={`Dạy bằng ${languageLabels.length > 0 ? languageLabels.join(", ") : "Tiếng Việt"}`}
                                                                     sx={{borderRadius: 999, bgcolor: "rgba(59,130,246,0.1)", color: "#1d4ed8", fontWeight: 700}}
                                                                 />
                                                                 <Chip
@@ -2267,7 +2275,7 @@ function SchoolCampaignEnrollmentCard({
                                                                     ? "ĐÃ NỘP HỒ SƠ"
                                                                     : String(offering?.applicationStatus || "").toUpperCase() === "PAUSED"
                                                                         ? "TẠM DỪNG NHẬN HỒ SƠ"
-                                                                        : "ĐĂNG KÝ XÉT TUYỂN"}
+                                                                        : "NỘP HỒ SƠ"}
                                                             </Button>
                                                         </Box>
                                                     </Box>
