@@ -1465,6 +1465,15 @@ export default function AdminPlatformSettings() {
         admissionImportInputRef.current?.click();
     };
 
+    const exportAdmissionTemplateFile = (fileName) => {
+        const anchor = document.createElement("a");
+        anchor.href = encodeURI(`/templates/${fileName}`);
+        anchor.setAttribute("download", fileName);
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+    };
+
     const getAdmissionImportRowTemplate = (type) => {
         switch (String(type || "").trim()) {
             case "ADMISSION_PROCESSES":
@@ -1931,29 +1940,49 @@ export default function AdminPlatformSettings() {
                                 Phương thức tuyển sinh
                             </Typography>
                             {admissionTemplateEditing ? (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                    disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
-                                    onClick={() => {
-                                        setImportType("ALLOWED_METHODS");
-                                        setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                    }}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tải lên
-                                </Button>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                        disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
+                                        onClick={() => {
+                                            setImportType("ALLOWED_METHODS");
+                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                        }}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tải lên
+                                    </Button>
+                                </Stack>
                             ) : (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={saving}
-                                    onClick={() => setAdmissionTemplateEditing(true)}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                >
-                                    Chỉnh sửa
-                                </Button>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={saving}
+                                        onClick={() => setAdmissionTemplateEditing(true)}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
+                                    >
+                                        Chỉnh sửa
+                                    </Button>
+                                </Stack>
                             )}
                         </Box>
                         <Box
@@ -2172,6 +2201,14 @@ export default function AdminPlatformSettings() {
                                                 </Button>
                                             </span>
                                         </Tooltip>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("hồ_sơ_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Mẫu hồ sơ
+                                        </Button>
                                         <Tooltip title={methods.length === 0 ? "Phải upload danh sách phương thức tuyển sinh đầu tiên" : ""} arrow>
                                             <span>
                                                 <Button
@@ -2189,6 +2226,14 @@ export default function AdminPlatformSettings() {
                                                 </Button>
                                             </span>
                                         </Tooltip>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("quy_trình_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Mẫu quy trình
+                                        </Button>
                                     </Stack>
                                 ) : (
                                     <Button
