@@ -52,7 +52,12 @@ import {
     getSchoolStorageKey,
     getUserIdentity
 } from "../../utils/savedSchoolsStorage";
-import {getPublicSchoolDetail, getPublicSchoolList, searchNearbyCampuses} from "../../services/SchoolPublicService.jsx";
+import {
+    getPublicSchoolCampaignTemplates,
+    getPublicSchoolDetail,
+    getPublicSchoolList,
+    searchNearbyCampuses
+} from "../../services/SchoolPublicService.jsx";
 import {
     deleteParentFavouriteSchool,
     getParentFavouriteSchools,
@@ -127,6 +132,44 @@ function mapPublicSchoolToRow(api) {
     };
 }
 
+function mergeCurriculumList(baseList, campaignList) {
+    const merged = [];
+    const seen = new Set();
+    const pushCurriculum = (curriculum) => {
+        if (!curriculum || typeof curriculum !== "object") return;
+        const idPart = curriculum?.id != null ? String(curriculum.id) : "";
+        const namePart = String(curriculum?.name || "").trim().toLowerCase();
+        const typePart = String(curriculum?.curriculumType || "").trim().toUpperCase();
+        const key = `${idPart}|${namePart}|${typePart}`;
+        if (!idPart && !namePart) return;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(curriculum);
+    };
+    (Array.isArray(baseList) ? baseList : []).forEach(pushCurriculum);
+    (Array.isArray(campaignList) ? campaignList : []).forEach(pushCurriculum);
+    return merged;
+}
+
+function pickCurriculumListFromCampaignTemplates(templates) {
+    const out = [];
+    const campaigns = Array.isArray(templates) ? templates : [];
+    for (const campaign of campaigns) {
+        const offerings = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
+        for (const offering of offerings) {
+            const curriculumFromOffering = offering?.curriculum;
+            if (curriculumFromOffering && typeof curriculumFromOffering === "object") {
+                out.push(curriculumFromOffering);
+            }
+            const curriculumFromProgram = offering?.program?.curriculum;
+            if (curriculumFromProgram && typeof curriculumFromProgram === "object") {
+                out.push(curriculumFromProgram);
+            }
+        }
+    }
+    return out;
+}
+
 
 export default function SchoolSearchPage() {
     const navigate = useNavigate();
@@ -154,6 +197,7 @@ export default function SchoolSearchPage() {
     const [selectedDistrict, setSelectedDistrict] = React.useState("");
     const [selectedProvince, setSelectedProvince] = React.useState("");
     const [selectedBoardingType, setSelectedBoardingType] = React.useState(null);
+    const [selectedCurriculumType, setSelectedCurriculumType] = React.useState(null);
 
     const provinces = React.useMemo(
         () =>
@@ -203,12 +247,17 @@ export default function SchoolSearchPage() {
                     rows.map(async (row) => {
                         if (!row?.id) return row;
                         try {
-                            const detailBody = await getPublicSchoolDetail(row.id);
+                            const [detailBody, campaignTemplates] = await Promise.all([
+                                getPublicSchoolDetail(row.id),
+                                getPublicSchoolCampaignTemplates(row.id, 0).catch(() => [])
+                            ]);
                             const mappedDetail = mapPublicSchoolDetailToRow(detailBody);
                             if (!mappedDetail) return row;
+                            const campaignCurriculumList = pickCurriculumListFromCampaignTemplates(campaignTemplates);
                             return {
                                 ...row,
-                                ...mappedDetail
+                                ...mappedDetail,
+                                curriculumList: mergeCurriculumList(mappedDetail?.curriculumList, campaignCurriculumList)
                             };
                         } catch {
                             return row;
@@ -296,7 +345,13 @@ export default function SchoolSearchPage() {
                         ? campusBoardingType === "BOTH"
                         : true
             : true;
-        return matchProvince && matchWard && matchKeyword && matchBoardingType;
+        const curriculumList = Array.isArray(s?.curriculumList) ? s.curriculumList : [];
+        const hasCurriculumType = curriculumList.some((curriculum) => {
+            const curriculumType = String(curriculum?.curriculumType || "").trim().toUpperCase();
+            return curriculumType === selectedCurriculumType;
+        });
+        const matchCurriculumType = selectedCurriculumType ? hasCurriculumType : true;
+        return matchProvince && matchWard && matchKeyword && matchBoardingType && matchCurriculumType;
     });
     const shownSchools = filteredSchools.slice(0, 20);
     const totalCount = filteredSchools.length;
@@ -804,6 +859,30 @@ export default function SchoolSearchPage() {
                                             sx={filterChipSx(selectedBoardingType === boardingType)}
                                         />
                                     ))}
+                                </Box>
+                            </Box>
+                            <Divider sx={{borderColor: 'rgba(226,232,240,0.95)'}}/>
+                            <Box>
+                                <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Loại khung chương trình</Typography>
+                                <Box sx={{display: 'flex', gap: 1, flexWrap: 'wrap'}}>
+                                    <Chip
+                                        label="Tất cả"
+                                        size="small"
+                                        onClick={() => setSelectedCurriculumType(null)}
+                                        sx={filterChipSx(!selectedCurriculumType)}
+                                    />
+                                    <Chip
+                                        label="Quốc gia"
+                                        size="small"
+                                        onClick={() => toggleSingleSelection("NATIONAL", setSelectedCurriculumType)}
+                                        sx={filterChipSx(selectedCurriculumType === "NATIONAL")}
+                                    />
+                                    <Chip
+                                        label="Quốc tế"
+                                        size="small"
+                                        onClick={() => toggleSingleSelection("INTERNATIONAL", setSelectedCurriculumType)}
+                                        sx={filterChipSx(selectedCurriculumType === "INTERNATIONAL")}
+                                    />
                                 </Box>
                             </Box>
                         </Stack>
