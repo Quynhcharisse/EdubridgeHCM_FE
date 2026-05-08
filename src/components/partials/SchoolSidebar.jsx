@@ -264,7 +264,7 @@ const menuGroupsBase = [
         title: "TUYỂN SINH",
         items: [
             { text: "Chiến dịch tuyển sinh", icon: <CampaignIcon />, path: "/school/campaigns" },
-            { text: "Chỉ tiêu tuyển sinh", icon: <ViewAgendaIcon />, path: "/school/campaign-offerings" },
+            { text: "Gói tuyển sinh", icon: <ViewAgendaIcon />, path: "/school/campaign-offerings" },
             { text: "Duyệt hồ sơ nhập học", icon: <FactCheckOutlinedIcon />, path: "/school/admission-reservations" },
         ],
     },
