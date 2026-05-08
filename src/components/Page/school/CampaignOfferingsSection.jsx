@@ -76,6 +76,26 @@ const APPLICATION_STATUS_BADGES = {
 
 const BADGE_EMPTY = { badgeBg: "rgba(241, 245, 249, 0.95)", badgeColor: "#94a3b8" };
 
+const VI_ENUM_LABELS = {
+    PRO_ACTIVE: "Đang hoạt động",
+    PRO_INACTIVE: "Ngừng hoạt động",
+    ACTIVE: "Đang hoạt động",
+    INACTIVE: "Ngừng hoạt động",
+    SEMESTER: "Học kỳ",
+    MONTH: "Tháng",
+    YEAR: "Năm",
+    WEEK: "Tuần",
+    DAY: "Ngày",
+    FULL_TIME: "Toàn thời gian",
+    PART_TIME: "Bán thời gian",
+    OFFLINE: "Trực tiếp",
+    ONLINE: "Trực tuyến",
+    HYBRID: "Kết hợp",
+    PROJECT_BASED: "Dựa trên dự án",
+    COOPERATIVE: "Hợp tác",
+    EXPERIENTIAL: "Trải nghiệm",
+};
+
 const DETAIL_BADGE_FIELD_KEYS = new Set([
     "applicationStatus",
     "status",
@@ -259,12 +279,29 @@ function formatCurrency(n) {
 function formatEnumLabel(v) {
     const s = String(v || "").trim();
     if (!s) return "—";
+    const normalized = s.toUpperCase();
+    if (VI_ENUM_LABELS[normalized]) return VI_ENUM_LABELS[normalized];
     return s.replaceAll("_", " ");
 }
 
 function stripHtmlTags(html) {
     const text = String(html || "").replace(/<[^>]*>/g, " ");
     return text.replace(/\s+/g, " ").trim();
+}
+
+function getListItemDisplayLabel(item) {
+    if (item === null || item === undefined) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item !== "object") return String(item).trim();
+    const candidate = [
+        item.label,
+        item.name,
+        item.languageName,
+        item.displayName,
+        item.value,
+        item.code,
+    ].find((v) => typeof v === "string" || typeof v === "number");
+    return candidate == null ? "" : String(candidate).trim();
 }
 
 /** Nhóm nội dung trong dialog chi tiết (theo domain). */
@@ -661,7 +698,13 @@ export default function CampaignOfferingsSection({
             key === "programExtraSubjectList"
         ) {
             if (!Array.isArray(value) || value.length === 0) return "—";
-            return value.map((x) => formatEnumLabel(x)).join(", ");
+            return value
+                .map((x) => {
+                    const label = getListItemDisplayLabel(x);
+                    return label ? formatEnumLabel(label) : "";
+                })
+                .filter(Boolean)
+                .join(", ") || "—";
         }
         if (key === "programGraduationStandard" || key === "programTargetStudentDescription") {
             return stripHtmlTags(value) || "—";
