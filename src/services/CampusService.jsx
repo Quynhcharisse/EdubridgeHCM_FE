@@ -8,8 +8,8 @@ export const extractCampusListBody = (response) => {
 };
 
 export const listCampuses = async () => {
-    // API yêu cầu query params `page` và `pageSize`
-    // Default pageSize lớn để các màn hình hiện tại có thể tự paginate/filter ở client.
+    
+    
     const response = await axiosClient.get("/school/campus/list", {
         params: {
             page: 0,
@@ -19,7 +19,7 @@ export const listCampuses = async () => {
     return response || null;
 };
 
-/** GET /school/campus/list/export — file Excel danh sách cơ sở */
+
 export const exportCampusList = async () => {
     const response = await axiosClient.get("/school/campus/list/export", {
         responseType: "blob",
@@ -60,10 +60,10 @@ export const createCampus = async ({
     return response || null;
 };
 
-/**
- * GET /api/v1/campus/quota/request/summary/emailjs
- * Dữ liệu cho campus phụ gửi email yêu cầu thêm nguồn lực tới campus chính (EmailJS).
- */
+
+
+
+
 export const getCampusQuotaRequestSummaryForEmailJs = async () => {
     const response = await axiosClient.get("/campus/quota/request/summary/emailjs");
     return response?.data?.body ?? response?.data ?? null;

@@ -93,7 +93,7 @@ function formatYmdVi(ymd) {
   return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-/** Trích gợi ý tên từ message lỗi kiểu "Counsellor B is busy" */
+
 function parseBusyCounsellorHints(message) {
   const m = String(message || "");
   const hints = [];
@@ -164,7 +164,7 @@ function counsellorIdsFromAssignedRows(rows) {
   return ids;
 }
 
-/** Giao các tập id đã gán trên từng cặp (templateId + thứ) — dùng gợi ý chọn khi gán batch */
+
 function counsellorIntersectionAcrossPairs(assignedRows, pairs) {
   if (!Array.isArray(pairs) || pairs.length === 0) return new Set();
   const sets = pairs.map(({templateId, dayOfWeekKey}) =>
@@ -182,7 +182,7 @@ export default function CounsellorAssignModal({
   onClose,
   campusId,
   templateId,
-  /** Gán hàng loạt: nhiều template; ưu tiên hơn một templateId đơn */
+  
   batchSlots = null,
   dayOfWeekKey,
   dayOfWeek,
@@ -193,12 +193,12 @@ export default function CounsellorAssignModal({
   defaultEndDate,
   minCounsellorsPerSlot = 1,
   maxCounsellorsPerSlot = 0,
-  /** Phụ huynh / booking — khác hẳn tối thiểu–tối đa tư vấn viên bên dưới */
+  
   maxBookingPerSlot = 1,
-  /** Chuẩn hoá từ GET campus/config */
+  
   academicCalendar: academicCalendarProp,
   academicSemesterLimitActive = false,
-  /** Sau HTTP 2xx: nhận kết quả parse body.slots (nếu có); parent ưu tiên merge, không thì refetch GET assigned */
+  
   onSuccess,
 }) {
   const academicCalendar = useMemo(
@@ -217,7 +217,7 @@ export default function CounsellorAssignModal({
   const [holidayWarningLabels, setHolidayWarningLabels] = useState([]);
   const [campaignOptions, setCampaignOptions] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
-  /** Chế độ «trọn phạm vi học kỳ trên máy chủ» vs nhập tay — chỉ ASSIGN khi đã bật HK đủ term */
+  
   const [useCustomDateRange, setUseCustomDateRange] = useState(true);
 
   const semesterLimitForUi = academicSemesterLimitActive && isAcademicCalendarLimitActive(academicCalendar);
@@ -236,7 +236,7 @@ export default function CounsellorAssignModal({
     return [];
   }, [batchSlots, templateId, dayOfWeekKey]);
 
-  /** Mỗi ô đã chọn một phần tử (có thể trùng templateId khác ngày) — khớp batch BE */
+  
   const templateIdsForPayload = useMemo(() => {
     return schedulePairs.map((p) => Number(p.templateId)).filter((n) => Number.isFinite(n) && n > 0);
   }, [schedulePairs]);

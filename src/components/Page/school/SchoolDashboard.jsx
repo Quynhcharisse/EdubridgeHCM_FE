@@ -261,7 +261,7 @@ export default function SchoolDashboard() {
                 elevation={0}
                 sx={{
                     borderRadius: 3,
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     boxShadow: "0 18px 40px rgba(15, 23, 42, 0.25)",
                     color: "white",
                     overflow: "hidden",
@@ -543,7 +543,7 @@ export default function SchoolDashboard() {
                             overflow: "hidden",
                             boxShadow: "0 14px 36px rgba(30, 64, 175, 0.08)",
                             backgroundImage:
-                                "radial-gradient(ellipse 130% 80% at 0% 0%, rgba(59,130,246,0.09) 0%, transparent 50%), radial-gradient(ellipse 130% 80% at 100% 100%, rgba(14,165,233,0.07) 0%, transparent 55%)",
+                                "rgba(219,234,254,0.55)",
                         }}
                     >
                         <CardContent sx={{p: { xs: 2, md: 3 }}}>
@@ -782,7 +782,7 @@ export default function SchoolDashboard() {
                 <DialogTitle
                     sx={{
                         pb: 1.4,
-                        background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+                        background: "#eff6ff",
                         borderBottom: "1px solid #e2e8f0",
                     }}
                 >

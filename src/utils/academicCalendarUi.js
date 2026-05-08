@@ -1,4 +1,4 @@
-/** UX + normalize cho `operationSettingsData.academicCalendar` (HK1/HK2) — giới hạn ngày gán lịch tư vấn. */
+
 
 export function normalizeAcademicDate(value) {
   if (value == null) return "";
@@ -39,7 +39,7 @@ export function termIsComplete(term) {
   return Boolean(s && e);
 }
 
-/** Chỉ một trong hai ô có giá trị → không hợp lệ khi đang bật giới hạn. */
+
 export function termIsPartial(term) {
   const s = String(term?.start ?? "").trim();
   const e = String(term?.end ?? "").trim();
@@ -53,9 +53,9 @@ function compareYmd(a, b) {
   return sa.localeCompare(sb);
 }
 
-/**
- * Đã cấu hình đủ để BE coi là «siết» theo học kỳ: ít nhất một HK có cả start/end và start ≤ end.
- */
+
+
+
 export function isAcademicCalendarLimitActive(cal) {
   const n = normalizeAcademicCalendarShape(cal);
   const check = (t) => termIsComplete(t) && compareYmd(t.start, t.end) <= 0;
@@ -69,10 +69,10 @@ export function emptyAcademicCalendar() {
   };
 }
 
-/**
- * Khi user bật công tắc giới hạn học kỳ và nhấn Lưu.
- * @returns {{ ok: boolean, message?: string }}
- */
+
+
+
+
 export function validateAcademicCalendarForSave(limitToggleOn, cal) {
   const n = normalizeAcademicCalendarShape(cal);
   if (!limitToggleOn) return {ok: true};
@@ -102,7 +102,7 @@ export function validateAcademicCalendarForSave(limitToggleOn, cal) {
   return {ok: true};
 }
 
-/** yyyy-mm-dd có nằm trong một học kỳ đã cấu hình đủ (start..end) không. */
+
 export function ymdInAnyConfiguredTerm(ymd, cal) {
   const n = normalizeAcademicCalendarShape(cal);
   const inTerm = (t) =>
@@ -110,10 +110,10 @@ export function ymdInAnyConfiguredTerm(ymd, cal) {
   return inTerm(n.term1) || inTerm(n.term2);
 }
 
-/**
- * ASSIGN: khi đã bật giới hạn HK, cả ngày bắt đầu và ngày kết thúc gán phải nằm trong phạm vi một học kỳ (có thể khác nhau).
- * @returns {{ ok: boolean, message?: string }}
- */
+
+
+
+
 export function validateAssignDateRangeAgainstAcademicTerms(startYmd, endYmd, cal, limitActive) {
   const s = String(startYmd ?? "").trim();
   const e = String(endYmd ?? "").trim();

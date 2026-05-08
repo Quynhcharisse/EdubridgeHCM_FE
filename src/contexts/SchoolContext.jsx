@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { extractCampusListBody, listCampuses } from "../services/CampusService.jsx";
 
-/**
- * isPrimaryBranch = true  → Campus chính (full quyền)
- * isPrimaryBranch = false → Campus phụ (chỉ: tạo/xem counsellor, xem campus bản thân, xem admission plan)
- */
+
+
+
+
 const SchoolContext = createContext({
   isPrimaryBranch: true,
-  /** Campus đang đăng nhập (campus phụ: 1 campus trong list) — dùng cho API /campus/{id}/… */
+  
   currentCampusId: null,
   loading: true,
   error: null,
@@ -36,7 +36,7 @@ export function SchoolProvider({ children }) {
         if (cancelled) return;
         const list = extractCampusListBody(res);
         if (res && res.status === 200 && Array.isArray(list)) {
-          // Campus phụ: backend chỉ trả về 1 campus và isPrimaryBranch = false
+          
           const singleCampus = list.length === 1 ? list[0] : null;
           const primary =
             singleCampus && singleCampus.isPrimaryBranch === false ? false : true;

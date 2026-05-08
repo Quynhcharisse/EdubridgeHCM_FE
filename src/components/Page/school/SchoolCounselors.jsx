@@ -109,7 +109,7 @@ const emptyForm = {
     avatar: "",
 };
 
-/** Khớp item trong GET /api/v1/campus/counsellor/list → body.counsellors.items */
+
 const mapCounsellorFromApi = (dto) => ({
     id: dto.id,
     campusId: dto.campusId,
@@ -134,14 +134,14 @@ const formatDate = (d) => {
     return date.toLocaleDateString("vi-VN");
 };
 
-/** Khớp `CounsellorValidation.normalize` (BE). */
+
 function normalizeCounsellorField(value) {
     if (value == null) return null;
     const trimmed = String(value).trim();
     return trimmed.length === 0 ? null : trimmed;
 }
 
-/** Khớp `CounsellorValidation.isValidEmail` (BE). */
+
 function isValidCounsellorEmail(email) {
     if (typeof email !== "string" || !email) return false;
     return /^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email);
@@ -159,7 +159,7 @@ const COUNSELLOR_CREATE_VI = {
         "Gói dịch vụ hiện tại không hỗ trợ tạo tư vấn viên. Vui lòng nâng cấp gói dịch vụ của bạn.",
 };
 
-/** Khớp thông báo `CounsellorValidation` (BE) → tiếng Việt cho snackbar. */
+
 function translateCreateCounsellorBackendMessage(raw) {
     if (raw == null) return null;
     const msg = String(raw).trim();
@@ -528,10 +528,10 @@ export default function SchoolCounselors() {
 
     return (
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
-            {/* Header with gradient */}
+            {}
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -624,7 +624,7 @@ export default function SchoolCounselors() {
                 <BranchQuotaRequestToPrimaryCard disabled={_loading} quotaUsage={currentUsage} quotaMax={maxQuota} />
             ) : null}
 
-            {/* Search & Filter */}
+            {}
             <Card
                 elevation={0}
                 sx={{
@@ -695,7 +695,7 @@ export default function SchoolCounselors() {
                 </CardContent>
             </Card>
 
-            {/* Table Card */}
+            {}
             <Card
                 elevation={0}
                 sx={{
@@ -802,7 +802,7 @@ export default function SchoolCounselors() {
                                                                 textTransform: "none",
                                                                 fontWeight: 600,
                                                                 background: canCreate
-                                                                    ? "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)"
+                                                                    ? "#60a5fa"
                                                                     : "#cbd5e1",
                                                                 opacity: canCreate ? 1 : 0.6,
                                                                 transition: "all 0.2s ease",
@@ -810,7 +810,7 @@ export default function SchoolCounselors() {
                                                                 "&:hover": canCreate
                                                                     ? {
                                                                         background:
-                                                                            "linear-gradient(135deg, #6b9be6 0%, #0b5ad1 100%)",
+                                                                            "#60a5fa",
                                                                     }
                                                                     : {},
                                                             }}
@@ -938,7 +938,7 @@ export default function SchoolCounselors() {
                             justifyContent: "center",
                             pt: {xs: 2, md: 0},
                             background:
-                                "linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.58))",
+                                "rgba(255,255,255,0.48)",
                             backdropFilter: "blur(6px)",
                             borderRadius: 3,
                             animation: "lockOverlayFadeIn 0.2s ease",
@@ -979,7 +979,7 @@ export default function SchoolCounselors() {
                                     inset: 0,
                                     pointerEvents: "none",
                                     background:
-                                        "linear-gradient(120deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1))",
+                                        "rgba(255,255,255,0.4)",
                                 },
                             }}
                         >
@@ -992,7 +992,7 @@ export default function SchoolCounselors() {
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        background: "linear-gradient(135deg, #dbeafe, #bfdbfe)",
+                                        background: "#dbeafe",
                                         boxShadow: "0 0 20px rgba(37, 99, 235, 0.3)",
                                     }}
                                 >
@@ -1015,13 +1015,13 @@ export default function SchoolCounselors() {
                                             borderRadius: 2,
                                             px: 2.75,
                                             py: 1,
-                                            background: "linear-gradient(135deg, #0D64DE, #2563eb)",
+                                            background: "#3b82f6",
                                             transition: "all 0.2s ease",
                                             boxShadow: "0 8px 18px rgba(37, 99, 235, 0.25)",
                                             "&:hover": {
                                                 transform: "translateY(-1px) scale(1.01)",
                                                 boxShadow: "0 10px 22px rgba(37, 99, 235, 0.32)",
-                                                background: "linear-gradient(135deg, #0b5ad1, #1d4ed8)",
+                                                background: "#2563eb",
                                             },
                                         }}
                                     >
@@ -1034,7 +1034,7 @@ export default function SchoolCounselors() {
                 )}
             </Card>
 
-            {/* Create Counselor Modal */}
+            
             <Dialog
                 open={createModalOpen}
                 onClose={(e, reason) => {
@@ -1140,7 +1140,7 @@ export default function SchoolCounselors() {
                             />
                         </Box>
                         <Typography variant="body2" sx={{color: "#64748b", fontSize: 13}}>
-                            Hệ thống tạo tài khoản role <strong>COUNSELLOR</strong> với email và ảnh đại diện (nếu có).
+                            Hệ thống tạo tài khoản vai trò <strong>Tư vấn viên</strong> với email và ảnh đại diện (nếu có).
                             Họ tên, mật khẩu và thông tin bổ sung có thể cập nhật sau khi tư vấn viên đăng nhập.
                         </Typography>
                         {createSubmitting && (
@@ -1189,7 +1189,7 @@ export default function SchoolCounselors() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         {createSubmitting ? "Đang tạo…" : "Tạo"}
@@ -1197,7 +1197,7 @@ export default function SchoolCounselors() {
                 </DialogActions>
             </Dialog>
 
-            {/* View Detail Modal */}
+            
 <Dialog
     open={viewModalOpen}
     onClose={(event, reason) => {
@@ -1215,7 +1215,7 @@ export default function SchoolCounselors() {
     }}
     slotProps={{backdrop: {sx: modalBackdropSx}}}
 >
-    {/* HEADER */}
+    
     <Box
         sx={{
             px: 3,
@@ -1243,11 +1243,11 @@ export default function SchoolCounselors() {
         </IconButton>
     </Box>
 
-    {/* CONTENT */}
+    
     <DialogContent sx={{px: 3, py: 3}}>
         {selectedCounselor && (
             <Stack spacing={3}>
-                {/* PROFILE */}
+                
                 <Stack direction="row" spacing={2} alignItems="center">
                     <Avatar
                         src={selectedCounselor.avatar || undefined}
@@ -1256,7 +1256,7 @@ export default function SchoolCounselors() {
                             width: 64,
                             height: 64,
                             background:
-                                "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                "#60a5fa",
                             fontWeight: 700,
                             fontSize: "1.4rem",
                         }}
@@ -1274,7 +1274,7 @@ export default function SchoolCounselors() {
                     </Box>
                 </Stack>
 
-                {/* INFO CARD */}
+                
                 <Box
                     sx={{
                         p: 2.5,
@@ -1297,7 +1297,7 @@ export default function SchoolCounselors() {
                             value={formatDate(selectedCounselor.registerDate)}
                         />
 
-                        {/* STATUS */}
+                        
                         <Box>
                             <Typography variant="caption" sx={{color: "#94a3b8"}}>
                                 Trạng thái
@@ -1336,7 +1336,7 @@ export default function SchoolCounselors() {
         )}
     </DialogContent>
 
-    {/* FOOTER */}
+    
     <DialogActions
         sx={{
             px: 3,

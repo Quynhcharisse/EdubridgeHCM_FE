@@ -384,7 +384,7 @@ export default function AdminSchoolVerification() {
                     borderRadius: 3.5,
                     mb: 2.5,
                     color: "white",
-                    background: "linear-gradient(95deg, #60a5fa 0%, #818cf8 46%, #a78bfa 100%)",
+                    background: "#60a5fa",
                     boxShadow: "0 12px 24px rgba(99, 102, 241, 0.2)",
                 }}
             >
@@ -584,7 +584,7 @@ export default function AdminSchoolVerification() {
                         color: "#1e293b",
                         pb: 1.2,
                         pr: 1,
-                        background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
+                        background: "#dbeafe",
                         borderBottom: "1px solid #93c5fd",
                     }}
                 >
@@ -747,10 +747,10 @@ export default function AdminSchoolVerification() {
                                         textTransform: "none",
                                         fontWeight: 700,
                                         minWidth: 120,
-                                        background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                                        background: "#22c55e",
                                         boxShadow: "0 4px 14px rgba(22, 163, 74, 0.45)",
                                         "&:hover": {
-                                            background: "linear-gradient(135deg, #16a34a 0%, #15803d 100%)",
+                                            background: "#16a34a",
                                             boxShadow: "0 6px 18px rgba(22, 163, 74, 0.5)",
                                         },
                                         "&.Mui-disabled": {
@@ -808,7 +808,7 @@ export default function AdminSchoolVerification() {
                 onConfirm={handleVerify}
                 loading={!!verifyingId}
                 paperSx={{
-                    background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+                    background: "#f8fbff",
                     border: "2px solid rgba(59,130,246,0.35)",
                     borderRadius: 4,
                     width: "min(92vw, 700px)",
@@ -855,9 +855,9 @@ export default function AdminSchoolVerification() {
                     height: 40,
                     borderRadius: 999,
                     boxShadow: "0 12px 26px rgba(37,99,235,0.5)",
-                    background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 58%, #1d4ed8 100%)",
+                    background: "#60a5fa",
                     "&:hover": {
-                        background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 58%, #1e40af 100%)",
+                        background: "#3b82f6",
                         boxShadow: "0 12px 26px rgba(29,78,216,0.5)",
                     },
                 }}

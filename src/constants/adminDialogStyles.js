@@ -9,7 +9,7 @@ export const adminDialogTitleSx = {
     fontWeight: 800,
     color: "#1e293b",
     pb: 1.2,
-    background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
+    background: "#dbeafe",
     borderBottom: "1px solid #93c5fd",
 };
 

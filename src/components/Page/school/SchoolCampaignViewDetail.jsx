@@ -187,7 +187,7 @@ function getCloneYearValidationError({ campaign, targetYear, campaigns }) {
         return y === targetYear && (s === "DRAFT" || s === "OPEN");
     });
     if (hasActiveOrDraftSameYear) {
-        return `Năm ${targetYear} đã có chiến dịch DRAFT/OPEN`;
+        return `Năm ${targetYear} đã có chiến dịch ở trạng thái Nháp/Đang mở`;
     }
     return "";
 }
@@ -272,7 +272,7 @@ export default function SchoolCampaignViewDetail() {
                     const parsed = parseCampaignTemplateResponse(res);
                     acc.push(...(Array.isArray(parsed.campaigns) ? parsed.campaigns.map(mapTemplate) : []));
                 } catch {
-                    // ignore
+                    
                 }
             }
             if (!cancelled) setCampaignsForCloneValidation(acc.filter(Boolean));
@@ -414,7 +414,7 @@ export default function SchoolCampaignViewDetail() {
             >
                 <Box
                     sx={{
-                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                        background: "#60a5fa",
                         px: { xs: 2.5, md: 3 },
                         py: { xs: 2.2, md: 2.6 },
                         color: "#fff",
@@ -1031,7 +1031,7 @@ export default function SchoolCampaignViewDetail() {
                 </DialogActions>
             </Dialog>
 
-            {/* Clone dialog */}
+            
             <Dialog
                 open={confirmCloneOpen}
                 onClose={(_, reason) => {
@@ -1069,7 +1069,7 @@ export default function SchoolCampaignViewDetail() {
                             setCloneYearError(err);
                         }}
                         error={!!cloneYearError}
-                        helperText={cloneYearError || "Năm mục tiêu phải >= năm campaign gốc và chưa có DRAFT/OPEN"}
+                        helperText={cloneYearError || "Năm mục tiêu phải >= năm chiến dịch gốc và chưa có trạng thái Nháp/Đang mở"}
                         inputProps={{ min: 1, step: 1 }}
                         sx={{ mt: 2.5, "& .MuiOutlinedInput-root": { borderRadius: "12px" } }}
                     />
@@ -1097,7 +1097,7 @@ export default function SchoolCampaignViewDetail() {
                 </DialogActions>
             </Dialog>
 
-            {/* Cancel dialog */}
+            
             <Dialog
                 open={confirmCancelOpen}
                 onClose={(_, reason) => { if (reason !== "backdropClick" && !cancelLoading) resetCancelFlow(); }}

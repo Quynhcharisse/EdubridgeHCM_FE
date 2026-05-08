@@ -27,20 +27,20 @@ const pickResponseBody = (response) => {
 	return body ?? null;
 };
 
-/**
- * GET /school/parents
- * Danh sách phụ huynh đã thêm trường vào yêu thích (dành cho SCHOOL campus chính).
- */
+
+
+
+
 export async function getSchoolFavouriteParents() {
 	const response = await axiosClient.get("/school/parents");
 	const body = pickResponseBody(response);
 	return Array.isArray(body) ? body : [];
 }
 
-/**
- * GET /parent/student/{id}
- * Chi tiết hồ sơ học sinh (student profile + academic profile).
- */
+
+
+
+
 export async function getParentStudentDetailById(studentId) {
 	const id = studentId != null ? String(studentId).trim() : "";
 	if (!id) {

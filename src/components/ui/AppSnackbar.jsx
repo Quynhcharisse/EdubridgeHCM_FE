@@ -1,6 +1,7 @@
 import React from 'react';
 import {Alert} from '@mui/material';
 import {enqueueSnackbar} from 'notistack';
+import {normalizeUiMessage} from '../../utils/normalizeUiMessage.js';
 
 const buildAlertContent =
     (severity = 'info') =>
@@ -15,7 +16,7 @@ const buildAlertContent =
         );
 
 export const showSuccessSnackbar = (message, options = {}) => {
-    enqueueSnackbar(message, {
+    enqueueSnackbar(normalizeUiMessage(message, ''), {
         autoHideDuration: 3000,
         ...options,
         content: buildAlertContent('success'),
@@ -23,7 +24,7 @@ export const showSuccessSnackbar = (message, options = {}) => {
 };
 
 export const showErrorSnackbar = (message, options = {}) => {
-    enqueueSnackbar(message, {
+    enqueueSnackbar(normalizeUiMessage(message), {
         autoHideDuration: 3000,
         ...options,
         content: buildAlertContent('error'),
@@ -31,7 +32,7 @@ export const showErrorSnackbar = (message, options = {}) => {
 };
 
 export const showInfoSnackbar = (message, options = {}) => {
-    enqueueSnackbar(message, {
+    enqueueSnackbar(normalizeUiMessage(message, ''), {
         autoHideDuration: 3000,
         ...options,
         content: buildAlertContent('info'),
@@ -39,7 +40,7 @@ export const showInfoSnackbar = (message, options = {}) => {
 };
 
 export const showWarningSnackbar = (message, options = {}) => {
-    enqueueSnackbar(message, {
+    enqueueSnackbar(normalizeUiMessage(message), {
         autoHideDuration: 3000,
         ...options,
         content: buildAlertContent('warning'),

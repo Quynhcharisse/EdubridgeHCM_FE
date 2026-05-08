@@ -487,7 +487,7 @@ export default function AdminPlatformSettings() {
         borderRadius: 2.5,
         p: 1.5,
         bgcolor: "#ffffff",
-        backgroundImage: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+        backgroundImage: "none",
         boxShadow: "0 6px 16px rgba(37, 99, 235, 0.08)",
         transition: "all 0.2s ease",
         height: "100%",
@@ -1772,7 +1772,7 @@ export default function AdminPlatformSettings() {
                             sx={{
                                 fontWeight: 900,
                                 color: "#0f172a",
-                                background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 48%, #bfdbfe 100%)",
+                                background: "#eff6ff",
                                 borderBottom: "1px solid #dbeafe",
                             }}
                         >
@@ -1803,7 +1803,7 @@ export default function AdminPlatformSettings() {
                                     <Table stickyHeader size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 800, width: 66, textAlign: "center" }}>STT</TableCell>
+                                                <TableCell sx={{ fontWeight: 800, width: 66, textAlign: "center" }}>Số TT</TableCell>
                                                 {importDisplayColumns.map((key) => (
                                                     <TableCell
                                                         key={`modal-col-${key}`}
@@ -2287,7 +2287,7 @@ export default function AdminPlatformSettings() {
                                                 <Table size="small">
                                                     <TableHead>
                                                         <TableRow sx={{ bgcolor: "#eef4ff" }}>
-                                                            <TableCell sx={{ width: 64, fontWeight: 800, color: "#374151" }}>STT</TableCell>
+                                                            <TableCell sx={{ width: 64, fontWeight: 800, color: "#374151" }}>Số TT</TableCell>
                                                             <TableCell sx={{ fontWeight: 800, color: "#374151" }}>Tên hồ sơ</TableCell>
                                                             <TableCell sx={{ width: 160, fontWeight: 800, color: "#374151" }}>Loại</TableCell>
                                                             {canEdit ? <TableCell align="center" sx={{ width: 64, fontWeight: 800, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
@@ -3268,7 +3268,7 @@ export default function AdminPlatformSettings() {
                         sx={{
                             fontWeight: 900,
                             color: "#0f172a",
-                            background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
+                            background: "#dbeafe",
                             borderBottom: "1px solid #93c5fd",
                         }}
                     >
@@ -3355,7 +3355,7 @@ export default function AdminPlatformSettings() {
                             borderRadius: 3,
                             p: { xs: 1.5, sm: 2 },
                             bgcolor: "#f8fbff",
-                            backgroundImage: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+                            backgroundImage: "none",
                             boxShadow: "0 10px 24px rgba(37, 99, 235, 0.08)",
                             mb: 1.75,
                         }}
@@ -3497,7 +3497,7 @@ export default function AdminPlatformSettings() {
                                     fontWeight: 800,
                                     color: "#0f172a",
                                     borderBottom: "1px solid #dbeafe",
-                                    background: "linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%)",
+                                    background: "#f8fbff",
                                 }}
                             >
                                Cập nhật hạn mức tuyển sinh
@@ -3756,7 +3756,7 @@ export default function AdminPlatformSettings() {
                     mb: 2.5,
                     color: "white",
                     background:
-                        "linear-gradient(95deg, #60a5fa 0%, #818cf8 46%, #a78bfa 100%)",
+                        "#60a5fa",
                     boxShadow: "0 12px 24px rgba(99, 102, 241, 0.2)",
                 }}
             >
@@ -4030,7 +4030,7 @@ export default function AdminPlatformSettings() {
                     sx={{
                         fontWeight: 900,
                         color: "#0f172a",
-                        background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 48%, #bfdbfe 100%)",
+                        background: "#eff6ff",
                         borderBottom: "1px solid #dbeafe",
                     }}
                 >

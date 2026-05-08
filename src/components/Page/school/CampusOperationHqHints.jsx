@@ -3,10 +3,10 @@ import {Chip, Stack, Typography} from "@mui/material";
 
 import {computeOpScalarVsHq, numOpScalar} from "../../../utils/campusOperationHqCompare.js";
 
-/**
- * So sánh giá trị form với cấu hình do trụ sở chính thiết lập (API: hqDefault.operation).
- * @param {{ fieldKey: string, effectiveOp: object, hqOp: object, hqMissing: boolean }} props
- */
+
+
+
+
 export function HqScalarDiffChip({fieldKey, effectiveOp, hqOp, hqMissing}) {
   const map = computeOpScalarVsHq(effectiveOp, hqOp, hqMissing);
   const differs = map[fieldKey];
@@ -35,7 +35,7 @@ function cycleStepLine(slot, buf) {
   return `Khoảng cách giữa hai đầu tiết (tiết + nghỉ): ${s + numOpScalar(buf)} phút`;
 }
 
-/** Nội dung ngắn (không lặp tiêu đề "Tư vấn viên:") — max 0 = không trần. */
+
 function fmtTvAssignBody(minV, maxV) {
   const mn = numOpScalar(minV);
   const mx = numOpScalar(maxV);
@@ -43,9 +43,9 @@ function fmtTvAssignBody(minV, maxV) {
   return `tối thiểu ${mn}${maxPart}`;
 }
 
-/**
- * So sánh quy định từ trụ sở chính với giá trị đang áp dụng tại cơ sở này (sau khi ghép dữ liệu).
- */
+
+
+
 export function HqVsCampusSlotBufferSummary({effectiveOp, hqOp, hqMissing}) {
   const effSlot = effectiveOp?.slotDurationInMinutes;
   const effBuf = effectiveOp?.bufferBetweenSlotsMinutes;
@@ -139,7 +139,7 @@ export function HqVsCampusSlotBufferSummary({effectiveOp, hqOp, hqMissing}) {
   );
 }
 
-/** Gợi ý chu kỳ tiết + nghỉ trên màn cấu hình cấp trường (không so sánh cơ sở). */
+
 export function SchoolSlotCycleHint({slotMinutes, bufferMinutes}) {
   const s = numOpScalar(slotMinutes);
   if (!(s > 0)) return null;

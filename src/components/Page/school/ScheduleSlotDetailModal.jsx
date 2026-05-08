@@ -49,9 +49,9 @@ function sessionBadgeColors(sessionType) {
   return { bg: "#F8FAFC", color: "#475569", border: BORDER_SOFT };
 }
 
-/**
- * Modal chi tiết khung giờ + danh sách tư vấn viên (School admin).
- */
+
+
+
 export default function ScheduleSlotDetailModal({
   open,
   onClose,

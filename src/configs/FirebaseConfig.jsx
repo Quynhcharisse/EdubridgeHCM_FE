@@ -12,10 +12,10 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-// Khởi tạo Messaging
+
 export const messaging = getMessaging(app);
 
-// Hàm xin quyền và lấy Token
+
 export const requestForToken = async () => {
     try {
         const currentToken = await getToken(messaging, {

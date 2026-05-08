@@ -39,10 +39,10 @@ export const markParentMessagesRead = async ({conversationId, username}) => {
     return response || null;
 };
 
-/**
- * Chi tiết hồ sơ học sinh cho TVV (GET /counsellor/student/{id}) — BE tách khỏi history chat.
- * Nếu path thực tế khác (vd /counsellor/parent/student/{id}), chỉnh một chỗ tại đây.
- */
+
+
+
+
 export const getCounsellorStudentById = async (studentProfileId) => {
     const id = studentProfileId != null ? String(studentProfileId).trim() : '';
     if (!id) {
@@ -86,7 +86,7 @@ export const markCounsellorMessagesRead = async ({conversationId, username}) => 
     return response || null;
 };
 
-/** PUT /campus/messages/read/{conversationId} — campus đánh dấu đã đọc tin từ admin. */
+
 export const markCampusMessagesRead = async (conversationId) => {
     const encodedConversationId = encodeURIComponent(conversationId ?? "");
     const endpoint = `/campus/messages/read/${encodedConversationId}`;

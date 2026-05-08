@@ -8,7 +8,7 @@ firebase.initializeApp({
     appId: "1:552134784046:web:6341327e597bb30c3edbbf",
 });
 
-// Lắng nghe thông báo khi app chạy ngầm hoặc đóng tab
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
@@ -19,15 +19,15 @@ messaging.onBackgroundMessage((payload) => {
     const targetPath = payload?.data?.route || payload?.data?.path || payload?.fcmOptions?.link || "/";
     const notificationOptions = {
         body: notificationBody,
-        icon: '/logo.png', // Thay bằng đường dẫn icon của bạn trong thư mục public
-        badge: '/logo.png', // Icon nhỏ hiện trên thanh trạng thái Android
+        icon: '/logo.png', 
+        badge: '/logo.png', 
         data: {
             ...(payload?.data || {}),
             route: targetPath,
-        }    // Lưu trữ dữ liệu thêm nếu cần xử lý khi click
+        }    
     };
 
-    // Hiển thị thông báo ra màn hình
+    
     self.registration.showNotification(notificationTitle, notificationOptions);
 });
 

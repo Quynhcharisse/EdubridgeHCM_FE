@@ -201,7 +201,7 @@ export default function LoginGoogle({onSuccess, onError}) {
                 </Box>
             </Box>
 
-            {isLoading && <div className="loading-message">Processing...</div>}
+            {isLoading && <div className="loading-message">Đang xử lý...</div>}
         </div>
     );
 }

@@ -44,7 +44,7 @@ export const sectionAccentBarSx = {
     width: 44,
     height: 3,
     borderRadius: 999,
-    background: 'linear-gradient(90deg, #2563eb 0%, #38bdf8 100%)',
+    background: '#60a5fa',
     mb: 2,
 };
 
@@ -53,7 +53,7 @@ export const pageShellSx = {
     minHeight: '100vh',
     pb: 5,
     background:
-        'linear-gradient(165deg, rgba(224, 242, 254, 0.92) 0%, rgba(186, 230, 253, 0.78) 40%, rgba(147, 197, 253, 0.65) 100%)',
+        'rgba(224, 242, 254, 0.92)',
 };
 
 export const backButtonSx = {

@@ -294,7 +294,7 @@ function SubscriptionPreviewModal({
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>VAT</Typography>
+                                            <Typography sx={{ color: "#334155", fontSize: "0.9rem" }}>Thuế GTGT (VAT)</Typography>
                                             <Typography sx={{ color: "#0f172a", fontSize: "0.9rem", fontWeight: 700 }}>
                                                 {formatVnd(previewData?.breakdown?.taxFee)}
                                             </Typography>
@@ -577,7 +577,7 @@ export default function PackageFeesPage() {
                     minHeight: "60vh",
                     pt: LAYOUT_HEADER_TOP_PX,
                     pb: { xs: 5, md: 7 },
-                    background: "linear-gradient(180deg, #f8fafc 0%, #f0f9ff 100%)",
+                    background: "#f0f9ff",
                 }}
             >
                 <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>

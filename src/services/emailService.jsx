@@ -40,9 +40,9 @@ export const sendWelcomeEmail = async ({ name, email }) => {
 
     emailjs.init({ publicKey: WELCOME_PUBLIC_KEY });
 
-    // Gửi đủ alias: HTML của bạn dùng {{userName}} / {{userEmail}}; trường "To Email"
-    // trên EmailJS thường là {{email}}, {{user_email}} hoặc {{to_email}} — nếu không khớp,
-    // người nhận rỗng và API sẽ lỗi.
+    
+    
+    
     const templateParams = {
         userName: trimmedName,
         userEmail: trimmedEmail,
@@ -117,7 +117,7 @@ export const sendSchoolVerifiedEmail = async ({ schoolName, email }) => {
     emailjs.init({ publicKey: WELCOME_PUBLIC_KEY });
 
     const templateParams = {
-        // Recipient aliases
+        
         email: trimmedEmail,
         userEmail: trimmedEmail,
         user_email: trimmedEmail,
@@ -129,7 +129,7 @@ export const sendSchoolVerifiedEmail = async ({ schoolName, email }) => {
         user_name: normalizedSchoolName,
         schoolName: normalizedSchoolName,
         school_name: normalizedSchoolName,
-        // Content aliases
+        
         subject: SCHOOL_VERIFIED_SUBJECT,
         email_subject: SCHOOL_VERIFIED_SUBJECT,
         title: SCHOOL_VERIFIED_SUBJECT,
@@ -162,10 +162,10 @@ const assertQuotaRequestEmailJsConfig = () => {
     }
 };
 
-/**
- * Campus phụ: lấy tóm tắt từ BE rồi gửi email tới email campus chính (EmailJS).
- * @param {{ requestedAmount: number; userNote?: string }} params
- */
+
+
+
+
 export const sendCampusQuotaRequestEmail = async ({requestedAmount, userNote = ""}) => {
     assertQuotaRequestEmailJsConfig();
 
@@ -192,7 +192,7 @@ export const sendCampusQuotaRequestEmail = async ({requestedAmount, userNote = "
     const noteDisplay = note || "—";
     const requestedStr = String(Math.floor(n));
 
-    /** Nội dung đã ghép sẵn — dùng trong EmailJS: {{message}} hoặc {{message_html}} (EmailJS chỉ map với {{tên_biến}}, không phải {tên_biến}). */
+    
     const message = `Kính gửi Ban Quản trị trường ${schoolName},
 
 Cơ sở ${campusName} hiện đã sử dụng hết hạn ngạch Tư vấn viên (${currentUsage}/${maxQuota}).

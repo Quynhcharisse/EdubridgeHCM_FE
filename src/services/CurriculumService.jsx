@@ -1,10 +1,10 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
-/**
- * GET /api/v1/school/curriculum/list
- * @param {number} page - zero-based page index
- * @param {number} pageSize - items per page
- */
+
+
+
+
+
 export const getCurriculumList = async (page = 0, pageSize = 10) => {
     const response = await axiosClient.get("/school/curriculum/list", {
         params: { page, pageSize },
@@ -12,20 +12,20 @@ export const getCurriculumList = async (page = 0, pageSize = 10) => {
     return response || null;
 };
 
-/**
- * POST /api/v1/school/curriculum
- * Upsert curriculum draft:
- * - Create when curriculumId is absent/null/0
- * - Update when curriculumId is provided (> 0)
- *
- * @param {Object} payload
- * @param {number|null} [payload.curriculumId]
- * @param {string} payload.subTypeName
- * @param {string} payload.description
- * @param {string} payload.curriculumType
- * @param {string[]} payload.methodLearningList
- * @param {Array<{name:string, description:string, isMandatory:boolean}>} payload.subjectOptions
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export const upsertCurriculum = async ({
     curriculumId = null,
     subTypeName,
@@ -41,7 +41,7 @@ export const upsertCurriculum = async ({
         methodLearningList: Array.isArray(methodLearningList) ? methodLearningList : [],
         subjectOptions: subjectOptions || [],
     };
-    // BE: curriculumId = 0 (hoặc không truyền) => tạo mới DRAFT
+    
     const numericId = curriculumId === null || curriculumId === undefined || curriculumId === "" ? null : Number(curriculumId);
     if (numericId !== null && !Number.isNaN(numericId) && numericId !== 0) {
         body.curriculumId = numericId;
@@ -54,16 +54,16 @@ export const upsertCurriculum = async ({
     return response || null;
 };
 
-// Backward-compatible alias
+
 export const saveCurriculum = upsertCurriculum;
 
-/**
- * PATCH /api/v1/school/{id}/activate/curriculum
- * Perform curriculum status action by curriculumId.
- *
- * @param {number|string} id
- * @param {"PUBLISH"|"REVISE"|"ARCHIVE"} action
- */
+
+
+
+
+
+
+
 export const activateCurriculum = async (id, action) => {
     const response = await axiosClient.patch(`/school/${id}/activate/curriculum`, {}, {
         params: { action },
@@ -74,18 +74,18 @@ export const activateCurriculum = async (id, action) => {
     return response || null;
 };
 
-/**
- * GET /api/v1/school/templates/national
- */
+
+
+
 export const getNationalCurriculumTemplate = async () => {
     const response = await axiosClient.get("/school/templates/national");
     return response || null;
 };
 
-/**
- * POST /api/v1/school/extract/excel/international
- * @param {File} file
- */
+
+
+
+
 export const extractInternationalCurriculumFromExcel = async (file) => {
     const formData = new FormData();
     formData.append("file", file);

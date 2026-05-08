@@ -6,20 +6,20 @@ import {
     validateMediaImageFile,
 } from "../../utils/platformMediaConfig.js";
 
-/**
- * Upload unsigned lên Cloudinary (preset trong Dashboard).
- *
- * @param {object} props
- * @param {(files: { url: string, type: string, publicId?: string, format?: string, bytes?: number }[]) => void} props.onSuccess
- * @param {(message: string) => void} [props.onError]
- * @param {string} [props.accept]
- * @param {boolean} [props.multiple]
- * @param {boolean} [props.disabled]
- * @param {{ extensions: string[], maxBytes: number, maxImgSizeMb?: number } | null} [props.mediaImageRules] — khi truyền (kèm accept chỉ ảnh), validate size/format trước khi upload
- * @param {boolean} [props.mediaImageRulesLoading]
- * @param {string} [props.inputId] — để gắn label/htmlFor từ ngoài (tránh trùng khi nhiều input trên trang)
- * @param {(ctx: { inputId: string, loading: boolean }) => React.ReactNode} props.children — nút kích hoạt (dùng htmlFor={inputId})
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export default function CloudinaryUpload({
     onSuccess,
     onError,

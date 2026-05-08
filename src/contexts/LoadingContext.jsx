@@ -1,7 +1,7 @@
 import {createContext, useCallback, useContext, useEffect, useState} from "react";
 
 const LoadingContext = createContext();
-// eslint-disable-next-line react-refresh/only-export-components
+
 export const useLoading = () => {
     const context = useContext(LoadingContext);
     if (!context) {

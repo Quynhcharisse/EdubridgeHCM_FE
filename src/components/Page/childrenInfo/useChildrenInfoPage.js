@@ -140,7 +140,7 @@ export function useChildrenInfoPage() {
         });
     };
 
-    /** Cùng tab: đăng nhập đổi tài khoản; tab khác: `storage`. Tránh giữ form học sinh của phiên trước. */
+    
     useEffect(() => {
         const bump = () => setAuthSessionTick((t) => t + 1);
         const onStorage = (e) => {
@@ -157,7 +157,7 @@ export function useChildrenInfoPage() {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            /** Sau logout storage đã xóa `user` nhưng vẫn bump tick — không gọi API để tránh 401/snackbar lỗi. */
+            
             try {
                 if (!localStorage.getItem('user')) {
                     if (!cancelled) setLoading(false);
@@ -433,7 +433,7 @@ export function useChildrenInfoPage() {
         ]);
     };
 
-    /** Xóa một dòng ngoại ngữ (catalog / metadata / dòng trống thêm tay). Giữ ít nhất một dòng trống để có thể thêm lại. */
+    
     const removeForeignLanguageRow = (rowId) => {
         setForeignRows((prev) => {
             const next = prev.filter((r) => r.rowId !== rowId);

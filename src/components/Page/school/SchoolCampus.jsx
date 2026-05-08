@@ -135,7 +135,7 @@ const HCM_CODE = 79;
 const HCM_CITY_NAME = "Ho Chi Minh City";
 const DEFAULT_MAP_CENTER = [10.7769, 106.7009];
 
-/** Đồng bộ với CampusValidation.normalize (BE). */
+
 function normalizeCampusField(value) {
     if (value == null) return null;
     const trimmed = String(value).trim();
@@ -675,10 +675,10 @@ export default function SchoolCampus() {
 
     return (
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
-            {/* Page Header */}
+            {}
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -737,7 +737,7 @@ export default function SchoolCampus() {
                 </Box>
             </Box>
 
-            {/* Search & Filter */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -825,7 +825,7 @@ export default function SchoolCampus() {
                 </CardContent>
             </Card>
 
-            {/* Campus Table */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -901,7 +901,7 @@ export default function SchoolCampus() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 600,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60a5fa",
                                                     }}
                                                 >
                                                     Tạo cơ sở
@@ -1018,7 +1018,7 @@ export default function SchoolCampus() {
                 )}
             </Card>
 
-            {/* Create Campus Modal */}
+            
             <Dialog
                 open={createModalOpen}
                 onClose={(event, reason) => {
@@ -1191,7 +1191,7 @@ export default function SchoolCampus() {
                                 <Box sx={{ mt: 2, height: 220, border: "1px solid #e2e8f0", borderRadius: 2, overflow: "hidden" }}>
                                     <MapContainer center={createMapCenter} zoom={hasCreateLatLng ? 15 : 12} style={{ height: "100%", width: "100%" }}>
                                         <TileLayer
-                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            attribution='&copy; <a href="https:
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
                                         {hasCreateLatLng && (
@@ -1205,8 +1205,8 @@ export default function SchoolCampus() {
                             </CardContent>
                         </Card>
                         <Typography variant="body2" sx={{color: "#64748b", fontSize: 13}}>
-                            Hệ thống sẽ tạo cơ sở mới và tài khoản quản lý tương ứng với role{" "}
-                            <strong>SCHOOL</strong> dựa trên email này.
+                            Hệ thống sẽ tạo cơ sở mới và tài khoản quản lý tương ứng với vai trò{" "}
+                            <strong>Trường học</strong> dựa trên email này.
                         </Typography>
                     </Stack>
                     </Box>
@@ -1235,7 +1235,7 @@ export default function SchoolCampus() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         {createCampusSubmitting ? "Đang tạo…" : "Tạo cơ sở"}
@@ -1243,7 +1243,7 @@ export default function SchoolCampus() {
                 </DialogActions>
             </Dialog>
 
-            {/* View Details Modal */}
+            
             <Dialog
                 open={viewModalOpen}
                 onClose={(event, reason) => {
@@ -1351,7 +1351,7 @@ export default function SchoolCampus() {
                 >
                     {selectedCampus && (
                         <Box sx={{display: "flex", flexDirection: "column", gap: 3, pb: 2.5}}>
-                            {/* Hero */}
+                            {}
                             <Box
                                 sx={{
                                     position: "relative",
@@ -1377,7 +1377,7 @@ export default function SchoolCampus() {
                                         position: "absolute",
                                         inset: 0,
                                         background:
-                                            "linear-gradient(180deg, rgba(2, 6, 23, 0.10) 0%, rgba(2, 6, 23, 0.58) 100%)",
+                                            "rgba(2, 6, 23, 0.36)",
                                     }}
                                 />
 
@@ -1425,7 +1425,7 @@ export default function SchoolCampus() {
                                 </Box>
                             </Box>
 
-                            {/* Info grid */}
+                            {}
                             <Box
                                 sx={{
                                     display: "grid",
@@ -1433,7 +1433,7 @@ export default function SchoolCampus() {
                                     gap: 2,
                                 }}
                             >
-                                {/** Address */}
+                                {}
                                 <Card
                                     sx={{
                                         borderRadius: 3,
@@ -1464,7 +1464,7 @@ export default function SchoolCampus() {
                                     </Typography>
                                 </Card>
 
-                                {/** City/District */}
+                                
                                 <Card
                                     sx={{
                                         borderRadius: 3,
@@ -1495,7 +1495,7 @@ export default function SchoolCampus() {
                                     </Typography>
                                 </Card>
 
-                                {/** Boarding type */}
+                                
                                 <Card
                                     sx={{
                                         borderRadius: 3,
@@ -1529,7 +1529,7 @@ export default function SchoolCampus() {
                                     </Typography>
                                 </Card>
 
-                                {/** Coordinates */}
+                                
                                 <Card
                                     sx={{
                                         borderRadius: 3,
@@ -1576,7 +1576,7 @@ export default function SchoolCampus() {
                                 </Card>
                             </Box>
 
-                            {/* Contact */}
+                            
                             <Card
                                 sx={{
                                     borderRadius: 3,
@@ -1671,7 +1671,7 @@ export default function SchoolCampus() {
                                 </Box>
                             </Card>
 
-                            {/* Date */}
+                            
                             <Card
                                 sx={{
                                     borderRadius: 3,
@@ -1741,7 +1741,7 @@ export default function SchoolCampus() {
                 </DialogActions>
             </Dialog>
 
-            {/* Edit Campus Modal */}
+            
             <Dialog
                 open={editModalOpen}
                 onClose={(event, reason) => {
@@ -1856,98 +1856,98 @@ export default function SchoolCampus() {
                             </Typography>
                             <CloudinaryUpload
                                 inputId="school-campus-edit-image"
-                                accept="image/*"
-                                multiple={false}
-                                mediaImageRules={mediaImageRules}
-                                mediaImageRulesLoading={mediaImageRulesLoading}
-                                onSuccess={handleCampusImageUploaded}
-                                onError={(msg) => enqueueSnackbar(msg, {variant: "error"})}
-                            >
-                                {({inputId, loading}) => (
-                                    <Button
-                                        component="label"
-                                        htmlFor={inputId}
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon/>}
-                                        disabled={loading}
-                                        sx={{borderRadius: 2, textTransform: "none"}}
-                                    >
-                                        {loading ? "Đang tải..." : "Tải ảnh lên (Cloudinary)"}
-                                    </Button>
-                                )}
-                            </CloudinaryUpload>
-                            {(formValues.imagePreview || selectedCampus?.imageUrl) && (
-                                <Box
-                                    component="img"
-                                    src={formValues.imagePreview || selectedCampus?.imageUrl || PLACEHOLDER_IMAGE}
-                                    alt="Preview"
-                                    sx={{
-                                        mt: 1,
-                                        maxHeight: 120,
-                                        borderRadius: 2,
-                                        border: "1px solid #e2e8f0",
-                                    }}
-                                />
-                            )}
-                        </Box>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                            }}
-                        >
-                            <Typography sx={{fontWeight: 500}}>Trạng thái</Typography>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                                <Typography
-                                    variant="body2"
-                                    sx={{color: formValues.status ? "#16a34a" : "#94a3b8"}}
-                                >
-                                    {formValues.status ? "Hoạt động" : "Ngưng hoạt động"}
-                                </Typography>
-                                <Switch
-                                    checked={formValues.status}
-                                    onChange={handleStatusToggle}
-                                    sx={{
-                                        "& .MuiSwitch-switchBase.Mui-checked": {color: "#0D64DE"},
-                                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                                            backgroundColor: "#0D64DE",
-                                        },
-                                    }}
-                                />
-                            </Stack>
-                        </Box>
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{px: 3, py: 2.5, borderTop: "1px solid #e2e8f0", gap: 1}}>
-                    <Button
-                        onClick={() => {
-                            setFormErrors({});
-                            setEditModalOpen(false);
-                        }}
-                        variant="text"
-                        color="inherit"
-                        sx={{textTransform: "none", fontWeight: 500}}
-                    >
-                        Hủy
-                    </Button>
-                    <Button
-                        onClick={handleEditSubmit}
-                        variant="contained"
-                        sx={{
-                            textTransform: "none",
-                            fontWeight: 600,
-                            borderRadius: 2,
-                            px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
-                        }}
-                    >
-                        Lưu
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                                accept="image
 
-            {/* Disable confirmation dialog */}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
             <Dialog
                 open={disableConfirmOpen}
                 onClose={(event, reason) => {

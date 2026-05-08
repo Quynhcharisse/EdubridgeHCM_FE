@@ -51,7 +51,7 @@ function normalizeFacilityMatchKey(s) {
     .toLowerCase();
 }
 
-/** Bản ghi ảnh từ `imageData.imageList` (có thể có `facilityCode` nếu BE gửi). */
+
 function facilityImageRecords(imageData) {
   if (!imageData || typeof imageData !== "object") return [];
   const list = Array.isArray(imageData.imageList) ? imageData.imageList : [];
@@ -68,7 +68,7 @@ function facilityImageRecords(imageData) {
     .filter(Boolean);
 }
 
-/** Các ảnh trong `imageData.imageList` — giữ cho tương thích / fallback ảnh chính. */
+
 function facilityImageEntries(imageData) {
   return facilityImageRecords(imageData).map((r) => ({
     url: r.url,
@@ -77,10 +77,10 @@ function facilityImageEntries(imageData) {
   }));
 }
 
-/**
- * Mỗi phần tử `itemList` ↔ một ảnh trong `imageList`: ưu tiên facilityCode, rồi tên/altName,
- * cuối cùng cùng chỉ số (dữ liệu song song như mẫu BE).
- */
+
+
+
+
 function pairFacilityItemsWithImages(itemList, imageData) {
   const items = Array.isArray(itemList) ? itemList : [];
   const entries = facilityImageRecords(imageData);
@@ -137,7 +137,7 @@ function pairFacilityItemsWithImages(itemList, imageData) {
   return out;
 }
 
-/** Ảnh lớn phía trên: ưu tiên bìa; không có thì ảnh đầu trong danh sách. */
+
 function facilityPrimaryImageUrl(imageData) {
   const cover = facilityCoverUrl(imageData);
   if (cover) return cover;
@@ -317,7 +317,7 @@ export default function ConfigList() {
   const [search, setSearch] = useState("");
   const [tabIndex, setTabIndex] = useState(0);
 
-  /** Cơ sở chính: toàn bộ danh sách API. Cơ sở phụ: chỉ bản ghi trùng campus đăng nhập (hoặc campusPrimary === false nếu chưa có id). */
+  
   const branchScopedRows = useMemo(() => {
     if (isPrimaryBranch) return rows;
     const cid =
@@ -426,7 +426,7 @@ export default function ConfigList() {
   const gradientHeader = (
     <Box
       sx={{
-        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+        background: "#60a5fa",
         borderRadius: 3,
         p: 3,
         color: "white",

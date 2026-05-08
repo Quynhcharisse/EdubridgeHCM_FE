@@ -76,11 +76,11 @@ const sectionCardSx = {
     boxShadow: "0 10px 24px rgba(15, 23, 42, 0.04)",
 };
 
-// Bảng vẫn có thể hiển thị thêm trạng thái khác từ API; filter chỉ theo 3 trạng thái admission campaign
+
 const STATUS_FILTER_OPTIONS = [
-    {value: "OPEN", label: "Đang mở"}, // OPEN_ADMISSION_CAMPAIGN / publish
-    {value: "CANCELLED", label: "Đã hủy"}, // CANCELLED_ADMISSION_CAMPAIGN
-    {value: "DRAFT", label: "Bản nháp"}, // DRAFT_ADMISSION_CAMPAIGN
+    {value: "OPEN", label: "Đang mở"}, 
+    {value: "CANCELLED", label: "Đã hủy"}, 
+    {value: "DRAFT", label: "Bản nháp"}, 
 ];
 
 const STATUS_OPTIONS = [
@@ -90,7 +90,7 @@ const STATUS_OPTIONS = [
     {value: "EXPIRED", label: "Hết hạn"},
 ];
 
-/** Normalize template from API (id or admissionCampaignTemplateId) */
+
 function normalizeCampaignStatus(rawStatus) {
     const s = String(rawStatus || "").trim().toUpperCase();
     if (!s) return "DRAFT";
@@ -195,10 +195,10 @@ function formatDate(dateStr) {
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
-/** Năm chọn khi xuất Excel (danh sách rộng để xuất theo từng năm) */
+
 const CAMPAIGN_EXPORT_YEAR_OPTIONS = Array.from({length: 16}, (_, i) => CURRENT_YEAR + 1 - i);
 
-/** Các năm quá khứ gộp trong tab «Các năm trước» (gọi API theo từng năm rồi merge). */
+
 const PAST_YEARS_FETCH_COUNT = 8;
 const PAST_YEARS_FOR_TAB = Array.from({length: PAST_YEARS_FETCH_COUNT}, (_, i) => CURRENT_YEAR - 1 - i);
 const FUTURE_YEARS_FETCH_COUNT = 30;
@@ -208,7 +208,7 @@ const CAMPAIGN_TAB_CURRENT = "current";
 const CAMPAIGN_TAB_UPCOMING = "upcoming";
 const CAMPAIGN_TAB_PAST = "past";
 
-/** Gộp nhiều response, trùng id chỉ giữ một bản. */
+
 function mergeCampaignListsById(rowsArrays) {
     const byId = new Map();
     for (const rows of rowsArrays) {
@@ -228,7 +228,7 @@ function mergeCampaignListsById(rowsArrays) {
     });
 }
 
-/** Parse YYYY-MM-DD as local calendar date (tránh lệch múi giờ so với LocalDate BE). */
+
 function parseLocalDate(iso) {
     const t = String(iso ?? "").trim();
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
@@ -272,7 +272,7 @@ function campaignDescriptionToInitialHtml(stored) {
     return `<p>${esc}</p>`;
 }
 
-/** Map BE validation messages (EN / VI) → hiển thị tiếng Việt (Create + Update) */
+
 const CAMPAIGN_ERROR_VI = {
     "Request is required": "Yêu cầu không được để trống",
     "Name is required": "Tên chiến dịch không được để trống",
@@ -284,7 +284,7 @@ const CAMPAIGN_ERROR_VI = {
     "Start date cannot be in the past": "Ngày bắt đầu không được ở trong quá khứ",
     "End date must be in the future": "Ngày kết thúc phải ở trong tương lai",
     "End date must be after start date": "Ngày kết thúc phải sau ngày bắt đầu",
-    // Thông điệp tiếng Việt từ validationCreateAdmissionCampaignTemplate (BE)
+    
     "Dữ liệu yêu cầu không được để trống": "Dữ liệu yêu cầu không được để trống",
     "Tên chiến dịch không được để trống": "Tên chiến dịch không được để trống",
     "Tên chiến dịch quá dài. Độ dài tối đa là 100 ký tự": "Tên chiến dịch quá dài. Độ dài tối đa là 100 ký tự",
@@ -680,7 +680,7 @@ export default function SchoolCampaigns() {
         if (statusFilter !== "all") {
             list = list.filter((c) => String(c.status).toUpperCase() === statusFilter);
         }
-        // Ưu tiên campaign trạng thái DRAFT, sau đó OPEN
+        
         return [...list].sort((a, b) => {
             const yearA = Number(a?.year) || 0;
             const yearB = Number(b?.year) || 0;
@@ -1130,10 +1130,10 @@ export default function SchoolCampaigns() {
                 fontFamily: '"Inter", "SF Pro Display", system-ui, sans-serif',
             }}
         >
-            {/* Header — cùng style trang Cơ sở */}
+            {}
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1204,7 +1204,7 @@ export default function SchoolCampaigns() {
                     overflow: "hidden",
                 }}
             >
-                {/* Tiêu đề trong card — cùng kiểu màn Cài đặt */}
+                
                 <Box
                     sx={{
                         px: 2.5,
@@ -1230,7 +1230,7 @@ export default function SchoolCampaigns() {
                     </Box>
                 </Box>
 
-                {/* Tabs năm học */}
+                {}
                 <Box sx={{px: 2.5}}>
                     <Tabs
                         value={campaignTab}
@@ -1549,7 +1549,7 @@ export default function SchoolCampaigns() {
                                                         textTransform: "none",
                                                         fontWeight: 600,
                                                         background:
-                                                            "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                            "#60a5fa",
                                                     }}
                                                 >
                                                     Tạo chiến dịch
@@ -1761,7 +1761,7 @@ export default function SchoolCampaigns() {
             </Box>
             </Fade>
 
-            {/* Create Campaign Modal */}
+            {}
             <Dialog
                 open={createModalOpen}
                 onClose={(event, reason) => {
@@ -2237,7 +2237,7 @@ export default function SchoolCampaigns() {
                 </DialogActions>
             </Dialog>
 
-            {/* Clone confirm dialog */}
+            
             <Dialog
                 open={confirmCloneOpen}
                 onClose={(event, reason) => {
@@ -2296,7 +2296,7 @@ export default function SchoolCampaigns() {
                 </DialogActions>
             </Dialog>
 
-            {/* Cancel confirm dialog */}
+            
             <Dialog
                 open={confirmCancelOpen}
                 onClose={(event, reason) => {

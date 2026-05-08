@@ -112,7 +112,7 @@ export default function SchoolServicePackagesGrid({
                     ? {
                           border: "1px solid rgba(168,85,247,0.45)",
                           shadow: "0 24px 58px rgba(147,51,234,0.2)",
-                          background: "linear-gradient(160deg, #f3e8ff 0%, #e9d5ff 55%, #ddd6fe 100%)",
+                          background: "#e9d5ff",
                           color: "#7e22ce",
                           checkColor: "#db2777",
                       }
@@ -120,7 +120,7 @@ export default function SchoolServicePackagesGrid({
                       ? {
                             border: "1px solid rgba(59,130,246,0.4)",
                             shadow: "0 18px 42px rgba(37,99,235,0.14)",
-                            background: "linear-gradient(165deg, #eff6ff 0%, #dbeafe 52%, #bfdbfe 100%)",
+                            background: "#dbeafe",
                             color: "#1d4ed8",
                             checkColor: "#0284c7",
                         }
@@ -128,7 +128,7 @@ export default function SchoolServicePackagesGrid({
                         ? {
                               border: "1px solid rgba(22,163,74,0.36)",
                               shadow: "0 16px 36px rgba(22,163,74,0.12)",
-                              background: "linear-gradient(165deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)",
+                              background: "#dcfce7",
                               color: "#166534",
                               checkColor: "#15803d",
                           }

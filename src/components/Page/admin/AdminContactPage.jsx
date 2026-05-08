@@ -65,7 +65,7 @@ const pickIncomingConversationId = (payload) => {
         const inner = JSON.parse(body.message);
         raw = extractConversationIdFromObject(inner);
       } catch {
-        /* ignore */
+        
       }
     }
   }
@@ -99,7 +99,7 @@ const unwrapWsPayload = (p) => {
   return p;
 };
 
-/** Gộp frame STOMP, body đã unwrap và `data` lồng — BE có thể đặt id ở lớp bất kỳ. */
+
 const mergeChatPayload = (payload) => {
   const root = unwrapWsPayload(payload);
   const base = payload && typeof payload === "object" && !Array.isArray(payload) ? {...payload} : {};
@@ -108,7 +108,7 @@ const mergeChatPayload = (payload) => {
   return {...base, ...r, ...nestedData};
 };
 
-/** Giống SchoolContactAdmin — BE/STOMP có thể đặt nội dung trong `chatMessage` hoặc `message` object. */
+
 const flattenWsForNormalize = (merged) => {
   const cm = merged?.chatMessage;
   const msg = merged?.message;
@@ -173,7 +173,7 @@ const formatMessageTime = (value) => {
   }
 };
 
-/** Nhãn cuộc trò chuyện (sidebar / header): ưu tiên tên trường + cơ sở từ WS/API. */
+
 const formatAdminConversationListLabel = ({schoolName, campusName, campusEmail, campusId}) => {
   const sn = String(schoolName || "").trim();
   const cn = String(campusName || "").trim();
@@ -187,7 +187,7 @@ const formatAdminConversationListLabel = ({schoolName, campusName, campusEmail, 
   return Number.isFinite(campusNum) && campusNum >= 0 ? `${labelBase} · ${campusNum}` : labelBase;
 };
 
-/** GET /admin/conversation — BE có thể đặt preview tin cuối dưới nhiều tên field. */
+
 const pickLastMessagePreviewFromConversationItem = (item) => {
   if (!item || typeof item !== "object") return "";
   const raw =
@@ -216,7 +216,7 @@ const normalizePrincipal = (v) =>
     .toLowerCase()
     .replace(/^["'<\s]+|["'>\s]+$/g, "");
 
-/** Giống SchoolContactAdmin — sender/receiver có thể nằm trong chatMessage / message lồng. */
+
 const extractPrivateMessageSender = (merged) => {
   const layers = [merged, merged?.chatMessage, merged?.message, merged?.data, merged?.dto, merged?.payload].filter(
     (x) => x && typeof x === "object" && !Array.isArray(x)
@@ -289,7 +289,7 @@ const extractItemsArray = (obj) => {
   return [];
 };
 
-/** Lấy mảng conversation từ GET /admin/conversation (hỗ trợ body lồng). */
+
 const extractAdminConversationList = (responseData) => {
   const envelope = parseBodyObject(responseData);
   const topBody = parseBodyObject(envelope?.body);
@@ -357,7 +357,7 @@ const matchesAdminConversationRow = (c, convId, campusId, senderNorm) => {
   return false;
 };
 
-/** Khi GET /admin/conversation trả rỗng nhưng WS đã có tin — tạo dòng danh sách từ payload (không gọi API). */
+
 const buildSyntheticAdminConversationRow = ({
   conversationId,
   campusId,
@@ -530,10 +530,10 @@ export default function AdminContactPage() {
         setConversations((prev) =>
           prev.map((c) => (isSameConversationId(c._conversationId, id) ? {...c, _unreadCount: 0} : c))
         );
-        /** Không dispatch admin-contact-conversations-refresh — tránh GET /admin/conversation mỗi lần focus ô nhập; badge sidebar nhận admin-contact-unread-aggregate từ state. */
+        
       }
     } catch {
-      /* ignore */
+      
     } finally {
       markReadInFlightRef.current = false;
     }
@@ -692,7 +692,7 @@ export default function AdminContactPage() {
         setConversationLoadError("Không tải được danh sách hội thoại.");
       } finally {
         setConversationsLoading(false);
-        /** Không dispatch admin-contact-conversations-refresh — tránh GET /admin/conversation lần 2; badge sidebar nhận admin-contact-unread-aggregate khi conversations set. */
+        
       }
     };
     void loadConversations();
@@ -749,7 +749,7 @@ export default function AdminContactPage() {
       const schoolNameWs = String(merged?.schoolName ?? merged?.school_name ?? "").trim();
       const campusNameWs = String(merged?.campusName ?? merged?.campus_name ?? "").trim();
 
-      /** Cập nhật danh sách trái: khớp dòng có sẵn hoặc thêm dòng synthetic khi GET trước đó rỗng. */
+      
       const {next, targetRow} = upsertAdminConversationsFromWs(conversationsRef.current, {
         incomingConversationId,
         campusFromPayload,
@@ -1090,7 +1090,7 @@ export default function AdminContactPage() {
               overflowX: "hidden",
               overflowY: "auto",
               WebkitOverflowScrolling: "touch",
-              bgcolor: "linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,0.95) 100%)",
+              bgcolor: "rgba(238,242,255,0.55)",
             }}
           >
             {historyLoading ? (

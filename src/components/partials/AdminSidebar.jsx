@@ -190,7 +190,7 @@ const menuGroups = [
 export default function AdminSidebar({ currentPath, collapsed = false, onToggleCollapse }) {
     const navigate = useNavigate();
     const [userAnchorEl, setUserAnchorEl] = useState(null);
-    /** Đồng bộ từ WS (aggregate) + GET lần đầu; khi không ở /admin/contact, WS bơm +từng tin. */
+    
     const [contactUnreadConversationCount, setContactUnreadConversationCount] = useState(0);
     const [contactUnreadMessageTotal, setContactUnreadMessageTotal] = useState(0);
     const currentPathRef = useRef(currentPath);
@@ -220,7 +220,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
             setContactUnreadConversationCount(Math.min(99, nConv));
             setContactUnreadMessageTotal(Math.min(99, nMsg));
         } catch {
-            /* ignore */
+            
         }
     }, []);
 
@@ -228,7 +228,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
         currentPathRef.current = currentPath;
     }, [currentPath]);
 
-    /** GET danh sách conversation chỉ lần đầu load sidebar; sau đó unread cập nhật qua WS (trang contact tự quản danh sách). */
+    
     useEffect(() => {
         void refreshAdminContactUnread();
         const onCustom = () => void refreshAdminContactUnread();
@@ -238,7 +238,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
         };
     }, [refreshAdminContactUnread]);
 
-    /** Trang Liên hệ emit sau mỗi lần cập nhật `conversations` (từ WS bump _unreadCount). */
+    
     useEffect(() => {
         const onAggregate = (e) => {
             const cw = Number(e?.detail?.conversationsWithUnread);
@@ -250,10 +250,10 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
         return () => window.removeEventListener("admin-contact-unread-aggregate", onAggregate);
     }, []);
 
-    /**
-     * Không GET khi có tin campus. Mỗi frame STOMP: +1 tổng tin; +1 số cuộc (debounce ~400ms, gộp nhiều tin cùng lúc).
-     * Trang /admin/contact: aggregate từ AdminContactPage ghi đè cả hai.
-     */
+    
+
+
+
     useEffect(() => {
         const onPrivateMessage = (payload) => {
             const root = unwrapWsPayloadAdmin(payload);
@@ -282,7 +282,7 @@ export default function AdminSidebar({ currentPath, collapsed = false, onToggleC
         };
     }, [myPrincipalLower]);
 
-    /** Badge menu Liên hệ: chỉ số cuộc có tin chưa đọc (không phải tổng số tin). Chi tiết tin/cuộc giữ trong tooltip. */
+    
     const adminContactBadgeDisplay = Math.min(99, contactUnreadConversationCount || 0);
 
     const handleUserMenuOpen = (e) => {

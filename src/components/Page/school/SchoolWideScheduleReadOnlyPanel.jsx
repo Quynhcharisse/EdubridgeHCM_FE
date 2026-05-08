@@ -46,13 +46,13 @@ function parseShiftLine(line) {
   return { label: safe, time: "—" };
 }
 
-/**
- * Khối chỉ đọc: lịch làm việc / ca do trường cấu hình (áp dụng chung mọi cơ sở).
- * @param {{
- *   workingConfig: { note?: string, workShifts?: unknown[], regularDays?: string[], weekendDays?: string[], isOpenSunday?: boolean },
- *   showSchoolOperationCta?: boolean
- * }} props
- */
+
+
+
+
+
+
+
 export default function SchoolWideScheduleReadOnlyPanel({ workingConfig, showSchoolOperationCta = false }) {
   const navigate = useNavigate();
   const wc = workingConfig || {};

@@ -2,9 +2,9 @@ import React from "react";
 import {Box} from "@mui/material";
 import SchoolHoliday from "./SchoolHoliday.jsx";
 
-/**
- * Trang cài đặt ngày nghỉ (trước đây là tab trong Cấu hình chung).
- */
+
+
+
 export default function SchoolHolidaySettingsPage() {
   return (
     <Box

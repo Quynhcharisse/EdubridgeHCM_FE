@@ -50,10 +50,10 @@ import ParentStudentInfoPanel, {
   extractSubjectsInSystemFromPayload,
 } from "../../chat/ParentStudentInfoPanel.jsx";
 
-/**
- * GET history trả campusId / studentProfileId ở root body; list pending đôi khi thiếu.
- * Dùng merge trước khi gửi intro qua STOMP để payload đủ cho BE push tới phụ huynh.
- */
+
+
+
+
 const mergeCounsellorConversationWithHistoryMeta = (conversation, historyMeta) => {
   if (!conversation) return conversation;
   const m = historyMeta && typeof historyMeta === "object" ? historyMeta : {};
@@ -219,7 +219,7 @@ const normalizeWsPrincipal = (v) =>
     .toLowerCase()
     .replace(/^["'<\s]+|["'>\s]+$/g, "");
 
-/** Fan-out campus: BE gửi broadcastToCampus hoặc receiver rỗng + campusId (receiverName ""). */
+
 const isBroadcastCampusMessage = (merged) => {
   if (!merged || typeof merged !== "object") return false;
   const b = merged.broadcastToCampus;
@@ -233,11 +233,11 @@ const isBroadcastCampusMessage = (merged) => {
   return Number.isFinite(n) && n > 0;
 };
 
-/**
- * Tin trên queue /user của tư vấn: receiverName thường là email tư vấn; BE fan-out campus có receiverName rỗng + broadcastToCampus.
- * Không dùng `username` làm người nhận — dễ trùng principal gây lọc sai.
- * Bỏ qua echo khi senderName là chính principal tư vấn.
- */
+
+
+
+
+
 const receiverMatchesCounsellor = (payload, identityLowerSet) => {
   const merged = mergeCounsellorWsPayload(payload);
   if (isBroadcastCampusMessage(merged)) return true;
@@ -250,14 +250,14 @@ const receiverMatchesCounsellor = (payload, identityLowerSet) => {
     return true;
   }
   if (identityLowerSet.has(recv)) return true;
-  // WS frame da vao /user queue cua counsellor, receiver trong body co the sai.
+  
   if (senderIds.length > 0 && senderIds.every((id) => identityLowerSet.has(id))) return false;
   return true;
 };
 
 const senderLooksLikeCounsellorSelf = (payload, identityLowerSet) => {
   const merged = mergeCounsellorWsPayload(payload);
-  /** Không dùng trường username — frame /user queue của TVV thường mang principal phiên, dễ nhầm tin phụ huynh thành echo. */
+  
   const identifiers = [
     normalizeWsPrincipal(merged?.senderName),
     normalizeWsPrincipal(merged?.senderEmail),
@@ -293,7 +293,7 @@ const pickStudentProfileIdFromMerged = (merged) => {
   return String(raw).trim();
 };
 
-/** Jackson LocalDateTime có thể là chuỗi ISO hoặc mảng [y,m,d,h,mi,s,nano]. */
+
 const coerceWsTimestamp = (v) => {
   if (v == null) return null;
   if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString();
@@ -319,9 +319,9 @@ const coerceWsTimestamp = (v) => {
   return null;
 };
 
-/**
- * Khi conversationId trên WS không khớp state: vẫn cập nhật preview nếu khớp email phụ huynh (+ studentProfileId nếu có).
- */
+
+
+
 const tryUpdateListByParentMatch = (list, merged, normalizedIncoming, identityLowerSet) => {
   const senders = extractSenderIdentifiers(merged).filter((id) => !identityLowerSet.has(id));
   if (senders.length === 0) return { next: list, matched: false };
@@ -347,10 +347,10 @@ const tryUpdateListByParentMatch = (list, merged, normalizedIncoming, identityLo
   return { next: matched ? next : list, matched };
 };
 
-/** Số cuộc tối đa mỗi lần tải / mỗi tab (theo yêu cầu UI). */
+
 const CONVERSATION_PAGE_SIZE = 20;
 
-/** Hiển thị số lượng trên tab: nếu BE báo hasMore thì hiện 20+ */
+
 const formatConversationCountLabel = (count, hasMore) => (hasMore ? "20+" : String(count));
 const COUNSELLOR_PARENT_UNREAD_CONVERSATIONS_KEY = "counsellor_parent_unread_conversations";
 
@@ -366,7 +366,7 @@ const writeCounsellorUnreadConversations = (value, options = {}) => {
   try {
     localStorage.setItem(COUNSELLOR_PARENT_UNREAD_CONVERSATIONS_KEY, String(next));
   } catch {
-    // ignore storage errors
+    
   }
   if (!silent && typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("counsellor-parent-unread-updated", { detail: { count: next } }));
@@ -422,7 +422,7 @@ export default function CounsellorParentConsultation() {
   const [messageNextCursorId, setMessageNextCursorId] = useState(null);
   const [messageHasMore, setMessageHasMore] = useState(false);
   const [studentProfileData, setStudentProfileData] = useState(null);
-  /** Đầy đủ từ GET /counsellor/student/{id} khi bấm « i » (BE tách khỏi history). */
+  
   const [studentProfileDetailForPanel, setStudentProfileDetailForPanel] = useState(null);
   const [studentProfileDetailLoading, setStudentProfileDetailLoading] = useState(false);
   const [studentInfoOpen, setStudentInfoOpen] = useState(false);
@@ -441,10 +441,10 @@ export default function CounsellorParentConsultation() {
   const messageHasMoreRef = useRef(false);
   const messageNextCursorIdRef = useRef(null);
   const pendingInitialBottomScrollRef = useRef(false);
-  /** Tránh gửi lặp tin chào TVV sau khi xác nhận cuộc chờ (cùng conversationId). */
+  
   const counsellorIntroSentIdsRef = useRef(new Set());
 
-  /** fixed: neo panel ngoài khung chat, cạnh trái cột tin nhắn (giống chat parent trên Header) */
+  
   const [studentPanelLayout, setStudentPanelLayout] = useState({
     right: undefined,
     left: undefined,
@@ -705,7 +705,7 @@ export default function CounsellorParentConsultation() {
   const normalizeMessage = (m) => {
     const id = m?.id ?? m?.messageId ?? m?.clientMessageId ?? `${m?.sentAt || Date.now()}-${Math.random()}`;
     const text = m?.content ?? m?.message ?? m?.text ?? "";
-    // BE lưu email trong senderName/receiverName — cần map vào sender để căn trái/phải đúng
+    
     const sender =
       m?.senderEmail ??
       m?.sender ??
@@ -797,7 +797,7 @@ export default function CounsellorParentConsultation() {
     return true;
   };
 
-  /** Shape giống phụ huynh (Header): name + raw cho panel thông tin học sinh */
+  
   const counsellorStudentForPanel = useMemo(() => {
     const sp = studentProfileDetailForPanel ?? studentProfileData;
     const name =
@@ -832,9 +832,9 @@ export default function CounsellorParentConsultation() {
     [counsellorStudentForPanel]
   );
 
-  /**
-   * Tin do tư vấn viên gửi (bên phải / xanh). BE thường lưu senderName/receiverName, không phải email.
-   */
+  
+
+
   const isCounsellorOutgoingMessage = (m, conv) => {
     const lower = (v) => (v ?? "").toString().trim().toLowerCase();
     const r = m?.raw || {};
@@ -911,7 +911,7 @@ export default function CounsellorParentConsultation() {
     setLoadingOlderMessages(false);
     setMessageError("");
     const loadResult = await loadMessageHistory({ conversation });
-    // Fallback sớm; effect phía dưới sẽ scroll chắc chắn sau khi render xong.
+    
     scrollMessageListToBottom();
     setTimeout(scrollMessageListToBottom, 30);
     await handleMarkRead({ conversation });
@@ -1027,8 +1027,8 @@ export default function CounsellorParentConsultation() {
         const parsed = parseHistoryResponse(response, conversation);
         const normalized = parsed.items.map(normalizeMessage);
         setMessageItems((prev) =>
-          // If history returns empty while we're refreshing after sending,
-          // keep current messages instead of wiping UI.
+          
+          
           cursorId
             ? mergeUniqueMessages([...normalized, ...prev])
             : normalized.length
@@ -1096,7 +1096,7 @@ export default function CounsellorParentConsultation() {
     }
   };
 
-  /** Bấm / focus ô nhập: luôn thử mark read (sau khi có tin mới hasMarkedReadRef vẫn có thể true). */
+  
   const handleMarkReadFromInput = () => {
     if (!selectedConversation) return;
     const now = Date.now();
@@ -1111,7 +1111,7 @@ export default function CounsellorParentConsultation() {
     const text = inputValue.trim();
     const { parentEmail, counsellorEmail } = getConversationEmails(selectedConversation);
     const conversationId = selectedConversation?.conversationId ?? selectedConversation?.id ?? null;
-    // Trùng principal Spring cho convertAndSendToUser — dùng email, không dùng tên hiển thị
+    
     const senderName = (counsellorEmail || userInfo?.email || "").trim();
     const receiverName = (parentEmail || "").trim();
     if (!senderName || !receiverName) return;
@@ -1140,7 +1140,7 @@ export default function CounsellorParentConsultation() {
     if (!sent) return;
     setInputValue("");
 
-    // BE thường chỉ broadcast tới queue người nhận — người gửi không nhận echo → hiển thị ngay (optimistic).
+    
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticRaw = {
       id: optimisticId,
@@ -1165,7 +1165,7 @@ export default function CounsellorParentConsultation() {
 
   useEffect(() => {
     loadConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   useEffect(() => {
@@ -1238,7 +1238,7 @@ export default function CounsellorParentConsultation() {
 
         const normalizedIncoming = normalizeMessage(root);
 
-        /** Không tạo mảng mới khi không có dòng khớp — tránh re-render thừa. */
+        
         const mapList = (list) => {
           let matched = false;
           const next = list.map((item) => {
@@ -1288,10 +1288,10 @@ export default function CounsellorParentConsultation() {
                 setActiveConversations(prevA);
                 setPendingConversations(rP2.next);
               } else {
-                /**
-                 * Không chèn hàng “ảo” từ WS: BE chưa lưu / chưa trả list thì không có conversationId ổn định trên DB,
-                 * mỗi tin + setState bất đồng bộ dễ sinh nhiều dòng trùng một phụ huynh. Chỉ gọi lại REST (debounce).
-                 */
+                
+
+
+
                 if (wsListRefreshTimerRef.current != null) {
                   clearTimeout(wsListRefreshTimerRef.current);
                 }
@@ -1328,7 +1328,7 @@ export default function CounsellorParentConsultation() {
       }
       removePrivateMessageListener(onCounsellorPrivateMessage);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   const handleMessageScroll = async (event) => {
@@ -1405,7 +1405,7 @@ export default function CounsellorParentConsultation() {
         height: "calc(100vh - 110px)",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "linear-gradient(145deg, #eef2ff 0%, #ecfeff 45%, #f8fafc 100%)",
+        bgcolor: "#eef2ff",
         px: { xs: 0, md: 1 },
       }}
     >
@@ -1416,7 +1416,7 @@ export default function CounsellorParentConsultation() {
           minHeight: 0,
           height: "100%",
           display: "grid",
-          // md+: hai cột (dashboard tư vấn). lg-only khiến tablet/laptop nhỏ thành 1 cột giống chat parent.
+          
           gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 34%) minmax(0, 1fr)" },
           gridTemplateRows: { xs: "auto minmax(0, 1fr)", md: "minmax(0, 1fr)" },
           alignItems: "stretch",
@@ -1438,7 +1438,7 @@ export default function CounsellorParentConsultation() {
             overflow: "hidden",
             bgcolor: {
               xs: "rgba(248,250,252,0.8)",
-              md: "linear-gradient(180deg, rgba(37,99,235,0.07) 0%, rgba(248,250,252,0.98) 48%, #f8fafc 100%)",
+              md: "rgba(37,99,235,0.07)",
             },
             px: 2,
           }}
@@ -1899,7 +1899,7 @@ export default function CounsellorParentConsultation() {
                 overflowX: "hidden",
                 overflowY: "auto",
                 WebkitOverflowScrolling: "touch",
-                bgcolor: "linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,0.95) 100%)",
+                bgcolor: "rgba(238,242,255,0.55)",
               }}
               onScroll={handleMessageScroll}
               ref={messageListRef}
@@ -2022,7 +2022,7 @@ export default function CounsellorParentConsultation() {
                 py: 2,
                 bgcolor: shouldShowPendingBlankPanel
                   ? "#ffffff"
-                  : "linear-gradient(135deg, #f8fafc 0, #eef2ff 40%, #e0f2fe 100%)",
+                  : "#eef2ff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -2119,7 +2119,7 @@ export default function CounsellorParentConsultation() {
 
       {studentInfoOpen && selectedConversation ? (
         <>
-          {/* Không dùng backdrop toàn màn — khung chat vẫn nhìn và gõ được; panel chỉ nằm trái mép chat */}
+          
           {(studentPanelLayout.right != null || studentPanelLayout.left != null) &&
             studentPanelLayout.top != null && (
           <Zoom
@@ -2162,7 +2162,7 @@ export default function CounsellorParentConsultation() {
                 border: "1px solid rgba(148,163,184,0.4)",
                 boxShadow: "0 22px 48px rgba(30,41,59,0.28)",
                 background:
-                  "linear-gradient(180deg, #f8fbff 0%, #f8fafc 38%, #ffffff 100%)",
+                  "#f8fbff",
                 overflow: "hidden",
               }}
             >

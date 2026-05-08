@@ -195,22 +195,22 @@ const glassPane = (sx) => ({
 function ConsultGraphicCluster({variant = 1, mirror = false}) {
     const palette = {
         1: [
-            ['linear-gradient(145deg, rgba(191,219,254,0.55), rgba(147,197,253,0.38))', -14, 2, 8],
-            ['linear-gradient(145deg, rgba(96,165,250,0.48), rgba(59,130,246,0.32))', 16, 44, 36],
-            ['linear-gradient(145deg, rgba(224,242,254,0.52), rgba(186,230,253,0.36))', 8, 4, 88],
-            ['linear-gradient(145deg, rgba(59,130,246,0.32), rgba(37,99,235,0.22))', -20, 52, 128]
+            ['rgba(191,219,254,0.55)', -14, 2, 8],
+            ['rgba(96,165,250,0.48)', 16, 44, 36],
+            ['rgba(224,242,254,0.52)', 8, 4, 88],
+            ['rgba(59,130,246,0.32)', -20, 52, 128]
         ],
         2: [
-            ['linear-gradient(145deg, rgba(147,197,253,0.5), rgba(125,211,252,0.34))', -18, 0, 12],
-            ['linear-gradient(145deg, rgba(96,165,250,0.42), rgba(37,99,235,0.26))', 22, 48, 48],
-            ['linear-gradient(145deg, rgba(219,234,254,0.55), rgba(191,219,254,0.38))', -10, 8, 108],
-            ['linear-gradient(145deg, rgba(37,99,235,0.28), rgba(59,130,246,0.2))', 14, 56, 168]
+            ['rgba(147,197,253,0.5)', -18, 0, 12],
+            ['rgba(96,165,250,0.42)', 22, 48, 48],
+            ['rgba(219,234,254,0.55)', -10, 8, 108],
+            ['rgba(37,99,235,0.28)', 14, 56, 168]
         ],
         3: [
-            ['linear-gradient(145deg, rgba(186,230,253,0.52), rgba(125,211,252,0.36))', 12, 6, 20],
-            ['linear-gradient(145deg, rgba(59,130,246,0.4), rgba(37,99,235,0.28))', -16, 44, 8],
-            ['linear-gradient(145deg, rgba(224,242,254,0.5), rgba(191,219,254,0.34))', -8, 4, 112],
-            ['linear-gradient(145deg, rgba(96,165,250,0.36), rgba(59,130,246,0.24))', 20, 48, 152]
+            ['rgba(186,230,253,0.52)', 12, 6, 20],
+            ['rgba(59,130,246,0.4)', -16, 44, 8],
+            ['rgba(224,242,254,0.5)', -8, 4, 112],
+            ['rgba(96,165,250,0.36)', 20, 48, 152]
         ]
     };
     const layers = palette[variant] || palette[1];
@@ -287,7 +287,7 @@ function parseJsonMaybe(value) {
 }
 
 function looksLikeHttpUrl(value) {
-    return /^https?:\/\//i.test(String(value || "").trim());
+    return /^https?:\/\
 }
 
 function looksLikeImageUrl(value) {
@@ -460,7 +460,7 @@ function BlogCard({
                     sx={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'linear-gradient(180deg, transparent 35%, rgba(51,65,85,0.55) 100%)',
+                        background: 'rgba(51,65,85,0.35)',
                         pointerEvents: 'none'
                     }}
                 />
@@ -993,7 +993,7 @@ function LatestAdmissionNewsSection({refreshTrigger = 0}) {
             sx={{
                 pt: {xs: 8, md: 10},
                 pb: {xs: 3, md: 4},
-                background: 'linear-gradient(180deg, #eff6ff 0%, #e0f2fe 42%, #fbfcfe 100%)',
+                background: '#eff6ff',
                 scrollMarginTop: '80px',
                 position: 'relative'
             }}
@@ -2372,7 +2372,7 @@ export default function HomePage() {
                 minHeight: '100vh',
                 overflow: 'hidden',
                 pt: {xs: '64px', md: '74px'},
-                backgroundImage: `linear-gradient(rgba(245, 249, 255, 0.64), rgba(245, 249, 255, 0.64)), url(${homeBackgroundImage})`,
+                backgroundImage: `url(${homeBackgroundImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -3075,7 +3075,7 @@ export default function HomePage() {
                                         content: '""',
                                         position: 'absolute',
                                         inset: 0,
-                                        background: 'linear-gradient(145deg, rgba(255,255,255,0.55) 0%, rgba(37,99,235,0.06) 100%)',
+                                        background: 'rgba(255,255,255,0.72)',
                                         pointerEvents: 'none'
                                     },
                                     '&:hover': {

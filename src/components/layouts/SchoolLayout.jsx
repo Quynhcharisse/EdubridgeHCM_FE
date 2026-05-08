@@ -12,7 +12,7 @@ const SIDEBAR_WIDTH_EXPANDED = 240;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
 const SIDEBAR_WIDTH_TRANSITION = "280ms cubic-bezier(0.4, 0, 0.2, 1)";
 
-/** Phông chữ dùng cho toàn bộ trang School (sidebar + nội dung) */
+
 const SCHOOL_FONT = '"Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
 export default function SchoolLayout() {
@@ -76,7 +76,7 @@ export default function SchoolLayout() {
         }
       }
     } catch {
-      /* ignore */
+      
     }
   }, [location.pathname, navigate]);
 
@@ -91,7 +91,7 @@ export default function SchoolLayout() {
             fontFamily: SCHOOL_FONT,
           }}
         >
-        {/* Sidebar: full height bên trái */}
+        {}
         <Drawer
         variant="persistent"
         open
@@ -125,7 +125,7 @@ export default function SchoolLayout() {
         />
       </Drawer>
 
-      {/* Vùng header + content: bằng với nội dung dashboard */}
+      
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <SchoolAuthHeader headerLeftOffset={sidebarWidth} />
         <Fade in key={location.pathname} timeout={{ enter: 250, exit: 150 }}>

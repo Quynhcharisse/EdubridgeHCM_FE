@@ -1,17 +1,17 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
-/**
- * GET campaign templates by year
- * @param {number} year
- * @returns {Promise<{ data?: any }>}
- */
+
+
+
+
+
 export const getCampaignTemplatesByYear = async (year) => {
     try {
         const response = await axiosClient.get(`/school/${year}/campaign/template`);
         return response || null;
     } catch (error) {
-        // Khi BE trả 404 (chưa có chiến dịch cho năm này), FE coi như "chưa có data"
-        // để không hiển thị lỗi.
+        
+        
         if (error?.response?.status === 404) {
             return { status: 404, data: { body: [] } };
         }
@@ -19,24 +19,24 @@ export const getCampaignTemplatesByYear = async (year) => {
     }
 };
 
-/**
- * POST create campaign template
- * @param {{
- *   admissionCampaignTemplateId?: number,
- *   name: string,
- *   description?: string,
- *   year: number,
- *   startDate: string,
- *   endDate: string,
- *   admissionMethodTimelines?: Array<{
- *     methodCode: string,
- *     startDate: string,
- *     endDate: string,
- *     allowReservationSubmission?: boolean,
- *     quota?: number
- *   }>
- * }} body
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export const createCampaignTemplate = async (body) => {
     const timelines = Array.isArray(body.admissionMethodTimelines)
         ? body.admissionMethodTimelines.map((t) => ({
@@ -61,10 +61,10 @@ export const createCampaignTemplate = async (body) => {
     return response || null;
 };
 
-/**
- * PUT update campaign template
- * @param {{ admissionCampaignTemplateId: number, name: string, description?: string, year?: number, startDate: string, endDate: string, admissionMethodTimelines?: Array<{ methodCode: string, startDate: string, endDate: string, allowReservationSubmission?: boolean, quota?: number }> }} body
- */
+
+
+
+
 export const updateCampaignTemplate = async (body) => {
     const timelines = Array.isArray(body.admissionMethodTimelines)
         ? body.admissionMethodTimelines.map((t) => ({
@@ -87,39 +87,39 @@ export const updateCampaignTemplate = async (body) => {
     return response || null;
 };
 
-/**
- * PUT publish campaign template (DRAFT -> OPEN)
- * @param {number} id
- */
+
+
+
+
 export const updateCampaignTemplateStatus = async (id) => {
     const response = await axiosClient.put(`/school/${id}/campaign/template/status`, null);
     return response || null;
 };
 
-/**
- * PUT cancel campaign template
- * @param {number} id
- * @param {string} reason
- * @param {{ resolveAllStatuses?: boolean }} [options] — true: không throw, trả response mọi status (precheck 412/400/…)
- */
+
+
+
+
+
+
 export const cancelCampaignTemplate = async (id, reason, options = {}) => {
     const { resolveAllStatuses = false } = options;
     const config = {
         params: { reason: reason?.trim() ?? "" },
     };
     if (resolveAllStatuses) {
-        // Luôn resolve (không throw) để đọc 412/400/403 trong precheck — dùng hàm rõ ràng cho mọi phiên bản axios
+        
         config.validateStatus = () => true;
     }
     const response = await axiosClient.put(`/school/${id}/campaign/template/cancel`, null, config);
     return response || null;
 };
 
-/**
- * POST clone campaign template
- * @param {number} id
- * @param {number} targetYear
- */
+
+
+
+
+
 export const cloneCampaignTemplate = async (id, targetYear) => {
     const response = await axiosClient.post(`/school/${id}/campaign/template/clone`, null, {
         params: { targetYear: Number(targetYear) },
@@ -127,11 +127,11 @@ export const cloneCampaignTemplate = async (id, targetYear) => {
     return response || null;
 };
 
-/**
- * GET /campus/{campusId}/offering/list — danh sách chỉ tiêu theo cơ sở (cả campus chính & phụ)
- * @param {number} campusId
- * @param {{ page?: number, pageSize?: number }} [params]
- */
+
+
+
+
+
 export const getCampaignOfferingsByCampus = async (campusId, { page = 0, pageSize = 10 } = {}) => {
     const cid = Number(campusId);
     const response = await axiosClient.get(`/campus/${cid}/offering/list`, {
@@ -144,18 +144,18 @@ export const getCampaignOfferingsByCampus = async (campusId, { page = 0, pageSiz
     return response || null;
 };
 
-/**
- * POST /campus/offering — tạo chỉ tiêu
- * @param {{
- *   admissionCampaignId: number,
- *   campusId: number,
- *   programId: number,
- *   learningMode: string,
- *   priceAdjustmentPercentage: number,
- *   openDate: string,
- *   closeDate: string
- * }} body
- */
+
+
+
+
+
+
+
+
+
+
+
+
 export const createCampaignOffering = async (body) => {
     const payload = {
         admissionCampaignId: Number(body.admissionCampaignId),
@@ -178,7 +178,7 @@ export const createCampaignOffering = async (body) => {
     return response || null;
 };
 
-/** PUT /campus/offering — cập nhật chỉ tiêu */
+
 export const updateCampaignOffering = async (body) => {
     const response = await axiosClient.put("/campus/offering", {
         id: Number(body.id),
@@ -189,7 +189,7 @@ export const updateCampaignOffering = async (body) => {
     return response || null;
 };
 
-/** GET /campus/offering/quota-summary?campaignId= */
+
 export const getCampusOfferingQuotaSummary = async (campaignId) => {
     const response = await axiosClient.get("/campus/offering/quota-summary", {
         params: { campaignId: Number(campaignId) },
@@ -197,11 +197,11 @@ export const getCampusOfferingQuotaSummary = async (campaignId) => {
     return response || null;
 };
 
-/**
- * PUT /campus/{offeringId}/offering/status
- * @param {number} offeringId
- * @param {"PUBLISH"|"PAUSE"|"CLOSE"} action
- */
+
+
+
+
+
 export const updateCampusOfferingStatus = async (offeringId, action) => {
     const response = await axiosClient.put(`/campus/${Number(offeringId)}/offering/status`, null, {
         params: { action },
@@ -209,16 +209,16 @@ export const updateCampusOfferingStatus = async (offeringId, action) => {
     return response || null;
 };
 
-/** PUT /campus/{offeringId}/offering/close */
+
 export const closeCampusOffering = async (offeringId) => {
     const response = await axiosClient.put(`/campus/${Number(offeringId)}/offering/close`, null);
     return response || null;
 };
 
-/**
- * GET /school/admission/campaign/list/export — file Excel danh sách chiến dịch theo năm
- * @param {number} year
- */
+
+
+
+
 export const exportAdmissionCampaignList = async (year) => {
     const response = await axiosClient.get("/school/admission/campaign/list/export", {
         params: { year: Number(year) },

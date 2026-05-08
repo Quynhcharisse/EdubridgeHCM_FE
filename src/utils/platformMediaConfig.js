@@ -1,4 +1,4 @@
-/** MIME phổ biến → danh sách phần mở rộng được coi là khớp (theo cấu hình admin). */
+
 const MIME_IMAGE_EXTS = {
     "image/jpeg": ["jpg", "jpeg"],
     "image/jpg": ["jpg"],
@@ -68,9 +68,9 @@ export function parseMaxImgSizeMbFromMedia(media) {
     return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/**
- * @returns {{ extensions: string[], maxImgSizeMb: number, maxBytes: number } | null}
- */
+
+
+
 export function buildMediaImageRulesFromMedia(media) {
     const extensions = parseImageFormatsFromMedia(media);
     const maxImgSizeMb = parseMaxImgSizeMbFromMedia(media);
@@ -85,10 +85,10 @@ export function buildMediaImageRulesFromMedia(media) {
 const DEFAULT_FALLBACK_IMG_EXT = ["jpg", "jpeg", "png"];
 const DEFAULT_FALLBACK_MAX_IMG_MB = 5;
 
-/**
- * Khi không đọc được GET /system/config (403 guest, lỗi mạng, v.v.) — dùng cho luồng public.
- * Ghi đè bằng env: VITE_PUBLIC_FALLBACK_MAX_IMG_MB, VITE_PUBLIC_FALLBACK_IMG_FORMATS (vd: jpg,png,webp).
- */
+
+
+
+
 export function getFallbackMediaImageRules() {
     const rawMb = import.meta.env.VITE_PUBLIC_FALLBACK_MAX_IMG_MB;
     const mbParsed = rawMb != null && String(rawMb).trim() !== "" ? Number(rawMb) : NaN;
@@ -112,7 +112,7 @@ export function getFallbackMediaImageRules() {
     };
 }
 
-/** Phần mở rộng tài liệu (không dấu chấm), mặc định pdf. Env: VITE_PUBLIC_FALLBACK_DOC_FORMATS */
+
 export function getFallbackDocFormatExtensions() {
     const raw = import.meta.env.VITE_PUBLIC_FALLBACK_DOC_FORMATS;
     if (raw != null && String(raw).trim() !== "") {
@@ -125,10 +125,10 @@ export function getFallbackDocFormatExtensions() {
     return ["pdf"];
 }
 
-/**
- * Trang `/register` + chưa có user trong localStorage: BE thường chặn GET /system/config (403).
- * Tránh gọi API và dùng fallback để không lỗi Network / không khóa upload logo vô cớ.
- */
+
+
+
+
 export function shouldUsePublicMediaFallbackInsteadOfSystemConfig() {
     if (typeof window === "undefined") return false;
     const p = window.location.pathname || "";
@@ -182,12 +182,12 @@ export function formatBytesHuman(n) {
     return `${(x / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Kiểm tra theo thứ tự: có file → dung lượng → định dạng (extension/mime).
- * @param {File} file
- * @param {{ extensions: string[], maxBytes: number, maxImgSizeMb?: number }} rules
- * @returns {{ ok: true } | { ok: false, message: string }}
- */
+
+
+
+
+
+
 export function validateMediaImageFile(file, rules) {
     if (!file) return {ok: false, message: "Chưa chọn file."};
     if (!rules?.extensions?.length || !rules?.maxBytes) {

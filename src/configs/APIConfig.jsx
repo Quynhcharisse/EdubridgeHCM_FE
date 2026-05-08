@@ -1,5 +1,6 @@
 import axios from "axios";
 import {refreshToken} from "../services/AuthService.jsx";
+import {normalizeUiMessage} from "../utils/normalizeUiMessage.js";
 
 function resolveApiV1Base(url) {
     if (!url) return "https://edubridgehcm.onrender.com/api/v1";
@@ -18,7 +19,7 @@ const apiBase = resolveApiV1Base(rawBaseUrl);
 axios.defaults.baseURL = apiBase;
 
 const axiosClient = axios.create({
-    // Đảm bảo luôn có /api/v1 ở cuối base URL
+    
     baseURL: apiBase,
     headers: {
         "Content-Type": "application/json",
@@ -40,6 +41,24 @@ axiosClient.interceptors.request.use((config) => {
 axiosClient.interceptors.response.use(
     response => response,
     async error => {
+        if (error?.response?.data && typeof error.response.data === "object") {
+            const payload = error.response.data;
+            if (typeof payload.message === "string") {
+                payload.message = normalizeUiMessage(payload.message);
+            }
+            if (typeof payload.error === "string") {
+                payload.error = normalizeUiMessage(payload.error);
+            }
+            if (typeof payload.detail === "string") {
+                payload.detail = normalizeUiMessage(payload.detail);
+            }
+            if (typeof payload.body === "string") {
+                payload.body = normalizeUiMessage(payload.body);
+            } else if (payload.body && typeof payload.body === "object" && typeof payload.body.message === "string") {
+                payload.body.message = normalizeUiMessage(payload.body.message);
+            }
+        }
+
         const originalRequest = error.config;
 
         if (originalRequest._retry) {

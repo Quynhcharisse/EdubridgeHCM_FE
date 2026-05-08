@@ -90,7 +90,7 @@ const METHOD_LEARNING_OPTIONS = [
     "STEM_STEAM",
 ];
 
-/** Đồng bộ với LearningMethod.valueOf(...toUpperCase()) trên BE. */
+
 function isValidLearningMethodCode(m) {
     const code = String(m ?? "")
         .trim()
@@ -137,7 +137,7 @@ const methodLearningIconMap = {
     STEM_STEAM: MenuBookIcon,
 };
 
-/** FE: disable Archive khi còn program (BE vẫn trả 409 nếu race). */
+
 const ARCHIVE_DISABLED_TOOLTIP =
     "Còn chương trình gắn khung — không thể lưu trữ. Gỡ/chuyển program hoặc dùng chỉnh sửa phiên bản (Revise/Publish).";
 
@@ -174,7 +174,7 @@ const toMethodLearningListLabel = (methodLearningList) => {
 const subjectEmpty = () => ({
     name: "",
     description: "",
-    /** Môn trong curriculum luôn bắt buộc — không cho phép tắt (đồng bộ BE). */
+    
     isMandatory: true,
     sourceType: "manual",
 });
@@ -187,10 +187,10 @@ const emptyForm = () => ({
     subjectOptions: [subjectEmpty()],
 });
 
-/**
- * BE generateName() luôn prefix "Hệ " + subTypeName. Nếu BE trả nhầm "Hệ ..." trong field subTypeName
- * thì cần bỏ các tiền tố "Hệ " lặp ở đầu để tránh "Hệ Hệ ..." khi submit.
- */
+
+
+
+
 function stripLeadingHePrefix(value) {
     let s = String(value ?? "").trim();
     while (s.length > 0) {
@@ -244,7 +244,7 @@ function mapCurriculumFromApi(item) {
 }
 
 function extractCurriculumIdFromResponse(res) {
-    // BE có thể trả ID ở nhiều vị trí khác nhau (kể cả body là số thuần sau REVISE).
+    
     const location = res?.headers?.location ?? res?.headers?.Location ?? null;
     if (location) {
         const match = String(location).match(/\/(\d+)(?:\/)?$/);
@@ -266,7 +266,7 @@ function extractCurriculumIdFromResponse(res) {
     );
 }
 
-/** Đọc message lỗi/thành công từ ResponseObject (axios response.data). */
+
 function getCurriculumApiMessage(responseData) {
     const d = responseData?.data ?? responseData;
     if (!d || typeof d !== "object") return "";
@@ -391,7 +391,7 @@ function toVietnameseValidationMessage(rawMessage) {
         "A curriculum cannot have more than 50 subjects.": "Một khung chương trình không thể có quá 50 môn học.",
         "Subject name cannot be empty.": "Tên môn học không được để trống.",
         "The curriculum must have at least one mandatory subject.": "Khung chương trình phải có ít nhất một môn học bắt buộc.",
-        // Thông điệp tiếng Việt từ CurriculumValidation (BE)
+        
         "Không tìm thấy khung chương trình.": "Không tìm thấy khung chương trình.",
         "Không thể cập nhật khung chương trình đã được lưu trữ. Vui lòng tạo phiên bản mới hoặc sử dụng bản đang hoạt động.":
             "Không thể cập nhật khung chương trình đã được lưu trữ. Vui lòng tạo phiên bản mới hoặc sử dụng bản đang hoạt động.",
@@ -462,7 +462,7 @@ export default function SchoolCurriculums() {
     const [evolveLoading, setEvolveLoading] = useState(false);
     const [publishLoading, setPublishLoading] = useState(false);
     const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
-    /** Khung đang xác nhận công bố (từ modal xem hoặc từ bảng); null thì fallback viewCurriculum nếu modal xem mở. */
+    
     const [publishPendingCurriculum, setPublishPendingCurriculum] = useState(null);
     const [curriculumToEditAfterConfirm, setCurriculumToEditAfterConfirm] = useState(null);
     const [activeLockedChoiceOpen, setActiveLockedChoiceOpen] = useState(false);
@@ -1121,9 +1121,7 @@ export default function SchoolCurriculums() {
             }));
         };
 
-        if (!isFormModalOpen) return;
-
-        // Đổi loại chương trình thì luôn làm mới dữ liệu môn/ngôn ngữ theo loại mới.
+        if (!isFormModalOpen) return;
         resetLanguageState();
         resetSubjectState();
 
@@ -1437,10 +1435,10 @@ export default function SchoolCurriculums() {
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%" }}>
-            {/* Header */}
+            
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1492,7 +1490,7 @@ export default function SchoolCurriculums() {
                 </Box>
             </Box>
 
-            {/* Search & Filters */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -1590,7 +1588,7 @@ export default function SchoolCurriculums() {
                 </CardContent>
             </Card>
 
-            {/* Table */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -1658,7 +1656,7 @@ export default function SchoolCurriculums() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 700,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60a5fa",
                                                     }}
                                                 >
                                                     Tạo khung chương trình
@@ -1875,9 +1873,9 @@ export default function SchoolCurriculums() {
                     )}
             </Card>
 
-            {/* activeLockedChoiceOpen dialog removed — ACTIVE edit now blocked with toast; Clone is direct action */}
+            
 
-            {/* View Curriculum Dialog */}
+            
             <Dialog
                 open={viewModalOpen}
                 onClose={(event, reason) => {
@@ -1949,11 +1947,11 @@ export default function SchoolCurriculums() {
                                         {PUBLISH_REPLACE_HINT}
                                     </Alert>
                                 ) : null}
-                                {/* Hero section */}
+                                
                                 <Box
                                     sx={{
                                         borderRadius: 3,
-                                        bgcolor: "linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(51,65,85,0.03) 100%)",
+                                        bgcolor: "rgba(37,99,235,0.08)",
                                         border: "1px solid rgba(148, 163, 184, 0.35)",
                                         p: 3,
                                     }}
@@ -2000,7 +1998,7 @@ export default function SchoolCurriculums() {
                                     </Box>
                                 </Box>
 
-                                {/* Detail section */}
+                                
                                 <Box
                                     sx={{
                                         display: "grid",
@@ -2092,7 +2090,7 @@ export default function SchoolCurriculums() {
                                                                     minHeight: 120,
                                                                     borderRadius: 3,
                                                                     border: "1px solid rgba(226, 232, 240, 1)",
-                                                                    bgcolor: "linear-gradient(145deg, #ffffff 0%, #f8fbff 100%)",
+                                                                    bgcolor: "#f8fbff",
                                                                     px: 1.6,
                                                                     py: 1.4,
                                                                     boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
@@ -2148,7 +2146,7 @@ export default function SchoolCurriculums() {
                                     </CardContent>
                                 </Card>
 
-                                {/* Description card */}
+                                
                                 <Card
                                     elevation={0}
                                     sx={{
@@ -2181,7 +2179,7 @@ export default function SchoolCurriculums() {
                                     </CardContent>
                                 </Card>
 
-                                {/* Subjects */}
+                                
                                 <Card
                                     elevation={0}
                                     sx={{
@@ -2321,7 +2319,7 @@ export default function SchoolCurriculums() {
                                     fontWeight: 900,
                                     borderRadius: 2,
                                     px: 3,
-                                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                    background: "#60a5fa",
                                 }}
                             >
                                 Công bố
@@ -2363,7 +2361,7 @@ export default function SchoolCurriculums() {
                 </DialogActions>
             </Dialog>
 
-            {/* Confirm Publish Dialog */}
+            
             <Dialog
                 open={confirmPublishOpen}
                 onClose={(event, reason) => {
@@ -2416,7 +2414,7 @@ export default function SchoolCurriculums() {
                             textTransform: "none",
                             fontWeight: 800,
                             borderRadius: 2,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         {publishLoading ? "Đang công bố..." : "Xác nhận công bố"}
@@ -2424,7 +2422,7 @@ export default function SchoolCurriculums() {
                 </DialogActions>
             </Dialog>
 
-            {/* Xác nhận lưu trữ (PATCH ARCHIVE) */}
+            
             <Dialog
                 open={confirmArchiveOpen}
                 onClose={(event, reason) => {
@@ -2461,7 +2459,7 @@ export default function SchoolCurriculums() {
                 </DialogActions>
             </Dialog>
 
-            {/* 409 / xung đột từ PATCH activate (đặc biệt archive khi còn program) */}
+            
             <Dialog
                 open={activateConflictOpen}
                 onClose={() => setActivateConflictOpen(false)}
@@ -2536,7 +2534,7 @@ export default function SchoolCurriculums() {
                             textTransform: "none",
                             fontWeight: 700,
                             borderRadius: 2,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         Tiếp tục
@@ -2544,7 +2542,7 @@ export default function SchoolCurriculums() {
                 </DialogActions>
             </Dialog>
 
-            {/* Create Curriculum Dialog */}
+            
             <Dialog
                 open={createModalOpen}
                 onClose={(event, reason) => {
@@ -2582,7 +2580,7 @@ export default function SchoolCurriculums() {
                 </DialogTitle>
                 <DialogContent dividers={false} sx={{ px: 3, pt: 2, pb: 1 }}>
                     <Stack spacing={2.4}>
-                        {/* Basic Information */}
+                        
                         <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "#1e293b" }}>
                             Thông tin cơ bản
                         </Typography>
@@ -2642,7 +2640,7 @@ export default function SchoolCurriculums() {
 
                         {formValues.curriculumType ? (
                             <>
-                                {/* Subjects */}
+                                
                                 <Box sx={{ mt: 0.6 }}>
                                     <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                                         <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "#1e293b" }}>
@@ -2887,7 +2885,7 @@ export default function SchoolCurriculums() {
                 </DialogActions>
             </Dialog>
 
-            {/* Edit Curriculum Dialog */}
+            
             <Dialog
                 open={editModalOpen}
                 onClose={(event, reason) => {
@@ -2924,7 +2922,7 @@ export default function SchoolCurriculums() {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers={false} sx={{ px: 3, pt: 2, pb: 1 }}>
-                    {/* reuse same form as create */}
+                    
                     <Stack spacing={2.4}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 900, color: "#1e293b" }}>
                             Thông tin cơ bản

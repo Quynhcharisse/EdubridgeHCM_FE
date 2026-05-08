@@ -503,7 +503,7 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                 justifyContent: 'center',
                 py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
-                backgroundImage: `linear-gradient(135deg, rgba(59,130,246,0.46), rgba(59,130,246,0.26)), url(${backgroundLogin})`,
+                backgroundImage: `url(${backgroundLogin})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -1089,115 +1089,115 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                         <Grid size={{xs: 12}}>
                                             <CloudinaryUpload
                                                 inputId="school-registration-logo"
-                                                accept="image/*"
-                                                multiple={false}
-                                                disabled={formSectionDisabled}
-                                                mediaImageRules={logoMediaImageRules}
-                                                mediaImageRulesLoading={logoMediaRulesLoading}
-                                                onSuccess={([f]) => {
-                                                    if (f?.url) {
-                                                        setFormData((p) => ({...p, logoUrl: f.url}));
-                                                        setFormErrors((prev) => ({...prev, logoUrl: ''}));
-                                                        enqueueSnackbar("Đã tải logo lên Cloudinary", {variant: "success"});
-                                                    }
-                                                }}
-                                                onError={(m) => enqueueSnackbar(m, {variant: "error"})}
-                                            >
-                                                {({inputId, loading}) => (
-                                                    <Box
-                                                        component="label"
-                                                        htmlFor={inputId}
-                                                        sx={{
-                                                            width: '100%',
-                                                            minHeight: {xs: 120, md: 96},
-                                                            border: '2px dashed #bfdbfe',
-                                                            borderRadius: 2,
-                                                            bgcolor: '#f8fafc',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            overflow: 'hidden',
-                                                            p: 1.25,
-                                                            cursor: loading ? 'not-allowed' : 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            '&:hover': loading ? {} : {
-                                                                borderColor: '#93c5fd',
-                                                                bgcolor: '#f1f5f9',
-                                                            },
-                                                        }}
-                                                    >
-                                                        {formData.logoUrl ? (
-                                                            <Box
-                                                                component="img"
-                                                                src={formData.logoUrl}
-                                                                alt="Logo trường"
-                                                                sx={{
-                                                                    width: 'auto',
-                                                                    height: 'auto',
-                                                                    maxWidth: {xs: 140, md: 120},
-                                                                    maxHeight: {xs: 140, md: 120},
-                                                                    objectFit: 'contain',
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <Stack alignItems="center" spacing={0.75}>
-                                                                <CloudUploadOutlinedIcon sx={{fontSize: 28, color: '#6b7280'}} />
-                                                                <Typography
-                                                                    variant="body2"
-                                                                    sx={{color: '#64748b', textAlign: 'center', lineHeight: 1.35}}
-                                                                >
-                                                                    Chạm hoặc thả logo vào đây
-                                                                </Typography>
-                                                            </Stack>
-                                                        )}
-                                                    </Box>
-                                                )}
-                                            </CloudinaryUpload>
-                                            {!!formErrors.logoUrl && (
-                                                <Typography variant="caption" sx={{color: '#d32f2f', mt: 0.5, display: 'block'}}>
-                                                    {formErrors.logoUrl}
-                                                </Typography>
-                                            )}
-                                        </Grid>
-                                </Grid>
-                                </Box>
+                                                accept="image
 
-                                <Box sx={{display: 'flex', justifyContent: 'center', pt: 0.75}}>
-                                    <Button
-                                        type="submit"
-                                        variant="contained"
-                                        disabled={isSubmitting || lockFormUntilTaxCodeVerified}
-                                        sx={{
-                                            minWidth: 170,
-                                            py: 0.82,
-                                            px: 3,
-                                            textTransform: 'none',
-                                            fontWeight: 700,
-                                            fontSize: '0.85rem',
-                                            borderRadius: 2,
-                                            background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
-                                            boxShadow: '0 8px 18px rgba(59,130,246,0.24)',
-                                            '&:hover': {
-                                                background: `linear-gradient(90deg, ${APP_PRIMARY_DARK} 0%, ${BRAND_NAVY} 100%)`,
-                                                boxShadow: '0 10px 20px rgba(59,130,246,0.3)',
-                                            },
-                                        }}
-                                    >
-                                        {isSubmitting ? (
-                                            <CircularProgress size={24} color="inherit" />
-                                        ) : (
-                                            'Đăng ký'
-                                        )}
-                                    </Button>
-                                </Box>
-                                </Box>
-                            </Stack>
-                        </Box>
-                    </Box>
-                </Paper>
-            </Container>
-        </Box>
-    );
-};
 
-export default SchoolRegistrationForm;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

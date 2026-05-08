@@ -32,19 +32,19 @@ function formatBytes(n) {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Dropzone upload ảnh (Cloudinary), không ô nhập URL — preview, trạng thái loading / thành công / lỗi.
- *
- * @param {object} props
- * @param {string | null} props.value — URL ảnh hiện tại
- * @param {(url: string | null) => void} props.onChange
- * @param {(message: string) => void} [props.onError]
- * @param {number} [props.maxBytes=5242880] — chỉ dùng khi không truyền mediaImageRules
- * @param {{ extensions: string[], maxBytes: number, maxImgSizeMb?: number } | null} [props.mediaImageRules]
- * @param {boolean} [props.mediaImageRulesLoading]
- * @param {boolean} [props.disabled]
- * @param {string} [props.inputId]
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
 export default function ImageUpload({
     value,
     onChange,
@@ -299,7 +299,7 @@ export default function ImageUpload({
                                 borderRadius: 2,
                                 px: 2.5,
                                 py: 1,
-                                background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                background: "#60a5fa",
                                 boxShadow: "0 4px 14px rgba(13, 100, 222, 0.35)",
                             }}
                         >

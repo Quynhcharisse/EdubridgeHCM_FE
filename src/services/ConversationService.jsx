@@ -59,7 +59,7 @@ export const createCampusAdminConversation = async () => {
     return response || null;
 };
 
-/** GET /api/v1/campus/conversation — trạng thái hội thoại campus ↔ admin (unreadCount, hasNewMessage). */
+
 export const getCampusConversation = async () => {
     const response = await axiosClient.request({
         url: "/campus/conversation",

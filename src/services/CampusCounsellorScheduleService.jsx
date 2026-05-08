@@ -1,13 +1,13 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
-/**
- * Lịch tư vấn viên — tách nguồn: template (schedule/templete/list) · assigned (slots/assigned) ·
- * available theo ngày (slot/available) · chọn người (available/list) · gán (assign).
- */
 
-/**
- * GET /api/v1/campus/counsellor/available/list — không query params; campus theo phiên.
- */
+
+
+
+
+
+
+
 export const getCounsellorAvailableList = async () => {
   const response = await axiosClient.get("/campus/counsellor/available/list");
   return response ?? null;
@@ -21,17 +21,17 @@ export function parseCounsellorAvailableListBody(res) {
 function logCounsellorAssign(stage, data) {
   const prefix = "[counsellor/assign]";
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
+    
     console.info(prefix, stage, data);
   }
 }
 
-/**
- * Chuẩn hóa body trước POST — UNASSIGN: `action` + (`slotIds` hoặc `counsellorIds` + `startDate/endDate`), không gửi campusId.
- * ASSIGN: templateIds + counsellorIds + campaignId + action, giữ startDate/endDate nếu FE có gửi.
- * @param {Record<string, unknown>} payload
- * @returns {Record<string, unknown>}
- */
+
+
+
+
+
+
 export function normalizeCounsellorAssignPayload(payload) {
   if (!payload || typeof payload !== "object") {
     throw new Error("counsellor/assign: payload is required");
@@ -125,19 +125,19 @@ export function normalizeCounsellorAssignPayload(payload) {
   return out;
 }
 
-/**
- * Thành công khi HTTP 2xx (thường 200). 4xx/5xx: axios throw → không toast success.
- * @param {unknown} res
- * @returns {boolean}
- */
+
+
+
+
+
 export function isCounsellorAssignResponseSuccess(res) {
   const st = res && typeof res === "object" && "status" in res ? Number(res.status) : 0;
   return st >= 200 && st < 300;
 }
 
-/**
- * syncCounsellorIntoSlots — log DEV để đối chiếu payload/response (200/4xx).
- */
+
+
+
 export const postCounsellorAssign = async (payload) => {
   const normalized = normalizeCounsellorAssignPayload(payload);
   const action = normalized.action;
@@ -162,11 +162,11 @@ export const postCounsellorAssign = async (payload) => {
   }
 };
 
-/**
- * POST /counsellor/assign thành công (HTTP 200) — BE mới trả snapshot toàn campus.
- * Cùng cấu trúc phần tử với GET …/slots/assigned. Nếu `body` null (BE cũ) → trả null, FE gọi GET.
- * @returns {{ action: 'ASSIGN' | 'UNASSIGN', slots: unknown[] } | null}
- */
+
+
+
+
+
 export function parseCounsellorAssignSuccessBody(res) {
   const body = res?.data?.body;
   if (body == null || typeof body !== "object") return null;
@@ -195,11 +195,11 @@ export function parseCounsellorAssignSuccessBody(res) {
   };
 }
 
-/**
- * GET /api/v1/campus/counsellor/slots/assigned
- * Query: counsellorId (optional).
- * @param {number|string} [counsellorId]
- */
+
+
+
+
+
 export const getCounsellorAssignedSlots = async (counsellorId) => {
   const params = {};
   if (counsellorId != null && counsellorId !== "" && counsellorId !== "ALL") {
@@ -211,7 +211,7 @@ export const getCounsellorAssignedSlots = async (counsellorId) => {
   });
   if (import.meta.env.DEV) {
     const rows = response?.data?.body;
-    // eslint-disable-next-line no-console
+    
     console.info("[GET /campus/counsellor/slots/assigned]", { params, count: Array.isArray(rows) ? rows.length : "?" });
   }
   return response ?? null;

@@ -23,25 +23,25 @@ import {
 } from "../Page/childrenInfo/childrenInfoHelpers.js";
 import { SubjectUnavailableHint } from "../Page/childrenInfo/SubjectUnavailableHint.jsx";
 
-/** Thứ tự hiển thị nhóm: môn chính trước, ngoại ngữ sau (không phụ thuộc thứ tự trong JSON). */
+
 const SUBJECT_GROUP_TYPE_ORDER = { regular: 0, foreign_language: 1 };
 
-/** Tooltip tiêu đề « Danh sách môn học khả dụng » (panel tư vấn viên). */
+
 const AVAILABLE_SUBJECTS_HEADING_TOOLTIP =
   "Danh sách môn học đang được hệ thống áp dụng cho hồ sơ học sinh.";
 
 const AVAILABLE_SUBJECTS_TOOLTIP_Z = 1700;
 
-/** Nhãn cột khối (Khối 6 … Khối 9), thống nhất với `GRADE_LEVELS`. */
+
 function gradeLevelHeaderLabel(g) {
   const digits = String(g.key || "").replace(/^g/i, "");
   const n = parseInt(digits, 10);
   return Number.isFinite(n) ? `Khối ${n}` : g.label.replace("Lớp ", "");
 }
 
-/**
- * Chuẩn hóa payload GET history tin nhắn (parent / counsellor): string JSON, lồng `data`, v.v.
- */
+
+
+
 export const parseMessagesHistoryPayloadRoot = (response) => {
   let payload = response?.data?.body?.body ?? response?.data?.body ?? response?.data ?? {};
   if (typeof payload === "string") {
@@ -68,9 +68,9 @@ export const parseMessagesHistoryPayloadRoot = (response) => {
   return payload;
 };
 
-/**
- * subjectsInSystem có thể nằm root, trong `data`, `studentProfile`, hoặc PascalCase.
- */
+
+
+
 export const extractSubjectsInSystemFromPayload = (payload) => {
   if (payload == null || typeof payload !== "object") return [];
   const roots = [];
@@ -89,10 +89,10 @@ export const extractSubjectsInSystemFromPayload = (payload) => {
   return [];
 };
 
-/**
- * subjectsInSystem từ API — mỗi phần tử: { label, type, subjects: [{ id, name }] }.
- * Trả về các nhóm đã sắp xếp; trong nhóm sắp tên theo tiếng Việt.
- */
+
+
+
+
 export const groupSubjectsInSystem = (subjectsInSystem) => {
   if (!Array.isArray(subjectsInSystem)) return [];
   const groups = subjectsInSystem
@@ -133,7 +133,7 @@ export const groupSubjectsInSystem = (subjectsInSystem) => {
   return groups;
 };
 
-/** Danh sách phẳng (theo thứ tự nhóm + tên) — dùng khi cần đếm hoặc tương thích. */
+
 export const flattenSubjectsInSystem = (subjectsInSystem) =>
   groupSubjectsInSystem(subjectsInSystem).flatMap((g) => g.subjects);
 
@@ -150,15 +150,13 @@ const normalizeSubjectLookupKey = (s) =>
     .normalize("NFC")
     .toLocaleLowerCase("vi-VN");
 
-/** Bỏ tiền tố « Môn » để so khớp tên danh mục với tên từ BE (vd. « Môn Toán » vs « Toán »). */
+
 const stripMonPrefix = (s) => {
   const t = String(s ?? "").trim();
   return /^môn\s+/i.test(t) ? t.replace(/^môn\s+/i, "").trim() : t;
 };
 
-/**
- * Khớp dòng điểm trong học bạ với môn trong danh sách khả dụng (tên catalog / id).
- */
+
 const findMatchingSubjectRow = (rows, catalogName, catalogSubjectId) => {
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const want = String(catalogName ?? "").trim();
@@ -318,7 +316,7 @@ export const buildAcademicScoreTable = (raw) => {
   }
 
   const subjectSet = new Set();
-  /** Môn có ít nhất một dòng subjectResult với isAvailable === false (metadata BE). */
+  
   const subjectUnavailable = new Set();
   for (const block of academicInfos) {
     const rows = block?.subjectResults ?? block?.subjectResultList ?? block?.results ?? [];
@@ -377,7 +375,7 @@ function ParentStudentInfoPanel({
           px: 1,
           py: 0.9,
           borderRadius: 1.5,
-          background: "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08))",
+          background: "rgba(59,130,246,0.12)",
           border: "1px solid rgba(99,102,241,0.2)",
         }}
       >

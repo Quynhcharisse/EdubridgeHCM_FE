@@ -28,10 +28,10 @@ const parseBodyObject = (value) => {
   return value && typeof value === "object" ? value : {};
 };
 
-/**
- * Root payload GET /campus/message/history/admin — có thể là `{ message, body: { schoolName, campusName, messages… } }`
- * hoặc phẳng; chọn object chứa messages/conversationId/metadata để gán state + payload gửi tin.
- */
+
+
+
+
 const pickCampusAdminHistoryBody = (responseData) => {
   const envelope = parseBodyObject(responseData);
   const layer1 = parseBodyObject(envelope?.body);
@@ -70,7 +70,7 @@ const pickIncomingConversationId = (payload) => {
   );
 };
 
-/** Chuẩn hóa object tin — BE có thể đặt nội dung trong `chatMessage` hoặc `message` object. */
+
 const flattenWsForNormalize = (merged) => {
   const cm = merged?.chatMessage;
   const msg = merged?.message;
@@ -139,7 +139,7 @@ const normalizePrincipal = (v) =>
     .toLowerCase()
     .replace(/^["'<\s]+|["'>\s]+$/g, "");
 
-/** Giống SchoolSidebar — STOMP có thể gửi body string hoặc lồng `data`. */
+
 const mergeSchoolIncomingWsPayload = (payload) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
   let body = payload;
@@ -181,19 +181,19 @@ const extractPrivateMessageSender = (merged) => {
 
 const SCHOOL_CONTACT_UNREAD_KEY = "school_contact_admin_unread_count";
 
-/** Xóa badge local — không dispatch school-contact-conversation-refresh (tránh GET /campus/conversation). */
+
 const clearSchoolContactUnreadLocally = () => {
   try {
     localStorage.setItem(SCHOOL_CONTACT_UNREAD_KEY, "0");
   } catch {
-    // ignore storage errors
+    
   }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("school-contact-unread-updated", {detail: {count: 0}}));
   }
 };
 
-/** GET /campus/conversation — không tạo conversation; chỉ bổ sung campus/admin email khi history chưa có. */
+
 const pickCampusConversationPayload = (responseData) => {
   const envelope = parseBodyObject(responseData);
   const body = parseBodyObject(envelope?.body);
@@ -233,7 +233,7 @@ export default function SchoolContactAdmin() {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
 
-  /** GET /campus/conversation — bổ sung metadata (email + tên trường/cơ sở cho payload ChatMessage BE). */
+  
   const fillContactContextFromCampusGet = useCallback(async () => {
     try {
       const response = await getCampusConversation();
@@ -293,7 +293,7 @@ export default function SchoolContactAdmin() {
     return !!myPrincipalLower && s === myPrincipalLower;
   };
 
-  /** Trả về context để handleSend dùng ngay sau await (tránh stale state). `false` khi lỗi HTTP. */
+  
   const loadHistory = async () => {
     setHistoryLoading(true);
     try {
@@ -331,7 +331,7 @@ export default function SchoolContactAdmin() {
 
       let schoolNameStr = String(body?.schoolName ?? body?.school_name ?? "").trim();
       let campusNameStr = String(body?.campusName ?? body?.campus_name ?? "").trim();
-      /** Ưu tiên user chỉ khi API không trả (history luôn có school/campus khi BE đã thêm). */
+      
       if (!schoolNameStr) schoolNameStr = String(userInfo?.schoolName ?? userInfo?.school ?? "").trim();
       if (!campusNameStr) campusNameStr = String(userInfo?.campusName ?? userInfo?.campus ?? "").trim();
       setSchoolName(schoolNameStr);
@@ -344,12 +344,12 @@ export default function SchoolContactAdmin() {
           : [];
       const normalized = messagesRaw.map(normalizeMessage).filter(hasRenderableChatText);
       setMessageItems(mergeUniqueMessages(normalized));
-      /** Lịch sử trống → đồng bộ badge sidebar (localStorage/WS trước đó có thể còn 1 dù chưa có tin admin). */
+      
       if (normalized.length === 0) {
         clearSchoolContactUnreadLocally();
       }
 
-      /** Chưa có email admin trên history — chỉ GET metadata (không POST tạo conversation). */
+      
       if (!adminEmailStr) {
         const filled = await fillContactContextFromCampusGet();
         if (filled) {
@@ -374,13 +374,13 @@ export default function SchoolContactAdmin() {
       };
     } finally {
       setHistoryLoading(false);
-      /** Không dispatch school-contact-conversation-refresh: GET /campus/conversation sau load lịch sử hay trả unread=0 và xóa badge đã + qua WebSocket. */
+      
     }
   };
 
   useEffect(() => {
     void loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   useEffect(() => {
@@ -432,7 +432,7 @@ export default function SchoolContactAdmin() {
     clearSchoolContactUnreadLocally();
     if (cid != null) {
       void markCampusMessagesRead(cid).catch(() => {
-        /* ignore */
+        
       });
     }
   };
@@ -565,7 +565,7 @@ export default function SchoolContactAdmin() {
               <SupportAgentIcon sx={{color: "#2563eb"}} />
             </Box>
             <Box sx={{minWidth: 0}}>
-              <Typography sx={{fontSize: 18, fontWeight: 700, color: "#1e293b"}}>Admin EduBridge</Typography>
+              <Typography sx={{fontSize: 18, fontWeight: 700, color: "#1e293b"}}>Quản trị EduBridge</Typography>
             </Box>
           </Paper>
         </Box>
@@ -582,7 +582,7 @@ export default function SchoolContactAdmin() {
               overflowX: "hidden",
               overflowY: "auto",
               WebkitOverflowScrolling: "touch",
-              bgcolor: "linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,0.95) 100%)",
+              bgcolor: "rgba(238,242,255,0.55)",
             }}
           >
             {historyLoading ? (

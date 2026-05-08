@@ -163,7 +163,7 @@ export const getAdminTemplateDocuments = async (categoryTemplate) => {
 
 export const uploadAdminTemplateDocument = async (categoryTemplate, file) => {
     const formData = new FormData();
-    // Key "file" phải khớp chính xác với @RequestParam("file") ở Backend
+    
     formData.append("file", file);
 
     const response = await axiosClient.post(
@@ -171,8 +171,8 @@ export const uploadAdminTemplateDocument = async (categoryTemplate, file) => {
         formData,
         {
             headers: {
-                // QUAN TRỌNG: Phải đảm bảo không có 'Content-Type': 'application/json'
-                // Thường thì để trình duyệt tự xử lý 'multipart/form-data' là tốt nhất
+                
+                
                 "Content-Type": "multipart/form-data",
             },
         }
@@ -180,13 +180,13 @@ export const uploadAdminTemplateDocument = async (categoryTemplate, file) => {
     return response;
 };
 
-// Code cũ giữ lại để tham chiếu:
-// export const uploadAdminTemplateDocument = async (categoryTemplate, file) => {
-//     const formData = new FormData();
-//     formData.append("file", file);
-//     const response = await axiosClient.post(`/admin/${categoryTemplate}/upload`, formData);
-//     return response || null;
-// };
+
+
+
+
+
+
+
 
 export const deleteAdminTemplateDocument = async (templateId) => {
     const response = await axiosClient.delete(`/admin/${templateId}`);

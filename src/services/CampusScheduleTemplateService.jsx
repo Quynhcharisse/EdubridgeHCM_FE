@@ -5,11 +5,11 @@ import { isAcademicCalendarLimitActive, normalizeAcademicCalendarShape } from ".
 
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-/**
- * Chuẩn hoá giờ gửi BE (`LocalTime.parse`): `HH:mm` (bỏ giây nếu có).
- * @param {string | null | undefined} t
- * @returns {string}
- */
+
+
+
+
+
 export function normalizeScheduleTimeHHmm(t) {
   const s = String(t ?? "").trim();
   if (!s) return "";
@@ -22,24 +22,24 @@ export function normalizeScheduleTimeHHmm(t) {
   return `${hh}:${mm}`;
 }
 
-/**
- * Ràng buộc form khung lịch từ GET /campus/config (`campusCurrent` + `hqDefault.operation`).
- * @returns {{
- *   slotDurationMinutes: number,
- *   bufferBetweenSlotsMinutes: number,
- *   stepMinutes: number,
- *   minCounsellorsPerSlot: number,
- *   maxCounsellorsPerSlot: number,
- *   maxBookingPerSlot: number,
- *   workShifts: Array<Record<string, unknown>>,
- *   regularDays: string[],
- *   weekendDays: string[],
- *   isOpenSunday: boolean,
- *   workingNote: string,
- *   academicCalendar: { term1: { start: string, end: string }, term2: { start: string, end: string } },
- *   academicSemesterLimitActive: boolean
- * }}
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export function parseCampusSchedulePolicyFromConfigResponse(res) {
   const body = parseSchoolConfigResponseBody(res);
   const cur = body.campusCurrent ?? body.campus_current ?? {};
@@ -53,7 +53,7 @@ export function parseCampusSchedulePolicyFromConfigResponse(res) {
         ? cur.policy_detail
         : {};
 
-  /** BE có thể đặt slot ở `hqDefault.operation.policyDetail` thay vì thẳng trên operation. */
+  
   const hqPol =
     hqOp.policyDetail && typeof hqOp.policyDetail === "object"
       ? hqOp.policyDetail
@@ -156,7 +156,7 @@ export function parseCampusSchedulePolicyFromConfigResponse(res) {
   const rawCurCal = cur.academicCalendar ?? cur.academic_calendar;
   const nHq = normalizeAcademicCalendarShape(rawHqCal);
   const nCur = normalizeAcademicCalendarShape(rawCurCal);
-  /** Trụ sở trước; nếu chưa «siết» thì dùng bản trên campus (nếu có). */
+  
   const academicCalendar = isAcademicCalendarLimitActive(nHq)
     ? nHq
     : isAcademicCalendarLimitActive(nCur)
@@ -181,25 +181,25 @@ export function parseCampusSchedulePolicyFromConfigResponse(res) {
   };
 }
 
-/**
- * POST /api/v1/campus/schedule/templete — body chuẩn contract:
- * - Tạo mới: không gửi `templateId` (hoặc null); có thể gửi `expandToPolicySlots: true`.
- * - Sửa: `templateId` > 0, `dayOfWeek` một phần tử.
- * - `campusId` giữ khi có (một số triển khai BE vẫn nhận).
- * @param {{
- *   templateId?: number | null,
- *   campusId?: number | null,
- *   dayOfWeek: string[],
- *   sessionType: string,
- *   active?: boolean,
- *   expandToPolicySlots?: boolean
- * }} input
- * @returns {Record<string, unknown>}
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export function buildUpsertCampusScheduleTemplatePayload(input) {
   const {templateId, campusId, dayOfWeek, sessionType, active, expandToPolicySlots} = input || {};
 
-  /** @type {Record<string, unknown>} */
+  
   const payload = {
     dayOfWeek: Array.isArray(dayOfWeek) ? dayOfWeek.map((d) => String(d || "").toUpperCase()) : [],
     sessionType: String(sessionType || "").trim().toUpperCase(),
@@ -229,10 +229,10 @@ export function buildUpsertCampusScheduleTemplatePayload(input) {
   return payload;
 }
 
-/**
- * Chuẩn hoá map thứ trong tuần → mảng template (GET campus list).
- * @param {Record<string, unknown>} raw
- */
+
+
+
+
 export function normalizeScheduleTemplateDayMap(raw) {
   const out = {};
   for (const d of DAYS) {
@@ -242,10 +242,10 @@ export function normalizeScheduleTemplateDayMap(raw) {
   return out;
 }
 
-/**
- * GET /api/v1/campus/{campusId}/schedule/templete/list — chỉ path `campusId`, không query/body (Parameters: none).
- * @param {number|string} campusId
- */
+
+
+
+
 export const getCampusScheduleTemplateList = async (campusId) => {
   const id = campusId == null || campusId === "" ? null : Number(campusId);
   if (id == null || Number.isNaN(id)) {
@@ -255,10 +255,10 @@ export const getCampusScheduleTemplateList = async (campusId) => {
   return response ?? null;
 };
 
-/**
- * GET /api/v1/campus/schedule/template/list/export
- * Export danh sách template lịch của campus hiện tại theo phiên đăng nhập.
- */
+
+
+
+
 export const exportCampusScheduleTemplateList = async () => {
   const response = await axiosClient.get("/campus/schedule/template/list/export", {
     responseType: "blob",
@@ -274,21 +274,21 @@ export function parseCampusScheduleTemplateListBody(res) {
   return normalizeScheduleTemplateDayMap(body);
 }
 
-/**
- * POST /api/v1/campus/schedule/templete (UPSERT)
- * Tạo mới: không gửi `templateId` trong body (dùng {@link buildUpsertCampusScheduleTemplatePayload}).
- * Sửa / vô hiệu: `templateId` > 0; `expandToPolicySlots` chỉ khi tạo mới.
- * @param {Record<string, unknown>} payload
- */
+
+
+
+
+
+
 export const upsertCampusScheduleTemplate = async (payload) => {
   const response = await axiosClient.post("/campus/schedule/templete", payload);
   return response ?? null;
 };
 
-/**
- * GET /api/v1/school/campus/schedule/template/list
- * @param {{ page?: number, pageSize?: number }} [params]
- */
+
+
+
+
 export const getSchoolCampusScheduleTemplateList = async (params = {}) => {
   const page = params.page ?? 0;
   const pageSize = params.pageSize ?? 50;
@@ -305,10 +305,10 @@ function isFlatScheduleTemplateItem(row) {
   return false;
 }
 
-/**
- * GET school list dạng phân trang: body.items = mảng template phẳng (templateId, campusId, dayOfWeek[], …)
- * → gom theo campusId → scheduleByDay giống GET /campus/{id}/schedule/templete/list
- */
+
+
+
+
 function parseFlatTemplateItemsToCampusRows(items) {
   if (!Array.isArray(items) || items.length === 0) return [];
 
@@ -351,12 +351,12 @@ function parseFlatTemplateItemsToCampusRows(items) {
   return [...byCampus.values()].sort((a, b) => a.campusId - b.campusId);
 }
 
-/**
- * Gọi GET /school/campus/schedule/template/list lặp theo `totalPages` rồi gộp `items`,
- * tránh thiếu campus/khung giờ khi phân trang theo từng dòng template (không phải theo campus).
- * @param {{ pageSize?: number }} [opts] — pageSize mỗi request (mặc định 200)
- * @returns {Promise<Array<{ campusId: number, campusName?: string, scheduleByDay: Record<string, unknown[]> }>>}
- */
+
+
+
+
+
+
 export async function fetchSchoolCampusScheduleTemplateListAll(opts = {}) {
   const pageSize = opts.pageSize ?? 200;
   const MAX_PAGES = 100;
@@ -378,10 +378,10 @@ export async function fetchSchoolCampusScheduleTemplateListAll(opts = {}) {
   return parseFlatTemplateItemsToCampusRows(allItems);
 }
 
-/**
- * Meta phân trang từ body (currentPage 0-based, totalPages, …)
- * @returns {{ totalPages: number, totalItems: number, currentPage: number, pageSize: number }}
- */
+
+
+
+
 export function parseSchoolCampusScheduleTemplateListPageMeta(res) {
   const body = res?.data?.body ?? res?.data?.data?.body;
   if (!body || typeof body !== "object") {
@@ -397,9 +397,9 @@ export function parseSchoolCampusScheduleTemplateListPageMeta(res) {
   };
 }
 
-/**
- * @returns {{ campusId: number, campusName?: string, scheduleByDay: Record<string, unknown[]> }[]}
- */
+
+
+
 export function parseSchoolCampusScheduleTemplateListBody(res) {
   const body = res?.data?.body ?? res?.data?.data?.body;
   if (!body || typeof body !== "object") return [];

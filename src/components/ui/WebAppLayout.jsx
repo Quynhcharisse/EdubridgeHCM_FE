@@ -115,7 +115,7 @@ export default function WebAppLayout() {
             return;
         }
 
-        // Nếu lastRoute không hợp lệ hoặc không có → về dashboard theo role
+        
         const dashboardRoute = getRoleDashboardRoute(role);
         if (currentPath !== dashboardRoute) {
             navigate(dashboardRoute, {replace: true});

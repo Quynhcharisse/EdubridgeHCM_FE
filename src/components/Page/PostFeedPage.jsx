@@ -106,7 +106,7 @@ function parseJsonMaybe(value) {
 }
 
 function looksLikeHttpUrl(value) {
-    return /^https?:\/\//i.test(String(value || "").trim());
+    return /^https?:\/\
 }
 
 function looksLikeImageUrl(value) {
@@ -275,7 +275,7 @@ function FeedPostCard({post, onOpen, onDisable, disableLoading = false, canDisab
                 position: "relative",
                 borderRadius: 3,
                 border: "none",
-                background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+                background: "#f8fbff",
                 boxShadow: "0 16px 34px rgba(15,23,42,0.14)",
                 transition: "background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                 "&:hover": {
@@ -528,9 +528,7 @@ export default function PostFeedPage() {
             const frameRect = frameEl.getBoundingClientRect();
             const frameWidth = frameRect.width;
             const frameHeight = frameRect.height;
-            if (!frameWidth || !frameHeight) return {x: 0, y: 0};
-
-            // Clamp by frame bounds so dragging never reveals outside background.
+            if (!frameWidth || !frameHeight) return {x: 0, y: 0};
             const maxOffsetX = Math.max(0, ((previewZoom - 1) * frameWidth) / 2);
             const maxOffsetY = Math.max(0, ((previewZoom - 1) * frameHeight) / 2);
             const x = Math.min(maxOffsetX, Math.max(-maxOffsetX, panX));
@@ -607,7 +605,7 @@ export default function PostFeedPage() {
                 minHeight: "100vh",
                 pt: {xs: 10.5, md: 12},
                 pb: {xs: 3, md: 5},
-                background: "linear-gradient(180deg, #e7edf6 0%, #d4deec 100%)"
+                background: "#e7edf6"
             }}
         >
             <Container maxWidth="md">

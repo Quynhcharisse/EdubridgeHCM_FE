@@ -82,7 +82,7 @@ const extractCampusAdminConversationId = (responseData) => {
     return raw;
 };
 
-/** Chỉ dùng field rõ ràng của conversation — tránh `unread` trùng tên field khác trên DTO tin nhắn WS. */
+
 const unreadDisplayFromCampusConversationPayload = (payload) => {
     if (!payload || typeof payload !== "object") return 0;
     const raw =
@@ -99,7 +99,7 @@ const unreadDisplayFromCampusConversationPayload = (payload) => {
     return 0;
 };
 
-/** BE có thể đặt sender trong chatMessage / message lồng. */
+
 const extractPrivateMessageSender = (merged) => {
     const layers = [merged, merged?.chatMessage, merged?.message, merged?.data, merged?.dto, merged?.payload].filter(
         (x) => x && typeof x === "object" && !Array.isArray(x)
@@ -119,7 +119,7 @@ const extractPrivateMessageSender = (merged) => {
     return "";
 };
 
-/** Gộp frame STOMP / body (kể cả chuỗi JSON) / data lồng — BE có thể gửi sender ở lớp bất kỳ. */
+
 const mergeSchoolContactWsPayload = (payload) => {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
     let body = payload;
@@ -140,7 +140,7 @@ const mergeSchoolContactWsPayload = (payload) => {
     return {...base, ...r, ...nestedData};
 };
 
-/** Cùng logic với SchoolContactAdmin — chỉ tăng badge khi thật sự có nội dung tin. */
+
 const flattenWsForSidebarMessage = (merged) => {
     const cm = merged?.chatMessage;
     const msg = merged?.message;
@@ -168,7 +168,7 @@ const normalizeSidebarMessage = (m) => {
 
 const hasRenderableSidebarChatText = (m) => stripInvisibleAndTrimSidebar(m?.text ?? "") !== "";
 
-/** Chỉ số unread số từ BE — không dùng `hasNewMessage` (dễ gây ghost badge khi chưa có tin thật). */
+
 const explicitUnreadNumericFromPayload = (payload) => {
     if (!payload || typeof payload !== "object") return 0;
     const raw =
@@ -205,7 +205,7 @@ const writeSchoolContactUnreadCount = (value) => {
     try {
         localStorage.setItem(SCHOOL_CONTACT_UNREAD_KEY, String(next));
     } catch {
-        // ignore storage errors
+        
     }
     if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("school-contact-unread-updated", { detail: { count: next } }));
@@ -330,16 +330,16 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
             if (response?.status !== 200) return;
             const payload = pickCampusConversationPayload(response?.data);
             const apiN = unreadDisplayFromCampusConversationPayload(payload);
-            /** Không ghi đè bump từ WS: GET đôi khi trả unread=0 chậm / lệch so với tin vừa tới qua STOMP. */
+            
             const localN = readSchoolContactUnreadCount();
             const merged = Math.max(apiN, localN);
             writeSchoolContactUnreadCount(merged);
         } catch {
-            /* ignore */
+            
         }
     }, []);
 
-    /** Vào trang Liên hệ từ sidebar → đánh dấu đã đọc trên server rồi xóa badge. */
+    
     const markSchoolContactReadAndClearBadge = useCallback(async () => {
         try {
             const response = await getCampusConversation();
@@ -361,7 +361,7 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
         }
     }, []);
 
-    /** GET /campus/conversation: lần đầu load sidebar + sau khi trang Liên hệ sync (event). Không gọi theo từng tin WS. */
+    
     useEffect(() => {
         void refreshSchoolContactFromApi();
         const onConversationRefresh = () => void refreshSchoolContactFromApi();
@@ -380,7 +380,7 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
                 try {
                     localStorage.setItem(SCHOOL_CONTACT_UNREAD_KEY, String(v));
                 } catch {
-                    /* ignore */
+                    
                 }
                 return;
             }
@@ -395,16 +395,16 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
             const merged = mergeSchoolContactWsPayload(payload);
             const sender = extractPrivateMessageSender(merged);
             const senderLower = normalizePrincipal(sender);
-            /** Tin do chính campus gửi (STOMP echo) — không tăng badge. */
+            
             if (senderLower && myPrincipalLower && senderLower === myPrincipalLower) return;
 
             const normalized = normalizeSidebarMessage(merged);
             const hasText = hasRenderableSidebarChatText(normalized);
             const explicitUnread = explicitUnreadNumericFromPayload(merged);
-            /**
-             * Trước đây mọi frame WS (kể cả rỗng/heartbeat) đều +1 — lệch với trang chat (lọc tin rỗng) → ghost badge.
-             * Chỉ cập nhật khi có số unread từ BE, hoặc khi payload giống tin chat thật (có nội dung).
-             */
+            
+
+
+
             if (!hasText) {
                 if (explicitUnread > 0) {
                     setContactUnreadCount(explicitUnread);
@@ -478,7 +478,7 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
                 fontFamily: '"Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif',
             }}
         >
-            {/* Top: Trường Học + nút thu gọn/mở rộng */}
+            {}
             <Box
                 sx={{
                     flexShrink: 0,
@@ -725,7 +725,7 @@ export default function SchoolSidebar({ currentPath, collapsed = false, onToggle
                 ))}
             </List>
 
-            {/* Bottom: Avatar + tên + role + dropdown */}
+            
             <Box
                 sx={{
                     flexShrink: 0,

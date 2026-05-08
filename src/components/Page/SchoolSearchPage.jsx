@@ -692,8 +692,7 @@ export default function SchoolSearchPage() {
                     borderRadius: '50%',
                     top: '-8%',
                     right: '-10%',
-                    background:
-                        'radial-gradient(circle, rgba(85,179,217,0.26) 0%, rgba(168,224,240,0.12) 42%, transparent 68%)',
+                    background: 'rgba(191,219,254,0.35)',
                     pointerEvents: 'none'
                 },
                 '&::after': {
@@ -704,8 +703,7 @@ export default function SchoolSearchPage() {
                     borderRadius: '50%',
                     bottom: '12%',
                     left: '-6%',
-                    background:
-                        'radial-gradient(circle, rgba(136,232,242,0.22) 0%, rgba(214,244,252,0.14) 45%, transparent 72%)',
+                    background: 'rgba(219,234,254,0.5)',
                     pointerEvents: 'none'
                 }
             }}
@@ -1060,14 +1058,14 @@ export default function SchoolSearchPage() {
                                                 <IconButton
                                                     size="small"
                                                     sx={{
-                                                        background: `linear-gradient(90deg, ${BRAND_NAVY}, ${BRAND_SKY})`,
+                                                        background: BRAND_SKY,
                                                         color: '#ffffff',
                                                         width: 34,
                                                         height: 34,
                                                         borderRadius: 999,
                                                         boxShadow: '0 8px 22px rgba(45, 95, 115, 0.28)',
                                                         '&:hover': {
-                                                            background: `linear-gradient(90deg, ${APP_PRIMARY_DARK}, ${BRAND_NAVY})`,
+                                                            background: APP_PRIMARY_DARK,
                                                             boxShadow: '0 10px 28px rgba(45, 95, 115, 0.35)'
                                                         }
                                                     }}

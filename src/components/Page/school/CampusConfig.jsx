@@ -67,15 +67,15 @@ const TAB_LABELS = [
   "Phân bổ nguồn lực",
 ];
 
-/** Cấu hình cơ sở: vận hành + cơ sở vật chất (GET/PUT /campus/{id}/config). Ngày nghỉ: /school/holiday-settings. */
+
 const BRANCH_TAB_SLUGS = ["operation", "facility"];
 const BRANCH_TAB_LABELS = ["Cài đặt vận hành", "Cài đặt cơ sở vật chất"];
 
-/**
- * Danh sách phương thức hiển thị checkbox: từ API, không preset FE.
- * - `availableMethods` / `available_methods`: đủ lựa chọn (bật/tắt theo `allowedMethods`).
- * - Chỉ có `allowedMethods`: mỗi dòng tương ứng một phương thức đang cấu hình (có thể thêm bằng nút Thêm).
- */
+
+
+
+
+
 function mergeAdmissionMethodCatalogRows(availableMethods, allowedMethods) {
   const map = new Map();
   for (const m of availableMethods || []) {
@@ -103,15 +103,15 @@ const DAY_CODES = [
   {code: "SUN", label: "CN"},
 ];
 
-/** Luân phiên theo chỉ số nhóm — tab Vận hành (quy trình theo phương thức) & tab Tài chính (các khoản phí). */
+
 const METHOD_PROCESS_VISUAL_ACCENTS = [
-  {bar: "#2563eb", border: "rgba(37, 99, 235, 0.42)", headerBg: "linear-gradient(100deg, rgba(37,99,235,0.16) 0%, rgba(37,99,235,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(37, 99, 235, 0.06)", stepsBorder: "rgba(37, 99, 235, 0.22)"},
-  {bar: "#7c3aed", border: "rgba(124, 58, 237, 0.4)", headerBg: "linear-gradient(100deg, rgba(124,58,237,0.16) 0%, rgba(124,58,237,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(124, 58, 237, 0.07)", stepsBorder: "rgba(124, 58, 237, 0.22)"},
-  {bar: "#0d9488", border: "rgba(13, 148, 136, 0.42)", headerBg: "linear-gradient(100deg, rgba(13,148,136,0.15) 0%, rgba(13,148,136,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(13, 148, 136, 0.07)", stepsBorder: "rgba(13, 148, 136, 0.22)"},
-  {bar: "#c2410c", border: "rgba(194, 65, 12, 0.4)", headerBg: "linear-gradient(100deg, rgba(194,65,12,0.14) 0%, rgba(194,65,12,0.05) 50%, rgba(255,255,255,0) 100%)", stepsBg: "rgba(194, 65, 12, 0.06)", stepsBorder: "rgba(194, 65, 12, 0.22)"},
+  {bar: "#2563eb", border: "rgba(37, 99, 235, 0.42)", headerBg: "rgba(37,99,235,0.12)", stepsBg: "rgba(37, 99, 235, 0.06)", stepsBorder: "rgba(37, 99, 235, 0.22)"},
+  {bar: "#7c3aed", border: "rgba(124, 58, 237, 0.4)", headerBg: "rgba(124,58,237,0.12)", stepsBg: "rgba(124, 58, 237, 0.07)", stepsBorder: "rgba(124, 58, 237, 0.22)"},
+  {bar: "#0d9488", border: "rgba(13, 148, 136, 0.42)", headerBg: "rgba(13,148,136,0.12)", stepsBg: "rgba(13, 148, 136, 0.07)", stepsBorder: "rgba(13, 148, 136, 0.22)"},
+  {bar: "#c2410c", border: "rgba(194, 65, 12, 0.4)", headerBg: "rgba(194,65,12,0.12)", stepsBg: "rgba(194, 65, 12, 0.06)", stepsBorder: "rgba(194, 65, 12, 0.22)"},
 ];
 
-/** Khớp enum BE `ResourceType`: value JSON `counsellor` (COUNSELLOR). */
+
 const RESOURCE_TYPE_OPTIONS = [{value: "counsellor", label: "Tư vấn viên"}];
 
 const RESOURCE_TYPE_VALUE_SET = new Set(RESOURCE_TYPE_OPTIONS.map((o) => o.value));
@@ -129,7 +129,7 @@ function isKnownResourceTypeValue(v) {
   return v != null && RESOURCE_TYPE_VALUE_SET.has(String(v));
 }
 
-/** Snackbar sau lưu Cấu hình chung (PUT school config) — đồng bộ với thông điệp BE tiếng Anh. */
+
 function schoolConfigSaveSuccessMessage(apiMessage) {
   const raw = apiMessage != null ? String(apiMessage).trim() : "";
   if (!raw) return "Chỉnh sửa thành công";
@@ -138,7 +138,7 @@ function schoolConfigSaveSuccessMessage(apiMessage) {
   return raw;
 }
 
-/** Snackbar sau lưu Cấu hình theo cơ sở (PUT /campus/{id}/config). */
+
 function campusConfigSaveSuccessMessage(apiMessage) {
   const raw = apiMessage != null ? String(apiMessage).trim() : "";
   if (!raw) return "Chỉnh sửa cấu hình cơ sở thành công";
@@ -190,7 +190,7 @@ function defaultConfig() {
         term1: {start: "", end: ""},
         term2: {start: "", end: ""},
       },
-      /** GET `admissionProcesses` / PUT `methodAdmissionProcess` — quy trình theo từng methodCode */
+      
       methodAdmissionProcess: [],
       admissionSeasons: [],
     },
@@ -205,7 +205,7 @@ function defaultConfig() {
   };
 }
 
-/** Parse `gallery` JSON string (hoặc array) từ BE → imageList UI */
+
 function galleryStringToImageList(gallery) {
   if (gallery == null || gallery === "") return [];
   if (Array.isArray(gallery)) {
@@ -248,7 +248,7 @@ function sanitizeCampusPutItemList(itemList) {
   }));
 }
 
-/** PUT /campus/{id}/config — `imageJsonData`: { coverUrl, imageList } */
+
 function buildImageJsonDataForCampusPut(imageData) {
   const img = imageData && typeof imageData === "object" ? imageData : {};
   const coverUrl =
@@ -274,7 +274,7 @@ function buildImageJsonDataForCampusPut(imageData) {
   };
 }
 
-/** So sánh ổn định cho PUT campus — tránh bỏ sót khi `JSON.stringify` cả `facilityData` không đổi nhưng `itemList` đã đổi. */
+
 function campusFacilityPutSlice(fac) {
   const f = fac && typeof fac === "object" ? fac : {};
   return {
@@ -283,13 +283,13 @@ function campusFacilityPutSlice(fac) {
   };
 }
 
-/**
- * BE trả song song `facilityData` (đã lưu) và `facility_template` (catalog mẫu).
- * Nếu trộn hai nhánh khi `facilityData` thiếu field (partial JSON), field đó sẽ bị lấy từ template
- * → UI như “quay về data cũ” sau GET/Lưu dù PUT đúng.
- * Quy tắc: có `facilityData` / `facility_data` thì CHỈ dùng object đó; thiếu key = rỗng, không fallback template.
- * Chỉ dùng `facility_template` khi không có nhánh facilityData.
- */
+
+
+
+
+
+
+
 function mergeFacilityFromBody(body) {
   const tpl = body.facility_template && typeof body.facility_template === "object" ? body.facility_template : {};
   const rawDat =
@@ -328,7 +328,7 @@ function mergeFacilityFromBody(body) {
   };
 }
 
-/** Ưu tiên object camelCase (PUT) nếu có key; không thì dùng snake_case từ GET đầy đủ */
+
 function pickSection(body, camelKey, snakeKey) {
   const camel = body[camelKey];
   const snake = body[snakeKey];
@@ -339,7 +339,7 @@ function pickSection(body, camelKey, snakeKey) {
   return c || s || {};
 }
 
-/** Một dòng hồ sơ: { code, name, required } */
+
 function normalizeDocItem(d) {
   if (!d || typeof d !== "object") return {code: "", name: "", required: false};
   return {
@@ -349,10 +349,10 @@ function normalizeDocItem(d) {
   };
 }
 
-/**
- * Một nhóm theo phương thức (contract BE):
- * { "methodCode": "ACADEMIC_RECORD", "documents": [{ "code", "name", "required" }] }
- */
+
+
+
+
 function normalizeByMethodGroup(g) {
   if (!g || typeof g !== "object") return {methodCode: "", documents: []};
   const methodCode =
@@ -365,7 +365,7 @@ function normalizeByMethodGroup(g) {
   return {methodCode, documents};
 }
 
-/** Một bước trong quy trình theo phương thức (GET admissionProcesses / PUT methodAdmissionProcess). */
+
 function normalizeAdmissionProcessStep(s, i) {
   if (!s || typeof s !== "object") {
     return {stepOrder: i + 1, stepName: "", description: ""};
@@ -491,10 +491,10 @@ function normalizeAcademicCalendarFromApi(raw, fallback) {
   };
 }
 
-/**
- * GET: `admissionProcesses` [{ methodCode, steps }].
- * Legacy: `admissionSteps` phẳng → một nhóm methodCode rỗng.
- */
+
+
+
+
 function parseMethodAdmissionProcessFromOperation(op) {
   if (!op || typeof op !== "object") return [];
   const raw = Array.isArray(op.admissionProcesses)
@@ -519,7 +519,7 @@ function parseMethodAdmissionProcessFromOperation(op) {
   return [];
 }
 
-/** Gửi PUT đúng shape, bỏ field thừa */
+
 function sanitizeDocumentRequirementsForApi(data) {
   if (!data || typeof data !== "object") return {mandatoryAll: [], byMethod: []};
   const mandatoryAll = Array.isArray(data.mandatoryAll)
@@ -544,7 +544,7 @@ function sanitizeDocumentRequirementsForApi(data) {
   return {mandatoryAll, byMethod};
 }
 
-/** PUT: bỏ field lạ (vd. itemList: true từ GET key), giữ đúng contract */
+
 function sanitizeAdmissionSettingsForApi(adm) {
   if (!adm || typeof adm !== "object") return adm;
   const raw = Array.isArray(adm.allowedMethods) ? adm.allowedMethods : [];
@@ -628,10 +628,10 @@ function sanitizeFeeItemForApi(item) {
   };
 }
 
-/**
- * BE lưu `priceAdjustment` dạng phân số (0.1 = 10% trên UI).
- * Nếu API cũ trả số nguyên phần trăm (vd. 15 = 15%) thì |n| > 1 → giữ nguyên cho UI.
- */
+
+
+
+
 function priceAdjustmentPercentFromApi(v) {
   if (v == null || v === "") return v;
   const n = Number(v);
@@ -640,7 +640,7 @@ function priceAdjustmentPercentFromApi(v) {
   return n;
 }
 
-/** UI nhập % (10) → gửi BE (0.1). */
+
 function priceAdjustmentPercentToApi(v) {
   if (v == null || v === "") return v;
   const n = Number(v);
@@ -648,7 +648,7 @@ function priceAdjustmentPercentToApi(v) {
   return n / 100;
 }
 
-/** GET → state: `feeItems` theo contract; legacy `reservationFee` → tạo một dòng RESERVATION_FEE. */
+
 function normalizeFinancePolicySection(fin, defaults) {
   const f = fin && typeof fin === "object" ? fin : {};
   const rawItems = Array.isArray(f.feeItems) ? f.feeItems.map(normalizeFeeItemFromApi).filter(Boolean) : [];
@@ -694,10 +694,10 @@ function normalizeFinancePolicySection(fin, defaults) {
   };
 }
 
-/**
- * PUT financePolicyData: chỉ gửi field / feeItems thực sự đổi so với snapshot ban đầu
- * (BE giữ nguyên phần không có trong body).
- */
+
+
+
+
 function feeItemsWithCodes(items) {
   return (Array.isArray(items) ? items : []).filter((row) => row && String(row.feeCode ?? "").trim() !== "");
 }
@@ -783,7 +783,7 @@ function reservationFeeSnapshotFromItems(feeItems) {
   };
 }
 
-/** Chỉ một dòng được `isReservationFee: true`. */
+
 function mapFeeItemsExclusiveReservation(items, index, checked) {
   const list = Array.isArray(items) ? items.map((r) => ({...(r && typeof r === "object" ? r : {})})) : [];
   if (index < 0 || index >= list.length) return list;
@@ -954,7 +954,7 @@ function sanitizeResourceDistributionDataForApi(rd) {
   return {allocations};
 }
 
-/** Gộp admission_settings (snake) với admissionSettingsData — bỏ key lạ như itemList: boolean */
+
 function mergeAdmissionFromBody(body) {
   const camel = body.admissionSettingsData && typeof body.admissionSettingsData === "object" ? body.admissionSettingsData : {};
   const snake = body.admission_settings && typeof body.admission_settings === "object" ? body.admission_settings : {};
@@ -1163,7 +1163,7 @@ function pickSchoolIdFromCampuses(campuses) {
   return null;
 }
 
-/** Campus chính để GET/PUT /campus/{id}/config (chỉ sửa cơ sở mình, không chọn campus khác). */
+
 function pickPrimaryCampusIdFromCampuses(campuses) {
   if (!Array.isArray(campuses) || campuses.length === 0) return null;
   const primary = campuses.find((c) => c.isPrimaryBranch === true);
@@ -1189,7 +1189,7 @@ function parseBranchFacilityJson(raw) {
   return null;
 }
 
-/** GET /api/v1/campus/config — envelope `body` (camelCase hoặc snake_case). */
+
 function pickCampusConfigGetEnvelope(body) {
   if (!body || typeof body !== "object") {
     return {hqDefault: {}, campusCurrent: {}};
@@ -1219,7 +1219,7 @@ function policyFromCampusCurrent(cur) {
   return "";
 }
 
-/** GET campus/config — bản văn tổng hợp BE tạo sau khi lưu PUT (nguồn hiển thị “thật” cho user). */
+
 function policyFullTextRenderedFromCampusCurrent(cur) {
   if (!cur || typeof cur !== "object") return "";
   const fullPolicyRendered = cur.fullPolicyRendered ?? cur.full_policy_rendered;
@@ -1233,10 +1233,10 @@ function policyFullTextRenderedFromCampusCurrent(cur) {
   return "";
 }
 
-/**
- * GET /campus/config — quy trình nhập học sau merge (BE), ưu tiên hơn `facilityJson.admissionStepsOverride`.
- * Hỗ trợ: admissionProcessesEffective / effectiveAdmissionProcesses (nhóm), admissionSteps (flat).
- */
+
+
+
+
 function parseCampusCurrentEffectiveAdmissionProcesses(cur) {
   if (!cur || typeof cur !== "object") return null;
   const eff =
@@ -1259,7 +1259,7 @@ function parseCampusCurrentEffectiveAdmissionProcesses(cur) {
   return null;
 }
 
-/** PUT /campus/{id}/config — nếu BE trả envelope giống GET thì FE hydrate lại không cần GET. */
+
 function campusConfigEnvelopeFromPutResponse(res) {
   const body = parseSchoolConfigResponseBody(res);
   if (!body || typeof body !== "object") return null;
@@ -1267,9 +1267,9 @@ function campusConfigEnvelopeFromPutResponse(res) {
   return null;
 }
 
-/**
- * `campusCurrent` phẳng — bốn số đặt chỗ (camel/snake). Áp sau `policyDetailRendered` để field BE trả trực tiếp thắng.
- */
+
+
+
 function applyCampusCurrentFlatBookingScalars(cur, mergedOp) {
   if (!cur || typeof cur !== "object" || !mergedOp) return;
   const pick = (camel, snake) => {
@@ -1291,10 +1291,10 @@ function applyCampusCurrentFlatBookingScalars(cur, mergedOp) {
   if (bf != null) mergedOp.bufferBetweenSlotsMinutes = bf;
 }
 
-/**
- * Phản hồi GET /api/v1/campus/config (campus theo phiên) — cả trụ sở và campus phụ.
- * CSVC + vận hành từ `campusCurrent.facilityJson` + merge HQ `hqDefault`.
- */
+
+
+
+
 function normalizeFromCampusConfigApi(body) {
   const d = defaultConfig();
   const {hqDefault: hq, campusCurrent: cur} = pickCampusConfigGetEnvelope(body);
@@ -1304,7 +1304,7 @@ function normalizeFromCampusConfigApi(body) {
 
   const hqImg = hqFac.imageData && typeof hqFac.imageData === "object" ? hqFac.imageData : {};
 
-  /** Ảnh bìa từ facilityJson campus (ưu tiên `imageData.cover` theo contract GET) */
+  
   function coverUrlFromFacilityJson(facilityJson) {
     if (!facilityJson || typeof facilityJson !== "object") return "";
     const img = facilityJson.imageData && typeof facilityJson.imageData === "object" ? facilityJson.imageData : {};
@@ -1461,12 +1461,12 @@ function normalizeFromCampusConfigApi(body) {
   };
 }
 
-/**
- * PUT /api/v1/campus/{campusId}/config — body phẳng partial (UpdateCampusConfigRequest).
- * BE merge partial; chỉ gửi field nhánh đã đổi (không gửi workingOverride — giờ/ca do trường cấu hình).
- *
- * @param hqOperation — `hqDefault.operation` từ GET; dùng so sánh admissionStepsOverride
- */
+
+
+
+
+
+
 function buildCampusFlatPutPayload(config, initial, hqOperation, initialPolicy, policy) {
   const fac = config.facilityData;
   const iFac = initial.facilityData;
@@ -1564,7 +1564,7 @@ function buildCampusFlatPutPayload(config, initial, hqOperation, initialPolicy, 
   return payload;
 }
 
-/** Gửi đủ nhánh PUT như phiên bản cũ — chỉ khi partial không map được thay đổi (hiếm). */
+
 function buildCampusFlatPutPayloadFallbackFull(config, hqOperation, policy) {
   const fac = config.facilityData;
   const op = config.operationSettingsData;
@@ -1615,18 +1615,18 @@ function admissionMethodExtraEntries(m) {
   return Object.entries(m).filter(([k]) => !ADMISSION_METHOD_DETAIL_SKIP.has(k));
 }
 
-/**
- * @param {{ variant?: "platform" | "campus" }} props
- * - platform: GET/PUT /school/config/{schoolId} (chỉ campus chính / isPrimaryBranch)
- * - campus: GET /campus/config; PUT /campus/{campusId}/config — campus phụ: cơ sở đăng nhập; campus chính: chỉ cơ sở chính (không chọn campus khác).
- */
+
+
+
+
+
 export default function CampusConfig() {
   const isCampusVariant = true;
   const {isPrimaryBranch, currentCampusId, loading: schoolCtxLoading} = useSchool();
   const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
-  /** Chỉ dùng khi campus chính + variant campus — id cơ sở chính sau listCampuses. */
+  
   const [primaryCampusResolvedId, setPrimaryCampusResolvedId] = useState(null);
 
   const effectiveCampusId = useMemo(() => {
@@ -1650,7 +1650,7 @@ export default function CampusConfig() {
     [setSearchParams, tabSlugs]
   );
 
-  /** Tab ngày nghỉ đã tách sang menu Cài đặt ngày nghỉ — link/bookmark cũ chuyển hướng. */
+  
   useLayoutEffect(() => {
     if (searchParams.get("tab") === "holiday") {
       navigate("/school/holiday-settings", {replace: true});
@@ -1661,14 +1661,14 @@ export default function CampusConfig() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [schoolId, setSchoolId] = useState(null);
-  /** Danh sách cơ sở (platform): chọn campusId trong tab Phân bổ nguồn lực — đồng bộ GET/PUT /school/config/{schoolId}. */
+  
   const [campusList, setCampusList] = useState([]);
   const [branchPolicyDetail, setBranchPolicyDetail] = useState("");
-  /** policyDetailRendered.fullTextRendered — chỉ đọc từ GET, cập nhật sau mỗi lần load. */
+  
   const [branchPolicyFullTextRendered, setBranchPolicyFullTextRendered] = useState("");
-  /** GET campus/config: thiếu `hqDefault.operation` — không có chuẩn vận hành từ trụ sở. */
+  
   const [campusHqOperationMissing, setCampusHqOperationMissing] = useState(false);
-  /** Snapshot `hqDefault.operation` — đồng bộ ref, dùng render badge so với form. */
+  
   const [branchHqOperation, setBranchHqOperation] = useState({});
   const branchHqOperationRef = useRef(null);
   const initialPolicyRef = useRef("");
@@ -1694,7 +1694,7 @@ export default function CampusConfig() {
     [config.admissionSettingsData?.availableMethods, config.admissionSettingsData?.allowedMethods]
   );
 
-  /** Tab Hồ sơ — nhóm theo phương thức: chỉ chọn methodCode từ allowedMethods (Cài đặt Tuyển sinh). */
+  
   const allowedMethodsDocumentDropdown = useMemo(
     () =>
       (config.admissionSettingsData?.allowedMethods || [])
@@ -1708,7 +1708,7 @@ export default function CampusConfig() {
     [config.admissionSettingsData?.allowedMethods]
   );
 
-  /** Mã phương thức gợi ý: đã bật tuyển sinh + nhóm hồ sơ theo phương thức + đang cấu hình quy trình */
+  
   const admissionMethodCodeOptions = useMemo(() => {
     const codes = new Map();
     (config.admissionSettingsData?.allowedMethods || []).forEach((m) => {
@@ -1741,7 +1741,7 @@ export default function CampusConfig() {
     return cfgDirty || polDirty;
   }, [snapshot, branchPolicyDetail]);
 
-  /** Khi không chỉnh sửa hoặc đang lưu: khoá nhập nhưng giữ màu bình thường (readOnly / chặn pointer, không dùng disabled). */
+  
   const fieldDisabled = saving || !editing;
   const blockPointerSx = fieldDisabled ? { pointerEvents: "none", cursor: "default" } : undefined;
 
@@ -1830,7 +1830,7 @@ export default function CampusConfig() {
       }
       setSchoolId(sid);
 
-      /** Cơ sở chính (isPrimaryBranch): GET /api/v1/school/config/{schoolId} — toàn bộ form. */
+      
       setBranchPolicyDetail("");
       initialPolicyRef.current = "";
       setBranchPolicyFullTextRendered("");
@@ -1985,7 +1985,7 @@ export default function CampusConfig() {
       return;
     }
 
-    /** Cơ sở chính: PUT /api/v1/school/config/{schoolId} (gồm operationSettingsData + facilityData nếu đổi). */
+    
     const schoolPayload = buildPartialPayload(config, initial);
 
     if (Object.keys(schoolPayload).length === 0) {
@@ -2339,7 +2339,7 @@ export default function CampusConfig() {
           borderRadius: 3,
           mb: 2.5,
           color: "white",
-          background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+          background: "#60a5fa",
           boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",
         }}
       >

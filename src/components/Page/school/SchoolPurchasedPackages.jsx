@@ -117,17 +117,17 @@ function toParentPostPermissionLabel(permission) {
     return permission || "—";
 }
 
-/**
- * Campus chính: còn gói có hạn ngạch nhưng trụ sở hoặc chi nhánh đang 0 → chuyển tới
- * Cấu hình chung → tab Phân bổ nguồn lực (`/school/facility-config?tab=resource-distribution`).
- */
+
+
+
+
 function shouldRedirectToResourceDistribution(rs) {
     if (!rs) return false;
     if (!(rs.totalPackageQuota > 0)) return false;
     return rs.myCampusQuota === 0 || rs.otherCampusesQuota === 0;
 }
 
-/** Map API body → normalized subscription model */
+
 function mapSubscription(body) {
     if (!body || typeof body !== "object") return null;
     const startDate = body.startDate || "";
@@ -176,10 +176,10 @@ function formatDateDDMMYYYY(iso) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
-/**
- * BE có thể trả suggestion tiếng Anh; hiển thị tiếng Việt cho người dùng.
- * Ví dụ: … from day to day2026-05-12 (thiếu khoảng trắng trước ngày).
- */
+
+
+
+
 function localizeSubscriptionSuggestion(raw, body) {
     const text = typeof raw === "string" ? raw.trim() : "";
     if (!text) return "";
@@ -205,9 +205,9 @@ function localizeSubscriptionSuggestion(raw, body) {
     return text;
 }
 
-/**
- * BE có thể trả statusMessage tiếng Anh (vd. Active (Remaining 30 days)).
- */
+
+
+
 function localizeSubscriptionStatusMessage(raw, body) {
     const text = typeof raw === "string" ? raw.trim() : "";
     if (!text) return "";
@@ -234,7 +234,7 @@ function localizeSubscriptionStatusMessage(raw, body) {
     return text;
 }
 
-/** Elapsed % through [startDate, endDate] by calendar (0–100). */
+
 function subscriptionElapsedPercent(startDate, endDate, isExpired) {
     if (isExpired) return 100;
     const start = startOfDay(new Date(startDate));
@@ -1032,10 +1032,10 @@ function CurrentSubscriptionPage({
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%" }}>
-            {/* Page Header — cùng phong cách SchoolCampus */}
+            {}
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1245,7 +1245,7 @@ export default function SchoolPurchasedPackages() {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%" }}>
                 <Box
                     sx={{
-                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                        background: "#60a5fa",
                         borderRadius: 3,
                         p: 3,
                         color: "white",

@@ -1,10 +1,10 @@
-/** UX + copy lỗi cho gán / hủy gán tư vấn viên (khớp backend / checklist). */
 
-/**
- * Hàng gán từ API có bị chặn gỡ do lịch hẹn (nếu BE gửi cờ).
- * @param {Record<string, unknown>|null|undefined} row
- * @returns {boolean}
- */
+
+
+
+
+
+
 export function assignmentRowBlocksUnassign(row) {
   if (!row || typeof row !== "object") return false;
   const n = row.activeBookingsCount ?? row.active_bookings_count ?? row.pendingBookingsCount ?? row.pending_bookings_count;
@@ -25,11 +25,11 @@ function lower(raw) {
   return String(raw ?? "").toLowerCase();
 }
 
-/**
- * Thông điệp gần đúng checklist; fallback chuỗi gốc từ BE.
- * @param {string|undefined} raw
- * @returns {string}
- */
+
+
+
+
+
 export function mapCounsellorAssignApiErrorMessage(raw) {
   const m = lower(raw);
   if (!m) return "Gán tư vấn viên không thành công.";
@@ -57,10 +57,10 @@ export function mapCounsellorAssignApiErrorMessage(raw) {
   return raw || "Gán tư vấn viên không thành công.";
 }
 
-/**
- * @param {string|undefined} raw
- * @returns {string}
- */
+
+
+
+
 export function mapCounsellorUnassignApiErrorMessage(raw) {
   const m = lower(raw);
   if (!m) return "Không thể hủy gán.";
@@ -76,12 +76,12 @@ export function mapCounsellorUnassignApiErrorMessage(raw) {
   return raw || "Không thể hủy gán.";
 }
 
-/**
- * @param {number} minC
- * @param {number} maxC 0 = không trần
- * @param {number} selectedCount
- * @returns {{ ok: boolean, message?: string }}
- */
+
+
+
+
+
+
 export function validateCounsellorCountForAssign(minC, maxC, selectedCount) {
   const min = Math.max(1, Number(minC) || 1);
   const max = Number(maxC);
@@ -101,7 +101,7 @@ export function validateCounsellorCountForAssign(minC, maxC, selectedCount) {
   return {ok: true};
 }
 
-/** Chỉ bỏ qua mức «không chặn tư vấn viên / vận hành» theo checklist. */
+
 const HOLIDAY_IMPACT_SKIP_WARN = new Set(["STUDENT_ONLY", "ONLINE_ONLY"]);
 
 function ymdRangesOverlap(a0, a1, b0, b1) {
@@ -113,12 +113,12 @@ function ymdRangesOverlap(a0, a1, b0, b1) {
   return as <= be && bs <= ae;
 }
 
-/**
- * @param {Array<Record<string, unknown>>} holidays — từ getHolidayList
- * @param {string} startYmd
- * @param {string} endYmd
- * @returns {string[]} nhãn ngày nghỉ giao với khoảng gán
- */
+
+
+
+
+
+
 export function listBlockingHolidayLabelsInRange(holidays, startYmd, endYmd) {
   if (!Array.isArray(holidays) || !startYmd || !endYmd) return [];
   const out = [];

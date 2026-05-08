@@ -109,7 +109,7 @@ const buildSourceViewUrl = (sourceUrl) => {
     return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(normalized)}`;
 };
 
-/** BE có thể ghép nhiều URL bằng dấu `;` — mỗi URL là một nguồn riêng */
+
 const parseSourceUrls = (source) => {
     const raw = String(source || '').trim();
     if (!raw) return [];
@@ -138,9 +138,9 @@ const humanizeStorageSegment = (segment) => {
     return core.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 };
 
-/**
- * Lấy chữ hiển thị từ URL storage (slug thư mục trường / cơ sở trong path EduBridge/...).
- */
+
+
+
 const getSourceLinkLabel = (rawUrl) => {
     const fallback = String(rawUrl || '').trim();
     if (!fallback) return '';
@@ -365,7 +365,7 @@ const Chatbot = () => {
                                 boxShadow: '0 12px 48px rgba(0,0,0,0.15)'
                             }}
                         >
-                            {/* Header */}
+                            {}
                             <Box
                                 sx={{
                                     bgcolor: APP_PRIMARY_MAIN,

@@ -150,7 +150,7 @@ export default function CounsellorProfile() {
 
   const counsellor = profile?.counsellor || {};
   const displayName = counsellor.name || profile?.email || "Tư vấn viên";
-  // GET /account/profile (COUNSELLOR): ảnh nằm trong counsellor.avatar; giữ fallback picture nếu BE cũ còn gửi.
+  
   const picture = counsellor.avatar ?? profile?.picture;
 
   if (loading) {
@@ -166,7 +166,7 @@ export default function CounsellorProfile() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4 }}>
       <Box
         sx={{
-          background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+          background: "#60a5fa",
           borderRadius: 3,
           p: 3,
           color: "white",

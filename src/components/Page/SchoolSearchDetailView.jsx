@@ -268,7 +268,7 @@ function readCachedParentPhone() {
                 }
             }
         } catch {
-            // Ignore malformed cache and continue checking other keys.
+            
         }
     }
     return "";
@@ -1703,8 +1703,7 @@ function SchoolPolicyInfoCard({school, activeCampusIndex, embedded = false}) {
     ].filter((item) => Boolean(item.value));
 
     const policyAllRows = React.useMemo(
-        () => [...policyRows, ...workingRows],
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        () => [...policyRows, ...workingRows],
         [activeCampus, workingConfig, policyDetail]
     );
     const hasStructuredPolicy = policyAllRows.length > 0;
@@ -2629,7 +2628,7 @@ function SchoolLocationMap({userLocation, fallbackCenter, campuses, maptilerApiK
             style={MAP_CONTAINER_STYLE}
             scrollWheelZoom
         >
-            <TileLayer url={mapUrl} attribution='&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap contributors'/>
+            <TileLayer url={mapUrl} attribution='&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap cộng tác viên'/>
             {userLocation ? (
                 <Marker position={[userLocation.lat, userLocation.lng]} icon={parentLocationIcon}>
                     <Popup>Vị trí của bạn</Popup>
@@ -3213,8 +3212,7 @@ export default function SchoolSearchDetailView({
                     if (!prevTrimmed || prevTrimmed === cachedPhoneAtRequest) return profilePhone;
                     return prev;
                 });
-            } catch {
-                // Keep silent here; booking still works with manual input/cached phone.
+            } catch {
             }
         })();
         return () => {
@@ -3698,11 +3696,7 @@ export default function SchoolSearchDetailView({
                             inset: 0,
                             pointerEvents: "none",
                             opacity: 0.1,
-                            backgroundImage: `
-                                linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px),
-                                linear-gradient(90deg, rgba(255,255,255,0.22) 1px, transparent 1px)
-                            `,
-                            backgroundSize: "26px 26px"
+                            backgroundColor: "rgba(255,255,255,0.12)"
                         }
                     }}
                 >
@@ -4651,7 +4645,7 @@ export default function SchoolSearchDetailView({
                                     </Typography>
                                     {!maptilerApiKey ? (
                                         <Typography sx={{color: "#b45309", fontSize: "0.9rem"}}>
-                                            Chưa có API key MapTiler. Thêm <code>VITE_MAPTILER_API_KEY</code> vào file{" "}
+                                            Chưa có khóa API MapTiler. Thêm <code>VITE_MAPTILER_API_KEY</code> vào file{" "}
                                             <code>.env</code> để hiển thị bản đồ.
                                         </Typography>
                                     ) : (
@@ -4666,11 +4660,6 @@ export default function SchoolSearchDetailView({
                                     {nearbyLoading && (
                                         <Typography sx={{mt: 1, color: "#0f172a", fontSize: "0.9rem"}}>
                                             Đang tìm campus lân cận...
-                                        </Typography>
-                                    )}
-                                    {!!nearbyError && (
-                                        <Typography sx={{mt: 1, color: "#dc2626", fontSize: "0.9rem"}}>
-                                            {nearbyError}
                                         </Typography>
                                     )}
                                     {!!nearbyNotice && (

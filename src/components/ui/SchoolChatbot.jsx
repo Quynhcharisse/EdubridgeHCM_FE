@@ -292,7 +292,7 @@ const SchoolChatbot = () => {
                                 boxShadow: '0 12px 48px rgba(0,0,0,0.15)'
                             }}
                         >
-                            {/* Header */}
+                            {}
                             <Box
                                 sx={{
                                     bgcolor: APP_PRIMARY_MAIN,
@@ -325,7 +325,7 @@ const SchoolChatbot = () => {
                                 </IconButton>
                             </Box>
 
-                            {/* Messages */}
+                            {}
                             <Box
                                 sx={{
                                     flex: 1,
@@ -522,7 +522,7 @@ const SchoolChatbot = () => {
                                 <div ref={messagesEndRef} />
                             </Box>
 
-                            {/* Input */}
+                            
                             <Box
                                 sx={{
                                     p: 2,

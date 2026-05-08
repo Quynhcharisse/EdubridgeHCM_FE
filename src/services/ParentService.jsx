@@ -5,10 +5,10 @@ export const getParentStudent = async () => {
     return response || null;
 };
 
-/**
- * Chi tiết một hồ sơ học sinh (GET /parent/student/{id}) — dùng cho panel « i »; BE tách khỏi payload history chat.
- * TVV có thể gọi cùng endpoint nếu BE cho phép role COUNSELLOR.
- */
+
+
+
+
 export const getParentStudentById = async (studentProfileId) => {
     const id = studentProfileId != null ? String(studentProfileId).trim() : '';
     if (!id) {
@@ -20,10 +20,10 @@ export const getParentStudentById = async (studentProfileId) => {
     return response || null;
 };
 
-/**
- * Trích object hồ sơ từ envelope API (message + body, hoặc body là chuỗi JSON).
- * Dùng chung cho GET /parent/student/{id} và GET counsellor tương ứng nếu cùng shape.
- */
+
+
+
+
 export function pickStudentDetailBodyFromResponse(response) {
     const data = response?.data;
     if (data == null) return null;
@@ -41,9 +41,9 @@ export function pickStudentDetailBodyFromResponse(response) {
     return inner && typeof inner === 'object' && !Array.isArray(inner) ? inner : null;
 }
 
-/**
- * Map body chi tiết (GET /parent/student/{id}) → state panel chat (cùng các field Header/counsellor đang dùng).
- */
+
+
+
 export function normalizeStudentDetailBodyForPanel(body) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
     const subjectsInSystem = Array.isArray(body.subjectsInSystem) ? body.subjectsInSystem : [];
@@ -67,7 +67,7 @@ export function normalizeStudentDetailBodyForPanel(body) {
     };
 }
 
-/** Danh sách hồ sơ học sinh của phụ huynh (GET /parent/student) — cùng endpoint với {@link getParentStudent}. */
+
 export const getStudents = async () => getParentStudent();
 
 export const postParentStudent = async (payload) => {

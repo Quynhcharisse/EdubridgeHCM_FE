@@ -164,7 +164,7 @@ export const writeNotificationUnreadCount = (value) => {
     try {
         localStorage.setItem(NOTIFICATION_UNREAD_KEY, String(next));
     } catch {
-        // ignore storage errors
+        
     }
     if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent(NOTIFICATION_UNREAD_EVENT, {detail: {count: next}}));

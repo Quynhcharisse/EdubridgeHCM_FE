@@ -59,7 +59,7 @@ function campaignDescriptionPlainText(html) {
     return s.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim();
 }
 
-/** Chuẩn hoá mô tả từ API (plain hoặc HTML) để đưa vào editor TipTap. */
+
 function campaignDescriptionToInitialHtml(stored) {
     const raw = stored ?? "";
     const s = String(raw).trim();
@@ -69,7 +69,7 @@ function campaignDescriptionToInitialHtml(stored) {
     return `<p>${esc}</p>`;
 }
 
-/** Đổi sang route quản lý hồ sơ đăng ký / tuyển sinh khi có trang riêng. */
+
 const SCHOOL_REGISTRATION_PROFILES_PATH = "/school/dashboard";
 
 const DEFAULT_CANCEL_BLOCKED_MESSAGE =
@@ -269,7 +269,7 @@ const CAMPAIGN_ERROR_VI = {
     "Campaign has expired": "Chiến dịch đã hết hạn, vui lòng cập nhật ngày kết thúc trước khi công bố",
     "Campaign already cancelled": "Chiến dịch này đã hủy trước đó",
     "Campaign already inactive": "Chiến dịch đã không còn hoạt động hoặc đã được hủy trước đó.",
-    // validationUpdateAdmissionCampaignTemplate (BE) — tiếng Việt
+    
     "Dữ liệu yêu cầu không được để trống": "Dữ liệu yêu cầu không được để trống",
     "Không tìm thấy tài khoản cơ sở trường học": "Không tìm thấy tài khoản cơ sở trường học",
     "Tên chiến dịch không được để trống": "Tên chiến dịch không được để trống",
@@ -384,12 +384,12 @@ export default function SchoolCampaignDetail() {
         admissionMethodTimelines: [{ methodCode: "", startDate: "", endDate: "", allowReservationSubmission: false, quota: "" }],
     });
     const [formErrors, setFormErrors] = useState({});
-    /** Chiến dịch khác cùng năm đang OPEN (để đồng bộ validationUpdateAdmissionCampaignTemplate). */
+    
     const [peerOpenSameYear, setPeerOpenSameYear] = useState(null);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
     const [cancelFlowOpen, setCancelFlowOpen] = useState(false);
-    /** idle | confirm | reason | blocked */
+    
     const [cancelFlowPhase, setCancelFlowPhase] = useState("idle");
     const [cancelBlockedMessage, setCancelBlockedMessage] = useState("");
     const [postCancelChoiceOpen, setPostCancelChoiceOpen] = useState(false);
@@ -431,7 +431,7 @@ export default function SchoolCampaignDetail() {
                                 : [];
                     acc.push(...list.map(mapTemplate).filter(Boolean));
                 } catch {
-                    // ignore single-year fetch errors
+                    
                 }
             }
             if (!cancelled) setCampaignsForCloneValidation(acc);
@@ -458,7 +458,7 @@ export default function SchoolCampaignDetail() {
                 const found = list.find((row) => Number(row?.id ?? row?.admissionCampaignTemplateId) === idNum);
                 if (found) return mapTemplate(found);
             } catch {
-                /* continue */
+                
             }
         }
         return null;
@@ -862,7 +862,7 @@ export default function SchoolCampaignDetail() {
         try {
             const res = await updateCampaignTemplateStatus(templateId);
             if (res?.status === 200 || res?.data) {
-                // Optimistic update so badge/actions switch to OPEN immediately.
+                
                 setCampaign((prev) => (prev ? { ...prev, status: "OPEN" } : prev));
                 enqueueSnackbar("Đã công bố chiến dịch thành công.", { variant: "success" });
                 setConfirmPublishOpen(false);
@@ -902,7 +902,7 @@ export default function SchoolCampaignDetail() {
 
     const runCancelCampaign = async () => {
         if (!templateId || isPastYearCampaign) return;
-            // OPEN status requires reason, DRAFT does not
+            
             if (status === "OPEN") {
                 const reason = cancelReason.trim();
                 if (!reason) {
@@ -1125,7 +1125,7 @@ export default function SchoolCampaignDetail() {
             >
                 <Box
                     sx={{
-                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                        background: "#60a5fa",
                         color: "#fff",
                         p: 3,
                         boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",

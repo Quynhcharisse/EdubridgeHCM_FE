@@ -1,12 +1,12 @@
-/**
- * Giờ làm việc / ca: một nguồn sự thật từ cấu hình vận hành trường (`hqDefault.operation.workingConfig`).
- * `campusCurrent.workingConfig` chỉ dùng fallback hiển thị khi BE chưa đủ dữ liệu ở nhánh HQ.
- */
 
-/**
- * @param {unknown} wc
- * @returns {boolean}
- */
+
+
+
+
+
+
+
+
 export function isWorkingConfigMeaningful(wc) {
   if (!wc || typeof wc !== "object") return false;
   if (Array.isArray(wc.workShifts) && wc.workShifts.length > 0) return true;
@@ -17,16 +17,16 @@ export function isWorkingConfigMeaningful(wc) {
   return false;
 }
 
-/**
- * @param {unknown} wc
- * @returns {{
- *   note: string,
- *   workShifts: unknown[],
- *   regularDays: string[],
- *   weekendDays: string[],
- *   isOpenSunday: boolean
- * }}
- */
+
+
+
+
+
+
+
+
+
+
 function normalizeWorkingConfigShape(wc) {
   const w = wc && typeof wc === "object" ? wc : {};
   return {
@@ -38,10 +38,10 @@ function normalizeWorkingConfigShape(wc) {
   };
 }
 
-/**
- * @param {Record<string, unknown>} hqOp — `hqDefault.operation`
- * @param {Record<string, unknown>} cur — `campusCurrent`
- */
+
+
+
+
 export function resolveSchoolWideWorkingConfigDisplay(hqOp, cur) {
   const hqOpObj = hqOp && typeof hqOp === "object" ? hqOp : {};
   const hqWc = hqOpObj.workingConfig ?? hqOpObj.working_config;

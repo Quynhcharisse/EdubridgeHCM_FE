@@ -79,7 +79,7 @@ const modalBackdropSx = {
     backgroundColor: "rgba(15, 23, 42, 0.45)",
 };
 
-/** Giống header bảng `SchoolCampus.jsx`. */
+
 const campusTableHeadCellSx = {fontWeight: 700, color: "#1e293b", py: 2};
 const tableHeadCellSx = campusTableHeadCellSx;
 
@@ -184,7 +184,7 @@ function startOfTodayLocal() {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/** Khóa sửa nếu ngày bắt đầu đã trước hôm nay (theo spec). */
+
 function isHolidayEditLockedByStartDate(startDateStr) {
     const s = parseYmdLocal(startDateStr);
     if (!s) return false;
@@ -203,12 +203,12 @@ function isValidHolidayImpactLevel(v) {
     return v != null && HOLIDAY_IMPACT_LEVEL_VALUES.has(String(v).trim());
 }
 
-/** Giống `Arrays.toString(HolidayImpactLevel.values())` trên BE (thứ tự khai báo enum có thể khác). */
+
 function formatHolidayImpactLevelsAllowedForBe() {
     return `[${Object.values(HOLIDAY_IMPACT_LEVEL).join(", ")}]`;
 }
 
-/** Khớp `HolidayValidation.createHolidayValidation` (BE). Trả về chuỗi lỗi hoặc `null`. */
+
 function validateCreateHolidayRequest(formValues, isPrimaryBranch) {
     const title = String(formValues?.title ?? "").trim();
     if (!title) {
@@ -247,7 +247,7 @@ function validateCreateHolidayRequest(formValues, isPrimaryBranch) {
     return null;
 }
 
-/** Khớp `HolidayValidation.updateHolidayValidation` (BE). */
+
 function validateUpdateHolidayRequest(editForm) {
     if (editForm?.id == null || editForm?.id === "") {
         return "ID ngày nghỉ không được để trống.";
@@ -330,7 +330,7 @@ export default function SchoolHoliday() {
     const [conflictMessage, setConflictMessage] = useState("");
     const [conflictAckForce, setConflictAckForce] = useState(false);
     const previewDebounceRef = useRef(null);
-    /** Tăng mỗi lần gọi preview mới — bỏ qua response cũ, tránh nháy số liệu. */
+    
     const previewSeqRef = useRef(0);
 
     const currentCampus = useMemo(() => {
@@ -375,7 +375,7 @@ export default function SchoolHoliday() {
             const response = await getHolidayList();
             const rows = extractHolidayListBody(response).map(normalizeHolidayRow);
             setHolidays(rows);
-            /** GET 200 + [] là bình thường (chưa có ngày nghỉ) — không báo lỗi. Lỗi chỉ khi request throw (4xx/5xx/mạng). */
+            
         } catch (error) {
             console.error("Load holiday list failed", error);
             const status = error?.response?.status;
@@ -674,7 +674,7 @@ export default function SchoolHoliday() {
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -863,7 +863,7 @@ export default function SchoolHoliday() {
                                                         textTransform: "none",
                                                         whiteSpace: "nowrap",
                                                         fontWeight: 600,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60a5fa",
                                                     }}
                                                 >
                                                     Tạo ngày nghỉ
@@ -1228,7 +1228,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         {submitting ? "Đang tạo…" : "Tạo"}
@@ -1371,7 +1371,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 2.5,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         Chỉnh sửa
@@ -1592,7 +1592,7 @@ export default function SchoolHoliday() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         {submitting ? "Đang lưu…" : "Cập nhật"}

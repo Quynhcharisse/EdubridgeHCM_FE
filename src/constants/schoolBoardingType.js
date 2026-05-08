@@ -1,7 +1,7 @@
-/**
- * CampusValidation (BE) dùng BoardingType enum: FULL_BOARDING, SEMI_BOARDING, BOTH.
- * UI vẫn dùng nhãn tiếng Việt trong BOARDING_TYPE_OPTIONS; parseBoardingType / gửi API map sang enum.
- */
+
+
+
+
 export const BOARDING_TYPE_DEFAULT_VI = "Nội trú";
 
 export const BOARDING_TYPE_OPTIONS = [
@@ -26,10 +26,10 @@ function normalizeTrimmedNull(value) {
     return trimmed === "" ? null : trimmed;
 }
 
-/**
- * Đồng bộ với CampusValidation.parseBoardingType (BE): enum name, dấu gạch / khoảng trắng, hoặc nhãn tiếng Việt (getValue tương đương).
- * @returns {"FULL_BOARDING"|"SEMI_BOARDING"|"BOTH"|null}
- */
+
+
+
+
 export function parseBoardingType(value) {
     const normalized = normalizeTrimmedNull(value);
     if (normalized == null) return null;
@@ -42,7 +42,7 @@ export function parseBoardingType(value) {
     return null;
 }
 
-/** Chuẩn hóa giá trị gửi API / hiển thị: chấp nhận cả enum cũ và đúng chuỗi tiếng Việt. */
+
 export function normalizeBoardingTypeForApi(raw) {
     if (raw == null || String(raw).trim() === "") return BOARDING_TYPE_DEFAULT_VI;
     const parsed = parseBoardingType(raw);

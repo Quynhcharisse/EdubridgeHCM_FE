@@ -82,7 +82,7 @@ const DETAIL_BADGE_FIELD_KEYS = new Set([
     "admissionMethod",
 ]);
 
-/** Trạng thái offering từ API list */
+
 const OFFERING_STATUS_LABELS = {
     OFFERING_ACTIVE: "Còn hiệu lực quản trị",
     OFFERING_INACTIVE: "Đã ngừng vòng đời",
@@ -97,21 +97,21 @@ function normalizeApplicationStatus(raw) {
     return String(raw || "").trim().toUpperCase();
 }
 
-/** API: phân số (0.1) hoặc phần trăm (10) → % hiển thị */
+
 function priceAdjustmentToDisplayPercent(raw) {
     const n = Number(String(raw ?? "").replace(",", "."));
     if (!Number.isFinite(n)) return 0;
     return Math.abs(n) <= 1 ? n * 100 : n;
 }
 
-/** Form % → gửi API (0.1 = 10%) */
+
 function priceAdjustmentToApiFraction(raw) {
     const n = Number(String(raw ?? "").replace(",", "."));
     if (!Number.isFinite(n)) return 0;
     return Math.abs(n) <= 1 ? n : n / 100;
 }
 
-/** { label, badgeBg, badgeColor } hoặc null nếu field không dùng badge */
+
 function getDetailFieldBadge(key, value) {
     if (!DETAIL_BADGE_FIELD_KEYS.has(key)) return null;
     if (value === null || value === undefined || value === "") {
@@ -162,7 +162,7 @@ function normalizeOfferingRow(row) {
         admissionCampaignId: row.admissionCampaignId ?? row.campaignId,
         campaignId: row.campaignId ?? row.admissionCampaignId,
         status: String(row.status ?? "").trim().toUpperCase(),
-        // Force giữ nguyên status từ BE, không derive theo ngày/cờ phụ.
+        
         applicationStatus: String(row.applicationStatus ?? "").trim().toUpperCase(),
         applicationYear:
             row.applicationYear ??
@@ -257,7 +257,39 @@ function formatCurrency(n) {
 function formatEnumLabel(v) {
     const s = String(v || "").trim();
     if (!s) return "—";
-    return s.replaceAll("_", " ");
+    const key = s.toUpperCase();
+    const enumViMap = {
+        YEAR: "Theo năm",
+        SEMESTER: "Theo học kỳ",
+        QUARTER: "Theo quý",
+        MONTH: "Theo tháng",
+        PRO_ACTIVE: "Hoạt động",
+        PRO_INACTIVE: "Không hoạt động",
+        PRO_DRAFT: "Nháp",
+        CUR_ACTIVE: "Hoạt động",
+        CUR_INACTIVE: "Không hoạt động",
+        CUR_DRAFT: "Nháp",
+        NATIONAL: "Quốc gia",
+        INTERNATIONAL: "Quốc tế",
+        INTEGRATED: "Tích hợp",
+        PROJECT_BASED: "Học theo dự án",
+        COOPERATIVE: "Học tập hợp tác",
+        EXPERIENTIAL: "Học qua trải nghiệm",
+        PROBLEM_BASED: "Giải quyết vấn đề",
+        PERSONALIZED: "Cá nhân hóa",
+        BLENDED: "Kết hợp trực tuyến",
+        VISUAL_PRACTICE: "Trực quan và thực hành",
+        STEM_STEAM: "Tích hợp STEM/STEAM",
+        VIETNAMESE: "Tiếng Việt",
+        ENGLISH: "Anh Văn",
+        FRENCH: "Tiếng Pháp",
+        CHINESE: "Tiếng Trung Quốc",
+        JAPANESE: "Tiếng Nhật",
+        KOREAN: "Tiếng Hàn",
+        GERMAN: "Tiếng Đức",
+        RUSSIAN: "Tiếng Nga",
+    };
+    return enumViMap[key] ?? s.replaceAll("_", " ");
 }
 
 function stripHtmlTags(html) {
@@ -265,7 +297,21 @@ function stripHtmlTags(html) {
     return text.replace(/\s+/g, " ").trim();
 }
 
-/** Nhóm nội dung trong dialog chi tiết (theo domain). */
+function formatDetailListItem(item) {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") {
+        return formatEnumLabel(item);
+    }
+    if (typeof item === "object") {
+        const name = String(item?.name ?? item?.label ?? item?.displayName ?? "").trim();
+        if (name) return formatEnumLabel(name);
+        const code = String(item?.code ?? item?.methodCode ?? item?.value ?? "").trim();
+        if (code) return formatEnumLabel(code);
+    }
+    return "";
+}
+
+
 const DETAIL_SECTIONS = [
     {
         id: "offering",
@@ -333,19 +379,19 @@ const emptyForm = {
     closeDate: "",
 };
 
-/**
- * @param {{
- *   campaignId: number,
- *   campaignPaused: boolean,
- *   canMutate: boolean,
- *   selectedCampaign?: { id: number|string, status?: string, admissionMethodTimelines?: Array<any> }|null,
- *   campaignOptions?: Array<{ id: number|string, name: string, year?: number|string, status?: string }>,
- *   selectedCampaignId?: number|string,
- *   onCampaignChange?: (id: string) => void,
- *   campaignOptionsLoading?: boolean,
- *   openCreateSignal?: number,
- * }} props
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
 export default function CampaignOfferingsSection({
     campaignId,
     campaignPaused,
@@ -380,8 +426,8 @@ export default function CampaignOfferingsSection({
     const [detailRow, setDetailRow] = useState(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [confirmActionOpen, setConfirmActionOpen] = useState(false);
-    const [confirmActionType, setConfirmActionType] = useState(null); // "toggle" | "close"
-    const [confirmTargetStatus, setConfirmTargetStatus] = useState(null); // targetStatus for toggle
+    const [confirmActionType, setConfirmActionType] = useState(null); 
+    const [confirmTargetStatus, setConfirmTargetStatus] = useState(null); 
     const [confirmRow, setConfirmRow] = useState(null);
     const [confirmActionLoading, setConfirmActionLoading] = useState(false);
     const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState(null);
@@ -616,7 +662,7 @@ export default function CampaignOfferingsSection({
             key === "programExtraSubjectList"
         ) {
             if (!Array.isArray(value) || value.length === 0) return "—";
-            return value.map((x) => formatEnumLabel(x)).join(", ");
+            return value.map((x) => formatDetailListItem(x)).filter(Boolean).join(", ") || "—";
         }
         if (key === "programGraduationStandard" || key === "programTargetStudentDescription") {
             return stripHtmlTags(value) || "—";

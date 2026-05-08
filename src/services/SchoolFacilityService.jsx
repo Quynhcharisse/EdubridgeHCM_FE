@@ -1,6 +1,6 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
-/** Parse `message` + `body` envelope từ GET config (full hoặc key). */
+
 export function parseSchoolConfigResponseBody(res) {
   let body = res?.data?.body ?? res?.data?.data?.body ?? res?.body ?? {};
   if (typeof body === "string") {
@@ -13,11 +13,11 @@ export function parseSchoolConfigResponseBody(res) {
   return body && typeof body === "object" ? body : {};
 }
 
-/**
- * GET /school/config/key?k=admissionSettingsData trả body dạng:
- * `{ "admissionSettingsData": { ... } }` (một key cấp top).
- * Hàm này trả object đưa vào `normalizeFromApi` cùng cách với GET full config.
- */
+
+
+
+
+
 export function schoolConfigKeyedBodyForNormalize(res, k) {
   const raw = parseSchoolConfigResponseBody(res);
   if (k == null || String(k).trim() === "") return raw;
@@ -27,7 +27,7 @@ export function schoolConfigKeyedBodyForNormalize(res, k) {
   return raw;
 }
 
-/** Query keys `k` for GET /api/v1/school/config/key?k= */
+
 export const SCHOOL_CONFIG_KEY = {
   ADMISSION_SETTINGS_DATA: "admissionSettingsData",
   DOCUMENT_REQUIREMENTS_DATA: "documentRequirementsData",
@@ -38,19 +38,19 @@ export const SCHOOL_CONFIG_KEY = {
   RESOURCE_DISTRIBUTION_DATA: "resourceDistributionData",
 };
 
-/**
- * GET full school configuration
- * @param {number | string} schoolId
- */
+
+
+
+
 export const getSchoolConfig = async (schoolId) => {
   const response = await axiosClient.get(`/school/config/${Number(schoolId) || schoolId}`);
   return response;
 };
 
-/**
- * GET partial config by key (catalog / section)
- * @param {string} k — e.g. admissionSettingsData, facilityData (see SCHOOL_CONFIG_KEY)
- */
+
+
+
+
 export const getSchoolConfigByKey = async (k) => {
   const response = await axiosClient.get("/school/config/key", {
     params: { k },
@@ -58,21 +58,21 @@ export const getSchoolConfigByKey = async (k) => {
   return response;
 };
 
-/**
- * PUT /api/v1/school/config/{schoolId} — cấu hình cấp trường (cơ sở chính / isPrimaryBranch):
- * admission, quota, finance, documents, operationSettingsData, facilityData,
- * resourceDistributionData (partial theo diff).
- * operationSettingsData (FE): GET `admissionProcesses` → state `methodAdmissionProcess`; PUT gửi `methodAdmissionProcess`;
- * `workingConfig.openSunday` khi PUT (GET có thể trả `isOpenSunday`).
- * @param {number | string} schoolId
- * @param {Record<string, unknown>} payload
- */
+
+
+
+
+
+
+
+
+
 export const updateSchoolConfig = async (schoolId, payload) => {
   const response = await axiosClient.put(`/school/config/${Number(schoolId) || schoolId}`, payload);
   return response;
 };
 
-/** Chuẩn hóa campusId cho segment URL path (path parameter, không query). */
+
 function campusConfigPathId(campusId) {
   if (campusId == null || campusId === "") return null;
   const n = Number(campusId);
@@ -81,28 +81,28 @@ function campusConfigPathId(campusId) {
   return s || null;
 }
 
-/**
- * GET /api/v1/campus/config — không path/query; campus theo phiên đăng nhập.
- * Response: `{ message, body: { campusCurrent, hqDefault } }` (camelCase; BE có thể dùng snake_case tương ứng).
- * `hqDefault.facility` / `hqDefault.operation` — chuẩn trụ sở (read-only so với campus).
- * `campusCurrent`: `itemList`, `imageData`; bốn số đặt chỗ + `policyDetail` / `fullPolicyRendered`; `workingConfig` (nếu có) — bản áp dụng chung do trường/HQ, FE hiển thị cùng nguồn với `hqDefault.operation.workingConfig`; có thể thêm `facilityJson` legacy.
- */
+
+
+
+
+
+
 export const getCampusConfig = async () => {
   const response = await axiosClient.get("/campus/config");
   return response;
 };
 
-/**
- * PUT /api/v1/campus/{campusId}/config — path `campusId`, không query params.
- * Body phẳng (partial), đúng contract BE, ví dụ:
- * overview, itemList[{ facilityCode, name, value, unit, category }],
- * imageJsonData: { coverUrl, imageList: [{ url, name, altName, … }] },
- * hotline, emailSupport, minCounsellorPerSlot, slotDurationInMinutes, maxBookingPerSlot,
- * allowBookingBeforeHours, admissionStepsOverride, policyDetail. (Không dùng `workingOverride` — giờ/ca do trường cấu hình.)
- * Partial body: BE merge; có thể trả `body: { campusCurrent, hqDefault }` giống GET để FE bớt một vòng GET.
- * @param {number | string} campusId
- * @param {Record<string, unknown>} payload
- */
+
+
+
+
+
+
+
+
+
+
+
 export const updateCampusConfig = async (campusId, payload) => {
   const id = campusConfigPathId(campusId);
   if (id == null) return Promise.reject(new Error("campusId is required"));
@@ -110,16 +110,16 @@ export const updateCampusConfig = async (campusId, payload) => {
   return response;
 };
 
-/** GET /api/v1/school/config/campus/list — read-only list of campus configs (facilities + policy per campus) */
+
 export const getSchoolCampusConfigList = async () => {
   const response = await axiosClient.get("/school/config/campus/list");
   return response;
 };
 
-/**
- * POST /api/v1/school/config/import/mandatory/docs/preview
- * Request body: multipart/form-data { file }
- */
+
+
+
+
 export const previewMandatoryDocsImport = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -131,20 +131,20 @@ export const previewMandatoryDocsImport = async (file) => {
   return response;
 };
 
-/**
- * POST /api/v1/school/config/validate-row
- * Request body: { rows: [{ rowData, error, isError }] }
- */
+
+
+
+
 export const validateMandatoryDocImportRow = async (rows) => {
   const payload = {rows: Array.isArray(rows) ? rows : []};
   const response = await axiosClient.post("/school/config/validate-row", payload);
   return response;
 };
 
-/**
- * POST /api/v1/school/config/confirm
- * Request body: { rows: [{ rowData, error, isError }] }
- */
+
+
+
+
 export const confirmMandatoryDocImportRows = async (rows) => {
   const payload = {rows: Array.isArray(rows) ? rows : []};
   const response = await axiosClient.post("/school/config/confirm", payload);
@@ -167,7 +167,7 @@ function parseFacilityConfigBlock(raw) {
   return null;
 }
 
-/** Normalize list body to an array of campus config rows */
+
 export function parseSchoolCampusConfigListBody(res) {
   const body = res?.data?.body ?? res?.data?.data?.body;
   if (!Array.isArray(body)) return [];
@@ -184,10 +184,10 @@ export function parseSchoolCampusConfigListBody(res) {
   });
 }
 
-/**
- * GET /school/config/campus/list — `policyDetail` có thể là string (legacy) hoặc object
- * { fullTextRendered, rawCustomNote, ... }.
- */
+
+
+
+
 export function schoolCampusListRowPolicyText(row) {
   const p = row?.policyDetail;
   if (p == null || p === "") return null;

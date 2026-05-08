@@ -1,10 +1,10 @@
 import axiosClient from "../configs/APIConfig.jsx";
 
-/**
- * GET /api/v1/school/program/list
- * @param {number} page - zero-based page index
- * @param {number} pageSize - items per page
- */
+
+
+
+
+
 export const getProgramList = async (page = 0, pageSize = 10) => {
     const response = await axiosClient.get("/school/program/list", {
         params: { page, pageSize },
@@ -12,11 +12,11 @@ export const getProgramList = async (page = 0, pageSize = 10) => {
     return response || null;
 };
 
-/**
- * POST /api/v1/school/program (Upsert)
- * - Create: omit `programId`
- * - Update: include `programId`
- */
+
+
+
+
+
 export const saveProgram = async ({
     programId,
     curriculumId,
@@ -54,9 +54,9 @@ export const saveProgram = async ({
     return response || null;
 };
 
-/**
- * PATCH /api/v1/school/{id}/activate/program?action=ACTIVATE|DEACTIVATE
- */
+
+
+
 export const handleProgramAction = async (id, action) => {
     const programId = Number(id);
     const safeAction = String(action || "").toUpperCase();
@@ -71,10 +71,10 @@ export const handleProgramAction = async (id, action) => {
     return response || null;
 };
 
-/**
- * POST /api/v1/school/{id}/program/clone
- * `id` là program gốc cần nhân bản (không phải campaign template).
- */
+
+
+
+
 export const cloneProgram = async (id) => {
     const programId = Number(id);
     const response = await axiosClient.post(`/school/${programId}/program/clone`, null, {
@@ -83,10 +83,10 @@ export const cloneProgram = async (id) => {
     return response || null;
 };
 
-/**
- * POST /api/v1/school/extract/excel/program-subjects
- * Request body: multipart/form-data { file }
- */
+
+
+
+
 export const importProgramSubjectsFromExcel = async (file) => {
     const formData = new FormData();
     formData.append("file", file);

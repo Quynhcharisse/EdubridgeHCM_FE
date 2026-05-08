@@ -3,13 +3,13 @@ import {Box, IconButton, Tooltip, Typography} from '@mui/material';
 import {InfoOutlined} from '@mui/icons-material';
 import {SUBJECT_UNAVAILABLE_TOOLTIP} from './childrenInfoHelpers.js';
 
-/** Cao hơn dialog / overlay phụ huynh (≈1600) để tooltip không bị che. */
+
 const TOOLTIP_Z_INDEX = 1700;
 
-/**
- * Nhãn “Không khả dụng” + nút (i) giải thích — dùng Thông tin con và panel chat.
- * Popper z-index cao + touch delay thấp để tooltip không nằm dưới modal và dễ xem trên mobile.
- */
+
+
+
+
 export function SubjectUnavailableHint() {
     return (
         <Box

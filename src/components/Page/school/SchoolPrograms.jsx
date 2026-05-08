@@ -112,7 +112,7 @@ const PROGRAM_VIEW_HEADER_ACCENT = "#0D64DE";
 const UI_ONLY_DEFAULT_LANGUAGE_ID = "ui-only-vietnamese";
 const UI_ONLY_DEFAULT_LANGUAGE_LABEL = "Tiếng Việt";
 
-/** Đồng bộ nhãn / icon phương pháp học với SchoolCurriculums (Chi tiết chương trình). */
+
 const methodLearningI18N = {
     PROJECT_BASED: "Dạy học dựa trên dự án",
     COOPERATIVE: "Dạy học hợp tác",
@@ -219,7 +219,7 @@ const formatVND = (value) => {
     }
 };
 
-/** Đồng bộ với SchoolCurriculums: subTypeName dùng cho form/API không được chứa tiền tố "Hệ " lặp. */
+
 function stripLeadingHePrefix(value) {
     let s = String(value ?? "").trim();
     while (s.length > 0) {
@@ -386,7 +386,7 @@ function safeString(v) {
     return String(v ?? "");
 }
 
-/** Đồng bộ với ProgramValidation.normalize(String) trên BE. */
+
 function normalizeField(value) {
     if (value == null) return null;
     const trimmed = String(value).trim();
@@ -404,7 +404,7 @@ function programRichTextPlainText(html) {
     return s.replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim();
 }
 
-/** Chuẩn hoá nội dung từ API (plain hoặc HTML) để đưa vào editor TipTap — cùng cách xử lý Mô tả chiến dịch (SchoolCampaigns). */
+
 function programRichTextToInitialHtml(stored) {
     const raw = stored ?? "";
     const t = String(raw).trim();
@@ -475,8 +475,8 @@ function mapProgramBackendMessageToVi(message) {
 
     const map = {
         "Request is required": "Yêu cầu là bắt buộc.",
-        "Curriculum ID is not found": "Không tìm thấy Curriculum.",
-        "Curriculum is invalid": "Curriculum không hợp lệ.",
+        "Curriculum ID is not found": "Không tìm thấy khung chương trình.",
+        "Curriculum is invalid": "Khung chương trình không hợp lệ.",
         "Cannot use an archived curriculum. Please use the latest active version.":
             "Không thể dùng Curriculum đã lưu trữ. Vui lòng chọn phiên bản hoạt động (CUR_ACTIVE) mới nhất.",
         "Name is required": "Tên chương trình là bắt buộc.",
@@ -488,7 +488,7 @@ function mapProgramBackendMessageToVi(message) {
         "Tuition fee is required": "Học phí gốc là bắt buộc.",
         "Tuition fee cannot be negative": "Học phí gốc không được là số âm.",
         "Fee unit is required": "Đơn vị học phí là bắt buộc.",
-        "Program not found in your school scope": "Không tìm thấy Program trong phạm vi trường của bạn.",
+        "Program not found in your school scope": "Không tìm thấy chương trình đào tạo trong phạm vi trường của bạn.",
         "Cannot change curriculum of an ACTIVE program.":
             "Không thể thay đổi khung chương trình của chương trình đang hoạt động.",
         "Cannot change tuition fee or fee unit of an ACTIVE program. Please close this and create a new program.":
@@ -503,7 +503,7 @@ function mapProgramBackendMessageToVi(message) {
         "Invalid program category. Must be one of: [MOET, MOET_INTEGRATED, CAMBRIDGE, IB, AMERICAN_AP, OXFORD, VOCATIONAL_ORIENTED]":
             "Loại chương trình không hợp lệ.",
         "Invalid fee unit. Must be one of: [YEAR, SEMESTER, QUARTER, MONTH]": "Đơn vị học phí không hợp lệ.",
-        // Thông điệp tiếng Việt từ ProgramValidation (BE)
+
         "Dữ liệu yêu cầu không được để trống": "Dữ liệu yêu cầu không được để trống",
         "Yêu cầu mã khung chương trình (Curriculum ID)": "Yêu cầu mã khung chương trình (Curriculum ID)",
         "Khung chương trình không hợp lệ hoặc không thuộc về trường của bạn": "Khung chương trình không hợp lệ hoặc không thuộc về trường của bạn",
@@ -551,7 +551,7 @@ function mapProgramBackendMessageToVi(message) {
     return msg;
 }
 
-/** Nội dung chi tiết Curriculum (read-only), bố cục đồng bộ với dialog Chi tiết chương trình — SchoolCurriculums. */
+
 function ProgramCurriculumDetailPanel({curriculum, isPrimaryBranch}) {
     const viewCurriculum = curriculum;
     if (!viewCurriculum) return null;
@@ -571,7 +571,7 @@ function ProgramCurriculumDetailPanel({curriculum, isPrimaryBranch}) {
             <Box
                 sx={{
                     borderRadius: 3,
-                    background: "linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(51,65,85,0.03) 100%)",
+                    background: "rgba(37,99,235,0.08)",
                     border: "1px solid rgba(148, 163, 184, 0.35)",
                     p: 3,
                 }}
@@ -712,7 +712,7 @@ function ProgramCurriculumDetailPanel({curriculum, isPrimaryBranch}) {
                                                 minHeight: 120,
                                                 borderRadius: 3,
                                                 border: "1px solid rgba(226, 232, 240, 1)",
-                                                background: "linear-gradient(145deg, #ffffff 0%, #f8fbff 100%)",
+                                                background: "#f8fbff",
                                                 px: 1.6,
                                                 py: 1.4,
                                                 boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
@@ -891,7 +891,6 @@ export default function SchoolPrograms() {
     const [curriculumTypeFilter, setCurriculumTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all");
 
-    // Modal
     const [programModalOpen, setProgramModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState("create"); // 'create' | 'edit' | 'view'
     const [activeStep, setActiveStep] = useState(0);
@@ -915,17 +914,15 @@ export default function SchoolPrograms() {
     const nameInputRef = useRef(null);
     const formDialogContentRef = useRef(null);
     const [programRichTextEditorsKey, setProgramRichTextEditorsKey] = useState(0);
-    /** Tab trong modal Chi tiết Program: 0 = Program, 1 = Curriculum */
+    
     const [programViewDetailTab, setProgramViewDetailTab] = useState(0);
-    /** Tab Bước 3 (Tạo/Sửa Program): 0 = Thông tin Program, 1 = Curriculum — cùng UI segmented như Chi tiết Program */
+    
     const [programWizardReviewTab, setProgramWizardReviewTab] = useState(0);
 
-    // Clone flow
     const [cloneLoading, setCloneLoading] = useState(false);
     const [isClonedDraftEdit, setIsClonedDraftEdit] = useState(false);
     const [shouldAutoSelectClonedName, setShouldAutoSelectClonedName] = useState(false);
 
-    // Activate/Deactivate flow
     const [actionConfirmOpen, setActionConfirmOpen] = useState(false);
     const [actionTargetProgram, setActionTargetProgram] = useState(null);
     const [actionType, setActionType] = useState("ACTIVATE"); // "ACTIVATE" | "DEACTIVATE"
@@ -947,11 +944,11 @@ export default function SchoolPrograms() {
                 setShouldAutoSelectClonedName(false);
                 await loadData(0, rowsPerPage);
             } else {
-                enqueueSnackbar(res?.data?.message || "Hành động không hợp lệ hoặc chương trình đã ở trạng thái Inactive.", {variant: "error"});
+                enqueueSnackbar(res?.data?.message || "Hành động không hợp lệ hoặc chương trình đã ở trạng thái không hoạt động.", {variant: "error"});
             }
         } catch (err) {
             console.error("Program deactivate error:", err);
-            enqueueSnackbar(err?.response?.data?.message || "Hành động không hợp lệ hoặc chương trình đã ở trạng thái Inactive.", {variant: "error"});
+            enqueueSnackbar(err?.response?.data?.message || "Hành động không hợp lệ hoặc chương trình đã ở trạng thái không hoạt động.", {variant: "error"});
         } finally {
             setActionLoading(false);
         }
@@ -1062,12 +1059,12 @@ export default function SchoolPrograms() {
                 const da = toEpoch(a.createdAt);
                 const db = toEpoch(b.createdAt);
                 if (da !== null || db !== null) {
-                    // "Tạo sau cùng" = createdAt lớn hơn lên đầu
+
                     if (da === null) return 1;
                     if (db === null) return -1;
                     if (db !== da) return db - da;
                 }
-                // Fallback: dùng id giảm dần
+
                 return Number(b.id) - Number(a.id);
             });
             setPrograms(mapped);
@@ -1093,14 +1090,14 @@ export default function SchoolPrograms() {
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [page]);
 
     const ensureCurriculumOptionsLoaded = async () => {
         if (curriculumOptions.length > 0 || curriculumOptionsLoading) return;
         setCurriculumOptionsLoading(true);
         try {
-            // Fetch a large set because Step 1 needs search/select by curriculum
+
             const res = await getCurriculumList(0, 1000);
             const raw = res?.data?.body ?? res?.data ?? res;
             const items = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : [];
@@ -1109,7 +1106,6 @@ export default function SchoolPrograms() {
 
             const active = mapped.filter((c) => normalizeStatus(c.curriculumStatus) === "CUR_ACTIVE");
 
-            // Put latest first
             active.sort((a, b) => Number(b.isLatest) - Number(a.isLatest));
 
             setCurriculumOptions(active);
@@ -1143,7 +1139,7 @@ export default function SchoolPrograms() {
             const found = curriculumOptions.find((c) => c.id === program.curriculumId);
             if (found) return found;
         }
-        // Fallback by name + year
+
         const name = safeString(program.curriculumName).trim().toLowerCase();
         const year = Number(program.applicationYear);
         if (!name && !Number.isFinite(year)) return null;
@@ -1164,10 +1160,9 @@ export default function SchoolPrograms() {
 
         const found = pickCurriculumForEdit(selectedProgram);
         if (found) setSelectedCurriculum(found);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [programModalOpen, modalMode, selectedProgram, curriculumOptions, curriculumOptionsLoading]);
 
-    // After cloning, auto-focus and select the " - Cloned (xxxx)" suffix so admin can replace quickly.
     useEffect(() => {
         if (!programModalOpen) return;
         if (modalMode !== "edit") return;
@@ -1184,12 +1179,12 @@ export default function SchoolPrograms() {
         const start = idx >= 0 ? idx : fallbackIdx;
         if (start >= 0) {
             input.focus();
-            // Give MUI one tick to ensure focus/selection works reliably.
+
             setTimeout(() => {
                 try {
                     input.setSelectionRange(start, name.length);
                 } catch {
-                    // ignore
+
                 }
             }, 0);
         } else {
@@ -1283,7 +1278,7 @@ export default function SchoolPrograms() {
         setProgramModalOpen(true);
         await ensureCurriculumOptionsLoaded();
         await ensureLanguageOptionsLoaded();
-        // selection will be picked by useEffect after options load
+
     };
 
     const handleOpenView = async (program) => {
@@ -1562,7 +1557,6 @@ export default function SchoolPrograms() {
             return;
         }
 
-        // Validate before submit always
         if (activeStep === 0) {
             if (!validateStep1()) return;
         }
@@ -1603,10 +1597,10 @@ export default function SchoolPrograms() {
             const status = err?.response?.status;
             let backendMsg = err?.response?.data?.message;
             if (!backendMsg) {
-                if (status === 400) backendMsg = "Dữ liệu không hợp lệ. Vui lòng kiểm tra các trường hoặc Curriculum chưa Active.";
+                if (status === 400) backendMsg = "Dữ liệu không hợp lệ. Vui lòng kiểm tra các trường hoặc khung chương trình chưa hoạt động.";
                 else if (status === 403)
                     backendMsg = "Không có quyền (chỉ cơ sở chính mới thực hiện được, hoặc tài khoản bị hạn chế).";
-                else if (status === 404) backendMsg = "Không tìm thấy Program hoặc Curriculum trong phạm vi trường.";
+                else if (status === 404) backendMsg = "Không tìm thấy chương trình đào tạo hoặc khung chương trình trong phạm vi trường.";
                 else if (status === 409) backendMsg = err?.response?.data?.message || "Không thể sửa chương trình này. Vui lòng dùng chức năng Nhân bản.";
                 else backendMsg = "Lỗi khi lưu program";
             }
@@ -1674,10 +1668,10 @@ export default function SchoolPrograms() {
 
     return (
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
-            {/* Header */}
+            
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1726,7 +1720,7 @@ export default function SchoolPrograms() {
                 </Box>
             </Box>
 
-            {/* Search & Filters */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -1809,7 +1803,7 @@ export default function SchoolPrograms() {
                 </CardContent>
             </Card>
 
-            {/* Table */}
+            
             <Card
                 elevation={0}
                 sx={{
@@ -1889,7 +1883,7 @@ export default function SchoolPrograms() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 700,
-                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                                        background: "#60a5fa",
                                                     }}
                                                 >
                                                     Tạo chương trình đào tạo
@@ -2059,7 +2053,7 @@ export default function SchoolPrograms() {
                 )}
             </Card>
 
-            {/* Create/Edit Program Dialog */}
+            
             <Dialog
                 open={programModalOpen}
                 onClose={(event, reason) => {
@@ -2144,7 +2138,7 @@ export default function SchoolPrograms() {
                                         px: {xs: 1.5, sm: 2},
                                         pt: {xs: 1.75, sm: 2},
                                         pb: 0,
-                                        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%)",
+                                        background: "#f8fafc",
                                         borderBottom: "1px solid rgba(226, 232, 240, 0.95)",
                                     }}
                                 >
@@ -2826,7 +2820,7 @@ export default function SchoolPrograms() {
                                                     px: {xs: 1.5, sm: 2},
                                                     pt: {xs: 1.75, sm: 2},
                                                     pb: 0,
-                                                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #f1f5f9 100%)",
+                                                    background: "#f8fafc",
                                                     borderBottom: "1px solid rgba(226, 232, 240, 0.95)",
                                                 }}
                                             >
@@ -3120,7 +3114,7 @@ export default function SchoolPrograms() {
                                             fontWeight: 950,
                                             borderRadius: 2,
                                             px: 3,
-                                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                            background: "#60a5fa",
                                         }}
                                     >
                                         Công bố
@@ -3188,7 +3182,7 @@ export default function SchoolPrograms() {
                                         fontWeight: 950,
                                         borderRadius: 2,
                                         px: 3,
-                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                        background: "#60a5fa",
                                     }}
                                 >
                                     Tiếp tục
@@ -3203,7 +3197,7 @@ export default function SchoolPrograms() {
                                         fontWeight: 950,
                                         borderRadius: 2,
                                         px: 3,
-                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                                        background: "#60a5fa",
                                     }}
                                 >
                                     {submitLoading
@@ -3218,7 +3212,7 @@ export default function SchoolPrograms() {
                 </DialogActions>
             </Dialog>
 
-            {/* Activate/Deactivate Dialog */}
+            
             <Dialog
                 open={actionConfirmOpen}
                 onClose={(event, reason) => {
@@ -3283,7 +3277,7 @@ export default function SchoolPrograms() {
                                 await executeDeactivate(actionTargetProgram);
                                 return;
                             }
-                            // ACTIVATE
+
                             setActionLoading(true);
                             try {
                                 const res = await handleProgramAction(actionTargetProgram.id, "ACTIVATE");
@@ -3313,7 +3307,7 @@ export default function SchoolPrograms() {
                             fontWeight: 950,
                             borderRadius: 2,
                             px: 3,
-                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                            background: "#60a5fa",
                         }}
                     >
                         Xác nhận

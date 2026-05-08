@@ -49,9 +49,9 @@ const BOARDING_TYPE_OPTIONS = [
 
 const BOARDING_TYPE_DEFAULT = "FULL_BOARDING";
 const HCM_CODE = 79;
-/** Dùng cho geocoding (Nominatim) */
+
 const HCM_CITY_NAME = "Ho Chi Minh City";
-/** Giá trị `city` gửi/nhận từ API profile (GET/PUT) */
+
 const API_CITY_DEFAULT = "Ho Chi Minh";
 const DEFAULT_MAP_CENTER = [10.7769, 106.7009];
 const BOARDING_VI_TO_ENUM = {
@@ -74,7 +74,7 @@ function boardingTypeLabel(value) {
     return match ? match.label : "—";
 }
 
-/** Mirror BE `AccountValidation.normalize` */
+
 function normalizeProfileStr(value) {
     if (value == null) return null;
     const trimmed = String(value).trim();
@@ -85,20 +85,20 @@ function campusPhoneDigits(value) {
     return String(value ?? "").replace(/\D/g, "");
 }
 
-/** Mirror BE `isValidPhoneNumber` (10 digits, leading 0). */
+
 function isValidCampusPhone(value) {
     const digits = campusPhoneDigits(value);
     return digits.length === 10 && /^0\d{9}$/.test(digits);
 }
 
-/** Mirror BE `isValidHotline`: `^(0|18|19)\d{7,10}$` on digits-only. */
+
 function isValidSchoolHotline(value) {
     const digits = String(value ?? "").replace(/\D/g, "");
     if (!digits) return true;
     return /^(0|18|19)\d{7,10}$/.test(digits);
 }
 
-/** Mirror BE `hasMaxWords` (> 100 words is invalid). */
+
 function exceedsMaxWords(value, maxWords = 100) {
     const n = normalizeProfileStr(value);
     if (!n) return false;
@@ -169,7 +169,7 @@ function syncSchoolFirstLoginInStorage(nextFirstLogin) {
             notifyAuthUserStorageChanged();
         }
     } catch {
-        /* ignore */
+        
     }
 }
 
@@ -469,7 +469,7 @@ export default function SchoolProfile() {
 
     const fetchWards = useCallback(async (districtCode) => {
         if (!districtCode) return [];
-        const res = await fetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
+        const res = await fetch(`https:
         if (!res.ok) throw new Error("Không tải được danh sách phường");
         const data = await res.json();
         return Array.isArray(data?.wards) ? data.wards : [];
@@ -604,7 +604,7 @@ export default function SchoolProfile() {
                 enqueueSnackbar("Vui lòng cập nhật thông tin hồ sơ cơ sở.", { variant: "info" });
             }
         } catch {
-            /* ignore */
+            
         }
     }, [loading]);
 
@@ -752,7 +752,7 @@ export default function SchoolProfile() {
     useEffect(() => {
         if (!editOpen || !selectedDistrictCode || !selectedWardCode || wards.length === 0) return;
         handleGetLocation();
-        // Auto geocode when ward selection is completed.
+        
     }, [editOpen, selectedDistrictCode, selectedWardCode, wards, handleGetLocation]);
 
     const campus = profile?.campus || {};
@@ -772,7 +772,7 @@ export default function SchoolProfile() {
     const initialEditSnapshotRef = useRef("");
 
     const formErrors = useMemo(() => {
-        /** Field order = scroll priority (aligned with BE `AccountValidation` for Role.SCHOOL). */
+        
         const errors = {};
 
         const cityNorm = normalizeProfileStr(formValues.city);
@@ -891,7 +891,7 @@ export default function SchoolProfile() {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4 }}>
             <Box
                 sx={{
-                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                    background: "#60a5fa",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1227,7 +1227,7 @@ export default function SchoolProfile() {
                     >
                         <MapContainer center={campusMapCenter} zoom={hasCampusLatLng ? 15 : 12} style={{ height: "100%", width: "100%" }}>
                             <TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> cộng tác viên'
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             />
                             {hasCampusLatLng && (
@@ -1340,7 +1340,7 @@ export default function SchoolProfile() {
                                         </Box>
                                         <Box sx={{ mt: 2, height: 220, border: "1px solid #e2e8f0", borderRadius: 2, overflow: "hidden" }}>
                                             <MapContainer center={editMapCenter} zoom={hasFormLatLng ? 15 : 12} style={{ height: "100%", width: "100%" }}>
-                                                <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                                <TileLayer attribution='&copy; <a href="https:
                                                 {hasFormLatLng && (
                                                     <>
                                                         <RecenterMap center={editMapCenter} zoom={15} />

@@ -1,7 +1,7 @@
 import {ROLES} from "../constants/roles.js";
 
 export const NOTIFICATION_EVENTS = {
-    // ── Platform ─────────────────────────────────────────────────
+    
     NEW_USER_REGISTERED:    "NEW_USER_REGISTERED",
     SCHOOL_POST_PUBLISHED:  "SCHOOL_POST_PUBLISHED",
     ADMIN_POST_PUBLISHED:   "ADMIN_POST_PUBLISHED",
@@ -38,11 +38,11 @@ const EVENT_ROLE_MATRIX = {
     [NOTIFICATION_EVENTS.COUNSELLOR_SLOT_ASSIGNED]:   [ROLES.COUNSELLOR],
     [NOTIFICATION_EVENTS.COUNSELLOR_SLOT_UNASSIGNED]: [ROLES.COUNSELLOR],
 
-    [NOTIFICATION_EVENTS.CONSULTATION_BOOKED]:    [ROLES.SCHOOL],        // Parent đặt → School campus nhận
-    [NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED]: [ROLES.PARENT],        // Counsellor xác nhận → Parent nhận
-    [NOTIFICATION_EVENTS.CONSULTATION_CANCELLED]: [ROLES.PARENT],        // Counsellor huỷ → Parent nhận
-    [NOTIFICATION_EVENTS.CONSULTATION_COMPLETED]: [ROLES.PARENT],        // Counsellor kết thúc → Parent nhận
-    [NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW]:   [ROLES.PARENT],        // Counsellor đánh dấu → Parent nhận
+    [NOTIFICATION_EVENTS.CONSULTATION_BOOKED]:    [ROLES.SCHOOL],        
+    [NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED]: [ROLES.PARENT],        
+    [NOTIFICATION_EVENTS.CONSULTATION_CANCELLED]: [ROLES.PARENT],        
+    [NOTIFICATION_EVENTS.CONSULTATION_COMPLETED]: [ROLES.PARENT],        
+    [NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW]:   [ROLES.PARENT],        
 };
 
 export const normalizeNotificationEventType = (payload) => {
@@ -77,12 +77,12 @@ export const canRoleReceiveEvent = (role, eventType) => {
 export const getNotificationMessage = (payload) => {
     const eventType = normalizeNotificationEventType(payload);
 
-    // Nếu server đã gửi title/body thì dùng luôn
+    
     const title = payload?.notification?.title;
     const body  = payload?.notification?.body;
     if (title || body) return {title: title || "Thông báo", body: body || "Bạn có thông báo mới."};
 
-    // Trích data fields từ payload
+    
     const actorName      = String(payload?.data?.actorName      || "").trim();
     const parentName     = String(payload?.data?.parentName     || "").trim();
     const packageName    = String(payload?.data?.packageName    || "").trim();
@@ -94,7 +94,7 @@ export const getNotificationMessage = (payload) => {
     const dateLabel      = appointmentDate ? ` ngày ${appointmentDate}` : "";
 
     const fallbackByEvent = {
-        // ── Platform ──────────────────────────────────────────────
+        
         [NOTIFICATION_EVENTS.NEW_USER_REGISTERED]: {
             title: "Đăng ký mới",
             body:  "Có người dùng mới vừa đăng ký tài khoản.",
@@ -124,7 +124,7 @@ export const getNotificationMessage = (payload) => {
             body:  "Bạn có thông báo mới từ hệ thống.",
         },
 
-        // ── School / Campus ────────────────────────────────────────
+        
         [NOTIFICATION_EVENTS.FAVORITE_SCHOOL]: {
             title: actorName ? `${actorName} vừa quan tâm trường của bạn` : "Phụ huynh mới quan tâm trường",
             body:  "Có phụ huynh vừa thêm trường của bạn vào danh sách yêu thích.",
@@ -136,7 +136,7 @@ export const getNotificationMessage = (payload) => {
                 : "Một phụ huynh vừa bỏ yêu thích trường của bạn.",
         },
 
-        // ── Counsellor ─────────────────────────────────────────────
+        
         [NOTIFICATION_EVENTS.COUNSELLOR_ASSIGNED]: {
             title: "Tư vấn viên đã được phân công",
             body:  "Bạn đã được phân công tư vấn viên mới.",
@@ -154,7 +154,7 @@ export const getNotificationMessage = (payload) => {
                 : "Một khung giờ làm việc của bạn đã bị huỷ gán.",
         },
 
-        // ── Consultation flow ──────────────────────────────────────
+        
         [NOTIFICATION_EVENTS.CONSULTATION_BOOKED]: {
             title: "Lịch tư vấn mới",
             body:  parentName && locationLabel

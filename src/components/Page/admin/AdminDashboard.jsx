@@ -436,7 +436,7 @@ export default function AdminDashboard() {
                 sx={{
                     borderRadius: 3,
                     border: "1px solid #bfdbfe",
-                    background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 40%, #f0f9ff 100%)",
+                    background: "#eff6ff",
                     boxShadow: "0 16px 36px rgba(37,99,235,0.16)",
                 }}
             >
@@ -454,7 +454,18 @@ export default function AdminDashboard() {
                                 Theo dõi biến động doanh thu và hiệu quả thực nhận trong kỳ.
                             </Typography>
                         </Box>
-                        <Chip label={`Đang xem theo: ${scopeLabel}`} color="primary" sx={{ fontWeight: 700, bgcolor: "#ffffff" }} />
+                        <Chip
+                            label={`Đang xem theo: ${scopeLabel}`}
+                            sx={{
+                                fontWeight: 700,
+                                bgcolor: "#ffffff",
+                                color: "#1d4ed8",
+                                border: "1px solid #93c5fd",
+                                "& .MuiChip-label": {
+                                    color: "#1d4ed8",
+                                },
+                            }}
+                        />
                     </Stack>
 
                     <Stack
@@ -500,7 +511,7 @@ export default function AdminDashboard() {
                             sx={{
                                 borderRadius: 99,
                                 px: 2,
-                                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                                background: "#3b82f6",
                                 boxShadow: "0 8px 18px rgba(37,99,235,0.28)",
                             }}
                         >
@@ -523,7 +534,7 @@ export default function AdminDashboard() {
                     sx={{
                         borderRadius: 3,
                         border: "1px solid #bbf7d0",
-                        background: "linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)",
+                        background: "#f0fdf4",
                         boxShadow: "0 14px 30px rgba(22,163,74,0.14)",
                     }}
                 >
@@ -582,7 +593,7 @@ export default function AdminDashboard() {
                 </Card>
             ) : null}
 
-            <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #bfdbfe", background: "linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)", boxShadow: "0 14px 30px rgba(37,99,235,0.12)" }}>
+            <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #bfdbfe", background: "#eff6ff", boxShadow: "0 14px 30px rgba(37,99,235,0.12)" }}>
                 <CardContent sx={{ p: 2.2 }}>
                     <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.3 }}>Biểu đồ Xu hướng Doanh thu theo {scopeLabel}</Typography>
                     <Typography sx={{ color: "#64748b", fontSize: 13, mb: 1.1 }}>

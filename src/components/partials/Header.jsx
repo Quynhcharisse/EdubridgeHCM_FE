@@ -87,16 +87,16 @@ import {
     watchNotificationUnread,
 } from "../../services/NotificationService.jsx";
 
-/** Khi bật poll: khoảng cách tối thiểu giữa các lần GET lịch sử tin (chỉ khi ENABLE_PARENT_CHAT_POLLING). */
+
 const PARENT_CHAT_POLL_INTERVAL_MS = 30000;
-/** Poll GET /parent/conversations (đang tắt — ENABLE_PARENT_CONVERSATION_POLL). */
-/** Debounce GET khi handler WS cần đồng bộ danh sách (thiếu conversationId, …) — không gọi sau mỗi tin TVV. */
+
+
 const PARENT_CONVERSATION_POLL_INTERVAL_MS = 5500;
 const PARENT_WS_CONVERSATION_REFRESH_DEBOUNCE_MS = 320;
-/**
- * Poll GET lịch sử tin nhắn trong khi cửa chat mở — dễ gây nhiều request liên tục trên Network.
- * Tin mới nên qua WebSocket; chỉ bật lại (và có thể giảm PARENT_CHAT_POLL_INTERVAL_MS) nếu BE chưa push tin tới /user.
- */
+
+
+
+
 const ENABLE_PARENT_CHAT_POLLING = false;
 const ENABLE_PARENT_CONVERSATION_POLL = false;
 
@@ -109,7 +109,7 @@ const sessionCampusLoose = (o) => {
     return Number.isFinite(n) ? n : null;
 };
 
-/** campusId > 0 — BE hay gửi 0 (primitive int default); không dùng để loại tin WS hoặc chặn khớp draft. */
+
 const meaningfulSessionCampus = (o) => {
     const c = sessionCampusLoose(o);
     return c != null && c > 0 ? c : null;
@@ -117,7 +117,7 @@ const meaningfulSessionCampus = (o) => {
 
 const sessionStudentIdLoose = (o) => String(o?.studentProfileId ?? o?.studentId ?? o?.student?.id ?? '').trim();
 
-/** Cùng phiên tư vấn (học sinh + campus) khi chưa/đã có conversationId — dùng để khớp WS với selection lệch id hoặc draft. */
+
 const isSameConversationSessionLoose = (a, b) => {
     if (!a || !b) return false;
     const ida = a?.conversationId ?? a?.id;
@@ -184,7 +184,7 @@ const pickIncomingConversationId = (payload) => {
                 const inner = JSON.parse(body.message);
                 raw = extractConversationIdFromObject(inner);
             } catch {
-                /* ignore */
+                
             }
         }
     }
@@ -227,7 +227,7 @@ const getParentPrincipalCandidatesLower = () => {
             if (s) set.add(s);
         });
     } catch {
-        /* ignore */
+        
     }
     return set;
 };
@@ -238,11 +238,11 @@ const normalizeWsPrincipal = (v) =>
         .toLowerCase()
         .replace(/^["'<\s]+|["'>\s]+$/g, '');
 
-/**
- * receiverName từ BE có thể là email/username principal — khớp với identity phụ huynh.
- * Nhiều BE khi push qua convertAndSendToUser **không gửi receiverName** trong body (chỉ có sender + nội dung);
- * frame đã vào queue /user/... của đúng session — khi đó coi là tin cho phụ huynh nếu sender không phải chính mình.
- */
+
+
+
+
+
 const receiverMatchesParent = (payload, emailFallbackLower) => {
     const recv = normalizeWsPrincipal(payload?.receiverName);
     const send = normalizeWsPrincipal(payload?.senderName);
@@ -255,20 +255,20 @@ const receiverMatchesParent = (payload, emailFallbackLower) => {
         return true;
     }
     if (candidates.has(recv)) return true;
-    /** BE đôi khi ghi nhầm receiver (vd email tư vấn). Tin đã vào queue /user của phụ huynh thì vẫn nhận nếu không phải echo tự gửi. */
+    
     if (send && candidates.has(send)) return false;
     return true;
 };
 
-/**
- * Echo tin tự gửi (bỏ qua khỏi WS handler).
- * Ưu tiên senderEmail: có email và không phải phụ huynh → luôn là tin đối phương (TVV/system), không lọc.
- * Tránh lỗi cũ: senderName + senderEmail cùng TVV nhưng .every() lên cả hai field vẫn false — OK;
- * nhưng chỉ một field khớp parent + field kia TVV có thể làm every false — tin vẫn nhận;
- * quan trọng: BE chỉ gửi senderEmail TVV → không còn nhầm với “self” vì thiếu email.
- * Chỉ một field (vd senderName) trùng parent + receiverName rỗng: BE thường bỏ receiver — không coi echo
- * (tránh nuốt tin; echo thật từ server thường có receiverName = TVV).
- */
+
+
+
+
+
+
+
+
+
 const senderLooksLikeParentSelf = (payload) => {
     if (!payload || typeof payload !== 'object') return false;
     const candidates = getParentPrincipalCandidatesLower();
@@ -293,10 +293,10 @@ const senderLooksLikeParentSelf = (payload) => {
     return true;
 };
 
-/**
- * Khớp tin WS với cuộc đang mở: theo id; hoặc id trên selection lệch nhưng list có dòng đúng id + cùng phiên;
- * hoặc draft: receiver = phụ huynh, sender khác phụ huynh — không bắt buộc trùng email tư vấn trên thẻ trường (dữ liệu search hay sai).
- */
+
+
+
+
 const privateMessageBelongsToParentSelection = (
     selected,
     incomingConversationId,
@@ -328,7 +328,7 @@ const privateMessageBelongsToParentSelection = (
             return !spSel || !spIt || spSel === spIt;
         });
         if (listAligns) return true;
-        // Không mở rộng "đang xem" sang mọi tin tới parent: đang mở cuộc A mà tin thuộc cuộc B vẫn phải tăng unread.
+        
         return false;
     }
 
@@ -342,11 +342,11 @@ const privateMessageBelongsToParentSelection = (
         return false;
     }
 
-    /**
-     * BE/STOMP thường chỉ gửi conversationId + nội dung; campusId/studentProfileId có thể thiếu hoặc = 0.
-     * Khi phụ huynh mở chat từ trang trường (draft đã có campus + con), lấy campus/student từ selected
-     * khi payload không có giá trị có nghĩa — không thì tin TVV không khớp phiên → không append bubble.
-     */
+    
+
+
+
+
     const payloadSession = {
         conversationId: incomingConversationId,
         campusId: meaningfulSessionCampus(payload) ?? meaningfulSessionCampus(selected),
@@ -365,7 +365,7 @@ const privateMessageBelongsToParentSelection = (
         .toString()
         .trim()
         .toLowerCase();
-    /** Cùng email tư vấn ≠ cùng cuộc (nhánh draft): chỉ coi “đang xem” khi khớp session hoặc đúng id trên list. */
+    
     if (counsellor && send === counsellor) {
         if (isSameConversationSessionLoose(selected, payloadSession)) return true;
         if (items.some((item) => isSameConversationId(item?.conversationId ?? item?.id, incomingConversationId))) {
@@ -427,7 +427,7 @@ const pickListItemsFromPayload = (p) => {
     return [];
 };
 
-/** Chuẩn hóa envelope GET /parent/conversations (body string, items/content, v.v.). */
+
 const parseParentConversationsEnvelope = (response) => {
     const top = unwrapEnvelopePayload(response);
     return {
@@ -451,24 +451,24 @@ const formatSectionDateLabel = (value) => {
 
 const STUDENT_CHAT_THEMES = [
     {
-        headerGradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 52%, #38bdf8 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #38bdf8 0%, #3b82f6 52%, #2563eb 100%)',
+        headerGradient: '#60a5fa',
+        bubbleGradient: '#3b82f6',
         accent: '#2563eb',
         accentSoft: 'rgba(59, 130, 246, 0.16)',
         border: 'rgba(59, 130, 246, 0.34)',
         peerAvatar: '#2563eb',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #065f46 0%, #059669 55%, #2dd4bf 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #2dd4bf 0%, #059669 52%, #065f46 100%)',
+        headerGradient: '#93c5fd',
+        bubbleGradient: '#60a5fa',
         accent: '#047857',
         accentSoft: 'rgba(5, 150, 105, 0.16)',
         border: 'rgba(5, 150, 105, 0.34)',
         peerAvatar: '#065f46',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 55%, #f59e0b 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #f59e0b 0%, #ea580c 52%, #7c2d12 100%)',
+        headerGradient: '#bfdbfe',
+        bubbleGradient: '#93c5fd',
         accent: '#c2410c',
         accentSoft: 'rgba(234, 88, 12, 0.16)',
         border: 'rgba(234, 88, 12, 0.34)',
@@ -623,7 +623,7 @@ function MainHeader() {
     const [chatWindowOpen, setChatWindowOpen] = useState(false);
     const [chatWindowMinimized, setChatWindowMinimized] = useState(false);
     const [selectedConversationStudent, setSelectedConversationStudent] = useState(null);
-    /** Chi tiết đầy đủ từ GET /parent/student/{id} khi bấm « i »; không lấy từ payload history sau khi BE tách. */
+    
     const [studentProfileDetailForPanel, setStudentProfileDetailForPanel] = useState(null);
     const [studentProfileDetailLoading, setStudentProfileDetailLoading] = useState(false);
     const [studentInfoOpen, setStudentInfoOpen] = useState(false);
@@ -632,7 +632,7 @@ function MainHeader() {
     const [studentSelectLoading, setStudentSelectLoading] = useState(false);
     const [studentSelectOptions, setStudentSelectOptions] = useState([]);
     const [pendingChatTarget, setPendingChatTarget] = useState(null);
-    /** Badge khi BE không gửi conversationId trên WS nhưng tin đã vào queue phụ huynh. */
+    
     const [parentWsUnreadBump, setParentWsUnreadBump] = useState(0);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(() => readNotificationUnreadCount());
     const [notificationItems, setNotificationItems] = useState([]);
@@ -641,7 +641,7 @@ function MainHeader() {
     const loadingMoreRef = React.useRef(false);
     const hasMarkedReadRef = React.useRef(false);
     const markReadInFlightRef = React.useRef(false);
-    /** PUT read đang chạy mà có thêm yêu cầu force (WS / focus ô nhập) → chạy lại ngay sau khi xong. */
+    
     const pendingParentMarkReadAfterInFlightRef = React.useRef(false);
     const lastParentInputMarkReadAtRef = React.useRef(0);
     const parentWsPostRefreshTimerRef = React.useRef(null);
@@ -657,7 +657,7 @@ function MainHeader() {
     const sendingParentMessageRef = React.useRef(false);
     const messageHasMoreRef = React.useRef(false);
     const messageNextCursorIdRef = React.useRef(null);
-    /** Chỉ true sau khi phụ huynh tương tác ô nhập (pointer/key) — tránh mở chat là coi như đã đọc, WS không tăng unread. */
+    
     const parentComposerEngagedRef = React.useRef(false);
     conversationItemsRef.current = conversationItems;
     chatWindowOpenRef.current = chatWindowOpen;
@@ -677,7 +677,7 @@ function MainHeader() {
         if (localStorage.getItem('user')) {
             try {
                 const parsed = JSON.parse(localStorage.getItem('user'));
-                /** Không dùng studentProfile* đã từng lưu nhầm trong blob user (nhiều tài khoản / cùng máy). */
+                
                 return sanitizeUserForLocalStorage(parsed) || null;
             } catch {
                 return null;
@@ -710,7 +710,7 @@ function MainHeader() {
         const notificationPollTimer = window.setInterval(() => {
             refreshNotificationInboxForUser(userInfo).catch(() => {});
         }, 20000);
-        // Khi tab được focus lại (từ background), sync ngay lập tức thay vì chờ poll
+        
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
                 refreshNotificationInboxForUser(userInfo).catch(() => {});
@@ -847,7 +847,7 @@ function MainHeader() {
     }, [selectedConversation]);
     const parentChatHasUnread = selectedConversationUnreadCount > 0;
     const isStudentInfoOpen = studentInfoOpen;
-    /** Badge header: số cuộc trò chuyện có tin chưa đọc (không cộng dồn từng tin). */
+    
     const conversationsWithUnreadCount = filteredConversationItems.reduce((count, item) => {
         const unread = Number(
             item?.unreadCount ??
@@ -859,7 +859,7 @@ function MainHeader() {
         );
         return count + (Number.isFinite(unread) && unread > 0 ? 1 : 0);
     }, 0);
-    /** WS thiếu conversationId: coi thêm tối đa 1 cuộc chưa gắn danh sách. */
+    
     const parentHeaderUnreadDisplay = Math.min(
         99,
         conversationsWithUnreadCount + (parentWsUnreadBump > 0 ? 1 : 0)
@@ -886,7 +886,7 @@ function MainHeader() {
             unreadCount: unreadNorm,
             unreadMessages: unreadNorm,
             participantEmail: conversation?.participantEmail ?? conversation?.otherUser ?? conversation?.counsellorEmail ?? '',
-            /** Chỉ email TVV được gán rõ — không dùng otherUser/participantEmail làm TVV (thường là trường/inbox), kẻo WS gửi receiverName khác rỗng và BE không fan-out campus. */
+            
             counsellorEmail:
                 String(conversation?.counsellorEmail ?? '').trim() ||
                 String(conversation?.participantCounsellorEmail ?? '').trim() ||
@@ -925,10 +925,10 @@ function MainHeader() {
         };
     };
 
-    /**
-     * History chat BE có thể không còn gender / traits / favouriteJob / academicProfileMetadata / subjectsInSystem —
-     * các trường đó lấy qua GET /parent/student/{id} khi bấm « i ».
-     */
+    
+
+
+
     const parseHistoryResponse = (response, conversation) => {
         const payload = parseMessagesHistoryPayloadRoot(response);
         const items = Array.isArray(payload?.messages)
@@ -1089,7 +1089,7 @@ function MainHeader() {
         [userIdentitySet, userInfo]
     );
 
-    /** Bubble tin từ tư vấn: vệt nền xanh theo unreadCount (N tin peer gần nhất). */
+    
     const peerUnreadBubbleIdSet = React.useMemo(() => {
         const raw = Number(selectedConversationUnreadCount || 0) || 0;
         const n = Math.min(40, raw);
@@ -1105,7 +1105,7 @@ function MainHeader() {
         return set;
     }, [messageItems, selectedConversationUnreadCount, isParentMessageMine]);
 
-    /** Tránh 2 bubble: optimistic + cùng tin từ API sau poll/refresh history (khác id). */
+    
     const removeOptimisticShadowedByServer = React.useCallback(
         (merged, serverNormalized) => {
             if (!Array.isArray(merged) || !Array.isArray(serverNormalized) || !serverNormalized.length) {
@@ -1142,7 +1142,7 @@ function MainHeader() {
                 setConversationItems((prev) => {
                     if (cursorId) return [...prev, ...normalizedItems];
                     if (!normalizedItems.length) return prev;
-                    // API thường trả unread=0 — giữ max với state local; giữ dòng chỉ có từ WS (chưa có trong API)
+                    
                     const mergedFromApi = normalizedItems.map((norm) => {
                         const id = norm?.conversationId ?? norm?.id;
                         const openChatSameConv =
@@ -1156,7 +1156,7 @@ function MainHeader() {
                                     selectedConversationRef.current?.id,
                                 id
                             );
-                        /** Đã chạm ô nhập trong cuộc đang mở → GET ép unread 0. */
+                        
                         const viewingThisAsRead =
                             openChatSameConv && parentComposerEngagedRef.current;
                         const prevHit = prev.find((p) =>
@@ -1170,7 +1170,7 @@ function MainHeader() {
                         }
                         const pu = Number(prevHit.unreadCount ?? prevHit.unreadMessages ?? 0) || 0;
                         const nu = Number(norm.unreadCount ?? norm.unreadMessages ?? 0) || 0;
-                        /** Không ép u=0 chỉ vì đang mở popup (openChatSameConv) — dễ nuốt unread mới khi chưa PUT mark read. */
+                        
                         const u = viewingThisAsRead ? 0 : Math.max(pu, nu);
                         return {...norm, unreadCount: u, unreadMessages: u};
                     });
@@ -1227,11 +1227,11 @@ function MainHeader() {
         return {parentEmail, counsellorEmail};
     };
 
-    /**
-     * Người nhận STOMP: khớp hiển thị "Tư vấn viên:" (counsellorEmail → participantEmail → otherUser).
-     * BE đôi khi chỉ trả email TVV ở otherUser/participantEmail, không điền counsellorEmail — vẫn phải gửi receiverName cho TVV.
-     * Chỉ fallback sang otherUser/participantEmail khi có dạng email (@) để tránh inbox trường/tên hiển thị làm hết fan-out campus.
-     */
+    
+
+
+
+
     const resolveWebSocketReceiverName = (conversation) => {
         const explicit =
             String(conversation?.counsellorEmail ?? '').trim() ||
@@ -1280,7 +1280,7 @@ function MainHeader() {
         return null;
     };
 
-    /** Khớp cuộc đang chọn với payload history khi chưa có conversationId (draft). */
+    
     const isSameConversationSession = (prev, conv) => {
         if (!prev || !conv) return false;
         const prevId = prev?.conversationId ?? prev?.id;
@@ -1447,8 +1447,8 @@ function MainHeader() {
                 );
                 const normalized = parsed.items.map(normalizeMessage);
                 setMessageItems((prev) => {
-                    // Merge với prev (WS / optimistic): history lần đầu hoặc silent sau gửi tin có thể
-                    // trả snapshot cũ hơn socket — không replace toàn list để tránh mất tin mới.
+                    
+                    
                     const merged =
                         normalized.length > 0 ? mergeUniqueMessages([...normalized, ...prev]) : prev;
                     const next = removeOptimisticShadowedByServer(merged, normalized);
@@ -1479,10 +1479,10 @@ function MainHeader() {
         }
     };
 
-    /**
-     * PUT đánh dấu đã đọc — chỉ gọi khi: (1) chọn một cuộc trong danh sách Tin nhắn, (2) focus/chạm ô nhập.
-     * Không gọi khi chỉ mở popup, nhận tin WS, hay gửi tin; hai PUT force chồng nhau thì xếp hàng sau khi xong.
-     */
+    
+
+
+
     const markParentConversationRead = React.useCallback(
         async (conv, opts = {}) => {
             const {syncComposerEngaged = false, force = false} = opts;
@@ -1549,7 +1549,7 @@ function MainHeader() {
         if (!isSignedIn || !isParent || !chatWindowOpen || !selectedConversation) return;
         const intervalId = setInterval(() => {
             if (document.visibilityState !== 'visible') return;
-            // Đang đọc tin cũ (không ở gần đáy) thì không poll history để tránh gọi API liên tục.
+            
             if (!parentStickToBottomRef.current) return;
             loadMessageHistoryRef.current?.({
                 conversation: selectedConversationRef.current,
@@ -1619,7 +1619,7 @@ function MainHeader() {
         }
     };
 
-    /** Chạm / focus ô nhập: bỏ qua hasMarkedReadRef (sau tin mới vẫn gọi lại API). */
+    
     const handleMarkRead = () => {
         const now = Date.now();
         if (now - lastParentInputMarkReadAtRef.current < 450) return;
@@ -1818,14 +1818,14 @@ function MainHeader() {
             return guess;
         };
 
-        /**
-         * Sự kiện điều khiển (CONVERSATION_READ, …).
-         * Không lấy type từ data/payload khi đã có nội dung tin — BE đôi khi lồng metadata khiến tin TVV bị coi nhầm CONVERSATION_READ
-         * → return sớm, không append bubble (lỗi: phụ huynh “không bắt” tin chat).
-         */
+        
+
+
+
+
         const pickWsControlEventType = (obj) => {
             if (!obj || typeof obj !== 'object') return '';
-            /** Phải ưu tiên nội dung tin: BE có thể gửi type/status (vd MESSAGE_SENT) cùng message → không được coi là control trước khi thấy body. */
+            
             const hasChatBody =
                 (obj.message != null && String(obj.message).trim() !== '') ||
                 (obj.content != null && String(obj.content).trim() !== '') ||
@@ -1843,10 +1843,10 @@ function MainHeader() {
             return nested;
         };
 
-        /**
-         * CONVERSATION_READ từ BE có thể broadcast khi TVV xác nhậnh cuộc — không được xóa unread inbox phụ huynh.
-         * Chỉ đồng bộ unread=0 khi payload nói rõ phụ huynh (chính user) là người đọc (đồng bộ tab/máy khác).
-         */
+        
+
+
+
         const conversationReadTargetsParentInbox = (root, rawPayload, parentEmailLower) => {
             const identities = new Set();
             const add = (x) => {
@@ -1861,7 +1861,7 @@ function MainHeader() {
                 add(u?.userName);
                 add(u?.sub);
             } catch {
-                /* ignore */
+                
             }
             if (!identities.size) return false;
 
@@ -1921,7 +1921,7 @@ function MainHeader() {
                 const root = unwrapWsPayload(payload);
                 const emailForMatch = getParentUserEmailLower() || String(userInfo?.email || '').trim().toLowerCase();
 
-                /** BE: CONVERSATION_READ — chỉ xóa unread phụ huynh khi sự kiện thuộc hành động đọc của chính phụ huynh. */
+                
                 const wsEventType = pickWsControlEventType(root) || pickWsControlEventType(payload);
                 if (wsEventType === 'CONVERSATION_READ') {
                     const readConversationId =
@@ -1974,7 +1974,7 @@ function MainHeader() {
                     return;
                 }
 
-                /** Không gọi receiverMatchesParent: tin đã vào queue /user/... của phiên phụ huynh là đủ. */
+                
 
                 const previewText = root?.message ?? root?.content ?? payload?.message ?? payload?.content ?? "";
                 const previewTime = root?.timestamp ?? root?.sentAt ?? root?.time ?? payload?.timestamp ?? null;
@@ -1982,10 +1982,10 @@ function MainHeader() {
                 const currentSelected = selectedConversationRef.current;
                 const chatOpen = chatWindowOpenRef.current;
                 const chatMinimized = chatWindowMinimizedRef.current;
-                /**
-                 * “Đang xem đúng cuộc” = popup chat mở và không thu nhỏ in-app.
-                 * Unread cục bộ +1 khi nhận tin TVV nếu chưa chạm ô nhập — GET thường trả unread=0 (BE lệch DB).
-                 */
+                
+
+
+
                 const wsBelongsToSelection = privateMessageBelongsToParentSelection(
                     currentSelected,
                     conversationId,
@@ -2004,12 +2004,12 @@ function MainHeader() {
                     !chatMinimized &&
                     currentSelected &&
                     (wsBelongsToSelection || sameConversationIdAsSelection);
-                /**
-                 * Luôn +1 unread cho tin từ đối phương (đã loại echo phụ huynh ở trên).
-                 * Không gắn với liveViewingThread / ô nhập: khi đang mở chat và vừa gửi “Hi”, ref composer = true
-                 * mà vẫn cần badge + unread list khi TVV trả lời/intro.
-                 * PUT mark read / merge GET sau đọc sẽ về 0.
-                 */
+                
+
+
+
+
+
                 const shouldBumpLocalUnreadFromCounsellorWs = true;
                 if (liveViewingThread && currentSelected) {
                     const sid = currentSelected?.conversationId ?? currentSelected?.id;
@@ -2151,7 +2151,7 @@ function MainHeader() {
                     });
                 }
 
-                /** Không GET /parent/conversations sau mỗi tin TVV — đã merge preview + unread cục bộ ở trên; GET dễ trùng request và (nếu BE lỗi) tác động read state. */
+                
         }
 
         connectPrivateMessageSocket({onMessage: onPrivateMessage});
@@ -2359,7 +2359,7 @@ function MainHeader() {
         
             try {
                 setStudentSelectLoading(true);
-                /** Luôn lấy danh sách hồ sơ từ API; không lưu studentProfile / studentProfileId trong localStorage. */
+                
                 const response = await getStudents();
                 if (response?.status !== 200) {
                     enqueueSnackbar("Không tải được danh sách học sinh.", {variant: "error"});
@@ -2676,7 +2676,7 @@ function MainHeader() {
                                 fontWeight: 800,
                                 letterSpacing: 0.4,
                                 fontSize: {xs: '1.15rem', sm: '1.35rem'},
-                                background: `linear-gradient(120deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 50%, ${BRAND_SKY_LIGHT} 100%)`,
+                                background: BRAND_SKY,
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text'
@@ -3030,7 +3030,7 @@ function MainHeader() {
                                             px: 2,
                                             py: 1.75,
                                             borderBottom: '1px solid rgba(59,130,246,0.1)',
-                                            background: 'linear-gradient(135deg, rgba(238,242,255,0.95) 0%, rgba(255,255,255,0.98) 100%)'
+                                            background: 'rgba(238,242,255,0.95)'
                                         }}
                                     >
                                         <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
@@ -3102,7 +3102,7 @@ function MainHeader() {
                                                                 gap: 1.5,
                                                                 cursor: 'pointer',
                                                                 bgcolor: hasUnread
-                                                                    ? 'linear-gradient(90deg, rgba(37,99,235,0.18) 0%, rgba(37,99,235,0.08) 60%, rgba(37,99,235,0.04) 100%)'
+                                                                    ? 'rgba(37,99,235,0.12)'
                                                                     : 'transparent',
                                                                 borderLeft: hasUnread ? '4px solid #1d4ed8' : '4px solid transparent',
                                                                 boxShadow: hasUnread
@@ -3111,7 +3111,7 @@ function MainHeader() {
                                                                 transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                                                                 '&:hover': {
                                                                     bgcolor: hasUnread
-                                                                        ? 'linear-gradient(90deg, rgba(37,99,235,0.24) 0%, rgba(37,99,235,0.11) 60%, rgba(37,99,235,0.06) 100%)'
+                                                                        ? 'rgba(37,99,235,0.16)'
                                                                         : 'rgba(59,130,246,0.08)'
                                                                 }
                                                             }}
@@ -3215,7 +3215,7 @@ function MainHeader() {
                                                 alignItems: 'flex-start',
                                                 justifyContent: 'space-between',
                                                 background: parentChatHasUnread
-                                                    ? 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)'
+                                                    ? '#fb923c'
                                                     : selectedStudentTheme.headerGradient,
                                                 borderBottom: '1px solid rgba(255,255,255,0.12)',
                                                 flexShrink: 0
@@ -3375,11 +3375,9 @@ function MainHeader() {
                                                 overflowY: 'auto',
                                                 overflowX: 'hidden',
                                                 background: parentChatHasUnread ? `
-                                                    linear-gradient(180deg, rgba(255,237,213,0.92) 0%, rgba(255,247,237,0.98) 35%, #fff7ed 100%),
-                                                    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.14), transparent 55%)
+                                                    rgba(255,237,213,0.92)
                                                 ` : `
-                                                    linear-gradient(180deg, rgba(238,242,255,0.65) 0%, rgba(248,250,252,0.98) 28%, #f1f5f9 100%),
-                                                    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12), transparent 55%)
+                                                    rgba(238,242,255,0.65)
                                                 `,
                                                 WebkitOverflowScrolling: 'touch'
                                             }}
@@ -3497,7 +3495,7 @@ function MainHeader() {
                                                                                     background: isMine
                                                                                         ? selectedStudentTheme.bubbleGradient
                                                                                         : peerUnreadHighlight
-                                                                                          ? 'linear-gradient(135deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.92) 100%)'
+                                                                                          ? 'rgba(219,234,254,0.98)'
                                                                                           : '#ffffff',
                                                                                     color: isMine ? '#ffffff' : '#1e293b',
                                                                                     border: isMine
@@ -3742,7 +3740,7 @@ function MainHeader() {
                                             borderRadius: 2,
                                             border: `1px solid ${selectedStudentTheme.border}`,
                                             boxShadow: '0 22px 48px rgba(30,41,59,0.28)',
-                                            background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 38%, #ffffff 100%)',
+                                            background: '#f8fbff',
                                             overflow: 'hidden'
                                         }}
                                     >
@@ -4064,10 +4062,10 @@ function MainHeader() {
                                           }
                                         : {
                                               color: '#fff',
-                                              background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
+                                              background: BRAND_SKY,
                                               boxShadow: '0 8px 24px rgba(37, 99, 235, 0.28)',
                                               '&:hover': {
-                                                  background: `linear-gradient(90deg, ${APP_PRIMARY_DARK} 0%, ${BRAND_NAVY} 100%)`,
+                                                  background: APP_PRIMARY_DARK,
                                                   boxShadow: '0 12px 32px rgba(37, 99, 235, 0.36)'
                                               }
                                           })
@@ -4317,7 +4315,7 @@ function MainHeader() {
                         fontWeight: 700,
                         fontSize: 24,
                         color: BRAND_NAVY,
-                        background: "linear-gradient(135deg, rgba(239,246,255,0.95) 0%, rgba(219,234,254,0.75) 100%)",
+                        background: "rgba(239,246,255,0.95)",
                         borderBottom: "1px solid rgba(59,130,246,0.16)"
                     }}
                 >

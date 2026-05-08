@@ -1,8 +1,8 @@
-const AXIOS_STATUS_MESSAGE = /^Request failed with status code \d+$/i;
+import {normalizeUiMessage} from "./normalizeUiMessage.js";
 
-/**
- * Lấy nội dung lỗi từ body response API; tránh hiển thị message mặc định của Axios.
- */
+
+
+
 export function getApiErrorMessage(error, fallback = 'Đã xảy ra lỗi. Vui lòng thử lại.') {
     const data = error?.response?.data;
 
@@ -11,22 +11,22 @@ export function getApiErrorMessage(error, fallback = 'Đã xảy ra lỗi. Vui l
         if (Array.isArray(raw)) {
             const joined = raw.map((x) => (typeof x === 'string' ? x.trim() : String(x))).filter(Boolean).join(', ');
             if (joined) {
-                return joined;
+                return normalizeUiMessage(joined, fallback);
             }
         } else if (typeof raw === 'string' && raw.trim()) {
-            return raw.trim();
+            return normalizeUiMessage(raw.trim(), fallback);
         }
         if (typeof data.body === 'string' && data.body.trim()) {
-            return data.body.trim();
+            return normalizeUiMessage(data.body.trim(), fallback);
         }
         if (data.body && typeof data.body.message === 'string' && data.body.message.trim()) {
-            return data.body.message.trim();
+            return normalizeUiMessage(data.body.message.trim(), fallback);
         }
     }
 
     const msg = error?.message;
-    if (typeof msg === 'string' && msg.trim() && !AXIOS_STATUS_MESSAGE.test(msg.trim())) {
-        return msg.trim();
+    if (typeof msg === 'string' && msg.trim()) {
+        return normalizeUiMessage(msg.trim(), fallback);
     }
 
     return fallback;

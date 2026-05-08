@@ -171,18 +171,18 @@ export default function CampusConsultationStats() {
     const byDayOfWeek = Array.isArray(stats?.byDayOfWeek) ? stats.byDayOfWeek : [];
     const byCampus = Array.isArray(stats?.byCampus) ? stats.byCampus : [];
     const isPrimaryBranch = stats?.isPrimaryBranch ?? false;
-    // Chỉ ẩn charts khi chưa load lần nào (stats=null), không ẩn khi data=0
+    
     const statsLoaded = stats !== null;
     const hasChartData = (cards.total ?? 0) > 0;
 
-    // ── Status cards ──────────────────────────────────────────────
+    
     const statusCards = [
         {
             key: "total",
             title: "Tổng lịch hẹn",
             value: cards.total ?? 0,
             icon: <EventNoteRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #1d4ed8 0%, #3b82f6 55%, #60a5fa 100%)",
+            gradient: "#60a5fa",
             glow: "0 12px 28px rgba(37,99,235,0.35)",
         },
         {
@@ -190,7 +190,7 @@ export default function CampusConsultationStats() {
             title: "Chờ xác nhận",
             value: cards.pending ?? 0,
             icon: <HourglassTopRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #d97706 0%, #f59e0b 55%, #fbbf24 100%)",
+            gradient: "#93c5fd",
             glow: "0 12px 28px rgba(217,119,6,0.32)",
         },
         {
@@ -198,7 +198,7 @@ export default function CampusConsultationStats() {
             title: "Đã xác nhận",
             value: cards.confirmed ?? 0,
             icon: <VerifiedRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #0369a1 0%, #0ea5e9 55%, #38bdf8 100%)",
+            gradient: "#7dd3fc",
             glow: "0 12px 28px rgba(3,105,161,0.3)",
         },
         {
@@ -206,7 +206,7 @@ export default function CampusConsultationStats() {
             title: "Đang diễn ra",
             value: cards.inProgress ?? 0,
             icon: <PlayCircleRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #6d28d9 0%, #8b5cf6 55%, #a78bfa 100%)",
+            gradient: "#bfdbfe",
             glow: "0 12px 28px rgba(109,40,217,0.3)",
         },
         {
@@ -214,7 +214,7 @@ export default function CampusConsultationStats() {
             title: "Hoàn thành",
             value: cards.completed ?? 0,
             icon: <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #15803d 0%, #22c55e 55%, #4ade80 100%)",
+            gradient: "#86efac",
             glow: "0 12px 28px rgba(21,128,61,0.3)",
         },
         {
@@ -222,7 +222,7 @@ export default function CampusConsultationStats() {
             title: "Đã huỷ",
             value: cards.cancelled ?? 0,
             icon: <CancelRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #b91c1c 0%, #ef4444 55%, #f87171 100%)",
+            gradient: "#fca5a5",
             glow: "0 12px 28px rgba(185,28,28,0.3)",
         },
         {
@@ -230,18 +230,18 @@ export default function CampusConsultationStats() {
             title: "Bỏ hẹn",
             value: cards.noShow ?? 0,
             icon: <PersonOffRoundedIcon sx={{ fontSize: 20 }} />,
-            gradient: "linear-gradient(135deg, #374151 0%, #6b7280 55%, #9ca3af 100%)",
+            gradient: "#cbd5e1",
             glow: "0 12px 28px rgba(55,65,81,0.3)",
         },
     ];
 
-    // ── Rate cards ────────────────────────────────────────────────
+    
     const rateCards = [
         { key: "completionRate", title: "Tỉ lệ hoàn thành", value: Number(cards.completionRate ?? 0), goodWhenHigh: true },
         { key: "cancellationRate", title: "Tỉ lệ huỷ", value: Number(cards.cancellationRate ?? 0), goodWhenHigh: false }
     ];
 
-    // ── Trend chart ───────────────────────────────────────────────
+    
     const trendLabels = trend.map((t) => t.label || "");
     const trendSeries = [
         { data: trend.map((t) => Number(t.completed ?? 0)), label: "Hoàn thành", color: STATUS_COLORS.completed, showMark: false },
@@ -250,11 +250,11 @@ export default function CampusConsultationStats() {
         { data: trend.map((t) => Number(t.cancelled ?? 0)), label: "Đã huỷ", color: STATUS_COLORS.cancelled, showMark: false },
     ];
 
-    // ── byDayOfWeek ───────────────────────────────────────────────
+    
     const dowLabels = byDayOfWeek.map((d) => d.label || d.day || "");
     const dowValues = byDayOfWeek.map((d) => Number(d.total ?? 0));
 
-    // ── Donut ─────────────────────────────────────────────────────
+    
     const pieData = [
         { id: 0, value: Number(cards.completed ?? 0), label: "Hoàn thành", color: STATUS_COLORS.completed },
         { id: 1, value: Number(cards.confirmed ?? 0), label: "Đã xác nhận", color: STATUS_COLORS.confirmed },
@@ -264,21 +264,21 @@ export default function CampusConsultationStats() {
         { id: 5, value: Number(cards.noShow ?? 0), label: "Bỏ hẹn", color: STATUS_COLORS.noShow },
     ].filter((d) => d.value > 0);
 
-    // ── byCampus ──────────────────────────────────────────────────
+    
     const campusNames = byCampus.map((c) => c.campusName || `Cơ sở ${c.campusId}`);
     const getCampusValues = (key) => byCampus.map((c) => Number(c[key] ?? 0));
     const campusChartHeight = Math.max(220, byCampus.length * 60);
 
-    // ── Shared sx ─────────────────────────────────────────────────
+    
     const sectionCard = { elevation: 0, sx: { borderRadius: 3, border: "1px solid", borderColor: "divider" } };
 
     return (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, pb: 4 }}>
 
-            {/* ── HEADER + FILTERS ── always visible ─────────────── */}
+            {}
             <Card {...sectionCard}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                    {/* Title row */}
+                    {}
                     <Stack direction="row" alignItems="center" gap={1.25} mb={1.75}>
                         <QueryStatsRoundedIcon sx={{ color: "primary.main", fontSize: 28 }} />
                         <Box>
@@ -293,7 +293,7 @@ export default function CampusConsultationStats() {
                         </Box>
                     </Stack>
 
-                    {/* Date range pickers + Apply */}
+                    {}
                     <Stack direction={{ xs: "column", sm: "row" }} gap={1.25} alignItems="center" flexWrap="wrap">
                         <TextField
                             label="Từ ngày"
@@ -321,7 +321,7 @@ export default function CampusConsultationStats() {
                         )}
                     </Stack>
 
-                    {/* Quick preset chips */}
+                    {}
                     <Stack direction="row" gap={0.75} mt={1.25} flexWrap="wrap">
                         {PRESETS.map((p) => (
                             <Chip
@@ -338,7 +338,7 @@ export default function CampusConsultationStats() {
                 </CardContent>
             </Card>
 
-            {/* ── STATE: LOADING ──────────────────────────────────── */}
+            
             {loading && (
                 <>
                     <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(4,1fr)", lg: "repeat(7,1fr)" } }}>
@@ -359,10 +359,10 @@ export default function CampusConsultationStats() {
                 </>
             )}
 
-            {/* ── STATE: HAS DATA or NO DATA (luôn hiện cards khi đã load) ── */}
+            {}
             {!loading && statsLoaded && (
                 <>
-                    {/* Row 1 – Status count cards */}
+                    {}
                     <Box
                         sx={{
                             display: "grid",
@@ -437,7 +437,7 @@ export default function CampusConsultationStats() {
                         ))}
                     </Box>
 
-                    {/* Row 2 – Rate cards */}
+                    {}
                     <Box
                         sx={{
                             display: "grid",
@@ -486,7 +486,7 @@ export default function CampusConsultationStats() {
                         })}
                     </Box>
 
-                    {/* Banner khi chưa có lịch tư vấn */}
+                    
                     {!hasChartData && (
                         <Box
                             sx={{
@@ -511,7 +511,7 @@ export default function CampusConsultationStats() {
                         </Box>
                     )}
 
-                    {/* Row 3 – Trend line chart */}
+                    {}
                     {hasChartData && (
                     <Card {...sectionCard}>
                         <CardContent sx={{ p: 2, pb: 0, "&:last-child": { pb: 0 } }}>
@@ -528,7 +528,7 @@ export default function CampusConsultationStats() {
                     </Card>
                     )}
 
-                    {/* Row 4 – byDayOfWeek + Donut */}
+                    {}
                     {hasChartData && <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                         <Card {...sectionCard}>
                             <CardContent sx={{ p: 2, pb: 0, "&:last-child": { pb: 0 } }}>
@@ -571,7 +571,7 @@ export default function CampusConsultationStats() {
                         </Card>
                     </Box>}
 
-                    {/* Row 5 – byCampus (chỉ HQ) */}
+                    
                     {isPrimaryBranch && byCampus.length > 0 && (
                         <Card {...sectionCard}>
                             <CardContent sx={{ p: 2, pb: 0, "&:last-child": { pb: 0 } }}>

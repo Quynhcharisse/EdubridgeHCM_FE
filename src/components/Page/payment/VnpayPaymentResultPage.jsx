@@ -1,12 +1,12 @@
-/**
- * Trang kết quả thanh toán VNPAY (đọc query trên URL của SPA).
- *
- * Flow: `vnp_ReturnUrl` trỏ thẳng FE (vd. /payment/vnpay-result). Sau khi VNPAY redirect kèm ?vnp_...,
- * trang này gọi GET /api/v1/school/vnpay-callback + cùng query string để BE verify và kích hoạt gói.
- * Khi thành công: GET /api/v1/school/payment/receipt?txnRef=vnp_TxnRef để hiển thị hóa đơn;
- * nút tải PDF gọi GET /api/v1/school/subscription/receipt/export?txnRef=...
- * Không tự chuyển trang: user bấm nút điều hướng khi muốn rời trang.
- */
+
+
+
+
+
+
+
+
+
 import React from "react";
 import {
     Alert,
@@ -47,10 +47,10 @@ import {
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {getPackageTypeLabelVi} from "../../../utils/servicePackageDisplay.js";
 
-/** Bù chiều cao Header cố định (`AppBar position="fixed"` trong WebAppLayout), khớp scroll anchor HomePage ~80px + biên */
+
 const LAYOUT_HEADER_OFFSET_PX = 88;
 
-/** Chiều rộng tối đa cột nội dung + footer (card rộng dần theo breakpoint) */
+
 const VNPAY_RECEIPT_MAX_WIDTH_SX = {
     width: "100%",
     maxWidth: {xs: "100%", sm: 600, md: 720, lg: 840},
@@ -323,7 +323,7 @@ function ReceiptSkeletonBlock() {
     );
 }
 
-/** Sau thanh toán VNPAY: tài khoản trường về trang gói đã mua; các role khác về dashboard mặc định */
+
 function getPostPaymentRedirectPath() {
     try {
         const raw = localStorage.getItem("user");
@@ -347,12 +347,12 @@ export default function VnpayPaymentResultPage() {
     const queryKey = searchParams.toString();
 
     const transactionId = parsed.transactionNo || parsed.txnRef || "";
-    /** Ưu tiên mã tham chiếu đơn hàng (txnRef) cho sao chép / hiển thị tóm tắt */
+    
     const summaryTxnId = String(parsed.txnRef || parsed.transactionNo || "").trim() || transactionId;
     const amountDisplay = formatVnpAmount(parsed.amountRaw);
     const payDateDisplay = formatVnpPayDate(parsed.payDateRaw);
 
-    /** na = không gọi BE; có tham số vnp_ thì gọi callback */
+    
     const [backendVerify, setBackendVerify] = React.useState("na");
 
     const [receipt, setReceipt] = React.useState(null);
@@ -395,7 +395,7 @@ export default function VnpayPaymentResultPage() {
         };
     }, [parsed.hasVnpParams, queryKey]);
 
-    /** Gọi receipt sau khi vnpay-callback không còn loading (BE thường cần ghi nhận giao dịch trước). Vẫn thử khi callback lỗi. */
+    
     React.useEffect(() => {
         if (status !== "success" || !parsed.txnRef) {
             setReceipt(null);
@@ -634,7 +634,7 @@ export default function VnpayPaymentResultPage() {
     const showPdf = status === "success" && Boolean(parsed.txnRef);
     const primaryIsSchool = redirectTarget.startsWith("/school");
     const showRetryInFooter = status === "failed" || status === "unknown" || status === "empty";
-    /** Nút chính + PDF nằm trong card Hóa đơn; footer chỉ còn khi cần nút ngoài card (vd. thử lại) */
+    
     const showStickyFooter = !showPdf || showRetryInFooter;
 
     const primaryButtonSx = {
@@ -648,9 +648,9 @@ export default function VnpayPaymentResultPage() {
         boxShadow: "0 8px 24px rgba(13, 100, 222, 0.28)",
         ...(primaryIsSchool
             ? {
-                  background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
+                  background: "#60a5fa",
                   "&:hover": {
-                      background: "linear-gradient(135deg, #6b9be6 0%, #0b5ad1 100%)",
+                      background: "#3b82f6",
                       boxShadow: "0 10px 28px rgba(13, 100, 222, 0.35)",
                   },
               }
@@ -684,7 +684,7 @@ export default function VnpayPaymentResultPage() {
                 pt: `${LAYOUT_HEADER_OFFSET_PX}px`,
                 pb: showStickyFooter ? {xs: 10, sm: 11} : {xs: 4, sm: 5},
                 px: {xs: 2, sm: 3},
-                background: "linear-gradient(165deg, #f8fafc 0%, #e8f0fe 38%, #dbeafe 72%, #f1f5f9 100%)",
+                background: "#e8f0fe",
                 fontFamily: FONT_UI,
             }}
         >
@@ -1031,7 +1031,7 @@ export default function VnpayPaymentResultPage() {
                         pb: "max(12px, env(safe-area-inset-bottom))",
                         pt: 1.5,
                         background:
-                            "linear-gradient(180deg, rgba(248,250,252,0) 0%, rgba(248,250,252,0.92) 28%, #f8fafc 100%)",
+                            "rgba(248,250,252,0.92)",
                         backdropFilter: "blur(8px)",
                     }}
                 >

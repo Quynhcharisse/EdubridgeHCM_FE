@@ -17,7 +17,7 @@ export function getUserIdentity(userInfo) {
 
 export function getSavedSchoolsStorageKey(userInfo) {
     const identity = getUserIdentity(userInfo);
-    // Fallback để tránh đụng key khi chưa có identity (không nên xảy ra ở role PARENT).
+    
     return `${NAMESPACE}:${STORAGE_PREFIX}:${identity || "unknown"}`;
 }
 

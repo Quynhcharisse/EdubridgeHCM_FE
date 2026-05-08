@@ -116,7 +116,7 @@ const DAY_SHORT = {
 
 const SESSION_OPTIONS = ["MORNING", "AFTERNOON"];
 
-/** Đồng bộ màu với SchoolCampaigns / Cơ sở */
+
 const PRIMARY = "#0D64DE";
 const PRIMARY_SOFT = "rgba(13, 100, 222, 0.1)";
 const PAGE_BG = "#F1F5F9";
@@ -127,7 +127,7 @@ const SHADOW_MD = "0 8px 30px rgba(15, 23, 42, 0.08)";
 const SHADOW_HERO = "0 12px 40px rgba(13, 100, 222, 0.22)";
 const RADIUS_CARD = "20px";
 const RADIUS_INNER = "14px";
-/** Mỗi cột ngày (Thứ + các khung giờ) trong lưới lịch tuần */
+
 const SCHEDULE_DAY_COLUMN_PX = 200;
 const TRANSITION_CARD = "box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease";
 
@@ -169,7 +169,7 @@ const filterSurfaceSx = {
     borderRadius: RADIUS_INNER,
     bgcolor: "rgba(248, 250, 252, 0.95)",
     border: `1px solid ${BORDER_SOFT}`,
-    backgroundImage: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,250,252,0.98) 100%)",
+    backgroundImage: "none",
 };
 
 const outlineSelectSx = {
@@ -232,7 +232,7 @@ function sessionTypeLabel(s) {
     return s || "—";
 }
 
-/** yyyy-mm-dd → dd/mm/yyyy (vi-VN) */
+
 function formatYmdVi(ymd) {
     const s = ymd != null ? String(ymd).trim() : "";
     if (s.length < 8) return s;
@@ -260,10 +260,10 @@ function parseFilenameFromContentDisposition(headerValue) {
     return null;
 }
 
-/**
- * Thống kê ô lưới: mỗi dòng GET assigned = một lần gán; có thể nhiều khoảng ngày khác nhau cùng template/thứ.
- * @returns {{ assignmentCount: number, distinctRangeCount: number, rangeLines: string[] }}
- */
+
+
+
+
 function summarizeGridCellAssignments(rows) {
     if (!Array.isArray(rows) || rows.length === 0) {
         return {assignmentCount: 0, distinctRangeCount: 0, rangeLines: []};
@@ -312,10 +312,10 @@ function minutesToHHmm(total) {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/**
- * Preview khi bật tách theo slot: mỗi tiết `slotMinutes`, nghỉ `bufferMinutes` giữa hai tiết (chuẩn BE).
- * `remainder` = khung không vừa khít (còn khoảng trống sau tiết cuối).
- */
+
+
+
+
 function computePolicySlotPreview(startTime, endTime, slotMinutes, bufferMinutes) {
     const start = timeToMinutes(startTime);
     const end = timeToMinutes(endTime);
@@ -374,7 +374,7 @@ function endOfMonth(d) {
     return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
-/** Ngày đầu tiên trong tháng của `anchorDate` trùng thứ `dayKey` (MON…SUN). */
+
 function firstWeekdayInMonthForDay(anchorDate, dayKey) {
     const y = anchorDate.getFullYear();
     const m = anchorDate.getMonth();
@@ -392,7 +392,7 @@ function formatColumnHeaderDate(d) {
     return d.toLocaleDateString("vi-VN", {day: "2-digit", month: "2-digit", year: "numeric"});
 }
 
-/** Hai khoảng [a0,a1] và [b0,b1] (YYYY-MM-DD) giao nhau */
+
 function dateRangesOverlapYMD(aStart, aEnd, bStart, bEnd) {
     const as = String(aStart || "");
     const ae = String(aEnd || "");
@@ -443,7 +443,7 @@ function sessionCardColors(sessionType) {
     const v = String(sessionType || "").toUpperCase();
     if (v === "MORNING") {
         return {
-            bg: "linear-gradient(145deg, #FFFBF0 0%, #FFF7E6 100%)",
+            bg: "#fff7e6",
             border: "rgba(245, 158, 11, 0.35)",
             accent: "#B45309",
             label: "Sáng",
@@ -451,7 +451,7 @@ function sessionCardColors(sessionType) {
     }
     if (v === "AFTERNOON") {
         return {
-            bg: "linear-gradient(145deg, #F0F7FF 0%, #E8F2FE 100%)",
+            bg: "#e8f2fe",
             border: "rgba(59, 130, 246, 0.35)",
             accent: "#1D4ED8",
             label: "Chiều",
@@ -459,21 +459,21 @@ function sessionCardColors(sessionType) {
     }
     if (v === "EVENING") {
         return {
-            bg: "linear-gradient(145deg, #F0F7FF 0%, #E8F2FE 100%)",
+            bg: "#e8f2fe",
             border: "rgba(59, 130, 246, 0.35)",
             accent: "#1D4ED8",
             label: "Chiều",
         };
     }
     return {
-        bg: "linear-gradient(145deg, #F8FAFC 0%, #F1F5F9 100%)",
+        bg: "#f1f5f9",
         border: "rgba(148, 163, 184, 0.35)",
         accent: "#475569",
         label: sessionTypeLabel(sessionType),
     };
 }
 
-/** Nền / viền vùng cố định theo buổi (lưới tuần) */
+
 function sessionZoneSurface(sessionType) {
     const v = String(sessionType || "").toUpperCase();
     if (v === "MORNING") {
@@ -508,7 +508,7 @@ const emptyForm = () => ({
     expandToPolicySlots: false,
 });
 
-/** Map message từ BE (tiếng Anh) → tiếng Việt cho template lịch tư vấn */
+
 const SCHEDULE_TEMPLATE_ERROR_VI = {
     "The requested time slot falls outside of operational shifts.":
         "Khung giờ không nằm trong ca vận hành đã cấu hình cho cơ sở.",
@@ -551,7 +551,7 @@ export default function SchoolCounselorSchedule() {
     const [formErrors, setFormErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
 
-    /** Đọc từ GET /campus/config — ca, slot, ngày mở (bước 0 theo contract). */
+    
     const [schedulePolicy, setSchedulePolicy] = useState({
         loading: false,
         error: null,
@@ -582,14 +582,14 @@ export default function SchoolCounselorSchedule() {
         day: null,
         batchSlots: null,
     });
-    /**
-     * Lưới = template (GET schedule/templete/list) theo dayOfWeek — không có id «cả tuần» ảo.
-     * Khóa ô: `${templateId}|${dayOfWeek}` (MON…SUN).
-     */
+    
+
+
+
     const [selectedFrameKeys, setSelectedFrameKeys] = useState(() => new Set());
     const [multiSelectMode, setMultiSelectMode] = useState(false);
 
-    /** Lưới lịch (mặc định) · danh sách lượt gán */
+    
     const [managePanel, setManagePanel] = useState("grid");
     const [listFilterDay, setListFilterDay] = useState("");
     const [listRangeStart, setListRangeStart] = useState("");
@@ -600,10 +600,10 @@ export default function SchoolCounselorSchedule() {
     const [blockedUnassignSlotIds, setBlockedUnassignSlotIds] = useState(() => new Set());
     const [exportingTemplate, setExportingTemplate] = useState(false);
 
-    /** Modal chi tiết khung giờ + danh sách tư vấn viên */
+    
     const [scheduleDetail, setScheduleDetail] = useState({open: false, slot: null, day: null});
 
-    /** Một menu ⋮ cho mỗi thẻ khung giờ (thay 3 nút riêng) */
+    
     const [slotActionsMenu, setSlotActionsMenu] = useState({anchorEl: null, slot: null, day: null});
 
     const closeSlotActionsMenu = useCallback(() => {
@@ -682,7 +682,7 @@ export default function SchoolCounselorSchedule() {
         }
     }, [isPrimaryBranch]);
 
-    /** Tab Xem tất cả: gộp mọi trang API (template phẳng) để mỗi campus có đủ lịch trong một lần hiển thị */
+    
     const loadOverview = useCallback(async () => {
         setLoadingOverview(true);
         try {
@@ -756,10 +756,10 @@ export default function SchoolCounselorSchedule() {
         };
     }, [viewMode, schoolCtxLoading]);
 
-    /**
-     * Campus đang thao tác: campus phụ → `currentCampusId`; campus chính → cơ sở đầu danh sách
-     * (đã sort campus chính trước), không còn dropdown chọn cơ sở.
-     */
+    
+
+
+
     const activeCampus = useMemo(() => {
         if (!campusRows.length) return null;
         if (currentCampusId != null) {
@@ -769,10 +769,10 @@ export default function SchoolCounselorSchedule() {
         return campusRows[0] || null;
     }, [campusRows, currentCampusId]);
 
-    /**
-     * ID campus cho GET /campus/{id}/schedule/templete/list (chỉ path, không query) và các API payload;
-     * ưu tiên context khi đăng nhập campus phụ, không thì từ dòng đang chọn.
-     */
+    
+
+
+
     const activeCampusId = useMemo(() => {
         if (currentCampusId != null) {
             const n = Number(currentCampusId);
@@ -812,7 +812,7 @@ export default function SchoolCounselorSchedule() {
         };
     }, [calendarAnchorDate, calendarGranularity]);
 
-    /** Mỗi cột MON…SUN: tuần → ngày trong tuần đang xem; tháng → ngày đầu tiên của thứ đó trong tháng. */
+    
     const columnHeaderDates = useMemo(() => {
         const out = {};
         const anchor = calendarAnchorDate;
@@ -838,7 +838,7 @@ export default function SchoolCounselorSchedule() {
         }
         setLoadingAssigned(true);
         try {
-            /** Luôn tải toàn bộ gán của cơ sở — lọc TVV chỉ áp dụng khi hiển thị lưới (tránh thiếu bản ghi khi có lọc). */
+            
             const res = await getCounsellorAssignedSlots();
             const st = res?.status ?? 0;
             if (st < 200 || st >= 300) {
@@ -982,7 +982,7 @@ export default function SchoolCounselorSchedule() {
         setSelectedAssignmentSlotIds(new Set());
     }, [listFilterDay, listRangeStart, listRangeEnd, filterCounsellorId, managePanel, sessionFilter]);
 
-    /** Lọc theo TVV (trên client) — `assignedSlotRows` luôn đủ để hiển thị đúng mọi bản ghi trùng template/thứ. */
+    
     const assignedRowsFilteredByCounsellor = useMemo(() => {
         if (filterCounsellorId === "" || filterCounsellorId === "ALL") return assignedSlotRows;
         const cid = Number(filterCounsellorId);
@@ -1038,7 +1038,7 @@ export default function SchoolCounselorSchedule() {
         );
     }, [assignedRowsFilteredByCounsellor, viewStartStr, viewEndStr]);
 
-    /** API đã trả bản ghi nhưng khoảng hiệu lực không giao với tuần/tháng đang xem → lưới không có chip */
+    
     const assignedOutOfViewHint = useMemo(() => {
         if (assignedRowsFilteredByCounsellor.length === 0 || visibleAssignedRows.length > 0) return null;
         let minS = "";
@@ -1065,10 +1065,10 @@ export default function SchoolCounselorSchedule() {
         };
     }, [assignedRowsFilteredByCounsellor, visibleAssignedRows]);
 
-    /**
-     * Lưới tuần = template (GET schedule/template) ghép assigned (GET counsellor/slots/assigned).
-     * Cùng templateId + dayOfWeek → chip tư vấn viên; available theo ngày là API khác (khi cần).
-     */
+    
+
+
+
     const assignmentMap = useMemo(() => {
         const m = new Map();
         for (const row of visibleAssignedRows) {
@@ -1299,7 +1299,7 @@ export default function SchoolCounselorSchedule() {
         setForm((prev) => ({...prev, dayOfWeek: days}));
     };
 
-    /** Trùng: cùng thứ + cùng buổi (session) — khung giờ do BE gán từ ca HQ. */
+    
     const checkSessionDayOverlap = useCallback(
         (sessionType, selectedDays, excludeTemplateId) => {
             const st = String(sessionType || "").toUpperCase();
@@ -1661,7 +1661,7 @@ export default function SchoolCounselorSchedule() {
                     p: {xs: 2.5, sm: 3.5},
                     color: "white",
                     boxShadow: SHADOW_HERO,
-                    background: "linear-gradient(128deg, #5B9BD8 0%, #0D64DE 42%, #064CAD 100%)",
+                    background: "#60a5fa",
                     "&::before": {
                         content: '""',
                         position: "absolute",
@@ -1669,7 +1669,7 @@ export default function SchoolCounselorSchedule() {
                         right: "-8%",
                         width: "52%",
                         height: "140%",
-                        background: "radial-gradient(ellipse at center, rgba(255,255,255,0.22) 0%, transparent 68%)",
+                        background: "rgba(255,255,255,0.18)",
                         pointerEvents: "none",
                     },
                     "&::after": {
@@ -1679,7 +1679,7 @@ export default function SchoolCounselorSchedule() {
                         left: "-10%",
                         width: "45%",
                         height: "100%",
-                        background: "radial-gradient(ellipse at center, rgba(255,255,255,0.08) 0%, transparent 65%)",
+                        background: "rgba(255,255,255,0.1)",
                         pointerEvents: "none",
                     },
                 }}
@@ -1777,7 +1777,7 @@ export default function SchoolCounselorSchedule() {
                         alignItems: "flex-start",
                         gap: 2,
                         borderBottom: `1px solid ${BORDER_SOFT}`,
-                        background: "linear-gradient(180deg, rgba(248,250,252,0.65) 0%, rgba(255,255,255,0) 100%)",
+                        background: "rgba(248,250,252,0.65)",
                     }}
                 >
                     <Box
@@ -2882,7 +2882,7 @@ export default function SchoolCounselorSchedule() {
                     },
                 }}
             >
-                {/* Gán: POST counsellor/assign ASSIGN. Sửa khung: template API. */}
+                {}
                 <MenuItem
                     onClick={() => {
                         const {slot: s, day: d} = slotActionsMenu;
@@ -2917,8 +2917,7 @@ export default function SchoolCounselorSchedule() {
                         <EditOutlinedIcon fontSize="small" sx={{color: "#475569"}}/>
                     </ListItemIcon>
                     <ListItemText
-                        primary="Sửa khung giờ"
-                        // secondary="Khác API gán tư vấn viên"
+                        primary="Sửa khung giờ"
                         primaryTypographyProps={{fontWeight: 600, fontSize: "0.875rem"}}
                         secondaryTypographyProps={{variant: "caption", sx: {color: "#94A3B8"}}}
                     />

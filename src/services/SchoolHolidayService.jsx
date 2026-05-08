@@ -63,9 +63,9 @@ export async function getHolidayList() {
     return axiosClient.get("/holiday/");
 }
 
-/**
- * PUT /api/v1/holiday/ — cập nhật ngày nghỉ.
- */
+
+
+
 export function buildUpdateHolidayPayload({
     id,
     title,
@@ -88,10 +88,10 @@ export async function updateHoliday(payload) {
     return axiosClient.put("/holiday/", payload);
 }
 
-/**
- * Xem trước thay đổi (draft) khi đổi ngày / mức ảnh hưởng.
- * Backend có thể map endpoint khác — chỉnh path nếu BE khác.
- */
+
+
+
+
 export async function previewHolidayUpdate(body) {
     return axiosClient.post("/holiday/preview", body);
 }

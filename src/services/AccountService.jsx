@@ -12,7 +12,7 @@ const normalizeProfileResponse = (response) => {
         try {
             response.data.body = JSON.parse(body);
         } catch {
-            // ignore parse error; keep original response
+            
         }
     }
     return response;

@@ -90,7 +90,7 @@ function parseScoreForPayload(val) {
     return Number.isFinite(n) ? n : null;
 }
 
-/** Chỉ gửi môn khi có đủ tên môn (không rỗng) và điểm hợp lệ. */
+
 function shouldIncludeSubjectRow(subjectName, score) {
     const name = subjectName != null ? String(subjectName).trim() : '';
     if (!name) return false;
@@ -112,10 +112,10 @@ export function resolveFavouriteJobString(favoriteMajorCodes, majorGroups) {
     return String(code);
 }
 
-/**
- * Theo BE academicProfileMetadata / subjectResults: chỉ khi `isAvailable === false` mới hiện nhãn "Không khả dụng".
- * Thiếu field hoặc true → coi là khả dụng (không hiện gì).
- */
+
+
+
+
 export function readSubjectResultIsAvailable(sr) {
     if (sr == null || typeof sr !== 'object') return true;
     const v = sr.isAvailable ?? sr.available;
@@ -123,7 +123,7 @@ export function readSubjectResultIsAvailable(sr) {
     return true;
 }
 
-/** Giải thích hiển thị kèm nhãn "Không khả dụng" (metadata / BE tắt isAvailable). */
+
 export const SUBJECT_UNAVAILABLE_TOOLTIP =
     'Môn này không còn nằm trong danh mục môn đang áp dụng trên hệ thống. Điểm đã lưu trong hồ sơ vẫn hiển thị để tham khảo.';
 
@@ -163,7 +163,7 @@ export function mergeAcademicInfosIntoGrades(academicInfos, regularSubjects, for
         return rowId;
     };
 
-    /** Môn trong academicProfileMetadata không khớng danh mục (vd. id null) — giữ đúng tên từ BE. */
+    
     const ensureCustomForeignRow = (displayName) => {
         const n = String(displayName || '').trim();
         if (!n) return null;

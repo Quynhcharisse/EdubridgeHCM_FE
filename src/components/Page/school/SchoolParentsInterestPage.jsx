@@ -550,7 +550,7 @@ export default function SchoolParentsInterestPage() {
                 <DialogTitle
                     sx={{
                         pb: 1.4,
-                        background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+                        background: "#eff6ff",
                         borderBottom: "1px solid #e2e8f0",
                     }}
                 >
@@ -817,7 +817,7 @@ export default function SchoolParentsInterestPage() {
                 <DialogTitle
                     sx={{
                         pb: 1.4,
-                        background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+                        background: "#eff6ff",
                         borderBottom: "1px solid #e2e8f0",
                     }}
                 >

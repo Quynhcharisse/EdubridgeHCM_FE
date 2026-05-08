@@ -7,12 +7,12 @@ import { sendCampusQuotaRequestEmail } from "../../../services/emailService.jsx"
 import { getCampusQuotaRequestSummaryForEmailJs } from "../../../services/CampusService.jsx";
 import { getApiErrorMessage } from "../../../utils/getApiErrorMessage.js";
 
-/**
- * @param {object} props
- * @param {boolean} props.disabled
- * @param {number} [props.quotaUsage] — nếu truyền cùng `quotaMax`, không gọi API xem trước (vd. trang Tư vấn viên).
- * @param {number} [props.quotaMax]
- */
+
+
+
+
+
+
 export default function BranchQuotaRequestToPrimaryCard({ disabled, quotaUsage, quotaMax }) {
     const [requestedAmount, setRequestedAmount] = useState("10");
     const [userNote, setUserNote] = useState("");

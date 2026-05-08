@@ -33,10 +33,10 @@ import { ROLE_SHELL_HEADER_HEIGHT_PX } from "../../../constants/appShellLayout.j
 import { APP_PRIMARY_DARK, BRAND_NAVY } from "../../../constants/homeLandingTheme";
 import logo from "../../../assets/logo.png";
 
-/**
- * Header dành RIÊNG cho School.
- * Copy từ `src/components/partials/AuthHeader.jsx` để tránh thay đổi ở file chung ảnh hưởng School.
- */
+
+
+
+
 export default function SchoolAuthHeader({ headerLeftOffset }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
@@ -53,7 +53,7 @@ export default function SchoolAuthHeader({ headerLeftOffset }) {
         const response = await getProfile();
         if (response && response.status === 200) setProfileData(response.data);
       } catch (error) {
-        // giữ hành vi giống file chung: chỉ log
+        
         console.error("Error fetching profile:", error);
       }
     };

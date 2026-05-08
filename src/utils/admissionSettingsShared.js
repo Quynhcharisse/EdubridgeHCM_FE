@@ -1,7 +1,7 @@
-/**
- * Chuẩn hoá payload PUT admissionSettingsData (trường + nền tảng).
- * @param {Record<string, unknown>} adm
- */
+
+
+
+
 export function sanitizeAdmissionSettingsForApi(adm) {
   if (!adm || typeof adm !== "object") return adm;
   const raw = Array.isArray(adm.allowedMethods) ? adm.allowedMethods : [];
@@ -69,9 +69,9 @@ export function sanitizeAdmissionSettingsForApi(adm) {
   });
   return {
     allowedMethods: methods,
-    // BE PUT contract uses `admissionProcesses`.
+    
     admissionProcesses: filteredAdmissionProcesses,
-    // Keep this key for backward-compatible BE readers if any.
+    
     methodAdmissionProcess: filteredAdmissionProcesses,
     methodDocumentRequirements: filteredMethodDocumentRequirements,
     autoCloseOnFull,

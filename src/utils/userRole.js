@@ -39,7 +39,7 @@ export function pickRoleFromAccessBody(body) {
     return null;
 }
 
-/** Không lưu các trường hồ sơ học sinh trong localStorage `user` — tránh nhiều tài khoản trên cùng máy dùng nhầm studentProfileId. */
+
 const USER_STORAGE_STRIP_STUDENT_KEYS = [
     "studentProfileId",
     "studentId",
@@ -63,7 +63,7 @@ export function sanitizeUserForLocalStorage(user) {
     return out;
 }
 
-/** Cùng tab không có sự kiện `storage` — bắn event sau khi ghi `localStorage.user` để trang như children-info refetch đúng phiên. */
+
 export const AUTH_USER_STORAGE_CHANGED_EVENT = "edubridge-auth-user-storage-changed";
 
 export function notifyAuthUserStorageChanged() {
@@ -71,6 +71,6 @@ export function notifyAuthUserStorageChanged() {
     try {
         window.dispatchEvent(new CustomEvent(AUTH_USER_STORAGE_CHANGED_EVENT));
     } catch {
-        /* ignore */
+        
     }
 }

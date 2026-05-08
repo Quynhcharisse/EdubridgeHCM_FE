@@ -2,7 +2,7 @@ import {getUserIdentity} from "./savedSchoolsStorage";
 
 const NAMESPACE = "edubridge";
 const STORAGE_PREFIX = "compareSchools";
-/** Không đăng nhập: dùng key cố định để vẫn lưu được danh sách so sánh. */
+
 const GUEST_SEGMENT = "guest";
 
 export const MAX_COMPARE_SCHOOLS = 4;

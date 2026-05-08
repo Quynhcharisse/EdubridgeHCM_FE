@@ -1,11 +1,11 @@
-/* Ẩn scrollbar ngay từ đầu, không delay */
+
 * {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE và Edge */
+    scrollbar-width: none; 
+    -ms-overflow-style: none; 
 }
 
 *::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none; 
     width: 0;
     height: 0;
     background: transparent;
@@ -25,7 +25,7 @@ body::-webkit-scrollbar {
     background: transparent !important;
 }
 
-/* Animations */
+
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -48,7 +48,7 @@ body::-webkit-scrollbar {
     }
 }
 
-/* Keep tables usable on small screens */
+
 .MuiTableContainer-root {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
@@ -65,7 +65,7 @@ body::-webkit-scrollbar {
     }
 }
 
-/* Override global hidden scrollbar for tables only */
+
 .MuiTableContainer-root::-webkit-scrollbar {
     display: block !important;
     height: 8px;
