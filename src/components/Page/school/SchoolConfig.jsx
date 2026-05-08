@@ -2747,6 +2747,16 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     mandatoryDocsImportInputRef.current?.click();
   }, [fieldDisabled]);
 
+  const exportMandatoryDocsTemplate = useCallback(() => {
+    const fileName = "hồ_sơ_bắt_buộc.xlsx";
+    const anchor = document.createElement("a");
+    anchor.href = encodeURI(`/templates/${fileName}`);
+    anchor.setAttribute("download", fileName);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  }, []);
+
   const addMandatoryDocument = useCallback(() => {
     if (fieldDisabled) return;
     setConfig((c) => ({
@@ -4026,7 +4036,15 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                         disabled={fieldDisabled}
                         sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
                       >
-                        Import file
+                        Tải tệp lên
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={exportMandatoryDocsTemplate}
+                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
+                      >
+                        Tài liệu mẫu
                       </Button>
                     </Stack>
                     <input

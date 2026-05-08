@@ -1515,6 +1515,16 @@ export default function SchoolPrograms() {
         }
     };
 
+    const exportExtraSubjectsTemplate = () => {
+        const fileName = "môn_học_bổ_sung_quốc_tế.xlsx";
+        const anchor = document.createElement("a");
+        anchor.href = encodeURI(`/templates/${fileName}`);
+        anchor.setAttribute("download", fileName);
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+    };
+
     useEffect(() => {
         if (!programModalOpen) return;
         if (modalMode === "view") return;
@@ -2792,6 +2802,7 @@ export default function SchoolPrograms() {
                                             disabled={submitLoading || programLockedByActive}
                                             importLoading={importExtraSubjectLoading}
                                             onImportFile={handleImportExtraSubjects}
+                                            onExportTemplate={exportExtraSubjectsTemplate}
                                         />
 
                                         {programLockedByActive ? (
@@ -3497,7 +3508,7 @@ function LanguageInstructionSelector({value, options, loading = false, onChange,
     );
 }
 
-function ExtraSubjectEditor({value, onChange, error, disabled = false, importLoading = false, onImportFile}) {
+function ExtraSubjectEditor({value, onChange, error, disabled = false, importLoading = false, onImportFile, onExportTemplate}) {
     const subjects = Array.isArray(value) ? value : [];
     const extraSubjectItemRefs = useRef([]);
     const importInputRef = useRef(null);
@@ -3548,6 +3559,25 @@ function ExtraSubjectEditor({value, onChange, error, disabled = false, importLoa
                     Môn bổ sung
                 </Typography>
                 <Stack direction="row" spacing={1}>
+                   
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={importLoading ? <CircularProgress size={16}/> : <FileUploadOutlinedIcon/>}
+                        onClick={triggerImportInput}
+                        disabled={disabled || importLoading}
+                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
+                    >
+                        Tải tệp lên
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={onExportTemplate}
+                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
+                    >
+                        Tài liệu mẫu
+                    </Button>
                     <Button
                         size="small"
                         variant="outlined"
@@ -3557,16 +3587,6 @@ function ExtraSubjectEditor({value, onChange, error, disabled = false, importLoa
                         sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
                     >
                         Thêm môn
-                    </Button>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={importLoading ? <CircularProgress size={16}/> : <FileUploadOutlinedIcon/>}
-                        onClick={triggerImportInput}
-                        disabled={disabled || importLoading}
-                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
-                    >
-                        Import file
                     </Button>
                 </Stack>
                 <input
