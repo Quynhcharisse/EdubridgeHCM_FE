@@ -377,7 +377,7 @@ function ParentStudentInfoPanel({
           px: 1,
           py: 0.9,
           borderRadius: 1.5,
-          background: "#60A5FA",
+          background: "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08))",
           border: "1px solid rgba(99,102,241,0.2)",
         }}
       >

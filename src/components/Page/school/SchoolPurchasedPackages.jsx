@@ -1035,7 +1035,7 @@ function CurrentSubscriptionPage({
             {/* Page Header — cùng phong cách SchoolCampus */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1245,7 +1245,7 @@ export default function SchoolPurchasedPackages() {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%" }}>
                 <Box
                     sx={{
-                        background: "#60A5FA",
+                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         borderRadius: 3,
                         p: 3,
                         color: "white",

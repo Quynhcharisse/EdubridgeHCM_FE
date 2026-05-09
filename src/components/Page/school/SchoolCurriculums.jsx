@@ -1450,7 +1450,7 @@ export default function SchoolCurriculums() {
             {/* Header */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1668,7 +1668,7 @@ export default function SchoolCurriculums() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 700,
-                                                        background: "#60A5FA",
+                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                                     }}
                                                 >
                                                     Tạo khung chương trình
@@ -1963,7 +1963,7 @@ export default function SchoolCurriculums() {
                                 <Box
                                     sx={{
                                         borderRadius: 3,
-                                        bgcolor: "#60A5FA",
+                                        bgcolor: "linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(51,65,85,0.03) 100%)",
                                         border: "1px solid rgba(148, 163, 184, 0.35)",
                                         p: 3,
                                     }}
@@ -2102,7 +2102,7 @@ export default function SchoolCurriculums() {
                                                                     minHeight: 120,
                                                                     borderRadius: 3,
                                                                     border: "1px solid rgba(226, 232, 240, 1)",
-                                                                    bgcolor: "#60A5FA",
+                                                                    bgcolor: "linear-gradient(145deg, #ffffff 0%, #f8fbff 100%)",
                                                                     px: 1.6,
                                                                     py: 1.4,
                                                                     boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
@@ -2331,7 +2331,7 @@ export default function SchoolCurriculums() {
                                     fontWeight: 900,
                                     borderRadius: 2,
                                     px: 3,
-                                    background: "#60A5FA",
+                                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                 }}
                             >
                                 Công bố
@@ -2426,7 +2426,7 @@ export default function SchoolCurriculums() {
                             textTransform: "none",
                             fontWeight: 800,
                             borderRadius: 2,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         {publishLoading ? "Đang công bố..." : "Xác nhận công bố"}
@@ -2546,7 +2546,7 @@ export default function SchoolCurriculums() {
                             textTransform: "none",
                             fontWeight: 700,
                             borderRadius: 2,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         Tiếp tục

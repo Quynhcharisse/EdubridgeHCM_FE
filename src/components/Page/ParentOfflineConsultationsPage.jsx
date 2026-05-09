@@ -197,7 +197,7 @@ const offlineDetailModalSx = {
   titleColor: "#0d47a1",
   valueColor: "#1e293b",
   fieldBorder: "1px solid #cfe8f8",
-  headerBar: "#60A5FA",
+  headerBar: "linear-gradient(180deg, #dceef9 0%, #c9e3f5 100%)",
 };
 
 function OfflineConsultDetailField({ label, value, grid = 12 }) {
@@ -444,7 +444,7 @@ export default function ParentOfflineConsultationsPage() {
           sx={{
             p: 2.5,
             borderRadius: 3,
-            background: "#60A5FA",
+            background: "linear-gradient(120deg, #1d4ed8 0%, #2563eb 45%, #0ea5e9 100%)",
             color: "#fff",
             boxShadow: "0 14px 35px rgba(37,99,235,0.25)",
           }}
@@ -570,7 +570,7 @@ export default function ParentOfflineConsultationsPage() {
                             bottom: 0,
                             width: 4,
                             borderRadius: "12px 0 0 12px",
-                            background: "#60A5FA",
+                            background: "linear-gradient(180deg, #7c3aed 0%, #6366f1 45%, #3b82f6 100%)",
                             opacity: 0.85,
                           },
                           "&:hover": {
@@ -593,7 +593,7 @@ export default function ParentOfflineConsultationsPage() {
                               alignItems: "flex-start",
                               gap: 2,
                               background:
-                                "#60A5FA",
+                                "linear-gradient(165deg, #faf5ff 0%, #ffffff 38%, #f0f9ff 100%)",
                               borderBottom: "1px solid rgba(226, 232, 240, 0.9)",
                             }}
                           >
@@ -627,7 +627,7 @@ export default function ParentOfflineConsultationsPage() {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                background: "#60A5FA",
+                                background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 55%, #2563eb 100%)",
                                 boxShadow: "0 10px 24px rgba(124, 58, 237, 0.35)",
                               }}
                             >
@@ -647,7 +647,7 @@ export default function ParentOfflineConsultationsPage() {
                                 justifyContent: "space-between",
                                 alignItems: "flex-start",
                                 gap: 2,
-                                background: showSlot ? "transparent" : "#60A5FA",
+                                background: showSlot ? "transparent" : "linear-gradient(165deg, #faf5ff 0%, #fff 55%)",
                               }}
                             >
                               <Box sx={{ flex: 1, minWidth: 0 }}>

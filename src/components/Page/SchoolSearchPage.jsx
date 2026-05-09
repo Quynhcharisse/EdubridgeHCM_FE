@@ -693,7 +693,7 @@ export default function SchoolSearchPage() {
                     top: '-8%',
                     right: '-10%',
                     background:
-                        '#60A5FA',
+                        'radial-gradient(circle, rgba(85,179,217,0.26) 0%, rgba(168,224,240,0.12) 42%, transparent 68%)',
                     pointerEvents: 'none'
                 },
                 '&::after': {
@@ -705,7 +705,7 @@ export default function SchoolSearchPage() {
                     bottom: '12%',
                     left: '-6%',
                     background:
-                        '#60A5FA',
+                        'radial-gradient(circle, rgba(136,232,242,0.22) 0%, rgba(214,244,252,0.14) 45%, transparent 72%)',
                     pointerEvents: 'none'
                 }
             }}
@@ -1060,14 +1060,14 @@ export default function SchoolSearchPage() {
                                                 <IconButton
                                                     size="small"
                                                     sx={{
-                                                        background: BRAND_SKY,
+                                                        background: `linear-gradient(90deg, ${BRAND_NAVY}, ${BRAND_SKY})`,
                                                         color: '#ffffff',
                                                         width: 34,
                                                         height: 34,
                                                         borderRadius: 999,
                                                         boxShadow: '0 8px 22px rgba(45, 95, 115, 0.28)',
                                                         '&:hover': {
-                                                            background: APP_PRIMARY_DARK,
+                                                            background: `linear-gradient(90deg, ${APP_PRIMARY_DARK}, ${BRAND_NAVY})`,
                                                             boxShadow: '0 10px 28px rgba(45, 95, 115, 0.35)'
                                                         }
                                                     }}

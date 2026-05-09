@@ -1,4 +1,4 @@
-﻿import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
     Avatar,
     Box,
@@ -254,8 +254,7 @@ const ParentProfile = ({onBack}) => {
                 justifyContent: 'center',
                 py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
-                backgroundImage: `url(${backgroundLogin})`,
-                backgroundColor: 'rgba(96, 165, 250, 0.26)',
+                backgroundImage: `linear-gradient(135deg, rgba(51,65,85,0.55), rgba(51,65,85,0.35)), url(${backgroundLogin})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -270,7 +269,7 @@ const ParentProfile = ({onBack}) => {
                         p: 4,
                         borderRadius: 4,
                         background:
-                            '#60A5FA',
+                            'radial-gradient(circle at top left, rgba(239,246,255,0.96) 0, rgba(239,246,255,0.98) 40%, #ffffff 100%)',
                         border: '1px solid #dbeafe',
                         backdropFilter: 'blur(10px)',
                         position: 'relative',
@@ -516,10 +515,10 @@ const ParentProfile = ({onBack}) => {
                                             textTransform: 'none',
                                             fontWeight: 700,
                                             borderRadius: 2,
-                                            background: '#60A5FA',
+                                            background: 'linear-gradient(90deg, #2563eb 0%, #2563eb 100%)',
                                             boxShadow: '0 10px 30px rgba(37, 99, 235, 0.35)',
                                             '&:hover': {
-                                                background: '#60A5FA',
+                                                background: 'linear-gradient(90deg, #2563eb 0%, #2563eb 100%)',
                                                 boxShadow: '0 12px 36px rgba(30, 64, 175, 0.45)',
                                             },
                                         }}
@@ -558,10 +557,10 @@ const ParentProfile = ({onBack}) => {
                                                 textTransform: 'none',
                                                 fontWeight: 700,
                                                 borderRadius: 2,
-                                                background: '#60A5FA',
+                                                background: 'linear-gradient(90deg, #2563eb 0%, #2563eb 100%)',
                                                 boxShadow: '0 10px 30px rgba(37, 99, 235, 0.35)',
                                                 '&:hover': {
-                                                    background: '#60A5FA',
+                                                    background: 'linear-gradient(90deg, #2563eb 0%, #2563eb 100%)',
                                                     boxShadow: '0 12px 36px rgba(30, 64, 175, 0.45)',
                                                 },
                                             }}

@@ -503,8 +503,7 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                 justifyContent: 'center',
                 py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
-                backgroundImage: `url(${backgroundLogin})`,
-                backgroundColor: 'rgba(96, 165, 250, 0.26)',
+                backgroundImage: `linear-gradient(135deg, rgba(59,130,246,0.46), rgba(59,130,246,0.26)), url(${backgroundLogin})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -1176,10 +1175,10 @@ const SchoolRegistrationForm = ({email, onBack}) => {
                                             fontWeight: 700,
                                             fontSize: '0.85rem',
                                             borderRadius: 2,
-                                            background: BRAND_SKY,
+                                            background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
                                             boxShadow: '0 8px 18px rgba(59,130,246,0.24)',
                                             '&:hover': {
-                                                background: APP_PRIMARY_DARK,
+                                                background: `linear-gradient(90deg, ${APP_PRIMARY_DARK} 0%, ${BRAND_NAVY} 100%)`,
                                                 boxShadow: '0 10px 20px rgba(59,130,246,0.3)',
                                             },
                                         }}

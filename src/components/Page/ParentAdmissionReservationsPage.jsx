@@ -541,7 +541,7 @@ export default function ParentAdmissionReservationsPage() {
                         py: {xs: 2.25, md: 2.6},
                         borderRadius: 2,
                         color: "#fff",
-                        background: "#60A5FA",
+                        background: "linear-gradient(120deg, #2563eb 0%, #1d8ee8 58%, #10a6df 100%)",
                         boxShadow: "0 18px 42px rgba(37,99,235,0.2)"
                     }}
                 >
