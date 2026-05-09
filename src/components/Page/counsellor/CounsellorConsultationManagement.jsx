@@ -1993,7 +1993,7 @@ export default function CounsellorConsultationManagement() {
             >
               <HighlightOffOutlinedIcon sx={{ fontSize: 26 }} />
             </Avatar>
-            <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ minWidth: 0, py: 0.25 }}>
               <Typography
                 sx={{
                   fontSize: { xs: 17, sm: 18 },
@@ -2004,13 +2004,17 @@ export default function CounsellorConsultationManagement() {
               >
                 Xác nhận hủy lịch hẹn
               </Typography>
-              <Typography sx={{ mt: 0.5, fontSize: 13.5, fontWeight: 500, color: "#455a64", lineHeight: 1.45 }}>
-                Lý do sẽ được gửi kèm khi cập nhật trạng thái.
-              </Typography>
             </Box>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ pt: 2.5, pb: 1, px: { xs: 2.25, sm: 2.75 }, bgcolor: counsellorDetailModalSx.pageBg }}>
+        <DialogContent
+          sx={{
+            pt: { xs: 3.25, sm: 3.5 },
+            pb: 2,
+            px: { xs: 2.25, sm: 2.75 },
+            bgcolor: counsellorDetailModalSx.pageBg,
+          }}
+        >
           <TextField
             label="Lý do hủy"
             placeholder="Ví dụ: Phụ huynh đổi lịch, không còn nhu cầu…"

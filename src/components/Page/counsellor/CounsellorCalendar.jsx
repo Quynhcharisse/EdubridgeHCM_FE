@@ -1497,17 +1497,21 @@ export default function CounsellorCalendar() {
             >
               <HighlightOffOutlinedIcon sx={{ fontSize: 26 }} />
             </Avatar>
-            <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ minWidth: 0, py: 0.25 }}>
               <Typography sx={{ fontSize: { xs: 17, sm: 18 }, fontWeight: 800, color: detailModalSx.titleColor, lineHeight: 1.25 }}>
                 Xác nhận hủy lịch hẹn
-              </Typography>
-              <Typography sx={{ mt: 0.5, fontSize: 13.5, fontWeight: 500, color: "#455a64", lineHeight: 1.45 }}>
-                Lý do sẽ được gửi kèm khi cập nhật trạng thái. Phụ huynh có thể xem thông báo theo quy trình hệ thống.
               </Typography>
             </Box>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ pt: 2.5, pb: 1, px: { xs: 2.25, sm: 2.75 }, bgcolor: detailModalSx.pageBg }}>
+        <DialogContent
+          sx={{
+            pt: { xs: 3.25, sm: 3.5 },
+            pb: 2,
+            px: { xs: 2.25, sm: 2.75 },
+            bgcolor: detailModalSx.pageBg,
+          }}
+        >
           <TextField
             label="Lý do hủy"
             placeholder="Ví dụ: Thay đổi lịch trực, phòng họp bận…"
