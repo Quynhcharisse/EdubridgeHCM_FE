@@ -951,8 +951,7 @@ export default function CompareSchoolsPage() {
                                             bgcolor: leftCriteriaColBg,
                                             borderRight: "1px solid rgba(59,130,246,0.25)",
                                             borderTopLeftRadius: 12,
-                                            borderTopRightRadius: 12,
-                                            position: "sticky"
+                                            borderTopRightRadius: 12
                                         }}
                                     >
                                     </Box>

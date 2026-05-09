@@ -86,6 +86,7 @@ export async function getPublicSchoolCampaignTemplates(schoolId, year = 0) {
             admissionMethod: String(item?.admissionMethod ?? "").trim(),
             applicationStatus: String(item?.applicationStatus ?? "").trim(),
             status: String(item?.status ?? "").trim(),
+            allowReservationSubmission: Boolean(item?.allowReservationSubmission),
             tuitionFee,
             baseTuitionFee,
             programName: String(item?.programName ?? program?.name ?? "").trim(),
