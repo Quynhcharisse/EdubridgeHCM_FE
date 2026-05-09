@@ -169,7 +169,7 @@ const filterSurfaceSx = {
     borderRadius: RADIUS_INNER,
     bgcolor: "rgba(248, 250, 252, 0.95)",
     border: `1px solid ${BORDER_SOFT}`,
-    backgroundImage: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,250,252,0.98) 100%)",
+    backgroundImage: "#60A5FA",
 };
 
 const outlineSelectSx = {
@@ -443,7 +443,7 @@ function sessionCardColors(sessionType) {
     const v = String(sessionType || "").toUpperCase();
     if (v === "MORNING") {
         return {
-            bg: "linear-gradient(145deg, #FFFBF0 0%, #FFF7E6 100%)",
+            bg: "#60A5FA",
             border: "rgba(245, 158, 11, 0.35)",
             accent: "#B45309",
             label: "Sáng",
@@ -451,7 +451,7 @@ function sessionCardColors(sessionType) {
     }
     if (v === "AFTERNOON") {
         return {
-            bg: "linear-gradient(145deg, #F0F7FF 0%, #E8F2FE 100%)",
+            bg: "#60A5FA",
             border: "rgba(59, 130, 246, 0.35)",
             accent: "#1D4ED8",
             label: "Chiều",
@@ -459,14 +459,14 @@ function sessionCardColors(sessionType) {
     }
     if (v === "EVENING") {
         return {
-            bg: "linear-gradient(145deg, #F0F7FF 0%, #E8F2FE 100%)",
+            bg: "#60A5FA",
             border: "rgba(59, 130, 246, 0.35)",
             accent: "#1D4ED8",
             label: "Chiều",
         };
     }
     return {
-        bg: "linear-gradient(145deg, #F8FAFC 0%, #F1F5F9 100%)",
+        bg: "#60A5FA",
         border: "rgba(148, 163, 184, 0.35)",
         accent: "#475569",
         label: sessionTypeLabel(sessionType),
@@ -1768,7 +1768,7 @@ export default function SchoolCounselorSchedule() {
                     p: {xs: 2.5, sm: 3.5},
                     color: "white",
                     boxShadow: SHADOW_HERO,
-                    background: "linear-gradient(128deg, #5B9BD8 0%, #0D64DE 42%, #064CAD 100%)",
+                    background: "#60A5FA",
                     "&::before": {
                         content: '""',
                         position: "absolute",
@@ -1776,7 +1776,7 @@ export default function SchoolCounselorSchedule() {
                         right: "-8%",
                         width: "52%",
                         height: "140%",
-                        background: "radial-gradient(ellipse at center, rgba(255,255,255,0.22) 0%, transparent 68%)",
+                        background: "#60A5FA",
                         pointerEvents: "none",
                     },
                     "&::after": {
@@ -1786,7 +1786,7 @@ export default function SchoolCounselorSchedule() {
                         left: "-10%",
                         width: "45%",
                         height: "100%",
-                        background: "radial-gradient(ellipse at center, rgba(255,255,255,0.08) 0%, transparent 65%)",
+                        background: "#60A5FA",
                         pointerEvents: "none",
                     },
                 }}
@@ -1884,7 +1884,7 @@ export default function SchoolCounselorSchedule() {
                         alignItems: "flex-start",
                         gap: 2,
                         borderBottom: `1px solid ${BORDER_SOFT}`,
-                        background: "linear-gradient(180deg, rgba(248,250,252,0.65) 0%, rgba(255,255,255,0) 100%)",
+                        background: "#60A5FA",
                     }}
                 >
                     <Box

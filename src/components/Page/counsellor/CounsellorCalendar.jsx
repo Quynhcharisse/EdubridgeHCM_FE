@@ -34,6 +34,7 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import { enqueueSnackbar } from "notistack";
 import {
   getCounsellorAdmissionCampaigns,
@@ -81,7 +82,7 @@ const detailModalSx = {
   titleColor: "#0d47a1",
   valueColor: "#1e293b",
   fieldBorder: "1px solid #cfe8f8",
-  headerBar: "linear-gradient(180deg, #dceef9 0%, #c9e3f5 100%)",
+  headerBar: "#60A5FA",
 };
 
 const detailDialogPaperProps = {
@@ -93,18 +94,6 @@ const detailDialogPaperProps = {
     boxShadow: "0 20px 45px -12px rgba(13, 71, 161, 0.18)",
   },
 };
-
-function hasOfflineAppointment(slot) {
-  const req = slot?.consultationOfflineRequest;
-  if (Array.isArray(req)) return req.length > 0;
-  return req != null;
-}
-
-function pickFirstOfflineAppointment(slot) {
-  const req = slot?.consultationOfflineRequest;
-  if (Array.isArray(req)) return req[0] || null;
-  return req || null;
-}
 
 function consultationStatusLabel(status) {
   const s = String(status || "").toUpperCase();
@@ -219,46 +208,6 @@ function slotLooksCompleted(status, statusLabel) {
     .includes("đã qua");
 }
 
-function calendarSlotChipSx(status, statusLabel) {
-  const s = String(status || "").toUpperCase();
-  const label = {
-    px: 0.75,
-    display: "block",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    lineHeight: 1.25,
-  };
-  const base = {
-    height: 26,
-    maxWidth: "100%",
-    fontSize: "0.68rem",
-    overflow: "hidden",
-    "& .MuiChip-label": label,
-  };
-  if (slotLooksCompleted(s, statusLabel)) {
-    return {
-      ...base,
-      fontWeight: 600,
-      borderRadius: "6px",
-      boxShadow: "none",
-      bgcolor: "rgba(255,255,255,0.88)",
-      color: "#475569",
-      border: "1px solid rgba(148,163,184,0.65)",
-      "&:hover": {
-        bgcolor: "rgba(255,255,255,0.98)",
-        borderColor: "rgba(100,116,139,0.55)",
-      },
-    };
-  }
-  return {
-    ...base,
-    fontWeight: 700,
-    borderRadius: "8px",
-    boxShadow: "0 2px 8px rgba(15,23,42,0.07)",
-  };
-}
-
 const toYmd = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -339,6 +288,9 @@ export default function CounsellorCalendar() {
   const [completionNote, setCompletionNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [earlyStartWarning, setEarlyStartWarning] = useState({ open: false, message: "", onConfirm: null });
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancelReasonDraft, setCancelReasonDraft] = useState("");
+  const [cancelReasonError, setCancelReasonError] = useState("");
 
   const [activeTab, setActiveTab] = useState(0);
   const [campaigns, setCampaigns] = useState([]);
@@ -454,6 +406,52 @@ export default function CounsellorCalendar() {
       setLoading(false);
     }
   }, [weekDays]);
+
+  const callAppointmentUpdate = useCallback(
+    async (action, noteValue = "", cancelReasonValue = "") => {
+      const id = Number(selectedAppointment?.id);
+      const counsellorSlotId = Number(selectedAppointment?.counsellorSlotId);
+      const appointmentDate = String(selectedAppointment?.appointmentDate || selectedAppointment?.slotDate || "").slice(0, 10);
+      if (!Number.isFinite(id) || id <= 0 || !appointmentDate || !Number.isFinite(counsellorSlotId) || counsellorSlotId <= 0) {
+        enqueueSnackbar("Thiếu dữ liệu cuộc hẹn để cập nhật trạng thái.", { variant: "warning" });
+        return false;
+      }
+      setActionLoading(true);
+      try {
+        const res = await putCounsellorOfflineConsultation({
+          id,
+          appointmentDate,
+          note: String(noteValue ?? ""),
+          cancelReason: String(cancelReasonValue ?? ""),
+          counsellorSlotId,
+          action,
+        });
+        const msg = String(res?.data?.message || "").trim();
+        enqueueSnackbar(msg || "Cập nhật lịch tư vấn thành công.", { variant: "success" });
+        setSelectedAppointment(null);
+        setAppointmentFlowStep("initial");
+        setCompletionNote("");
+        await loadCalendar();
+        return true;
+      } catch (e) {
+        const msg =
+          e?.response?.data?.message || e?.response?.data?.error || e?.message || "Không thể cập nhật lịch tư vấn.";
+        enqueueSnackbar(String(msg), { variant: "error" });
+        return false;
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [selectedAppointment, loadCalendar]
+  );
+
+  useEffect(() => {
+    if (!selectedAppointment) {
+      setCancelConfirmOpen(false);
+      setCancelReasonDraft("");
+      setCancelReasonError("");
+    }
+  }, [selectedAppointment]);
 
   const loadCampaigns = useCallback(async () => {
     setCampaignsLoading(true);
@@ -1163,6 +1161,7 @@ export default function CounsellorCalendar() {
         maxWidth="sm"
         fullWidth
         scroll="paper"
+        disableEnforceFocus={cancelConfirmOpen}
         PaperProps={detailDialogPaperProps}
       >
         <DialogTitle sx={{ p: 0, bgcolor: "transparent" }}>
@@ -1290,78 +1289,79 @@ export default function CounsellorCalendar() {
             (() => {
               const isInProgress = consultationIsInProgress(selectedAppointment.status);
               const isDone = consultationIsDone(selectedAppointment.status);
-              const callUpdateAction = async (action, noteValue = "") => {
-                const id = Number(selectedAppointment?.id);
-                const counsellorSlotId = Number(selectedAppointment?.counsellorSlotId);
-                const appointmentDate = String(selectedAppointment?.appointmentDate || selectedAppointment?.slotDate || "").slice(0, 10);
-                if (!Number.isFinite(id) || id <= 0 || !appointmentDate || !Number.isFinite(counsellorSlotId) || counsellorSlotId <= 0) {
-                  enqueueSnackbar("Thiếu dữ liệu cuộc hẹn để cập nhật trạng thái.", { variant: "warning" });
-                  return;
-                }
-                setActionLoading(true);
-                try {
-                  const res = await putCounsellorOfflineConsultation({
-                    id,
-                    appointmentDate,
-                    note: String(noteValue ?? ""),
-                    cancelReason: "",
-                    counsellorSlotId,
-                    action,
-                  });
-                  const msg = String(res?.data?.message || "").trim();
-                  enqueueSnackbar(msg || "Cập nhật lịch tư vấn thành công.", { variant: "success" });
-                  setSelectedAppointment(null);
-                  setAppointmentFlowStep("initial");
-                  setCompletionNote("");
-                  await loadCalendar();
-                } catch (e) {
-                  const msg =
-                    e?.response?.data?.message || e?.response?.data?.error || e?.message || "Không thể cập nhật lịch tư vấn.";
-                  enqueueSnackbar(String(msg), { variant: "error" });
-                } finally {
-                  setActionLoading(false);
-                }
-              };
               if (isDone) return null;
               if (!isInProgress) {
                 return (
-                  <>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      minWidth: "100%",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <Button
                       variant="outlined"
-                      disabled={actionLoading}
-                      onClick={() => void callUpdateAction("no_show")}
-                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.4, minWidth: 120 }}
-                    >
-                      Vắng mặt
-                    </Button>
-                    <Button
-                      variant="contained"
+                      color="error"
                       disabled={actionLoading}
                       onClick={() => {
-                        const msg = getEarlyStartWarningMessage(
-                          selectedAppointment?.slotDate || String(selectedAppointment?.appointmentDate || "").slice(0, 10),
-                          selectedAppointment?.slotTime
-                        );
-                        if (msg) {
-                          setEarlyStartWarning({ open: true, message: msg, onConfirm: () => void callUpdateAction("start") });
-                        } else {
-                          void callUpdateAction("start");
-                        }
+                        setCancelReasonDraft("");
+                        setCancelReasonError("");
+                        setCancelConfirmOpen(true);
                       }}
                       sx={{
                         textTransform: "none",
                         fontWeight: 700,
                         borderRadius: 2,
-                        px: 3,
-                        minWidth: 120,
-                        bgcolor: "#1565c0",
-                        boxShadow: "0 4px 14px rgba(21, 101, 160, 0.35)",
-                        "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
+                        px: 2.4,
+                        minWidth: 132,
+                        borderColor: "rgba(239,68,68,0.55)",
+                        color: "#dc2626",
+                        "&:hover": { borderColor: "#dc2626", bgcolor: "rgba(239,68,68,0.06)" },
                       }}
                     >
-                      Bắt đầu
+                      Hủy lịch hẹn
                     </Button>
-                  </>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <Button
+                        variant="outlined"
+                        disabled={actionLoading}
+                        onClick={() => void callAppointmentUpdate("no_show")}
+                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.4, minWidth: 120 }}
+                      >
+                        Vắng mặt
+                      </Button>
+                      <Button
+                        variant="contained"
+                        disabled={actionLoading}
+                        onClick={() => {
+                          const msg = getEarlyStartWarningMessage(
+                            selectedAppointment?.slotDate || String(selectedAppointment?.appointmentDate || "").slice(0, 10),
+                            selectedAppointment?.slotTime
+                          );
+                          if (msg) {
+                            setEarlyStartWarning({ open: true, message: msg, onConfirm: () => void callAppointmentUpdate("start") });
+                          } else {
+                            void callAppointmentUpdate("start");
+                          }
+                        }}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 700,
+                          borderRadius: 2,
+                          px: 3,
+                          minWidth: 120,
+                          bgcolor: "#1565c0",
+                          boxShadow: "0 4px 14px rgba(21, 101, 160, 0.35)",
+                          "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
+                        }}
+                      >
+                        Bắt đầu
+                      </Button>
+                    </Stack>
+                  </Box>
                 );
               }
               if (appointmentFlowStep !== "complete_form") {
@@ -1389,7 +1389,7 @@ export default function CounsellorCalendar() {
                 <Button
                   variant="contained"
                   disabled={actionLoading}
-                  onClick={() => void callUpdateAction("end", completionNote)}
+                  onClick={() => void callAppointmentUpdate("end", completionNote)}
                   sx={{
                     textTransform: "none",
                     fontWeight: 700,
@@ -1450,6 +1450,143 @@ export default function CounsellorCalendar() {
             }}
           >
             Bắt đầu
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={cancelConfirmOpen && Boolean(selectedAppointment)}
+        onClose={() => {
+          if (actionLoading) return;
+          setCancelConfirmOpen(false);
+          setCancelReasonError("");
+        }}
+        maxWidth="sm"
+        fullWidth
+        disableEscapeKeyDown={actionLoading}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            borderRadius: 2.5,
+            overflow: "hidden",
+            border: "1px solid #b0cfe8",
+            boxShadow: "0 22px 50px -14px rgba(13, 71, 161, 0.22)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 0 }}>
+          <Box
+            sx={{
+              px: 2.5,
+              py: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              background: "linear-gradient(135deg, #e0f2fe 0%, #dbeafe 55%, #e8f4fc 100%)",
+              borderBottom: "1px solid #b0cfe8",
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: "rgba(239,68,68,0.14)",
+                color: "#dc2626",
+                width: 44,
+                height: 44,
+                border: "1px solid rgba(239,68,68,0.22)",
+              }}
+            >
+              <HighlightOffOutlinedIcon sx={{ fontSize: 26 }} />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: { xs: 17, sm: 18 }, fontWeight: 800, color: detailModalSx.titleColor, lineHeight: 1.25 }}>
+                Xác nhận hủy lịch hẹn
+              </Typography>
+              <Typography sx={{ mt: 0.5, fontSize: 13.5, fontWeight: 500, color: "#455a64", lineHeight: 1.45 }}>
+                Lý do sẽ được gửi kèm khi cập nhật trạng thái. Phụ huynh có thể xem thông báo theo quy trình hệ thống.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, pb: 1, px: { xs: 2.25, sm: 2.75 }, bgcolor: detailModalSx.pageBg }}>
+          <TextField
+            label="Lý do hủy"
+            placeholder="Ví dụ: Thay đổi lịch trực, phòng họp bận…"
+            multiline
+            minRows={4}
+            fullWidth
+            value={cancelReasonDraft}
+            onChange={(e) => {
+              setCancelReasonDraft(e.target.value);
+              if (cancelReasonError) setCancelReasonError("");
+            }}
+            error={Boolean(cancelReasonError)}
+            helperText={cancelReasonError || undefined}
+            disabled={actionLoading}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "#fff",
+                borderRadius: 2,
+              },
+              "& .MuiInputLabel-root": { fontWeight: 600 },
+            }}
+          />
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: { xs: 2.25, sm: 2.75 },
+            py: 2,
+            bgcolor: "#f5fafd",
+            borderTop: "1px solid #b0cfe8",
+            gap: 1,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            variant="outlined"
+            disabled={actionLoading}
+            onClick={() => {
+              setCancelConfirmOpen(false);
+              setCancelReasonError("");
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 2.5,
+              minWidth: 108,
+              borderColor: "#90caf9",
+              color: "#1565c0",
+              "&:hover": { borderColor: "#1565c0", bgcolor: "rgba(21,101,160,0.06)" },
+            }}
+          >
+            Quay lại
+          </Button>
+          <Button
+            variant="contained"
+            disabled={actionLoading}
+            onClick={async () => {
+              const reason = cancelReasonDraft.trim();
+              if (!reason) {
+                setCancelReasonError("Vui lòng nhập lý do hủy lịch hẹn.");
+                return;
+              }
+              setCancelReasonError("");
+              const ok = await callAppointmentUpdate("cancel", "", reason);
+              if (ok) setCancelConfirmOpen(false);
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 2.75,
+              minWidth: 132,
+              bgcolor: "#dc2626",
+              boxShadow: "0 4px 14px rgba(220, 38, 38, 0.35)",
+              "&:hover": { bgcolor: "#b91c1c", boxShadow: "0 6px 18px rgba(185, 28, 28, 0.38)" },
+            }}
+          >
+            {actionLoading ? "Đang xử lý…" : "Xác nhận hủy"}
           </Button>
         </DialogActions>
       </Dialog>

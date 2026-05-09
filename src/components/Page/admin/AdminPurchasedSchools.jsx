@@ -88,7 +88,7 @@ export default function AdminPurchasedSchools() {
                     borderRadius: 3.5,
                     mb: 2.5,
                     color: "white",
-                    background: "linear-gradient(95deg, #60a5fa 0%, #818cf8 46%, #a78bfa 100%)",
+                    background: "#60A5FA",
                     boxShadow: "0 12px 24px rgba(99, 102, 241, 0.2)",
                 }}
             >

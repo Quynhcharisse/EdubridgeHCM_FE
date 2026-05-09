@@ -283,7 +283,7 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                             variant="contained"
                             disabled={isSubmitting}
                             onClick={onApprove}
-                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 800, background: "linear-gradient(90deg, #0D64DE 0%, #2563eb 100%)" }}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 800, background: "#60A5FA" }}
                         >
                             Phê duyệt
                         </Button>
@@ -691,7 +691,7 @@ export default function SchoolCampusAdmissionReservations() {
 
     return (
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4}}>
-            <Box sx={{ background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)", borderRadius: 3, p: { xs: 2.2, md: 3 }, color: "white", boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)" }}>
+            <Box sx={{ background: "#60A5FA", borderRadius: 3, p: { xs: 2.2, md: 3 }, color: "white", boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)" }}>
                 <Box
                     sx={{
                         display: "flex",

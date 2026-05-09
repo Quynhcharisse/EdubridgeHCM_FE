@@ -451,24 +451,24 @@ const formatSectionDateLabel = (value) => {
 
 const STUDENT_CHAT_THEMES = [
     {
-        headerGradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 52%, #38bdf8 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #38bdf8 0%, #3b82f6 52%, #2563eb 100%)',
+        headerGradient: '#60A5FA',
+        bubbleGradient: '#60A5FA',
         accent: '#2563eb',
         accentSoft: 'rgba(59, 130, 246, 0.16)',
         border: 'rgba(59, 130, 246, 0.34)',
         peerAvatar: '#2563eb',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #065f46 0%, #059669 55%, #2dd4bf 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #2dd4bf 0%, #059669 52%, #065f46 100%)',
+        headerGradient: '#60A5FA',
+        bubbleGradient: '#60A5FA',
         accent: '#047857',
         accentSoft: 'rgba(5, 150, 105, 0.16)',
         border: 'rgba(5, 150, 105, 0.34)',
         peerAvatar: '#065f46',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 55%, #f59e0b 100%)',
-        bubbleGradient: 'linear-gradient(145deg, #f59e0b 0%, #ea580c 52%, #7c2d12 100%)',
+        headerGradient: '#60A5FA',
+        bubbleGradient: '#60A5FA',
         accent: '#c2410c',
         accentSoft: 'rgba(234, 88, 12, 0.16)',
         border: 'rgba(234, 88, 12, 0.34)',
@@ -2676,10 +2676,7 @@ function MainHeader() {
                                 fontWeight: 800,
                                 letterSpacing: 0.4,
                                 fontSize: {xs: '1.15rem', sm: '1.35rem'},
-                                background: `linear-gradient(120deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 50%, ${BRAND_SKY_LIGHT} 100%)`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text'
+                                color: BRAND_NAVY
                             }}
                         >
                             EduBridgeHCM
@@ -3030,7 +3027,7 @@ function MainHeader() {
                                             px: 2,
                                             py: 1.75,
                                             borderBottom: '1px solid rgba(59,130,246,0.1)',
-                                            background: 'linear-gradient(135deg, rgba(238,242,255,0.95) 0%, rgba(255,255,255,0.98) 100%)'
+                                            background: '#60A5FA'
                                         }}
                                     >
                                         <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
@@ -3102,7 +3099,7 @@ function MainHeader() {
                                                                 gap: 1.5,
                                                                 cursor: 'pointer',
                                                                 bgcolor: hasUnread
-                                                                    ? 'linear-gradient(90deg, rgba(37,99,235,0.18) 0%, rgba(37,99,235,0.08) 60%, rgba(37,99,235,0.04) 100%)'
+                                                                    ? '#60A5FA'
                                                                     : 'transparent',
                                                                 borderLeft: hasUnread ? '4px solid #1d4ed8' : '4px solid transparent',
                                                                 boxShadow: hasUnread
@@ -3111,7 +3108,7 @@ function MainHeader() {
                                                                 transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                                                                 '&:hover': {
                                                                     bgcolor: hasUnread
-                                                                        ? 'linear-gradient(90deg, rgba(37,99,235,0.24) 0%, rgba(37,99,235,0.11) 60%, rgba(37,99,235,0.06) 100%)'
+                                                                        ? '#60A5FA'
                                                                         : 'rgba(59,130,246,0.08)'
                                                                 }
                                                             }}
@@ -3215,7 +3212,7 @@ function MainHeader() {
                                                 alignItems: 'flex-start',
                                                 justifyContent: 'space-between',
                                                 background: parentChatHasUnread
-                                                    ? 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)'
+                                                    ? '#60A5FA'
                                                     : selectedStudentTheme.headerGradient,
                                                 borderBottom: '1px solid rgba(255,255,255,0.12)',
                                                 flexShrink: 0
@@ -3374,13 +3371,9 @@ function MainHeader() {
                                                 pb: 2,
                                                 overflowY: 'auto',
                                                 overflowX: 'hidden',
-                                                background: parentChatHasUnread ? `
-                                                    linear-gradient(180deg, rgba(255,237,213,0.92) 0%, rgba(255,247,237,0.98) 35%, #fff7ed 100%),
-                                                    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.14), transparent 55%)
-                                                ` : `
-                                                    linear-gradient(180deg, rgba(238,242,255,0.65) 0%, rgba(248,250,252,0.98) 28%, #f1f5f9 100%),
-                                                    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12), transparent 55%)
-                                                `,
+                                                background: parentChatHasUnread
+                                                    ? 'rgba(255, 237, 213, 0.92)'
+                                                    : 'rgba(238, 242, 255, 0.9)',
                                                 WebkitOverflowScrolling: 'touch'
                                             }}
                                         >
@@ -3497,7 +3490,7 @@ function MainHeader() {
                                                                                     background: isMine
                                                                                         ? selectedStudentTheme.bubbleGradient
                                                                                         : peerUnreadHighlight
-                                                                                          ? 'linear-gradient(135deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.92) 100%)'
+                                                                                          ? '#60A5FA'
                                                                                           : '#ffffff',
                                                                                     color: isMine ? '#ffffff' : '#1e293b',
                                                                                     border: isMine
@@ -3742,7 +3735,7 @@ function MainHeader() {
                                             borderRadius: 2,
                                             border: `1px solid ${selectedStudentTheme.border}`,
                                             boxShadow: '0 22px 48px rgba(30,41,59,0.28)',
-                                            background: 'linear-gradient(180deg, #f8fbff 0%, #f8fafc 38%, #ffffff 100%)',
+                                            background: '#60A5FA',
                                             overflow: 'hidden'
                                         }}
                                     >
@@ -4064,10 +4057,10 @@ function MainHeader() {
                                           }
                                         : {
                                               color: '#fff',
-                                              background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
+                                              background: BRAND_SKY,
                                               boxShadow: '0 8px 24px rgba(37, 99, 235, 0.28)',
                                               '&:hover': {
-                                                  background: `linear-gradient(90deg, ${APP_PRIMARY_DARK} 0%, ${BRAND_NAVY} 100%)`,
+                                                  background: APP_PRIMARY_DARK,
                                                   boxShadow: '0 12px 32px rgba(37, 99, 235, 0.36)'
                                               }
                                           })
@@ -4317,7 +4310,7 @@ function MainHeader() {
                         fontWeight: 700,
                         fontSize: 24,
                         color: BRAND_NAVY,
-                        background: "linear-gradient(135deg, rgba(239,246,255,0.95) 0%, rgba(219,234,254,0.75) 100%)",
+                        background: "#60A5FA",
                         borderBottom: "1px solid rgba(59,130,246,0.16)"
                     }}
                 >

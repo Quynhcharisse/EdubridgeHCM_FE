@@ -248,7 +248,7 @@ export default function AdminPersonalityTypes() {
                     borderRadius: 3.5,
                     mb: 2.5,
                     color: "white",
-                    background: "linear-gradient(95deg, #60a5fa 0%, #818cf8 46%, #a78bfa 100%)",
+                    background: "#60A5FA",
                     boxShadow: "0 12px 24px rgba(99, 102, 241, 0.2)",
                 }}
             >
@@ -1052,7 +1052,7 @@ const personalityModalSectionSx = {
 const personalityModalContentSx = {
     bgcolor: "#eff6ff",
     backgroundImage:
-        "radial-gradient(circle at top right, rgba(59,130,246,0.24), transparent 45%), radial-gradient(circle at bottom left, rgba(37,99,235,0.2), transparent 42%)",
+        "#60A5FA",
 };
 
 function PersonalityModalSectionHeader({ icon: Icon, title }) {

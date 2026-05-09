@@ -13,17 +13,11 @@ export const BRAND_AQUA = '#93c5fd';
 export const BRAND_PASTEL_BLUE = 'rgba(191, 219, 254, 0.82)';
 
 export const BRAND_PASTEL_SURFACE = `
-    linear-gradient(168deg,
-        rgba(248, 250, 255, 0.98) 0%,
-        rgba(235, 244, 255, 0.96) 42%,
-        rgba(224, 238, 255, 0.97) 100%
-    )
+    #eaf3ff
 `;
 
 export const BRAND_PASTEL_AURA = `
-    radial-gradient(ellipse 85% 60% at 12% 8%, rgba(255,255,255,0.65) 0%, transparent 52%),
-    radial-gradient(ellipse 70% 50% at 92% 88%, rgba(147,197,253,0.28) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 48% 55%, rgba(59,130,246,0.1) 0%, transparent 62%)
+    rgba(191, 219, 254, 0.45)
 `;
 
 export const BRAND_BLUE_GRADIENT = BRAND_PASTEL_BLUE;
@@ -33,7 +27,7 @@ export const BRAND_BLUE_GRADIENT_OVERLAY = 'transparent';
 export const HOME_HERO_SHELF_GRADIENT = BRAND_PASTEL_SURFACE;
 
 export const HOME_PAGE_BODY_GRADIENT =
-    'linear-gradient(180deg, #f5f9ff 0%, #fafcff 26%, #eaf2ff 50%, #f8fbff 100%)';
+    '#60A5FA';
 
 /** Homepage: light → slightly deeper blue per section (subtle, readable) */
 export const HOME_BAND_0 = '#eef4ff';
@@ -45,7 +39,7 @@ export const HOME_BAND_5 = '#a8c6ff';
 export const HOME_BAND_6 = '#99bcff';
 
 export const HOME_PAGE_SURFACE_GRADIENT =
-    `linear-gradient(180deg, ${HOME_BAND_0} 0%, ${HOME_BAND_0} 100%)`;
+    HOME_BAND_0;
 
 export const HOME_SECTION_ABOUT_BG =
     HOME_BAND_1;
@@ -81,19 +75,10 @@ export const HOME_SCHOOL_SECTION_SURFACE = '#e8f4fc';
 export const HOME_CONSULT_SECTION_TOP = '#eff6ff';
 
 export const HOME_PAGE_HERO_BANNER_GRADIENT =
-    `linear-gradient(180deg,
-        ${HEADER_HOME_BAR_BG} 0%,
-        ${HEADER_HOME_BAR_BG} 12%,
-        ${HERO_BAND_A} 22%,
-        ${HERO_BAND_B} 38%,
-        ${HERO_BAND_C} 52%,
-        ${HERO_BAND_D} 68%,
-        ${HERO_BAND_E} 82%,
-        ${HOME_HERO_BOTTOM_BG} 96%,
-        ${HOME_HERO_BOTTOM_BG} 100%)`;
+    HEADER_HOME_BAR_BG;
 
 export const HOME_PAGE_HERO_TOP_GRADIENT =
-    `linear-gradient(180deg, ${HEADER_HOME_BAR_BG} 0%, ${HERO_BAND_A} 45%, ${HERO_BAND_B} 100%)`;
+    HERO_BAND_A;
 
 export const HOME_MOUNTAIN_HERO_FILLS = [
     HEADER_HOME_BAR_BG,
