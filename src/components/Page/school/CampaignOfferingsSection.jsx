@@ -1146,6 +1146,7 @@ export default function CampaignOfferingsSection({
                                 items.map((row) => (
                                     (() => {
                                         const actionState = getOfferingActionState(row, campaignPaused);
+                                        const appStatusBadge = getApplicationStatusBadgeStyle(row.applicationStatus);
                                         return (
                                     <TableRow
                                         key={row.id}
@@ -1168,52 +1169,23 @@ export default function CampaignOfferingsSection({
                                         </TableCell>
                                         <TableCell sx={{ py: 2.25 }}>{formatCurrency(row.tuitionFee)}</TableCell>
                                         <TableCell sx={{ py: 2.25 }}>
-                                            {(() => {
-                                                if (actionState.isInactive) {
-                                                    return (
-                                                        <Box
-                                                            component="span"
-                                                            sx={{
-                                                                display: "inline-flex",
-                                                                alignItems: "center",
-                                                                px: 1.2,
-                                                                py: 0.4,
-                                                                borderRadius: "999px",
-                                                                fontSize: 12,
-                                                                fontWeight: 800,
-                                                                lineHeight: 1,
-                                                                color: "#475569",
-                                                                bgcolor: "rgba(148, 163, 184, 0.2)",
-                                                            }}
-                                                        >
-                                                            Đã ngừng hoạt động
-                                                        </Box>
-                                                    );
-                                                }
-                                                const label = getApplicationStatusLabel(row.applicationStatus);
-                                                const { badgeBg, badgeColor } = getApplicationStatusBadgeStyle(
-                                                    row.applicationStatus
-                                                );
-                                                return (
-                                                    <Box
-                                                        component="span"
-                                                        sx={{
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            px: 1.2,
-                                                            py: 0.4,
-                                                            borderRadius: "999px",
-                                                            fontSize: 12,
-                                                            fontWeight: 800,
-                                                            lineHeight: 1,
-                                                            color: badgeColor,
-                                                            bgcolor: badgeBg,
-                                                        }}
-                                                    >
-                                                        {label}
-                                                    </Box>
-                                                );
-                                            })()}
+                                            <Box
+                                                component="span"
+                                                sx={{
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    px: 1.2,
+                                                    py: 0.4,
+                                                    borderRadius: "999px",
+                                                    fontSize: 12,
+                                                    fontWeight: 800,
+                                                    lineHeight: 1,
+                                                    color: appStatusBadge.badgeColor,
+                                                    bgcolor: appStatusBadge.badgeBg,
+                                                }}
+                                            >
+                                                {getApplicationStatusLabel(row.applicationStatus)}
+                                            </Box>
                                         </TableCell>
                                         <TableCell sx={{ py: 2.25 }}>
                                             {formatDate(row.openDate)} — {formatDate(row.closeDate)}
