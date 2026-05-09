@@ -20,9 +20,7 @@ import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
-import VerticalAlignTopOutlinedIcon from "@mui/icons-material/VerticalAlignTopOutlined";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
-import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { enqueueSnackbar } from "notistack";
@@ -65,9 +63,7 @@ function mapEntitlements(raw) {
         postLimit: toNonNegativeNumber(raw.postLimit),
         hasAiAssistant: raw.hasAiAssistant === true,
         supportLevel: typeof raw.supportLevel === "string" ? raw.supportLevel : "",
-        topRanking: toNonNegativeNumber(raw.topRanking),
         parentPostPermission: typeof raw.parentPostPermission === "string" ? raw.parentPostPermission : "",
-        isFeatured: raw.isFeatured === true,
     };
 }
 
@@ -380,23 +376,10 @@ function EntitlementsGrid({ entitlements }) {
             icon: <WorkspacePremiumOutlinedIcon sx={{ fontSize: 20 }} />,
         },
         {
-            key: "topRanking",
-            label: "Top Ranking",
-            value: entitlements.topRanking,
-            hint: "Thứ hạng ưu tiên hiển thị",
-            icon: <VerticalAlignTopOutlinedIcon sx={{ fontSize: 20 }} />,
-        },
-        {
             key: "parentPostPermission",
             label: "Quyền bài viết",
             value: toParentPostPermissionLabel(entitlements.parentPostPermission),
             icon: <CampaignOutlinedIcon sx={{ fontSize: 20 }} />,
-        },
-        {
-            key: "isFeatured",
-            label: "Featured",
-            value: entitlements.isFeatured ? "Có" : "Không",
-            icon: <AutoAwesomeOutlinedIcon sx={{ fontSize: 20 }} />,
         },
     ];
     return (
@@ -1035,7 +1018,7 @@ function CurrentSubscriptionPage({
             {/* Page Header — cùng phong cách SchoolCampus */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1245,7 +1228,7 @@ export default function SchoolPurchasedPackages() {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%" }}>
                 <Box
                     sx={{
-                        background: "#60A5FA",
+                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         borderRadius: 3,
                         p: 3,
                         color: "white",

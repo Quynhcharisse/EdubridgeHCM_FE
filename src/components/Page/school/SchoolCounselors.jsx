@@ -531,7 +531,7 @@ export default function SchoolCounselors() {
             {/* Header with gradient */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -802,7 +802,7 @@ export default function SchoolCounselors() {
                                                                 textTransform: "none",
                                                                 fontWeight: 600,
                                                                 background: canCreate
-                                                                    ? "#60A5FA"
+                                                                    ? "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)"
                                                                     : "#cbd5e1",
                                                                 opacity: canCreate ? 1 : 0.6,
                                                                 transition: "all 0.2s ease",
@@ -810,7 +810,7 @@ export default function SchoolCounselors() {
                                                                 "&:hover": canCreate
                                                                     ? {
                                                                         background:
-                                                                            "#60A5FA",
+                                                                            "linear-gradient(135deg, #6b9be6 0%, #0b5ad1 100%)",
                                                                     }
                                                                     : {},
                                                             }}
@@ -938,7 +938,7 @@ export default function SchoolCounselors() {
                             justifyContent: "center",
                             pt: {xs: 2, md: 0},
                             background:
-                                "#60A5FA",
+                                "linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,255,255,0.58))",
                             backdropFilter: "blur(6px)",
                             borderRadius: 3,
                             animation: "lockOverlayFadeIn 0.2s ease",
@@ -979,7 +979,7 @@ export default function SchoolCounselors() {
                                     inset: 0,
                                     pointerEvents: "none",
                                     background:
-                                        "#60A5FA",
+                                        "linear-gradient(120deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1))",
                                 },
                             }}
                         >
@@ -992,7 +992,7 @@ export default function SchoolCounselors() {
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        background: "#60A5FA",
+                                        background: "linear-gradient(135deg, #dbeafe, #bfdbfe)",
                                         boxShadow: "0 0 20px rgba(37, 99, 235, 0.3)",
                                     }}
                                 >
@@ -1015,13 +1015,13 @@ export default function SchoolCounselors() {
                                             borderRadius: 2,
                                             px: 2.75,
                                             py: 1,
-                                            background: "#60A5FA",
+                                            background: "linear-gradient(135deg, #0D64DE, #2563eb)",
                                             transition: "all 0.2s ease",
                                             boxShadow: "0 8px 18px rgba(37, 99, 235, 0.25)",
                                             "&:hover": {
                                                 transform: "translateY(-1px) scale(1.01)",
                                                 boxShadow: "0 10px 22px rgba(37, 99, 235, 0.32)",
-                                                background: "#60A5FA",
+                                                background: "linear-gradient(135deg, #0b5ad1, #1d4ed8)",
                                             },
                                         }}
                                     >
@@ -1189,7 +1189,7 @@ export default function SchoolCounselors() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         {createSubmitting ? "Đang tạo…" : "Tạo"}
@@ -1256,7 +1256,7 @@ export default function SchoolCounselors() {
                             width: 64,
                             height: 64,
                             background:
-                                "#60A5FA",
+                                "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                             fontWeight: 700,
                             fontSize: "1.4rem",
                         }}

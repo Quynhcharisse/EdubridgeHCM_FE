@@ -30,7 +30,7 @@ export const adminTableContainerSx = {
 };
 
 export const adminTableHeadRowSx = {
-    background: "#60A5FA",
+    background: "linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%)",
 };
 
 export const adminTableHeadCellSx = {

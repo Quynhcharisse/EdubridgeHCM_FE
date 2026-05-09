@@ -19,12 +19,6 @@ import {
     Select,
     Skeleton,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
     Pagination,
@@ -336,16 +330,6 @@ function formatQuotaNumber(value) {
     return Number.isFinite(n) ? String(n) : "—";
 }
 
-function getQuotaBreakdownCampusLabel(item) {
-    return (
-        String(item?.campusName ?? "").trim() ||
-        String(item?.name ?? "").trim() ||
-        String(item?.campusCode ?? "").trim() ||
-        String(item?.campusId ?? "").trim() ||
-        "—"
-    );
-}
-
 /** Nhóm nội dung trong dialog chi tiết (theo domain). */
 const DETAIL_SECTIONS = [
     {
@@ -392,7 +376,6 @@ const DETAIL_SECTIONS = [
         Icon: MenuBookIcon,
         fields: [
             { key: "programDetailName", label: "Tên chương trình đào tạo" },
-            { key: "programLanguageOfInstructionList", label: "Ngôn ngữ giảng dạy" },
             { key: "programGraduationStandard", label: "Chuẩn đầu ra" },
             { key: "programTargetStudentDescription", label: "Đối tượng học sinh" },
             { key: "programBaseTuitionFee", label: "Học phí gốc" },
@@ -1472,54 +1455,6 @@ export default function CampaignOfferingsSection({
                                             </Box>
                                         ))}
                                     </Box>
-                                    {Array.isArray(detailMethodQuotaBreakdown.campusBreakdown) &&
-                                    detailMethodQuotaBreakdown.campusBreakdown.length > 0 ? (
-                                        <TableContainer sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
-                                            <Table size="small">
-                                                <TableHead>
-                                                    <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                                                        <TableCell sx={{ fontWeight: 700 }}>Cơ sở</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Đã dùng</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }} align="right">Còn lại có thể thêm</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }} align="center">Đầy</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {detailMethodQuotaBreakdown.campusBreakdown.map((item, index) => (
-                                                        <TableRow key={`${getQuotaBreakdownCampusLabel(item)}-${index}`}>
-                                                            <TableCell sx={{ py: 1.25 }}>{getQuotaBreakdownCampusLabel(item)}</TableCell>
-                                                            <TableCell sx={{ py: 1.25 }} align="right">
-                                                                {formatQuotaNumber(
-                                                                    item?.usedQuota ?? item?.totalUsedQuota ?? item?.used
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.25 }} align="right">
-                                                                {formatQuotaNumber(
-                                                                    item?.maxAdditionalQuota ?? item?.remainingQuota
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.25 }} align="center">
-                                                                {item?.isFull ? "Có" : "Không"}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
-                                    ) : (
-                                        <Box
-                                            sx={{
-                                                border: "1px dashed #cbd5e1",
-                                                borderRadius: "12px",
-                                                p: 2,
-                                                bgcolor: "#f8fafc",
-                                            }}
-                                        >
-                                            <Typography variant="body2" color="text.secondary">
-                                                Chưa có phân bổ quota theo cơ sở cho phương thức này.
-                                            </Typography>
-                                        </Box>
-                                    )}
                                 </CardContent>
                             </Card>
                         ) : null}

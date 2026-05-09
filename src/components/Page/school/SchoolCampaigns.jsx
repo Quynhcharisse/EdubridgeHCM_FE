@@ -1098,7 +1098,7 @@ export default function SchoolCampaigns() {
             {/* Header — cùng style trang Cơ sở */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -1514,7 +1514,7 @@ export default function SchoolCampaigns() {
                                                         textTransform: "none",
                                                         fontWeight: 600,
                                                         background:
-                                                            "#60A5FA",
+                                                            "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                                     }}
                                                 >
                                                     Tạo chiến dịch

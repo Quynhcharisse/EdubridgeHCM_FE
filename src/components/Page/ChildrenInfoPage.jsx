@@ -220,7 +220,7 @@ export default function ChildrenInfoPage() {
                                 width: {xs: 72, sm: 88},
                                 borderRadius: 999,
                                 background:
-                                    '#60A5FA',
+                                    'linear-gradient(90deg, #2563eb 0%, #38bdf8 55%, rgba(56, 189, 248, 0.35) 100%)',
                             }}
                         />
                     </Box>
@@ -297,18 +297,18 @@ export default function ChildrenInfoPage() {
                                     fontWeight: 700,
                                     borderRadius: '14px 14px 0 0',
                                     background:
-                                        '#60A5FA',
+                                        'linear-gradient(180deg, rgba(224, 242, 254, 0.95) 0%, rgba(219, 234, 254, 0.95) 100%)',
                                     color: '#2563eb',
                                     border: '1px dashed rgba(37, 99, 235, 0.5)',
                                     borderBottom: 'none',
                                     '&:hover': {
                                         background:
-                                            '#60A5FA',
+                                            'linear-gradient(180deg, rgba(219, 234, 254, 1) 0%, rgba(191, 219, 254, 0.95) 100%)',
                                         color: '#2563eb',
                                     },
                                     '&.Mui-selected': {
                                         background:
-                                            '#60A5FA',
+                                            'linear-gradient(180deg, rgba(191, 219, 254, 0.95) 0%, rgba(147, 197, 253, 0.9) 100%)',
                                         color: '#2563eb',
                                     },
                                 }}
@@ -1029,7 +1029,7 @@ export default function ChildrenInfoPage() {
                                                                 width: 4,
                                                                 borderRadius: '0 4px 4px 0',
                                                                 background:
-                                                                    '#60A5FA',
+                                                                    'linear-gradient(180deg, #2563eb 0%, #38bdf8 55%, #7dd3fc 100%)',
                                                             },
                                                         }}
                                                     >
@@ -1549,10 +1549,10 @@ export default function ChildrenInfoPage() {
                                                                         fontSize: 13,
                                                                         fontWeight: 600,
                                                                         color: '#ffffff',
-                                                                        background: '#60A5FA',
+                                                                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                                                                         boxShadow: '0 6px 16px rgba(37,99,235,0.35)',
                                                                         '&:hover': {
-                                                                            background: '#60A5FA',
+                                                                            background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
                                                                             boxShadow: '0 8px 20px rgba(29,78,216,0.4)',
                                                                         },
                                                                     }}
@@ -2134,10 +2134,10 @@ export default function ChildrenInfoPage() {
                             sx={{
                                 textTransform: 'none',
                                 color: '#ffffff',
-                                background: '#60A5FA',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                                 boxShadow: '0 6px 14px rgba(37,99,235,0.3)',
                                 '&:hover': {
-                                    background: '#60A5FA',
+                                    background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
                                 },
                             }}
                         >

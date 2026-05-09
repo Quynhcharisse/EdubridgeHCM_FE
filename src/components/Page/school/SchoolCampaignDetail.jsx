@@ -1092,7 +1092,7 @@ export default function SchoolCampaignDetail() {
             >
                 <Box
                     sx={{
-                        background: "#60A5FA",
+                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         color: "#fff",
                         p: 3,
                         boxShadow: "0 8px 32px rgba(13, 100, 222, 0.25)",

@@ -678,7 +678,7 @@ export default function SchoolCampus() {
             {/* Page Header */}
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -901,7 +901,7 @@ export default function SchoolCampus() {
                                                         borderRadius: 2,
                                                         textTransform: "none",
                                                         fontWeight: 600,
-                                                        background: "#60A5FA",
+                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                                     }}
                                                 >
                                                     Tạo cơ sở
@@ -1235,7 +1235,7 @@ export default function SchoolCampus() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         {createCampusSubmitting ? "Đang tạo…" : "Tạo cơ sở"}
@@ -1377,7 +1377,7 @@ export default function SchoolCampus() {
                                         position: "absolute",
                                         inset: 0,
                                         background:
-                                            "#60A5FA",
+                                            "linear-gradient(180deg, rgba(2, 6, 23, 0.10) 0%, rgba(2, 6, 23, 0.58) 100%)",
                                     }}
                                 />
 
@@ -1939,7 +1939,7 @@ export default function SchoolCampus() {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         Lưu

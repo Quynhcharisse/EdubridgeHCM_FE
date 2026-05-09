@@ -675,7 +675,7 @@ export default function SchoolHoliday({onHolidayCreated} = {}) {
         <Box sx={{display: "flex", flexDirection: "column", gap: 3, width: "100%"}}>
             <Box
                 sx={{
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                     borderRadius: 3,
                     p: 3,
                     color: "white",
@@ -864,7 +864,7 @@ export default function SchoolHoliday({onHolidayCreated} = {}) {
                                                         textTransform: "none",
                                                         whiteSpace: "nowrap",
                                                         fontWeight: 600,
-                                                        background: "#60A5FA",
+                                                        background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                                                     }}
                                                 >
                                                     Tạo ngày nghỉ
@@ -1229,7 +1229,7 @@ export default function SchoolHoliday({onHolidayCreated} = {}) {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         {submitting ? "Đang tạo…" : "Tạo"}
@@ -1372,7 +1372,7 @@ export default function SchoolHoliday({onHolidayCreated} = {}) {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 2.5,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         Chỉnh sửa
@@ -1593,7 +1593,7 @@ export default function SchoolHoliday({onHolidayCreated} = {}) {
                             fontWeight: 600,
                             borderRadius: 2,
                             px: 3,
-                            background: "#60A5FA",
+                            background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
                         }}
                     >
                         {submitting ? "Đang lưu…" : "Cập nhật"}
