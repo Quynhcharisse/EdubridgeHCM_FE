@@ -33,7 +33,11 @@ import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
 const FILTERS = [
     {value: "ALL", label: "Tất cả"},
     {value: "PENDING", label: "Chờ duyệt", statuses: ["RESERVATION_PENDING", "PENDING"]},
-    {value: "CONFIRMED", label: "Đã xác nhận", statuses: ["RESERVATION_CONFIRMED", "CONFIRMED", "APPROVED", "ACCEPTED"]},
+    {
+        value: "CONFIRMED",
+        label: "Đã xác nhận",
+        statuses: ["RESERVATION_APPROVAL", "RESERVATION_CONFIRMED", "CONFIRMED", "APPROVED", "ACCEPTED"]
+    },
     {value: "REJECTED", label: "Từ chối", statuses: ["RESERVATION_REJECTED", "REJECTED"]},
     {value: "CANCELLED", label: "Đã hủy", statuses: ["RESERVATION_CANCELLED", "CANCELLED"]}
 ];
@@ -52,6 +56,12 @@ const STATUS_META = {
         border: "#fed7aa"
     },
     RESERVATION_CONFIRMED: {
+        label: "Đã xác nhận",
+        color: "#047857",
+        bg: "#d1fae5",
+        border: "#a7f3d0"
+    },
+    RESERVATION_APPROVAL: {
         label: "Đã xác nhận",
         color: "#047857",
         bg: "#d1fae5",
