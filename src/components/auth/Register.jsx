@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState} from 'react';
 import {signup} from '../../services/AuthService';
 import {ROLES} from '../../constants/roles';
 import RegisterGoogle from '../ui/RegisterGoogle';
@@ -118,8 +118,7 @@ const Register = () => {
                 justifyContent: 'center',
                 py: {xs: 2, md: 3},
                 px: {xs: 2, md: 0},
-                backgroundImage: `url(${backgroundLogin})`,
-                backgroundColor: 'rgba(96, 165, 250, 0.26)',
+                backgroundImage: `linear-gradient(135deg, rgba(51,65,85,0.55), rgba(51,65,85,0.35)), url(${backgroundLogin})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -217,7 +216,10 @@ const Register = () => {
                             border: '1px solid rgba(51,65,85,0.08)',
                             boxShadow: landingSectionShadow(4),
                             backdropFilter: 'blur(12px)',
-                            backgroundImage: 'none',
+                            backgroundImage: `
+                                radial-gradient(ellipse 120% 80% at 0% 0%, rgba(85,179,217,0.08) 0%, transparent 55%),
+                                radial-gradient(ellipse 90% 70% at 100% 100%, rgba(59,130,246,0.06) 0%, transparent 50%)
+                            `,
                         }}
                     >
                         <Stack spacing={3}>
@@ -351,10 +353,10 @@ const Register = () => {
                                                 fontWeight: 700,
                                                 borderRadius: 2,
                                                 color: '#fff',
-                                                background: BRAND_SKY,
+                                                background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 100%)`,
                                                 boxShadow: '0 8px 24px rgba(45, 95, 115, 0.28)',
                                                 '&:hover': {
-                                                    background: APP_PRIMARY_DARK,
+                                                    background: `linear-gradient(90deg, ${APP_PRIMARY_DARK} 0%, ${BRAND_NAVY} 100%)`,
                                                     boxShadow: '0 12px 32px rgba(45, 95, 115, 0.36)',
                                                 },
                                                 '&.Mui-disabled': {

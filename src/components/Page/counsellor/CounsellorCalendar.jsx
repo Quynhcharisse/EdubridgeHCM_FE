@@ -82,7 +82,7 @@ const detailModalSx = {
   titleColor: "#0d47a1",
   valueColor: "#1e293b",
   fieldBorder: "1px solid #cfe8f8",
-  headerBar: "#60A5FA",
+  headerBar: "linear-gradient(180deg, #dceef9 0%, #c9e3f5 100%)",
 };
 
 const detailDialogPaperProps = {

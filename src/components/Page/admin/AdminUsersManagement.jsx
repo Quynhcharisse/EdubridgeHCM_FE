@@ -605,7 +605,7 @@ export default function AdminUsersManagement() {
                     borderRadius: 3.5,
                     mb: 2.5,
                     color: "white",
-                    background: "#60A5FA",
+                    background: "linear-gradient(95deg, #60a5fa 0%, #818cf8 46%, #a78bfa 100%)",
                     boxShadow: "0 12px 24px rgba(99, 102, 241, 0.2)",
                 }}
             >
@@ -1087,7 +1087,7 @@ export default function AdminUsersManagement() {
                         fontWeight: 800,
                         color: "#1e293b",
                         pb: 1.2,
-                        background: "#60A5FA",
+                        background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
                         borderBottom: "1px solid #93c5fd",
                     }}
                 >
@@ -1219,7 +1219,7 @@ export default function AdminUsersManagement() {
                         fontWeight: 800,
                         color: "#1e293b",
                         pb: 1.2,
-                        background: "#60A5FA",
+                        background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 48%, #93c5fd 100%)",
                         borderBottom: "1px solid #93c5fd",
                     }}
                 >

@@ -166,7 +166,7 @@ export default function CounsellorProfile() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", pb: 4 }}>
       <Box
         sx={{
-          background: "#60A5FA",
+          background: "linear-gradient(135deg, #7AA9EB 0%, #0D64DE 100%)",
           borderRadius: 3,
           p: 3,
           color: "white",

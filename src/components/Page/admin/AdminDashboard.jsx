@@ -436,7 +436,7 @@ export default function AdminDashboard() {
                 sx={{
                     borderRadius: 3,
                     border: "1px solid #bfdbfe",
-                    background: "#60A5FA",
+                    background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 40%, #f0f9ff 100%)",
                     boxShadow: "0 16px 36px rgba(37,99,235,0.16)",
                 }}
             >
@@ -500,7 +500,7 @@ export default function AdminDashboard() {
                             sx={{
                                 borderRadius: 99,
                                 px: 2,
-                                background: "#60A5FA",
+                                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
                                 boxShadow: "0 8px 18px rgba(37,99,235,0.28)",
                             }}
                         >
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
                     sx={{
                         borderRadius: 3,
                         border: "1px solid #bbf7d0",
-                        background: "#60A5FA",
+                        background: "linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)",
                         boxShadow: "0 14px 30px rgba(22,163,74,0.14)",
                     }}
                 >
@@ -582,7 +582,7 @@ export default function AdminDashboard() {
                 </Card>
             ) : null}
 
-            <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #bfdbfe", background: "#60A5FA", boxShadow: "0 14px 30px rgba(37,99,235,0.12)" }}>
+            <Card elevation={0} sx={{ borderRadius: 3, border: "1px solid #bfdbfe", background: "linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)", boxShadow: "0 14px 30px rgba(37,99,235,0.12)" }}>
                 <CardContent sx={{ p: 2.2 }}>
                     <Typography sx={{ fontWeight: 800, color: "#0f172a", mb: 0.3 }}>Biểu đồ Xu hướng Doanh thu theo {scopeLabel}</Typography>
                     <Typography sx={{ color: "#64748b", fontSize: 13, mb: 1.1 }}>
