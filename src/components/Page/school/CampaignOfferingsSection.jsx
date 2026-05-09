@@ -765,7 +765,7 @@ export default function CampaignOfferingsSection({
                 Number.isFinite(Number(breakdown?.remainingQuota)) &&
                 Number(breakdown?.remainingQuota) <= 0
             ) {
-                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (remainingQuota = 0).";
+                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (chỉ tiêu còn lại = 0).";
             } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
                 errors.quota = `Chỉ tiêu không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
             }
@@ -786,7 +786,7 @@ export default function CampaignOfferingsSection({
                 Number.isFinite(Number(breakdown?.remainingQuota)) &&
                 Number(breakdown?.remainingQuota) <= 0
             ) {
-                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (remainingQuota = 0).";
+                errors.quota = "Phương thức đã hết chỉ tiêu còn lại (chỉ tiêu còn lại = 0).";
             } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
                 errors.quota = `Chỉ tiêu mới không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
             }
@@ -1631,7 +1631,7 @@ export default function CampaignOfferingsSection({
                                     Number(selectedMethodQuotaBreakdown?.totalMethodQuota)) && (
                                 <Alert severity="warning" sx={{ borderRadius: 2 }}>
                                     {Number(selectedMethodQuotaBreakdown?.remainingQuota) === 0
-                                        ? "Cảnh báo: phương thức tuyển sinh đã hết chỉ tiêu còn lại (remainingQuota = 0)."
+                                        ? "Cảnh báo: phương thức tuyển sinh đã hết chỉ tiêu còn lại (chỉ tiêu còn lại = 0)."
                                         : "Cảnh báo: số lượng đã dùng đang vượt quá tổng quota của phương thức tuyển sinh."}
                                 </Alert>
                             )}
