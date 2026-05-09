@@ -137,9 +137,6 @@ export const buildFeatureLines = (features = {}, durationDays = 0) => {
     } else if (Number.isFinite(postLimit) && postLimit > 0) {
         lines.push(`Tối đa ${postLimit.toLocaleString("vi-VN")} bài đăng`);
     }
-    if (Number(features.topRanking) > 0) {
-        lines.push(`Ưu tiên hiển thị top ${Number(features.topRanking).toLocaleString("vi-VN")}`);
-    }
     if (durationDays > 0) {
         lines.push(`Thời hạn sử dụng ${Number(durationDays).toLocaleString("vi-VN")} ngày`);
     }
