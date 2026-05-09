@@ -29,6 +29,7 @@ import {
   TableRow,
   Tab,
   Tabs,
+  TextField,
   Tooltip,
   Typography,
   Button,
@@ -45,6 +46,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import AssignmentTurnedInOutlinedIcon from "@mui/icons-material/AssignmentTurnedInOutlined";
 import TodayIcon from "@mui/icons-material/Today";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 import { enqueueSnackbar } from "notistack";
 import {
   COUNSELLOR_OFFLINE_CONSULTATION_STATUSES,
@@ -1050,6 +1052,11 @@ export default function CounsellorConsultationManagement() {
   const [editSlotBaselineKey, setEditSlotBaselineKey] = useState(null);
   const [editSaveLoading, setEditSaveLoading] = useState(false);
   const [confirmingRowId, setConfirmingRowId] = useState(null);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancelTargetRow, setCancelTargetRow] = useState(null);
+  const [cancelReasonDraft, setCancelReasonDraft] = useState("");
+  const [cancelReasonError, setCancelReasonError] = useState("");
+  const [cancelSubmitLoading, setCancelSubmitLoading] = useState(false);
 
   const currentUserEmail = useMemo(() => {
     try {
@@ -1248,6 +1255,64 @@ export default function CounsellorConsultationManagement() {
       enqueueSnackbar(typeof msg === "string" ? msg : "Tiếp nhận không thành công.", { variant: "error" });
     } finally {
       setConfirmingRowId(null);
+    }
+  };
+
+  const openCancelFromRow = (row) => {
+    setCancelTargetRow(row);
+    setCancelReasonDraft("");
+    setCancelReasonError("");
+    setCancelConfirmOpen(true);
+  };
+
+  const handleSubmitCancelAppointment = async () => {
+    const row = cancelTargetRow;
+    if (!row) return;
+    const reason = cancelReasonDraft.trim();
+    if (!reason) {
+      setCancelReasonError("Vui lòng nhập lý do hủy lịch hẹn.");
+      return;
+    }
+    const consultationId = Number(row?.id);
+    const appointmentDate = String(row?.appointmentDate ?? "").trim().slice(0, 10);
+    const counsellorSlotId = Number(row?.counsellorSlotId ?? row?.slotId ?? 0);
+    if (!Number.isFinite(consultationId) || consultationId <= 0 || !appointmentDate || !Number.isFinite(counsellorSlotId) || counsellorSlotId <= 0) {
+      enqueueSnackbar("Thiếu dữ liệu để hủy lịch hẹn.", { variant: "warning" });
+      return;
+    }
+    setCancelSubmitLoading(true);
+    setCancelReasonError("");
+    try {
+      const res = await putCounsellorOfflineConsultation({
+        id: consultationId,
+        appointmentDate,
+        note: String(row?.note ?? "").trim(),
+        cancelReason: reason,
+        counsellorSlotId,
+        action: "cancel",
+      });
+      const okMsg = res?.data?.message;
+      enqueueSnackbar(
+        typeof okMsg === "string" && okMsg.trim() ? okMsg.trim() : "Đã hủy lịch hẹn.",
+        { variant: "success" }
+      );
+      setCancelConfirmOpen(false);
+      setCancelTargetRow(null);
+      setCancelReasonDraft("");
+      if (detailRow && Number(detailRow.id) === consultationId) {
+        setDetailOpen(false);
+        setDetailRow(null);
+      }
+      await load(page);
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Hủy lịch không thành công. Vui lòng thử lại.";
+      enqueueSnackbar(typeof msg === "string" ? msg : "Hủy lịch không thành công.", { variant: "error" });
+    } finally {
+      setCancelSubmitLoading(false);
     }
   };
 
@@ -1616,6 +1681,32 @@ export default function CounsellorConsultationManagement() {
                                   </span>
                                 </Tooltip>
                               )}
+                              {activeListStatus === "pending" && (
+                                <Tooltip title="Hủy lịch hẹn">
+                                  <span>
+                                    <IconButton
+                                      size="small"
+                                      aria-label="Hủy lịch hẹn"
+                                      onClick={() => openCancelFromRow(row)}
+                                      disabled={
+                                        (cancelSubmitLoading && Number(cancelTargetRow?.id) === Number(row?.id)) ||
+                                        confirmingRowId === Number(row?.id)
+                                      }
+                                      sx={{
+                                        ...viewActionSx,
+                                        color: "#dc2626",
+                                        "&:hover": { bgcolor: "rgba(239,68,68,0.10)" },
+                                      }}
+                                    >
+                                      {cancelSubmitLoading && Number(cancelTargetRow?.id) === Number(row?.id) ? (
+                                        <CircularProgress size={16} thickness={4} sx={{ color: "#dc2626" }} />
+                                      ) : (
+                                        <HighlightOffOutlinedIcon fontSize="small" />
+                                      )}
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              )}
                               <Tooltip title="Xem chi tiết">
                                 <IconButton
                                   size="small"
@@ -1657,6 +1748,7 @@ export default function CounsellorConsultationManagement() {
         maxWidth="md"
         fullWidth
         scroll="paper"
+        disableEnforceFocus={cancelConfirmOpen}
         PaperProps={counsellorDialogPaperProps}
       >
         <DialogTitle sx={{ p: 0, bgcolor: "transparent" }}>
@@ -1792,39 +1884,205 @@ export default function CounsellorConsultationManagement() {
             justifyContent: "flex-end",
           }}
         >
-          {activeListStatus === "pending" && (
-            <Tooltip
-              title={
-                detailRow?.confirmingBy == null
-                  ? "Tiếp nhận lịch hẹn trước khi được phép chỉnh sửa"
-                  : detailRow.confirmingBy !== currentUserEmail
-                  ? "Lịch hẹn đang được tiếp nhận bởi tư vấn viên khác"
-                  : ""
-              }
-              placement="top"
+          {activeListStatus === "pending" && detailRow ? (
+            <Box
+              sx={{
+                display: "flex",
+                minWidth: "100%",
+                flexWrap: "wrap",
+                gap: 1,
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
             >
-              <span>
-                <Button
-                  variant="contained"
-                  startIcon={<EditOutlinedIcon />}
-                  onClick={() => void openEditFromDetail()}
-                  disabled={!detailRow?.confirmingBy || detailRow.confirmingBy !== currentUserEmail}
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    px: 3,
-                    minWidth: 140,
-                    bgcolor: "#1565c0",
-                    boxShadow: "0 4px 14px rgba(21, 101, 160, 0.35)",
-                    "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
-                  }}
-                >
-                  Chỉnh sửa
-                </Button>
-              </span>
-            </Tooltip>
-          )}
+              <Button
+                variant="outlined"
+                color="error"
+                disabled={cancelSubmitLoading}
+                onClick={() => openCancelFromRow(detailRow)}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  px: 2.4,
+                  minWidth: 132,
+                  borderColor: "rgba(239,68,68,0.55)",
+                  color: "#dc2626",
+                  "&:hover": { borderColor: "#dc2626", bgcolor: "rgba(239,68,68,0.06)" },
+                }}
+              >
+                Hủy lịch hẹn
+              </Button>
+              <Tooltip
+                title={
+                  detailRow?.confirmingBy == null
+                    ? "Tiếp nhận lịch hẹn trước khi được phép chỉnh sửa"
+                    : detailRow.confirmingBy !== currentUserEmail
+                      ? "Lịch hẹn đang được tiếp nhận bởi tư vấn viên khác"
+                      : ""
+                }
+                placement="top"
+              >
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={<EditOutlinedIcon />}
+                    onClick={() => void openEditFromDetail()}
+                    disabled={!detailRow?.confirmingBy || detailRow.confirmingBy !== currentUserEmail}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      px: 3,
+                      minWidth: 140,
+                      bgcolor: "#1565c0",
+                      boxShadow: "0 4px 14px rgba(21, 101, 160, 0.35)",
+                      "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
+                    }}
+                  >
+                    Chỉnh sửa
+                  </Button>
+                </span>
+              </Tooltip>
+            </Box>
+          ) : null}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={cancelConfirmOpen && Boolean(cancelTargetRow)}
+        onClose={() => {
+          if (cancelSubmitLoading) return;
+          setCancelConfirmOpen(false);
+          setCancelTargetRow(null);
+          setCancelReasonError("");
+        }}
+        maxWidth="sm"
+        fullWidth
+        disableEscapeKeyDown={cancelSubmitLoading}
+        PaperProps={{
+          elevation: 0,
+          sx: {
+            borderRadius: 2.5,
+            overflow: "hidden",
+            border: "1px solid #b0cfe8",
+            boxShadow: "0 22px 50px -14px rgba(13, 71, 161, 0.22)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ p: 0 }}>
+          <Box
+            sx={{
+              px: 2.5,
+              py: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              background: "linear-gradient(135deg, #e0f2fe 0%, #dbeafe 55%, #e8f4fc 100%)",
+              borderBottom: "1px solid #b0cfe8",
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: "rgba(239,68,68,0.14)",
+                color: "#dc2626",
+                width: 44,
+                height: 44,
+                border: "1px solid rgba(239,68,68,0.22)",
+              }}
+            >
+              <HighlightOffOutlinedIcon sx={{ fontSize: 26 }} />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  fontSize: { xs: 17, sm: 18 },
+                  fontWeight: 800,
+                  color: counsellorDetailModalSx.titleColor,
+                  lineHeight: 1.25,
+                }}
+              >
+                Xác nhận hủy lịch hẹn
+              </Typography>
+              <Typography sx={{ mt: 0.5, fontSize: 13.5, fontWeight: 500, color: "#455a64", lineHeight: 1.45 }}>
+                Lý do sẽ được gửi kèm khi cập nhật trạng thái.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, pb: 1, px: { xs: 2.25, sm: 2.75 }, bgcolor: counsellorDetailModalSx.pageBg }}>
+          <TextField
+            label="Lý do hủy"
+            placeholder="Ví dụ: Phụ huynh đổi lịch, không còn nhu cầu…"
+            multiline
+            minRows={4}
+            fullWidth
+            value={cancelReasonDraft}
+            onChange={(e) => {
+              setCancelReasonDraft(e.target.value);
+              if (cancelReasonError) setCancelReasonError("");
+            }}
+            error={Boolean(cancelReasonError)}
+            helperText={cancelReasonError || undefined}
+            disabled={cancelSubmitLoading}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "#fff",
+                borderRadius: 2,
+              },
+              "& .MuiInputLabel-root": { fontWeight: 600 },
+            }}
+          />
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: { xs: 2.25, sm: 2.75 },
+            py: 2,
+            bgcolor: "#f5fafd",
+            borderTop: "1px solid #b0cfe8",
+            gap: 1,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            variant="outlined"
+            disabled={cancelSubmitLoading}
+            onClick={() => {
+              setCancelConfirmOpen(false);
+              setCancelTargetRow(null);
+              setCancelReasonError("");
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 2.5,
+              minWidth: 108,
+              borderColor: "#90caf9",
+              color: "#1565c0",
+              "&:hover": { borderColor: "#1565c0", bgcolor: "rgba(21,101,160,0.06)" },
+            }}
+          >
+            Quay lại
+          </Button>
+          <Button
+            variant="contained"
+            disabled={cancelSubmitLoading}
+            onClick={() => void handleSubmitCancelAppointment()}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 2.75,
+              minWidth: 132,
+              bgcolor: "#dc2626",
+              boxShadow: "0 4px 14px rgba(220, 38, 38, 0.35)",
+              "&:hover": { bgcolor: "#b91c1c", boxShadow: "0 6px 18px rgba(185, 28, 28, 0.38)" },
+            }}
+          >
+            {cancelSubmitLoading ? "Đang xử lý…" : "Xác nhận hủy"}
+          </Button>
         </DialogActions>
       </Dialog>
 
