@@ -212,6 +212,7 @@ const IMPORT_TYPE_LABEL = {
     ALLOWED_METHODS: "Phương thức xét tuyển",
     ADMISSION_PROCESSES: "Quy trình tuyển sinh",
     METHOD_DOCUMENTS: "Hồ sơ theo phương thức",
+    MANDATORY_ALL: "Hồ sơ bắt buộc chung",
 };
 
 const IMPORT_TYPE_OPTIONS = Object.keys(IMPORT_TYPE_LABEL);
@@ -420,6 +421,7 @@ export default function AdminPlatformSettings() {
         allowedMethods: [],
         methodAdmissionProcess: [],
         methodDocumentRequirements: [],
+        mandatoryAllDocumentRequirements: [],
     });
     const [importType, setImportType] = useState("ALLOWED_METHODS");
     const [admissionImportRows, setAdmissionImportRows] = useState([]);
@@ -703,7 +705,7 @@ export default function AdminPlatformSettings() {
     const getAdmissionInitialForm = (cfg) => {
         const adm = cfg?.admissionSettingsData;
         if (!adm || typeof adm !== "object") {
-            return { allowedMethods: [], methodAdmissionProcess: [], methodDocumentRequirements: [] };
+            return { allowedMethods: [], methodAdmissionProcess: [], methodDocumentRequirements: [], mandatoryAllDocumentRequirements: [] };
         }
         const processSource = Array.isArray(adm.methodAdmissionProcess)
             ? adm.methodAdmissionProcess
@@ -712,10 +714,19 @@ export default function AdminPlatformSettings() {
               : [];
         const methodDocsSource = Array.isArray(adm.methodDocumentRequirements)
             ? adm.methodDocumentRequirements
+            : Array.isArray(adm?.documentRequirements?.byMethod)
+              ? adm.documentRequirements.byMethod
             : Array.isArray(adm?.documentRequirementsData?.byMethod)
               ? adm.documentRequirementsData.byMethod
               : Array.isArray(adm.byMethod)
                 ? adm.byMethod
+                : [];
+        const mandatoryDocsSource = Array.isArray(adm?.documentRequirements?.mandatoryAll)
+            ? adm.documentRequirements.mandatoryAll
+            : Array.isArray(adm?.documentRequirementsData?.mandatoryAll)
+              ? adm.documentRequirementsData.mandatoryAll
+              : Array.isArray(adm?.mandatoryAll)
+                ? adm.mandatoryAll
                 : [];
         const normalizedProcessSource = processSource.some((group) => Array.isArray(group?.steps))
             ? processSource
@@ -789,6 +800,11 @@ export default function AdminPlatformSettings() {
                             }))
                           : [],
                   })),
+            mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => ({
+                code: doc?.code != null ? String(doc.code) : "",
+                name: doc?.name != null ? String(doc.name) : "",
+                required: doc?.required === true,
+            })),
         };
     };
 
@@ -886,10 +902,12 @@ export default function AdminPlatformSettings() {
         setAdmissionTemplateForm(admInit);
         setAdmissionImportPreview({
             allowedMethods: admInit.allowedMethods,
+            documentRequirements: {
+                mandatoryAll: admInit.mandatoryAllDocumentRequirements,
+                byMethod: admInit.methodDocumentRequirements,
+            },
             documentRequirementsData: {
-                mandatoryAll: Array.isArray(configBody?.admissionSettingsData?.documentRequirementsData?.mandatoryAll)
-                    ? configBody.admissionSettingsData.documentRequirementsData.mandatoryAll
-                    : [],
+                mandatoryAll: admInit.mandatoryAllDocumentRequirements,
                 byMethod: admInit.methodDocumentRequirements,
             },
             admissionProcesses: admInit.methodAdmissionProcess,
@@ -1476,6 +1494,12 @@ export default function AdminPlatformSettings() {
 
     const getAdmissionImportRowTemplate = (type) => {
         switch (String(type || "").trim()) {
+            case "MANDATORY_ALL":
+                return {
+                    documentCode: "",
+                    documentName: "",
+                    required: "",
+                };
             case "ADMISSION_PROCESSES":
                 return {
                     methodCode: "",
@@ -1509,6 +1533,8 @@ export default function AdminPlatformSettings() {
 
     const getRequiredFieldsByImportType = (type) => {
         switch (String(type || "").trim()) {
+            case "MANDATORY_ALL":
+                return ["documentCode", "documentName"];
             case "METHOD_DOCUMENTS":
                 return ["methodCode", "documentCode", "documentName"];
             case "ADMISSION_PROCESSES":
@@ -1660,6 +1686,15 @@ export default function AdminPlatformSettings() {
         const rowDisabled = !admissionTemplateEditing || saving;
         const methods = admissionTemplateForm.allowedMethods || [];
         const preview = admissionImportPreview;
+        const mandatoryDocsSource = admissionTemplateEditing
+            ? Array.isArray(admissionTemplateForm.mandatoryAllDocumentRequirements)
+                ? admissionTemplateForm.mandatoryAllDocumentRequirements
+                : []
+            : Array.isArray(preview?.documentRequirements?.mandatoryAll)
+                ? preview.documentRequirements.mandatoryAll
+                : Array.isArray(preview?.documentRequirementsData?.mandatoryAll)
+                    ? preview.documentRequirementsData.mandatoryAll
+                    : [];
         const docsSource = admissionTemplateEditing
             ? Array.isArray(admissionTemplateForm.methodDocumentRequirements)
                 ? admissionTemplateForm.methodDocumentRequirements
@@ -1988,7 +2023,10 @@ export default function AdminPlatformSettings() {
                         <Box
                             sx={{
                                 display: "grid",
-                                gridTemplateColumns: { xs: "1fr", md: "0.9fr 1fr 1.5fr 52px" },
+                                gridTemplateColumns: {
+                                    xs: "1fr",
+                                    md: admissionTemplateEditing ? "0.9fr 1fr 1.5fr 52px" : "0.9fr 1fr 1.5fr",
+                                },
                                 gap: 1.25,
                                 px: 1,
                                 py: 0.75,
@@ -2001,7 +2039,9 @@ export default function AdminPlatformSettings() {
                             <Typography sx={{ fontWeight: 800, color: "#374151", fontSize: 13 }}>Mã phương thức</Typography>
                             <Typography sx={{ fontWeight: 800, color: "#374151", fontSize: 13 }}>Tên hiển thị</Typography>
                             <Typography sx={{ fontWeight: 800, color: "#374151", fontSize: 13 }}>Mô tả</Typography>
-                            <Typography sx={{ fontWeight: 800, color: "#374151", fontSize: 13, textAlign: "center" }}>Xóa</Typography>
+                            {admissionTemplateEditing ? (
+                                <Typography sx={{ fontWeight: 800, color: "#374151", fontSize: 13, textAlign: "center" }}>Xóa</Typography>
+                            ) : null}
                         </Box>
 
                         {methods.length === 0 ? (
@@ -2026,7 +2066,10 @@ export default function AdminPlatformSettings() {
                                         key={`adm-${idx}-${row.code ?? "row"}`}
                                         sx={{
                                             display: "grid",
-                                            gridTemplateColumns: { xs: "1fr", md: "0.9fr 1fr 1.5fr 52px" },
+                                            gridTemplateColumns: {
+                                                xs: "1fr",
+                                                md: admissionTemplateEditing ? "0.9fr 1fr 1.5fr 52px" : "0.9fr 1fr 1.5fr",
+                                            },
                                             gap: 1.25,
                                             p: 1.1,
                                             borderRadius: 1.75,
@@ -2116,27 +2159,29 @@ export default function AdminPlatformSettings() {
                                             }}
                                             sx={admissionInputSx}
                                         />
-                                        <Box sx={{ display: "flex", justifyContent: "center", pt: 0.25 }}>
-                                            <Tooltip title="Xóa dòng" placement="left">
-                                                <span>
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        disabled={rowDisabled}
-                                                        aria-label="Xóa dòng"
-                                                        onClick={() =>
-                                                            setAdmissionTemplateForm((p) => {
-                                                                const next = [...(p.allowedMethods || [])];
-                                                                next.splice(idx, 1);
-                                                                return { ...p, allowedMethods: next };
-                                                            })
-                                                        }
-                                                    >
-                                                        <DeleteOutlineIcon fontSize="small" />
-                                                    </IconButton>
-                                                </span>
-                                            </Tooltip>
-                                        </Box>
+                                        {admissionTemplateEditing ? (
+                                            <Box sx={{ display: "flex", justifyContent: "center", pt: 0.25 }}>
+                                                <Tooltip title="Xóa dòng" placement="left">
+                                                    <span>
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            disabled={rowDisabled}
+                                                            aria-label="Xóa dòng"
+                                                            onClick={() =>
+                                                                setAdmissionTemplateForm((p) => {
+                                                                    const next = [...(p.allowedMethods || [])];
+                                                                    next.splice(idx, 1);
+                                                                    return { ...p, allowedMethods: next };
+                                                                })
+                                                            }
+                                                        >
+                                                            <DeleteOutlineIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </span>
+                                                </Tooltip>
+                                            </Box>
+                                        ) : null}
                                     </Box>
                                 ))}
                             </Stack>
@@ -2164,6 +2209,202 @@ export default function AdminPlatformSettings() {
                             </Box>
                         ) : null}
                     </Box>
+                </Box>
+
+                <Box
+                    sx={{
+                        p: 1.5,
+                        borderRadius: 2.25,
+                        border: "1px solid rgba(191, 219, 254, 0.9)",
+                        bgcolor: "rgba(248,251,255,0.78)",
+                        boxShadow: "0 10px 22px rgba(37, 99, 235, 0.08)",
+                        transition: "all 220ms ease",
+                        "&:hover": {
+                            borderColor: "rgba(96, 165, 250, 0.65)",
+                            boxShadow: "0 14px 28px rgba(37, 99, 235, 0.14)",
+                        },
+                    }}
+                >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, mb: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#1d4ed8" }}>
+                            Hồ sơ bắt buộc chung
+                        </Typography>
+                        {admissionTemplateEditing ? (
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                    onClick={() => {
+                                        setImportType("MANDATORY_ALL");
+                                        setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                    }}
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Tải hồ sơ chung
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Tài liệu mẫu
+                                </Button>
+                            </Stack>
+                        ) : (
+                            <Stack direction="row" spacing={1}>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Tài liệu mẫu
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={saving}
+                                    onClick={() => setAdmissionTemplateEditing(true)}
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
+                                >
+                                    Chỉnh sửa
+                                </Button>
+                            </Stack>
+                        )}
+                    </Box>
+                    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.5, bgcolor: "#ffffff" }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: "#eef4ff" }}>
+                                    <TableCell sx={{ width: 64, fontWeight: 800, color: "#374151" }}>STT</TableCell>
+                                    <TableCell sx={{ fontWeight: 800, color: "#374151" }}>Tên hồ sơ</TableCell>
+                                    <TableCell sx={{ width: 160, fontWeight: 800, color: "#374151" }}>Loại</TableCell>
+                                    {admissionTemplateEditing ? (
+                                        <TableCell align="center" sx={{ width: 64, fontWeight: 800, whiteSpace: "nowrap", color: "#374151" }}>
+                                            Thao tác
+                                        </TableCell>
+                                    ) : null}
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {mandatoryDocsSource.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={admissionTemplateEditing ? 4 : 3} sx={{ py: 4, textAlign: "center", color: "#64748b" }}>
+                                            <InfoOutlinedIcon sx={{ fontSize: 22, color: "#94a3b8", mb: 0.5 }} />
+                                            <Typography variant="body2">Chưa có hồ sơ bắt buộc chung.</Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : mandatoryDocsSource.map((doc, dIdx) => (
+                                    <TableRow key={`mandatory-doc-${dIdx}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
+                                        <TableCell>{dIdx + 1}</TableCell>
+                                        <TableCell>
+                                            {admissionTemplateEditing ? (
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    value={doc?.name ?? ""}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setAdmissionTemplateForm((prev) => {
+                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                                ? [...prev.mandatoryAllDocumentRequirements]
+                                                                : [];
+                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], name: value };
+                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
+                                                        });
+                                                    }}
+                                                    placeholder="Nhập tên hồ sơ"
+                                                    sx={admissionInputSx}
+                                                />
+                                            ) : (
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {admissionTemplateEditing ? (
+                                                <TextField
+                                                    size="small"
+                                                    select
+                                                    fullWidth
+                                                    value={doc?.required === true ? "true" : "false"}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setAdmissionTemplateForm((prev) => {
+                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                                ? [...prev.mandatoryAllDocumentRequirements]
+                                                                : [];
+                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], required: value === "true" };
+                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
+                                                        });
+                                                    }}
+                                                    sx={admissionInputSx}
+                                                >
+                                                    <MenuItem value="true">Bắt buộc</MenuItem>
+                                                    <MenuItem value="false">Tùy chọn</MenuItem>
+                                                </TextField>
+                                            ) : (
+                                                <Chip
+                                                    size="small"
+                                                    label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                    sx={{
+                                                        height: 24,
+                                                        fontWeight: 700,
+                                                        fontSize: 11,
+                                                        color: doc?.required ? "#b91c1c" : "#166534",
+                                                        bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                    }}
+                                                />
+                                            )}
+                                        </TableCell>
+                                        {admissionTemplateEditing ? (
+                                            <TableCell align="center">
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => {
+                                                        setAdmissionTemplateForm((prev) => {
+                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                                ? [...prev.mandatoryAllDocumentRequirements]
+                                                                : [];
+                                                            nextDocs.splice(dIdx, 1);
+                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
+                                                        });
+                                                    }}
+                                                >
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                </IconButton>
+                                            </TableCell>
+                                        ) : null}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    {admissionTemplateEditing ? (
+                        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<AddIcon fontSize="small" />}
+                                onClick={() =>
+                                    setAdmissionTemplateForm((prev) => ({
+                                        ...prev,
+                                        mandatoryAllDocumentRequirements: [
+                                            ...(Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                ? prev.mandatoryAllDocumentRequirements
+                                                : []),
+                                            { code: "", name: "", required: false },
+                                        ],
+                                    }))
+                                }
+                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                            >
+                                Thêm hồ sơ chung
+                            </Button>
+                        </Box>
+                    ) : null}
                 </Box>
 
                 {preview ? (() => {
