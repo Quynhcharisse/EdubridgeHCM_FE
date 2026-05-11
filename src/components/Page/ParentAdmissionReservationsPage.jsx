@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Avatar,
     Box,
@@ -508,30 +508,55 @@ export default function ParentAdmissionReservationsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
     const [selectedReservation, setSelectedReservation] = useState(null);
+    const mountedRef = useRef(true);
+
+    const loadReservations = useCallback(async ({silent = false} = {}) => {
+        if (!silent) setLoading(true);
+        try {
+            const response = await getParentAdmissionReservationForms();
+            const rows = pickAdmissionReservationFormsFromResponse(response);
+            if (mountedRef.current) setReservations(rows);
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] load error:", error);
+            if (mountedRef.current && !silent) {
+                setReservations([]);
+                enqueueSnackbar("Không thể tải danh sách đơn đăng ký. Vui lòng thử lại sau.", {variant: "error"});
+            }
+        } finally {
+            if (mountedRef.current && !silent) setLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
-        let mounted = true;
-
-        async function loadReservations() {
-            setLoading(true);
-            try {
-                const response = await getParentAdmissionReservationForms();
-                const rows = pickAdmissionReservationFormsFromResponse(response);
-                if (mounted) setReservations(rows);
-            } catch (error) {
-                console.error("[ParentAdmissionReservationsPage] load error:", error);
-                if (mounted) setReservations([]);
-                enqueueSnackbar("Không thể tải danh sách đơn đăng ký. Vui lòng thử lại sau.", {variant: "error"});
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
-
-        loadReservations();
+        mountedRef.current = true;
+        void loadReservations();
         return () => {
-            mounted = false;
+            mountedRef.current = false;
         };
-    }, []);
+    }, [loadReservations]);
+
+    useEffect(() => {
+        const refreshIfVisible = () => {
+            if (document.visibilityState === "visible") {
+                void loadReservations({silent: true});
+            }
+        };
+
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === "visible") {
+                void loadReservations({silent: true});
+            }
+        }, 10000);
+
+        window.addEventListener("focus", refreshIfVisible);
+        document.addEventListener("visibilitychange", refreshIfVisible);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener("focus", refreshIfVisible);
+            document.removeEventListener("visibilitychange", refreshIfVisible);
+        };
+    }, [loadReservations]);
 
     const filteredReservations = useMemo(() => {
         if (filter === "ALL") return reservations;
