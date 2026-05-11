@@ -2861,7 +2861,9 @@ export default function SchoolSearchDetailView({
     detailIsSaved,
     detailInCompare,
     toggleCompare,
-    toggleSave
+    toggleSave,
+    /** Gọi sau khi phụ huynh nộp đơn giữ chỗ thành công (vd. chuyển trường tiếp theo trong lô). */
+    onAfterAdmissionReservationSubmitted,
 }) {
     const [detailActiveSection, setDetailActiveSection] = React.useState("intro");
     const detailScrollRef = React.useRef(null);
@@ -2932,7 +2934,10 @@ export default function SchoolSearchDetailView({
 
     const handleAdmissionSubmitted = React.useCallback(() => {
         setAdmissionSubmissionLocked(true);
-    }, []);
+        if (typeof onAfterAdmissionReservationSubmitted === "function") {
+            onAfterAdmissionReservationSubmitted();
+        }
+    }, [onAfterAdmissionReservationSubmitted]);
 
     React.useEffect(() => {
         setAdmissionSubmissionLocked(false);

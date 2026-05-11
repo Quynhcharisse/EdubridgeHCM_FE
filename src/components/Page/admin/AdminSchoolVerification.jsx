@@ -182,14 +182,7 @@ export default function AdminSchoolVerification() {
                     );
                 }
 
-                setDetailItem((prev) =>
-                    prev && getVerifyRequestId(prev) === requestId
-                        ? {
-                              ...prev,
-                              status: "VERIFIED",
-                          }
-                        : prev
-                );
+                closeDetail();
             }
         } catch (error) {
             console.error("Verify school registration failed", error);
