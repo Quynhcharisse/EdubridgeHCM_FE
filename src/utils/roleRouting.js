@@ -61,6 +61,7 @@ export const isRouteAllowedForRole = (path, role) => {
             '/parent/profile',
             '/parent/offline-consultations',
             '/parent/admission-reservations',
+            '/parent/admission-hold-profile',
             '/children-info',
             '/saved-schools',
             '/compare-schools',

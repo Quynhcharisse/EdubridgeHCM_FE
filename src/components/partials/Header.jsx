@@ -33,6 +33,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
+import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SearchIcon from "@mui/icons-material/Search";
@@ -3941,6 +3942,27 @@ function MainHeader() {
                                             <MenuItem
                                                 onClick={() => {
                                                     handleUserMenuClose();
+                                                    goTo('/parent/admission-hold-profile');
+                                                }}
+                                                sx={{
+                                                    fontSize: 15,
+                                                    fontWeight: 500,
+                                                    color: BRAND_NAVY,
+                                                    borderRadius: 1,
+                                                    gap: 1.5,
+                                                    mt: 0.5,
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(59,130,246,0.08)',
+                                                        color: APP_PRIMARY_DARK,
+                                                    },
+                                                    transition: 'background 0.2s, color 0.2s',
+                                                }}
+                                            >
+                                                <NoteAddOutlinedIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Hồ sơ giữ chỗ
+                                            </MenuItem>
+                                            <MenuItem
+                                                onClick={() => {
+                                                    handleUserMenuClose();
                                                     goTo('/parent/admission-reservations');
                                                 }}
                                                 sx={{
@@ -4239,6 +4261,15 @@ function MainHeader() {
                                             >
                                                 <ListItemText 
                                                     primary="Thông tin con"
+                                                    sx={{color: BRAND_NAVY, fontWeight: 600}}
+                                                />
+                                            </ListItem>
+                                            <ListItem
+                                                onClick={() => goTo('/parent/admission-hold-profile')}
+                                                sx={{cursor: 'pointer'}}
+                                            >
+                                                <ListItemText
+                                                    primary="Hồ sơ giữ chỗ"
                                                     sx={{color: BRAND_NAVY, fontWeight: 600}}
                                                 />
                                             </ListItem>
