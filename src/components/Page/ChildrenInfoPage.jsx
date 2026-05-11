@@ -156,14 +156,13 @@ export default function ChildrenInfoPage() {
     const openTranscriptImageListModal = async () => {
         setActiveTranscriptSlide(0);
         setAutoFillPreviewData(null);
+        setTranscriptImageListOpen(true);
         if (transcriptSlides.length === 0) {
-            setTranscriptImageListOpen(true);
             return;
         }
         const result = await requestAutoFillFromTranscriptImages();
         if (!result) return;
         setAutoFillPreviewData(result);
-        setTranscriptImageListOpen(true);
     };
 
     const handleApplyAutoFillFromPreview = () => {
@@ -1541,6 +1540,12 @@ export default function ChildrenInfoPage() {
                                                                     size="medium"
                                                                     variant="contained"
                                                                     onClick={openTranscriptImageListModal}
+                                                                    disabled={autoFillLoading}
+                                                                    startIcon={
+                                                                        autoFillLoading ? (
+                                                                            <CircularProgress size={14} thickness={6} sx={{color: '#ffffff'}}/>
+                                                                        ) : null
+                                                                    }
                                                                     sx={{
                                                                         textTransform: 'none',
                                                                         minWidth: 'fit-content',
@@ -1555,9 +1560,14 @@ export default function ChildrenInfoPage() {
                                                                             background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
                                                                             boxShadow: '0 8px 20px rgba(29,78,216,0.4)',
                                                                         },
+                                                                        '&.Mui-disabled': {
+                                                                            color: 'rgba(255,255,255,0.85)',
+                                                                            background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
+                                                                            boxShadow: 'none',
+                                                                        },
                                                                     }}
                                                                 >
-                                                                    Tự động điền
+                                                                    {autoFillLoading ? 'Đang điền...' : 'Tự động điền'}
                                                                 </Button>
                                                             )}
                                                         </Box>
