@@ -1644,13 +1644,13 @@ export default function AdminPlatformSettings() {
             const errorCount = rows.filter((row) => row.isError).length;
             if (rows.length === 0) {
                 enqueueSnackbar("File không có dữ liệu để nhập.", { variant: "warning" });
-            } else if (admissionTemplateEditing && errorCount === 0) {
-                setAdmissionTemplateForm((prev) => applyImportedRowsToAdmissionDraft(prev, importType, rows));
-                enqueueSnackbar("Đã nạp dữ liệu vào bản nháp. Nhấn Lưu để cập nhật hệ thống.", { variant: "success" });
-                setAdmissionImportRows([]);
-                setAdmissionImportPreviewOpen(false);
             } else if (errorCount === 0) {
-                enqueueSnackbar("Dữ liệu hợp lệ, bạn có thể xác nhận nhập ngay.", { variant: "success" });
+                enqueueSnackbar(
+                    admissionTemplateEditing
+                        ? "Dữ liệu hợp lệ. Kiểm tra trong bảng, sau đó nhấn Xác nhận nhập để áp dụng vào bản nháp."
+                        : "Dữ liệu hợp lệ, bạn có thể xác nhận nhập ngay.",
+                    { variant: "success" }
+                );
                 setAdmissionImportPreviewOpen(true);
             } else {
                 enqueueSnackbar(`Đã tải xem trước: ${errorCount}/${rows.length} dòng có lỗi.`, { variant: "warning" });
@@ -1881,9 +1881,40 @@ export default function AdminPlatformSettings() {
             mb: 1,
             display: "block",
         };
+        const admissionToolbarSmallOutlinedSx = {
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 2,
+            borderColor: "#93c5fd",
+            color: "#2563eb",
+            bgcolor: "#ffffff",
+            "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" },
+        };
+        const admissionToolbarSmallPrimarySx = {
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 2,
+            bgcolor: "#2563eb",
+            color: "#ffffff",
+            boxShadow: "none",
+            "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" },
+        };
 
         return (
             <Stack spacing={2.5} sx={{ width: "100%" }}>
+                {!admissionTemplateEditing ? (
+                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={saving}
+                            onClick={() => setAdmissionTemplateEditing(true)}
+                            sx={admissionToolbarSmallOutlinedSx}
+                        >
+                            Chỉnh sửa
+                        </Button>
+                    </Box>
+                ) : null}
                 <Box>
                     <input
                         ref={admissionImportInputRef}
@@ -2086,25 +2117,14 @@ export default function AdminPlatformSettings() {
                                     </Button>
                                 </Stack>
                             ) : (
-                                <Stack direction="row" spacing={1}>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                    >
-                                        Tài liệu mẫu
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={saving}
-                                        onClick={() => setAdmissionTemplateEditing(true)}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                    >
-                                        Chỉnh sửa
-                                    </Button>
-                                </Stack>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Tài liệu mẫu
+                                </Button>
                             )}
                         </Box>
                         {methods.length === 0 ? (
@@ -2271,28 +2291,6 @@ export default function AdminPlatformSettings() {
                                 </Table>
                             </TableContainer>
                         )}
-                        {admissionTemplateEditing ? (
-                            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 2 }}>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={saving}
-                                    onClick={() => { cancelAdmissionTemplate(); setAdmissionTemplateEditing(false); }}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                >
-                                    Hủy
-                                </Button>
-                                <Button
-                                    size="small"
-                                    variant="contained"
-                                    disabled={saving}
-                                    onClick={() => void saveAdmissionTemplate()}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#2563eb", color: "#ffffff", boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
-                                >
-                                    Lưu
-                                </Button>
-                            </Box>
-                        ) : null}
                     </Box>
                 </Box>
 
@@ -2338,25 +2336,14 @@ export default function AdminPlatformSettings() {
                                 </Button>
                             </Stack>
                         ) : (
-                            <Stack direction="row" spacing={1}>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tài liệu mẫu
-                                </Button>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={saving}
-                                    onClick={() => setAdmissionTemplateEditing(true)}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                >
-                                    Chỉnh sửa
-                                </Button>
-                            </Stack>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
+                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                            >
+                                Tài liệu mẫu
+                            </Button>
                         )}
                     </Box>
                     <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.5, bgcolor: "#ffffff" }}>
@@ -2577,15 +2564,6 @@ export default function AdminPlatformSettings() {
                                             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                         >
                                             Tài liệu mẫu quy trình
-                                        </Button>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            disabled={saving}
-                                            onClick={() => setAdmissionTemplateEditing(true)}
-                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                        >
-                                            Chỉnh sửa
                                         </Button>
                                     </Stack>
                                 )}
@@ -2967,33 +2945,44 @@ export default function AdminPlatformSettings() {
                                     </Card>
                                 </>
                             )}
-
-                            {admissionTemplateEditing ? (
-                                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 2 }}>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={saving}
-                                        onClick={() => { cancelAdmissionTemplate(); setAdmissionTemplateEditing(false); }}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#93c5fd", color: "#2563eb", bgcolor: "#ffffff", "&:hover": { borderColor: "#60a5fa", bgcolor: "#eff6ff" } }}
-                                    >
-                                        Hủy
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        variant="contained"
-                                        disabled={saving}
-                                        onClick={() => void saveAdmissionTemplate()}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#2563eb", color: "#ffffff", boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
-                                    >
-                                        Lưu
-                                    </Button>
-                                </Box>
-                            ) : null}
                         </Box>
                     );
                 })() : null}
 
+                {admissionTemplateEditing ? (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: 1,
+                            flexWrap: "wrap",
+                            pt: 0.5,
+                            pb: 0.25,
+                        }}
+                    >
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={saving}
+                            onClick={() => {
+                                cancelAdmissionTemplate();
+                                setAdmissionTemplateEditing(false);
+                            }}
+                            sx={admissionToolbarSmallOutlinedSx}
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            disabled={saving}
+                            onClick={() => void saveAdmissionTemplate()}
+                            sx={admissionToolbarSmallPrimarySx}
+                        >
+                            Lưu
+                        </Button>
+                    </Box>
+                ) : null}
             </Stack>
         );
     };
