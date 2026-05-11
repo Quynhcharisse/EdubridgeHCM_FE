@@ -45,7 +45,6 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {useNavigate, useSearchParams} from "react-router-dom";
 import {closeSnackbar, enqueueSnackbar} from "notistack";
@@ -2192,9 +2191,28 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     /** Cơ sở chính: PUT /api/v1/school/config/{schoolId} (gồm operationSettingsData + facilityData nếu đổi). */
     const schoolPayloadRaw = buildPartialPayload(config, initial);
     const allowedSectionKeys = new Set(getSectionKeysByTabSlug(tabSlug));
-    const schoolPayload = Object.fromEntries(
+    let schoolPayload = Object.fromEntries(
       Object.entries(schoolPayloadRaw).filter(([key]) => allowedSectionKeys.has(key))
     );
+    if (schoolPayload.admissionSettingsData != null) {
+      const docReq = sanitizeDocumentRequirementsForApi(config.documentRequirementsData);
+      schoolPayload = {
+        ...schoolPayload,
+        admissionSettingsData: {
+          ...schoolPayload.admissionSettingsData,
+          // Đồng bộ mandatoryAll theo nguồn dữ liệu tab Cài đặt hồ sơ.
+          documentRequirements: {
+            ...(schoolPayload.admissionSettingsData.documentRequirements || {}),
+            mandatoryAll: docReq.mandatoryAll,
+          },
+          // Giữ key cũ để tương thích BE reader hiện tại.
+          documentRequirementsData: {
+            ...(schoolPayload.admissionSettingsData.documentRequirementsData || {}),
+            mandatoryAll: docReq.mandatoryAll,
+          },
+        },
+      };
+    }
 
     if (Object.keys(schoolPayload).length === 0) {
       enqueueSnackbar("Không có thay đổi để lưu", {variant: "info"});
@@ -2419,6 +2437,38 @@ export default function SchoolConfig({variant = "platform"} = {}) {
         },
       }));
       enqueueSnackbar("Đã áp dụng mẫu hệ thống cho Cài đặt hồ sơ (chưa lưu DB).", {variant: "success"});
+    } finally {
+      setLoadingSystemAdmission(false);
+    }
+  }, []);
+
+  const applySystemMandatoryAllTemplateToForm = useCallback(async () => {
+    setLoadingSystemAdmission(true);
+    try {
+      const res = await getSystemConfigByKey("admissionSettingsData");
+      const body = res?.data?.body ?? res?.data?.data ?? res?.data ?? {};
+      const admissionRoot =
+        body?.admissionSettingsData && typeof body.admissionSettingsData === "object" ? body.admissionSettingsData : body;
+      const docRoot =
+        admissionRoot?.documentRequirementsData && typeof admissionRoot.documentRequirementsData === "object"
+          ? admissionRoot.documentRequirementsData
+          : admissionRoot;
+      const mandatoryRaw = Array.isArray(docRoot?.mandatoryAll) ? docRoot.mandatoryAll : [];
+      if (!mandatoryRaw.length) {
+        enqueueSnackbar("Không có dữ liệu Hồ sơ bắt buộc chung trên hệ thống.", {variant: "info"});
+        return;
+      }
+      const mandatoryAll = mandatoryRaw.map((item) => ({...normalizeDocItem(item), required: true}));
+      setConfig((c) => ({
+        ...c,
+        documentRequirementsData: {
+          ...c.documentRequirementsData,
+          mandatoryAll,
+        },
+      }));
+      enqueueSnackbar("Đã lấy mẫu Hồ sơ bắt buộc chung từ hệ thống (chưa lưu DB).", {variant: "success"});
+    } catch (err) {
+      enqueueSnackbar(err?.response?.data?.message || err?.message || "Không thể lấy mẫu từ hệ thống", {variant: "error"});
     } finally {
       setLoadingSystemAdmission(false);
     }
@@ -3926,30 +3976,13 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<CloudUploadOutlinedIcon/>}
-                        onClick={onImportMandatoryDocsClick}
-                        disabled={fieldDisabled}
+                        onClick={() => void applySystemMandatoryAllTemplateToForm()}
+                        disabled={loadingSystemAdmission || fieldDisabled}
                         sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
                       >
-                        Tải tệp lên
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={exportMandatoryDocsTemplate}
-                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
-                      >
-                        Tài liệu mẫu
+                        Lấy mẫu từ hệ thống
                       </Button>
                     </Stack>
-                    <input
-                      ref={mandatoryDocsImportInputRef}
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      style={{display: "none"}}
-                      onChange={onMandatoryDocsFileChange}
-                      disabled={fieldDisabled}
-                    />
                   </Stack>
                   <Alert severity="info" sx={{borderRadius: 2, maxWidth: 1200}}>
                     <Typography variant="body2" component="div" sx={{fontWeight: 700, mb: 0.75}}>
