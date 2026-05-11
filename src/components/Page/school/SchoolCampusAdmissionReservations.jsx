@@ -575,6 +575,14 @@ export default function SchoolCampusAdmissionReservations() {
     const [rejectState, setRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
 
+    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
+        if (!VALID_STATUSES.has(nextStatus)) return;
+        setDetailOpen(false);
+        setSelectedReservation(null);
+        setStatusFilter(nextStatus);
+        setPage(0);
+    }, []);
+
     const loadData = React.useCallback(async () => {
         setLoading(true);
         setError("");
@@ -654,7 +662,7 @@ export default function SchoolCampusAdmissionReservations() {
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
             setConfirmState({open: false, form: null});
-            await loadData();
+            redirectToProcessedStatusView("RESERVATION_APPROVAL");
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể phê duyệt hồ sơ."), {variant: "error"});
         } finally {
@@ -681,7 +689,7 @@ export default function SchoolCampusAdmissionReservations() {
             });
             enqueueSnackbar("Từ chối thành công", {variant: "success"});
             setRejectState({open: false, form: null, reason: "", touched: false});
-            await loadData();
+            redirectToProcessedStatusView("RESERVATION_REJECTED");
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối hồ sơ."), {variant: "error"});
         } finally {
