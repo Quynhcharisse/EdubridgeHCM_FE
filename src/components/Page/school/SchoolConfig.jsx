@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
+  Autocomplete,
   Accordion,
   AccordionDetails,
   AccordionSummary,
@@ -20,11 +21,13 @@ import {
   FormControl,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   InputLabel,
   LinearProgress,
   MenuItem,
   Paper,
   Select,
+  Skeleton,
   Stack,
   Switch,
   Tab,
@@ -44,10 +47,19 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
+import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
+import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import NumbersOutlinedIcon from "@mui/icons-material/NumbersOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {useNavigate, useSearchParams} from "react-router-dom";
 import {closeSnackbar, enqueueSnackbar} from "notistack";
+import {motion} from "framer-motion";
 
 import {extractCampusListBody, listCampuses} from "../../../services/CampusService.jsx";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
@@ -55,6 +67,7 @@ import {
   confirmMandatoryDocImportRows,
   getCampusConfig,
   getSchoolConfig,
+  getSchoolConfigByKey,
   parseSchoolConfigResponseBody,
   previewMandatoryDocsImport,
   updateCampusConfig,
@@ -84,7 +97,7 @@ import {
   WORK_SHIFT_TYPE_LABEL_VI,
 } from "../../../utils/workShiftPolicy.js";
 
-const TAB_SLUGS = ["admission", "documents", "operation", "finance", "facility", "quota", "resource-distribution"];
+const TAB_SLUGS = ["admission", "documents", "operation", "finance", "facility", "quota", "resource-distribution", "bank-info"];
 const TAB_LABELS = [
   "Cài đặt tuyển sinh",
   "Cài đặt hồ sơ",
@@ -93,6 +106,7 @@ const TAB_LABELS = [
   "Cài đặt cơ sở vật chất",
   "Cài đặt chỉ tiêu",
   "Phân bổ nguồn lực",
+  "Tài khoản ngân hàng",
 ];
 
 /** Campus phụ: chỉ vận hành + cơ sở vật chất (API GET/PUT /campus/{id}/config) */
@@ -206,6 +220,12 @@ function defaultConfig() {
       feeItems: [],
       reservationFee: {amount: 0, display: "", currency: "VND"},
       priceAdjustment: {minPercent: 0, maxPercent: 0},
+    },
+    bankInfoData: {
+      bankId: "",
+      accountNo: "",
+      accountName: "",
+      bankName: "",
     },
     documentRequirementsData: {
       mandatoryAll: [],
@@ -1069,6 +1089,62 @@ function sanitizeResourceDistributionDataForApi(rd) {
   return {allocations};
 }
 
+function sanitizeBankInfoDataForApi(data) {
+  if (!data || typeof data !== "object") {
+    return {bankId: "", accountNo: "", accountName: "", bankName: ""};
+  }
+  return {
+    bankId: data.bankId != null ? String(data.bankId).trim() : "",
+    accountNo: data.accountNo != null ? String(data.accountNo).trim() : "",
+    accountName: data.accountName != null ? String(data.accountName).trim() : "",
+    bankName: data.bankName != null ? String(data.bankName).trim() : "",
+  };
+}
+
+function normalizeVietQrBankList(raw) {
+  const src = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  return src
+    .map((item) => {
+      const bankId = String(item?.bin ?? item?.bankId ?? item?.id ?? "").trim();
+      const bankName = String(item?.shortName ?? item?.name ?? item?.bankName ?? "").trim();
+      const fullName = String(item?.name ?? "").trim();
+      if (!bankId || !bankName) return null;
+      return {
+        bankId,
+        bankName,
+        label: fullName && fullName !== bankName ? `${bankName} - ${fullName}` : bankName,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.label.localeCompare(b.label, "vi"));
+}
+
+function buildVietQrQuickImageUrl(bankInfo) {
+  const bankId = String(bankInfo?.bankId ?? "").trim();
+  const accountNo = String(bankInfo?.accountNo ?? "").trim();
+  if (!bankId || !accountNo) return "";
+  const params = new URLSearchParams();
+  const accountName = String(bankInfo?.accountName ?? "").trim();
+  if (accountName) params.set("accountName", accountName);
+  const base = `https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNo)}-compact2.png`;
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+function maskBankAccountNo(raw) {
+  const digits = String(raw ?? "").replace(/\s+/g, "");
+  if (!digits) return "---- ---- ----";
+  if (digits.length <= 4) return digits;
+  const tail = digits.slice(-4);
+  return `${"*".repeat(Math.max(0, digits.length - 4))}${tail}`;
+}
+
+function formatAccountNoForDisplay(raw) {
+  const s = String(raw ?? "").replace(/\s+/g, "");
+  if (!s) return "";
+  return s.replace(/(.{4})/g, "$1 ").trim();
+}
+
 /** Gộp admission_settings (snake) với admissionSettingsData — bỏ key lạ như itemList: boolean */
 function mergeAdmissionFromBody(body) {
   const camel = body.admissionSettingsData && typeof body.admissionSettingsData === "object" ? body.admissionSettingsData : {};
@@ -1087,6 +1163,7 @@ function normalizeFromApi(body) {
   const adm = mergeAdmissionFromBody(body);
   const quota = pickSection(body, "quotaConfigData", "quota_config");
   const fin = pickSection(body, "financePolicyData", "finance_policy");
+  const bank = pickSection(body, "bankInfoData", "bank_info");
   const doc = pickSection(body, "documentRequirementsData", "document_requirements");
   const op = pickSection(body, "operationSettingsData", "operation_settings");
   const fac = mergeFacilityFromBody(body);
@@ -1125,6 +1202,7 @@ function normalizeFromApi(body) {
       campusAssignments: Array.isArray(quota.campusAssignments) ? quota.campusAssignments : d.quotaConfigData.campusAssignments,
     },
     financePolicyData: normalizeFinancePolicySection(fin, d.financePolicyData),
+    bankInfoData: sanitizeBankInfoDataForApi(bank),
     documentRequirementsData: {
       ...d.documentRequirementsData,
       mandatoryAll: Array.isArray(doc.mandatoryAll)
@@ -1154,6 +1232,7 @@ const CONFIG_SECTION_SANITIZERS = {
   admissionSettingsData: sanitizeAdmissionSettingsForApi,
   quotaConfigData: sanitizeQuotaConfigForApi,
   documentRequirementsData: sanitizeDocumentRequirementsForApi,
+  bankInfoData: sanitizeBankInfoDataForApi,
   operationSettingsData: sanitizeOperationSettingsForApi,
   facilityData: sanitizeFacilityDataForApi,
   resourceDistributionData: sanitizeResourceDistributionDataForApi,
@@ -1164,6 +1243,7 @@ function buildPartialPayload(current, initial) {
     "admissionSettingsData",
     "quotaConfigData",
     "financePolicyData",
+    "bankInfoData",
     "documentRequirementsData",
     "operationSettingsData",
     "facilityData",
@@ -1206,6 +1286,8 @@ function getSectionKeysByTabSlug(tabSlug) {
       return ["operationSettingsData"];
     case "finance":
       return ["financePolicyData"];
+    case "bank-info":
+      return ["bankInfoData"];
     case "facility":
       return ["facilityData"];
     case "quota":
@@ -1753,6 +1835,9 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const [mandatoryImportLoading, setMandatoryImportLoading] = useState(false);
   const [mandatoryImportConfirming, setMandatoryImportConfirming] = useState(false);
   const [mandatoryImportRows, setMandatoryImportRows] = useState([]);
+  const [vietQrBanks, setVietQrBanks] = useState([]);
+  const [loadingVietQrBanks, setLoadingVietQrBanks] = useState(false);
+  const [vietQrBanksLoaded, setVietQrBanksLoaded] = useState(false);
   /** Pattern A: bật mới hiện form HK; tắt = không giới hạn (xóa ngày trong form). Đồng bộ sau load. */
   const [academicSemesterLimitEnabled, setAcademicSemesterLimitEnabled] = useState(false);
 
@@ -1952,6 +2037,18 @@ export default function SchoolConfig({variant = "platform"} = {}) {
         }
         const schoolBody = parseSchoolConfigResponseBody(schoolRes);
         next = normalizeFromApi(schoolBody);
+        try {
+          const bankRes = await getSchoolConfigByKey("bankInfoData");
+          const bankBody = parseSchoolConfigResponseBody(bankRes);
+          if (bankBody?.bankInfoData && typeof bankBody.bankInfoData === "object") {
+            next = {
+              ...next,
+              bankInfoData: sanitizeBankInfoDataForApi(bankBody.bankInfoData),
+            };
+          }
+        } catch {
+          // ignore, fallback dùng dữ liệu từ GET /school/config nếu có.
+        }
       } catch (e) {
         console.error(e);
         enqueueSnackbar(
@@ -2931,6 +3028,58 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const showFacilityTab = (!useCampusConfigFlow && tabSlug === "facility") || (useCampusConfigFlow && tabSlug === "facility");
   const showQuotaTab = !useCampusConfigFlow && tabSlug === "quota";
   const showResourceDistributionTab = !useCampusConfigFlow && tabSlug === "resource-distribution";
+  const showBankInfoTab = !useCampusConfigFlow && tabSlug === "bank-info";
+  const bankInfoData = config.bankInfoData || {};
+  const bankFormCompleted = Boolean(
+    String(bankInfoData.bankId ?? "").trim() &&
+    String(bankInfoData.bankName ?? "").trim() &&
+    String(bankInfoData.accountNo ?? "").trim() &&
+    String(bankInfoData.accountName ?? "").trim()
+  );
+  const bankQrPreviewUrl = useMemo(() => buildVietQrQuickImageUrl(bankInfoData), [bankInfoData]);
+  const selectedBankOption = useMemo(
+    () => vietQrBanks.find((b) => b.bankId === String(bankInfoData.bankId ?? "").trim()) || null,
+    [vietQrBanks, bankInfoData.bankId]
+  );
+
+  useEffect(() => {
+    if (!showBankInfoTab || vietQrBanksLoaded) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingVietQrBanks(true);
+      try {
+        let list = [];
+        try {
+          const res = await fetch("https://api.vietqr.io/v2/banks");
+          if (res.ok) {
+            const json = await res.json();
+            list = normalizeVietQrBankList(json);
+          }
+        } catch {
+          // fallback endpoint phía dưới
+        }
+        if (!list.length) {
+          const fallbackRes = await fetch("https://img.vietqr.io/json/banks.json");
+          if (fallbackRes.ok) {
+            const fallbackJson = await fallbackRes.json();
+            list = normalizeVietQrBankList(fallbackJson);
+          }
+        }
+        if (cancelled) return;
+        setVietQrBanks(list);
+        setVietQrBanksLoaded(true);
+      } catch {
+        if (cancelled) return;
+        setVietQrBanks([]);
+        enqueueSnackbar("Không tải được danh sách ngân hàng từ VietQR.", {variant: "warning"});
+      } finally {
+        if (!cancelled) setLoadingVietQrBanks(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showBankInfoTab, vietQrBanksLoaded]);
 
 
   const pageTitle = isCampusVariant ? "Cấu hình cơ sở của bạn" : "Cấu hình toàn trường";
@@ -3954,6 +4103,318 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                 </Stack>
               </CardContent>
             </Card>
+          )}
+
+          {showBankInfoTab && (
+            <Stack spacing={2}>
+              <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{duration: 0.28}}>
+                <Card sx={{borderRadius: 5, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,0.08)"}}>
+                  <CardContent sx={{p: {xs: 2.2, md: 3}}}>
+                    <Stack direction="row" justifyContent="space-between" alignItems={{xs: "flex-start", md: "center"}} gap={1.5}>
+                      <Stack spacing={0.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <AccountBalanceOutlinedIcon sx={{color: "#1d4ed8"}}/>
+                          <Typography variant="h6" sx={{fontWeight: 800}}>Tài khoản ngân hàng</Typography>
+                        </Stack>
+                        <Typography variant="body2" sx={{color: "#64748b"}}>
+                          Thông tin tài khoản dùng để nhận thanh toán và tạo mã QR chuyển khoản.
+                        </Typography>
+                      </Stack>
+                      <Chip
+                        icon={bankFormCompleted ? <CheckCircleOutlineIcon fontSize="small"/> : <ErrorOutlineIcon fontSize="small"/>}
+                        label={bankFormCompleted ? "Đã cấu hình" : "Chưa hoàn tất"}
+                        color={bankFormCompleted ? "success" : "default"}
+                        variant={bankFormCompleted ? "filled" : "outlined"}
+                        sx={{fontWeight: 700}}
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{duration: 0.35, delay: 0.04}}>
+                <Card sx={{borderRadius: 5, border: "1px solid #e2e8f0", boxShadow: "0 14px 34px rgba(15,23,42,0.08)", overflow: "hidden"}}>
+                  <CardContent sx={{p: {xs: 2.2, md: 3}}}>
+                    <Box sx={{display: "grid", gridTemplateColumns: {xs: "1fr", lg: "1.15fr 0.85fr"}, alignItems: "flex-start", gap: {xs: 2, lg: 2.4}}}>
+                      <Stack spacing={1.8}>
+                        <Card variant="outlined" sx={{borderRadius: 4, borderColor: "#e2e8f0", bgcolor: "#fcfdff", boxShadow: "0 6px 16px rgba(15,23,42,0.04)"}}>
+                          <CardContent sx={{p: {xs: 1.8, md: 2.2}}}>
+                            <Typography sx={{fontWeight: 700, mb: 1.2}}>Thông tin ngân hàng</Typography>
+                            <Stack spacing={1.3}>
+                              <Autocomplete
+                                options={vietQrBanks}
+                                value={selectedBankOption}
+                                getOptionLabel={(option) => option?.label || ""}
+                                loading={loadingVietQrBanks}
+                                disabled={fieldDisabled || loadingVietQrBanks}
+                                onChange={(_, selectedBank) =>
+                                  setConfig((c) => ({
+                                    ...c,
+                                    bankInfoData: {
+                                      ...c.bankInfoData,
+                                      bankId: selectedBank?.bankId || "",
+                                      bankName: selectedBank?.bankName || "",
+                                    },
+                                  }))
+                                }
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Ngân hàng"
+                                    helperText="Search và chọn ngân hàng để tự điền Bank ID / BIN."
+                                    InputProps={{
+                                      ...params.InputProps,
+                                      startAdornment: (
+                                        <>
+                                          <InputAdornment position="start">
+                                            <AccountBalanceOutlinedIcon fontSize="small" sx={{color: "#64748b"}}/>
+                                          </InputAdornment>
+                                          {params.InputProps.startAdornment}
+                                        </>
+                                      ),
+                                    }}
+                                  />
+                                )}
+                              />
+                              <TextField
+                                label="Bank ID / BIN"
+                                value={bankInfoData.bankId ?? ""}
+                                helperText="Tự động điền từ ngân hàng đã chọn."
+                                disabled
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <NumbersOutlinedIcon fontSize="small" sx={{color: "#64748b"}}/>
+                                    </InputAdornment>
+                                  ),
+                                  sx: {fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"},
+                                }}
+                              />
+                            </Stack>
+                          </CardContent>
+                        </Card>
+
+                        <Card variant="outlined" sx={{borderRadius: 4, borderColor: "#e2e8f0", bgcolor: "#fcfdff", boxShadow: "0 6px 16px rgba(15,23,42,0.04)"}}>
+                          <CardContent sx={{p: {xs: 1.8, md: 2.2}}}>
+                            <Typography sx={{fontWeight: 700, mb: 1.2}}>Thông tin tài khoản</Typography>
+                            <Stack spacing={1.3}>
+                              <TextField
+                                label="Số tài khoản"
+                                value={bankInfoData.accountNo ?? ""}
+                                onChange={(e) =>
+                                  setConfig((c) => ({
+                                    ...c,
+                                    bankInfoData: {
+                                      ...c.bankInfoData,
+                                      accountNo: e.target.value,
+                                    },
+                                  }))
+                                }
+                                helperText="Hiển thị theo định dạng nhóm 4 số trong preview."
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <CreditCardOutlinedIcon fontSize="small" sx={{color: "#64748b"}}/>
+                                    </InputAdornment>
+                                  ),
+                                  readOnly: fieldDisabled,
+                                  sx: {fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"},
+                                }}
+                              />
+                              <TextField
+                                label="Tên tài khoản"
+                                value={bankInfoData.accountName ?? ""}
+                                onChange={(e) =>
+                                  setConfig((c) => ({
+                                    ...c,
+                                    bankInfoData: {
+                                      ...c.bankInfoData,
+                                      accountName: e.target.value,
+                                    },
+                                  }))
+                                }
+                                helperText="Tên chủ tài khoản nhận chuyển khoản."
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <BadgeOutlinedIcon fontSize="small" sx={{color: "#64748b"}}/>
+                                    </InputAdornment>
+                                  ),
+                                  readOnly: fieldDisabled,
+                                }}
+                              />
+                            </Stack>
+                          </CardContent>
+                        </Card>
+
+                        <Card variant="outlined" sx={{borderRadius: 4, borderColor: "#e2e8f0", bgcolor: "#fcfdff", boxShadow: "0 6px 16px rgba(15,23,42,0.04)"}}>
+                          <CardContent sx={{p: {xs: 1.8, md: 2.2}}}>
+                            <Typography sx={{fontWeight: 700, mb: 0.8}}>Cấu hình QR</Typography>
+                            <Typography variant="body2" sx={{color: "#64748b"}}>
+                              Mã QR sẽ được tạo realtime khi có đủ ngân hàng và số tài khoản.
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Stack>
+
+                      <Box sx={{position: {xs: "static", lg: "sticky"}, top: {lg: 24}}}>
+                        <Stack spacing={1.35}>
+                            <Box
+                              sx={{
+                                borderRadius: 4,
+                                p: 2.1,
+                                minHeight: 208,
+                                color: "#f8fafc",
+                                border: "1px solid rgba(255,255,255,0.22)",
+                                background: "radial-gradient(circle at 18% 12%, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 24%, rgba(255,255,255,0) 42%), linear-gradient(130deg, #0f172a 0%, #1e3a8a 55%, #1d4ed8 100%)",
+                                boxShadow: "0 20px 34px rgba(30,58,138,0.28)",
+                                transition: "transform .2s ease, box-shadow .2s ease",
+                                "&:hover": {transform: "translateY(-2px)", boxShadow: "0 24px 40px rgba(30,58,138,0.34)"},
+                              }}
+                            >
+                              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <AccountBalanceOutlinedIcon fontSize="small"/>
+                                  <Typography variant="subtitle2" sx={{fontWeight: 700}}>
+                                    {bankInfoData.bankName || "Chưa chọn ngân hàng"}
+                                  </Typography>
+                                </Stack>
+                                <Chip size="small" label="VietQR Supported" sx={{bgcolor: "rgba(255,255,255,0.16)", color: "#fff", fontWeight: 700}}/>
+                              </Stack>
+                              <Typography sx={{mt: 2.8, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace"}}>
+                                {formatAccountNoForDisplay(maskBankAccountNo(bankInfoData.accountNo))}
+                              </Typography>
+                              <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{mt: 2.6}}>
+                                <Box>
+                                  <Typography variant="caption" sx={{opacity: 0.82}}>Chủ tài khoản</Typography>
+                                  <Typography sx={{fontWeight: 700}}>{bankInfoData.accountName || "—"}</Typography>
+                                </Box>
+                                <Stack direction="row" spacing={0.6} alignItems="center">
+                                  <SecurityOutlinedIcon fontSize="small"/>
+                                  <Typography variant="caption" sx={{opacity: 0.9}}>Secure transfer</Typography>
+                                </Stack>
+                              </Stack>
+                            </Box>
+
+                            <Paper sx={{borderRadius: 3.5, p: 1.6, border: "1px solid #e2e8f0", boxShadow: "0 8px 18px rgba(15,23,42,0.05)"}}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{mb: 1.1}}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <QrCode2OutlinedIcon sx={{color: "#2563eb"}} fontSize="small"/>
+                                  <Typography sx={{fontWeight: 700}}>Xem trước QR</Typography>
+                                </Stack>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    if (!bankQrPreviewUrl) return;
+                                    window.open(bankQrPreviewUrl, "_blank", "noopener,noreferrer");
+                                  }}
+                                  disabled={!bankQrPreviewUrl}
+                                  sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}
+                                >
+                                  Tạo mã QR
+                                </Button>
+                              </Stack>
+
+                              <motion.div animate={{height: bankQrPreviewUrl ? 258 : 232}} transition={{duration: 0.22}}>
+                                <Box
+                                  sx={{
+                                    height: "100%",
+                                    borderRadius: 3,
+                                    border: "1px dashed #cbd5e1",
+                                    bgcolor: "#f8fafc",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    p: 1.4,
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {loadingVietQrBanks ? (
+                                    <Box sx={{width: "100%"}}>
+                                      <Skeleton variant="rounded" height={30} sx={{mb: 1.2, borderRadius: 2}}/>
+                                      <Skeleton variant="rounded" height={92} sx={{mb: 1.2, borderRadius: 2}}/>
+                                      <Skeleton variant="rounded" height={22} width="62%" sx={{borderRadius: 2}}/>
+                                    </Box>
+                                  ) : bankQrPreviewUrl ? (
+                                    <Box
+                                      component="img"
+                                      src={bankQrPreviewUrl}
+                                      alt="QR ngân hàng"
+                                      sx={{
+                                        width: "100%",
+                                        height: "100%",
+                                        maxWidth: 252,
+                                        maxHeight: "100%",
+                                        objectFit: "contain",
+                                        display: "block",
+                                      }}
+                                    />
+                                  ) : (
+                                    <Stack spacing={0.7} alignItems="center">
+                                      <QrCode2OutlinedIcon sx={{color: "#94a3b8"}}/>
+                                      <Typography variant="body2" sx={{color: "#64748b", textAlign: "center"}}>
+                                        Điền đủ ngân hàng và số tài khoản để hiển thị QR.
+                                      </Typography>
+                                      <Typography variant="caption" sx={{color: "#94a3b8"}}>
+                                        QR sẽ tự cập nhật theo dữ liệu hiện tại.
+                                      </Typography>
+                                    </Stack>
+                                  )}
+                                </Box>
+                              </motion.div>
+
+                              <Stack direction={{xs: "column", sm: "row"}} spacing={1} sx={{mt: 1.3}}>
+                                <Button
+                                  fullWidth
+                                  variant="outlined"
+                                  startIcon={<DownloadOutlinedIcon/>}
+                                  disabled={!bankQrPreviewUrl}
+                                  onClick={() => {
+                                    if (!bankQrPreviewUrl) return;
+                                    const a = document.createElement("a");
+                                    a.href = bankQrPreviewUrl;
+                                    a.download = "vietqr-bank.png";
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                  }}
+                                  sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, py: 1}}
+                                >
+                                  Tải QR
+                                </Button>
+                                <Button
+                                  fullWidth
+                                  variant="outlined"
+                                  startIcon={<ContentCopyOutlinedIcon/>}
+                                  onClick={async () => {
+                                    const lines = [
+                                      `Ngân hàng: ${bankInfoData.bankName || ""}`,
+                                      `Bank ID: ${bankInfoData.bankId || ""}`,
+                                      `Số TK: ${bankInfoData.accountNo || ""}`,
+                                      `Chủ TK: ${bankInfoData.accountName || ""}`,
+                                    ];
+                                    try {
+                                      await navigator.clipboard.writeText(lines.join("\n"));
+                                      enqueueSnackbar("Đã sao chép thông tin tài khoản.", {variant: "success"});
+                                    } catch {
+                                      enqueueSnackbar("Không thể sao chép thông tin.", {variant: "warning"});
+                                    }
+                                  }}
+                                  sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, py: 1}}
+                                >
+                                  Sao chép thông tin
+                                </Button>
+                              </Stack>
+                            </Paper>
+                        </Stack>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+            </Stack>
           )}
 
           {showDocumentsTab && (
