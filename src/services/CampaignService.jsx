@@ -39,13 +39,23 @@ export const getCampaignTemplatesByYear = async (year) => {
  */
 export const createCampaignTemplate = async (body) => {
     const timelines = Array.isArray(body.admissionMethodTimelines)
-        ? body.admissionMethodTimelines.map((t) => ({
-              methodCode: String(t?.methodCode ?? "").trim(),
-              startDate: String(t?.startDate ?? "").trim(),
-              endDate: String(t?.endDate ?? "").trim(),
-              allowReservationSubmission: Boolean(t?.allowReservationSubmission),
-              quota: Number(t?.quota ?? 0),
-          }))
+        ? body.admissionMethodTimelines.map((t) => {
+              const allowReservationSubmission = Boolean(t?.allowReservationSubmission);
+              const baseTimeline = {
+                  methodCode: String(t?.methodCode ?? "").trim(),
+                  startDate: String(t?.startDate ?? "").trim(),
+                  endDate: String(t?.endDate ?? "").trim(),
+                  allowReservationSubmission,
+                  quota: Number(t?.quota ?? 0),
+              };
+              if (!allowReservationSubmission) return baseTimeline;
+              return {
+                  ...baseTimeline,
+                  reservationFee: Number(t?.reservationFee ?? 0),
+                  depositEndDate: String(t?.depositEndDate ?? "").trim(),
+                  confirmationEndDate: String(t?.confirmationEndDate ?? "").trim(),
+              };
+          })
         : [];
     const response = await axiosClient.post("/school/campaign/template", {
         ...(body.admissionCampaignTemplateId != null
@@ -67,13 +77,23 @@ export const createCampaignTemplate = async (body) => {
  */
 export const updateCampaignTemplate = async (body) => {
     const timelines = Array.isArray(body.admissionMethodTimelines)
-        ? body.admissionMethodTimelines.map((t) => ({
-              methodCode: String(t?.methodCode ?? "").trim(),
-              startDate: String(t?.startDate ?? "").trim(),
-              endDate: String(t?.endDate ?? "").trim(),
-              allowReservationSubmission: Boolean(t?.allowReservationSubmission),
-              quota: Number(t?.quota ?? 0),
-          }))
+        ? body.admissionMethodTimelines.map((t) => {
+              const allowReservationSubmission = Boolean(t?.allowReservationSubmission);
+              const baseTimeline = {
+                  methodCode: String(t?.methodCode ?? "").trim(),
+                  startDate: String(t?.startDate ?? "").trim(),
+                  endDate: String(t?.endDate ?? "").trim(),
+                  allowReservationSubmission,
+                  quota: Number(t?.quota ?? 0),
+              };
+              if (!allowReservationSubmission) return baseTimeline;
+              return {
+                  ...baseTimeline,
+                  reservationFee: Number(t?.reservationFee ?? 0),
+                  depositEndDate: String(t?.depositEndDate ?? "").trim(),
+                  confirmationEndDate: String(t?.confirmationEndDate ?? "").trim(),
+              };
+          })
         : [];
     const response = await axiosClient.put("/school/campaign/template", {
         admissionCampaignTemplateId: Number(body.admissionCampaignTemplateId),
