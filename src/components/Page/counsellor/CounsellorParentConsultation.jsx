@@ -3,6 +3,7 @@ import { enqueueSnackbar } from "notistack";
 import {
   Avatar,
   Box,
+  Dialog,
   IconButton,
   InputBase,
   List,
@@ -21,6 +22,8 @@ import SearchIcon from "@mui/icons-material/Search";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import MoodRoundedIcon from "@mui/icons-material/MoodRounded";
 import CloseIcon from "@mui/icons-material/Close";
+import DownloadIcon from "@mui/icons-material/Download";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import Zoom from "@mui/material/Zoom";
@@ -42,6 +45,7 @@ import {
   sendMessage,
 } from "../../../services/WebSocketService.jsx";
 import {APP_PRIMARY_DARK, APP_PRIMARY_MAIN} from "../../../constants/homeLandingTheme";
+import axiosClient from "../../../configs/APIConfig.jsx";
 import ParentStudentInfoPanel, {
   getStudentCompactInfo,
   buildAcademicScoreTable,
@@ -54,6 +58,20 @@ import ParentStudentInfoPanel, {
  * GET history trả campusId / studentProfileId ở root body; list pending đôi khi thiếu.
  * Dùng merge trước khi gửi intro qua STOMP để payload đủ cho BE push tới phụ huynh.
  */
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+const isImageFile = (f) => IMAGE_EXT_RE.test(String(f?.fileName || f?.fileUrl || ""));
+const UUID_PREFIX_RE = /^[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}_/i;
+const formatAttachmentName = (fileName, maxBase = 8) => {
+  let name = String(fileName || "").trim();
+  let prev;
+  do { prev = name; name = name.replace(UUID_PREFIX_RE, ""); } while (name !== prev);
+  const dotIdx = name.lastIndexOf(".");
+  const base = dotIdx >= 0 ? name.slice(0, dotIdx) : name;
+  const ext = dotIdx >= 0 ? name.slice(dotIdx) : "";
+  if (base.length <= maxBase) return name;
+  return `${base.slice(0, maxBase)}...${ext}`;
+};
+
 const mergeCounsellorConversationWithHistoryMeta = (conversation, historyMeta) => {
   if (!conversation) return conversation;
   const m = historyMeta && typeof historyMeta === "object" ? historyMeta : {};
@@ -338,7 +356,7 @@ const tryUpdateListByParentMatch = (list, merged, normalizedIncoming, identityLo
     const nextUnread = Math.min(99, u + 1);
     return {
       ...item,
-      lastMessage: normalizedIncoming.text || item.lastMessage,
+      lastMessage: normalizedIncoming.text || (normalizedIncoming.files?.length ? "Tệp đính kèm" : item.lastMessage),
       time: normalizedIncoming.sentAt || item.time,
       unreadCount: nextUnread,
       unreadMessages: nextUnread,
@@ -386,6 +404,7 @@ export default function CounsellorParentConsultation() {
 
   const usernameForRead = userInfo?.email || userInfo?.username || userInfo?.userName;
 
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const [activeConversations, setActiveConversations] = useState([]);
   const [pendingConversations, setPendingConversations] = useState([]);
   const [activeHasMore, setActiveHasMore] = useState(false);
@@ -415,6 +434,9 @@ export default function CounsellorParentConsultation() {
 
   const [inputValue, setInputValue] = useState("");
   const [searchValue, setSearchValue] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const [messageItems, setMessageItems] = useState([]);
   const [messageLoading, setMessageLoading] = useState(false);
   const [messageError, setMessageError] = useState("");
@@ -692,7 +714,8 @@ export default function CounsellorParentConsultation() {
       otherUser: c?.otherUser ?? "",
       updatedAt: c?.updatedAt ?? "",
       avatarColor: c?.avatarColor ?? fallbackAvatarColors[index % fallbackAvatarColors.length],
-      lastMessage: c?.lastMessage ?? c?.lastText ?? c?.lastContent ?? c?.last?.content ?? "",
+      lastMessage: (c?.lastMessageIsFile && !c?.lastMessage) ? "Tệp đính kèm" : (c?.lastMessage ?? c?.lastText ?? c?.lastContent ?? c?.last?.content ?? ""),
+      lastMessageIsFile: !!(c?.lastMessageIsFile),
       time: c?.time ?? c?.lastMessageTime ?? c?.last?.sentAt ?? "",
       unreadCount: Number(c?.unreadCount ?? c?.unreadMessages ?? c?.unread ?? 0) || 0,
       status: String(c?.status || fallbackStatus).toLowerCase(),
@@ -717,7 +740,8 @@ export default function CounsellorParentConsultation() {
       "";
     const sentAtRaw = m?.sentAt ?? m?.createdAt ?? m?.timestamp ?? m?.time ?? null;
     const sentAt = coerceWsTimestamp(sentAtRaw) ?? (typeof sentAtRaw === "string" ? sentAtRaw : null);
-    return { id: String(id), text, sender, sentAt, raw: m };
+    const files = Array.isArray(m?.files) ? m.files : [];
+    return { id: String(id), text, sender, sentAt, files, raw: m };
   };
 
   const getConversationEmails = (conversation) => {
@@ -1105,13 +1129,33 @@ export default function CounsellorParentConsultation() {
     void handleMarkRead({ force: true });
   };
 
-  const handleSend = () => {
-    if (!inputValue.trim() || !selectedConversation) return;
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length || !selectedConversation) return;
+    const file = files[0];
+    setIsUploading(true);
+    try {
+      const fileType = file.type.startsWith("image/") ? "image" : "doc";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const body = res.data?.body ?? res.data;
+      const uploaded = { fileName: body.fileName, fileUrl: body.fileUrl };
+      handleSendWithFiles([uploaded]);
+    } catch {
+      enqueueSnackbar("Tải file thất bại, vui lòng thử lại.", { variant: "error" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-    const text = inputValue.trim();
+  const handleSendWithFiles = (filesToSend, text = "") => {
+    if (!selectedConversation) return;
     const { parentEmail, counsellorEmail } = getConversationEmails(selectedConversation);
     const conversationId = selectedConversation?.conversationId ?? selectedConversation?.id ?? null;
-    // Trùng principal Spring cho convertAndSendToUser — dùng email, không dùng tên hiển thị
     const senderName = (counsellorEmail || userInfo?.email || "").trim();
     const receiverName = (parentEmail || "").trim();
     if (!senderName || !receiverName) return;
@@ -1121,6 +1165,8 @@ export default function CounsellorParentConsultation() {
       selectedConversation?.studentProfileId ??
       studentProfileData?.studentProfileId ??
       selectedConversation?.raw?.studentProfileId;
+
+    const files = filesToSend && filesToSend.length > 0 ? filesToSend : undefined;
 
     const payload = buildPrivateChatPayload({
       conversationId,
@@ -1134,13 +1180,12 @@ export default function CounsellorParentConsultation() {
         selectedConversation?.campus?.id ??
         studentProfileData?.campusId,
       studentProfileId: studentProfileIdForSend,
+      files,
     });
 
     const sent = sendMessage(payload);
     if (!sent) return;
-    setInputValue("");
 
-    // BE thường chỉ broadcast tới queue người nhận — người gửi không nhận echo → hiển thị ngay (optimistic).
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticRaw = {
       id: optimisticId,
@@ -1153,14 +1198,23 @@ export default function CounsellorParentConsultation() {
       timestamp: payload.timestamp,
       sentAt: new Date().toISOString(),
       status: "SEND",
+      files,
     };
     const optimisticMsg = normalizeMessage(optimisticRaw);
     setMessageItems((prev) => mergeUniqueMessages([...prev, optimisticMsg]));
     updateConversationInLists(conversationId, (item) => ({
       ...item,
-      lastMessage: text,
+      lastMessage: text || (files ? "Tệp đính kèm" : ""),
       time: optimisticMsg.sentAt,
     }));
+  };
+
+  const handleSend = () => {
+    if (!inputValue.trim()) return;
+    if (!selectedConversation) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    handleSendWithFiles(undefined, text);
   };
 
   useEffect(() => {
@@ -1248,7 +1302,7 @@ export default function CounsellorParentConsultation() {
             const nextUnread = Math.min(99, u + 1);
             return {
               ...item,
-              lastMessage: normalizedIncoming.text || item.lastMessage,
+              lastMessage: normalizedIncoming.text || (normalizedIncoming.files?.length ? "Tệp đính kèm" : item.lastMessage),
               time: normalizedIncoming.sentAt || item.time,
               unreadCount: nextUnread,
               unreadMessages: nextUnread,
@@ -1307,9 +1361,16 @@ export default function CounsellorParentConsultation() {
         if (isSameConversationId(selectedConversationIdRef.current, conversationId)) {
           setMessageItems((prev) => {
             let replacedOptimistic = false;
+            const incomingFiles = normalizedIncoming.files ?? [];
             const withoutMatchingOptimistic = prev.filter((m) => {
               if (!String(m.id).startsWith("optimistic-")) return true;
-              if (!normalizedIncoming.text || m.text !== normalizedIncoming.text) return true;
+              const textMatch = normalizedIncoming.text && m.text === normalizedIncoming.text;
+              const fileOnlyMatch =
+                !normalizedIncoming.text &&
+                incomingFiles.length > 0 &&
+                (m.files ?? []).length === incomingFiles.length &&
+                (m.files ?? []).every((f, i) => f.fileUrl === incomingFiles[i]?.fileUrl);
+              if (!textMatch && !fileOnlyMatch) return true;
               if (replacedOptimistic) return true;
               replacedOptimistic = true;
               return false;
@@ -1400,6 +1461,7 @@ export default function CounsellorParentConsultation() {
   };
 
   return (
+    <>
     <Box
       sx={{
         height: "calc(100vh - 110px)",
@@ -1661,7 +1723,7 @@ export default function CounsellorParentConsultation() {
                                 ) : null}
                               </Box>
                             }
-                            secondary={<Typography component="span" sx={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{c.lastMessage || "Bắt đầu cuộc trò chuyện..."}</Typography>}
+                            secondary={<Typography component="span" sx={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: "2px" }}>{c.lastMessageIsFile && <AttachFileRoundedIcon sx={{ fontSize: 13, flexShrink: 0 }} />}{c.lastMessage || "Bắt đầu cuộc trò chuyện..."}</Typography>}
                           />
                           <Tooltip title="Chấp nhận cuộc trò chuyện">
                             <IconButton
@@ -1774,7 +1836,7 @@ export default function CounsellorParentConsultation() {
                                 ) : null}
                               </Box>
                             }
-                            secondary={<Typography component="span" sx={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{c.lastMessage || "Bắt đầu cuộc trò chuyện..."}</Typography>}
+                            secondary={<Typography component="span" sx={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: "2px" }}>{c.lastMessageIsFile && <AttachFileRoundedIcon sx={{ fontSize: 13, flexShrink: 0 }} />}{c.lastMessage || "Bắt đầu cuộc trò chuyện..."}</Typography>}
                     />
                   </Paper>
                 </ListItem>
@@ -1966,28 +2028,90 @@ export default function CounsellorParentConsultation() {
                             ".msg-actions": { display: "none" },
                           }}
                         >
-                          <Box sx={{ maxWidth: "78%" }}>
+                          <Box sx={{ maxWidth: "78%", ...(m.files?.length > 0 && { width: "min(240px, 78%)" }) }}>
                             <Box
                               sx={{
-                                bgcolor: isMine ? "#0084ff" : "#e5e5ea",
-                                color: isMine ? "#ffffff" : "#1e293b",
+                                bgcolor: (m.files && m.files.length > 0) ? "#e5e5ea" : isMine ? "#0084ff" : "#e5e5ea",
+                                color: (isMine && !(m.files && m.files.length > 0)) ? "#ffffff" : "#1e293b",
                                 px: 1.75,
                                 py: 1.05,
                                 borderRadius: "18px",
                                 borderBottomRightRadius: isMine ? "4px" : "18px",
                                 borderBottomLeftRadius: isMine ? "18px" : "4px",
                                 boxShadow: isMine ? "0 1px 1px rgba(0,0,0,0.08)" : "none",
-                                border: "none",
                               }}
                             >
-                              <Typography sx={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                                {m.text}
-                              </Typography>
-                              {m?.raw?.fileUrl ? (
-                                <Typography sx={{ mt: 0.75, fontSize: 11, opacity: 0.85 }}>
-                                  Tep dinh kem: {m.raw.fileName || "Xem tep"}
+                              {m.text ? (
+                                <Typography sx={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                                  {m.text}
                                 </Typography>
                               ) : null}
+                              {m.files && m.files.length > 0 && (
+                                <Box
+                                  sx={{
+                                    bgcolor: "#ffffff",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 1.5,
+                                    p: 0.75,
+                                    mt: m.text ? 0.75 : 0,
+                                    width: "100%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 0.75,
+                                  }}
+                                >
+                                  {m.files.map((f, idx) =>
+                                    isImageFile(f) ? (
+                                      <Box
+                                        key={idx}
+                                        onClick={() => setLightboxUrl(f.fileUrl)}
+                                        sx={{ display: "block", cursor: "pointer" }}
+                                      >
+                                        <Box
+                                          component="img"
+                                          src={f.fileUrl}
+                                          alt=""
+                                          sx={{
+                                            display: "block",
+                                            width: "100%",
+                                            height: "auto",
+                                            maxHeight: 220,
+                                            borderRadius: 1,
+                                            objectFit: "contain",
+                                          }}
+                                        />
+                                      </Box>
+                                    ) : (
+                                      <Box
+                                        key={idx}
+                                        component="a"
+                                        href={f.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          textDecoration: "none",
+                                          width: "100%",
+                                          borderRadius: 1,
+                                          "&:hover": { opacity: 0.85 },
+                                        }}
+                                      >
+                                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: APP_PRIMARY_MAIN, flexShrink: 0 }} />
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#1e293b", lineHeight: 1.3, wordBreak: "break-all" }}>
+                                            {formatAttachmentName(f.fileName)}
+                                          </Typography>
+                                          <Typography sx={{ fontSize: 10, color: "#94a3b8", mt: 0.15 }}>
+                                            Nhấn để xem
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    )
+                                  )}
+                                </Box>
+                              )}
                             </Box>
 
                             <Box
@@ -2039,13 +2163,20 @@ export default function CounsellorParentConsultation() {
           {shouldShowPendingBlankPanel ? null : (
           <Box
             sx={{
-              px: 3,
+              pl: 3,
+              pr: 10,
               py: 1.5,
               borderTop: "1px solid #e2e8f0",
               bgcolor: "rgba(255,255,255,0.94)",
               flexShrink: 0,
             }}
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: "none" }}
+              onChange={handleFileSelect}
+            />
             <Paper
               elevation={0}
               sx={{
@@ -2063,10 +2194,17 @@ export default function CounsellorParentConsultation() {
                 },
               }}
             >
-              <Tooltip title="Dinh kem">
-                <IconButton size="small" sx={{ color: APP_PRIMARY_MAIN, ml: 0.25 }}>
-                  <AttachFileRoundedIcon fontSize="small" />
-                </IconButton>
+              <Tooltip title="Đính kèm tệp">
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={{ color: APP_PRIMARY_MAIN, ml: 0.25 }}
+                    disabled={!selectedConversation || isUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {isUploading ? <CircularProgress size={16} /> : <AttachFileRoundedIcon fontSize="small" />}
+                  </IconButton>
+                </span>
               </Tooltip>
               <InputBase
                 placeholder={
@@ -2074,6 +2212,8 @@ export default function CounsellorParentConsultation() {
                     ? "Type a message..."
                     : "Chon mot cuoc tro chuyen de bat dau nhan tin..."
                 }
+                multiline
+                maxRows={4}
                 sx={{ flex: 1, fontSize: 13, px: 1 }}
                 value={inputValue}
                 disabled={!selectedConversation}
@@ -2081,7 +2221,19 @@ export default function CounsellorParentConsultation() {
                   onPointerDown={handleMarkReadFromInput}
                   onFocus={handleMarkReadFromInput}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter") {
+                    if (e.altKey) {
+                      e.preventDefault();
+                      const el = e.target;
+                      const start = el.selectionStart;
+                      const end = el.selectionEnd;
+                      const newVal = inputValue.slice(0, start) + '\n' + inputValue.slice(end);
+                      setInputValue(newVal);
+                      requestAnimationFrame(() => {
+                        el.selectionStart = el.selectionEnd = start + 1;
+                      });
+                      return;
+                    }
                     e.preventDefault();
                     handleSend();
                   }
@@ -2100,10 +2252,7 @@ export default function CounsellorParentConsultation() {
                   bgcolor: inputValue.trim() && selectedConversation ? "#4F46E5" : "transparent",
                   color: inputValue.trim() && selectedConversation ? "#ffffff" : "#4F46E5",
                   "&:hover": {
-                    bgcolor:
-                      inputValue.trim() && selectedConversation
-                        ? APP_PRIMARY_DARK
-                        : "rgba(37,99,235,0.08)",
+                    bgcolor: inputValue.trim() && selectedConversation ? APP_PRIMARY_DARK : "rgba(37,99,235,0.08)",
                   },
                   "&:active": { transform: "scale(0.95)" },
                   transition: "all 0.2s ease-in-out",
@@ -2112,6 +2261,16 @@ export default function CounsellorParentConsultation() {
                 <SendIcon fontSize="small" />
               </IconButton>
             </Paper>
+            {selectedConversation && (
+              <Typography sx={{ fontSize: 10.5, color: "#94a3b8", mt: 1.5, px: 0.5, userSelect: "none" }}>
+                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
+                {" "}gửi tin nhắn{"  ·  "}
+                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Alt</Box>
+                {" + "}
+                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
+                {" "}xuống hàng
+              </Typography>
+            )}
           </Box>
           )}
         </Box>
@@ -2224,5 +2383,47 @@ export default function CounsellorParentConsultation() {
         </>
       ) : null}
     </Box>
+
+    <Dialog open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} maxWidth={false}
+      sx={{ zIndex: 2000 }}
+      PaperProps={{ sx: { bgcolor: "transparent", boxShadow: "none", m: 1 } }}
+    >
+      <Box sx={{ position: "relative" }}>
+        <Box sx={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          display: "flex",
+          gap: 0.5,
+          zIndex: 1
+        }}>
+          <IconButton
+            component="a"
+            href={lightboxUrl || ""}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Tải xuống"
+            size="small"
+            sx={{ bgcolor: "rgba(0,0,0,0.5)", color: "white", "&:hover": { bgcolor: "rgba(0,0,0,0.75)" } }}
+          >
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            onClick={() => setLightboxUrl(null)}
+            title="Đóng"
+            size="small"
+            sx={{ bgcolor: "rgba(0,0,0,0.5)", color: "white", "&:hover": { bgcolor: "rgba(0,0,0,0.75)" } }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <Box component="img" src={lightboxUrl || ""} alt=""
+          onClick={() => setLightboxUrl(null)}
+          sx={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 2, display: "block", cursor: "zoom-out" }}
+        />
+      </Box>
+    </Dialog>
+    </>
   );
 }

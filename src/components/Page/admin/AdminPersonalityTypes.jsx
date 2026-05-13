@@ -333,24 +333,6 @@ export default function AdminPersonalityTypes() {
                                 ))}
                             </Select>
                         </FormControl>
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={() => setAddOpen(true)}
-                            sx={{
-                                flexShrink: 0,
-                                height: 40,
-                                minHeight: 40,
-                                px: 2,
-                                textTransform: "none",
-                                fontWeight: 700,
-                                boxShadow: "0 6px 14px rgba(37,99,235,0.35)",
-                                ml: { xs: 0, md: "auto" },
-                            }}
-                        >
-                            Thêm loại tính cách
-                        </Button>
                     </Stack>
 
                     <TableContainer component={Paper} elevation={0} sx={adminTableContainerSx}>

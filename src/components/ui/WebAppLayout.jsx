@@ -22,6 +22,12 @@ export default function WebAppLayout() {
     const toBoolean = (value) => value === true || value === 'true' || value === 1 || value === '1';
     const hasHandledInitialRoute = useRef(false);
     const isSignedIn = Boolean(localStorage.getItem('user'));
+    const isParent = (() => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem('user') || 'null');
+            return normalizeUserRole(parsed?.role ?? '') === 'PARENT';
+        } catch { return false; }
+    })();
 
     const isPublicRoute = (path) => {
         return (
@@ -199,7 +205,7 @@ export default function WebAppLayout() {
             </Box>
             {!isAuthPage && !isParentFirstLoginRoute && !isParentProfileRoute && <Footer/>}
             {!isAuthPage && <ScrollTopButton/>}
-            {!isAuthPage && isSignedIn && <Chatbot/>}
+            {!isAuthPage && isSignedIn && !isParent && <Chatbot/>}
         </Box>
     );
 }
