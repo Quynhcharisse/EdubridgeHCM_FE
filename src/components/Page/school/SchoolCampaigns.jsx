@@ -107,11 +107,16 @@ function mapTemplate(row) {
     const normalizedTimelines = Array.isArray(row.admissionMethodTimelines)
         ? row.admissionMethodTimelines.map((t) => ({
               ...t,
+              methodCode: String(t?.methodCode ?? "").trim(),
+              displayName: String(t?.displayName ?? t?.name ?? t?.methodCode ?? "").trim(),
+              description: String(t?.description ?? "").trim(),
               startDate: normalizeDateLikeToIso(t?.startDate),
               endDate: normalizeDateLikeToIso(t?.endDate),
               depositEndDate: normalizeDateLikeToIso(t?.depositEndDate),
               confirmationEndDate: normalizeDateLikeToIso(t?.confirmationEndDate),
               reservationFee: t?.reservationFee != null ? Number(t?.reservationFee) : "",
+              admissionProcessSteps: Array.isArray(t?.admissionProcessSteps) ? t.admissionProcessSteps : [],
+              methodDocumentRequirements: Array.isArray(t?.methodDocumentRequirements) ? t.methodDocumentRequirements : [],
           }))
         : [];
 

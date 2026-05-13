@@ -87,6 +87,9 @@ function mapTemplate(row) {
         endDate: normalizeDateLikeToIso(d?.endDate),
         quota: Number(d?.quota ?? 0),
         allowReservationSubmission: Boolean(d?.allowReservationSubmission),
+        reservationFee: d?.reservationFee != null ? Number(d?.reservationFee) : null,
+        depositEndDate: normalizeDateLikeToIso(d?.depositEndDate),
+        confirmationEndDate: normalizeDateLikeToIso(d?.confirmationEndDate),
         admissionProcessSteps: Array.isArray(d?.admissionProcessSteps) ? d.admissionProcessSteps : [],
         methodDocumentRequirements: Array.isArray(d?.methodDocumentRequirements) ? d.methodDocumentRequirements : [],
     }));
@@ -98,6 +101,9 @@ function mapTemplate(row) {
               endDate: normalizeDateLikeToIso(t?.endDate),
               quota: Number(t?.quota ?? 0),
               allowReservationSubmission: Boolean(t?.allowReservationSubmission),
+              reservationFee: t?.reservationFee != null ? Number(t?.reservationFee) : null,
+              depositEndDate: normalizeDateLikeToIso(t?.depositEndDate),
+              confirmationEndDate: normalizeDateLikeToIso(t?.confirmationEndDate),
           }))
         : details.map((d) => ({
               ...d,
@@ -145,6 +151,12 @@ function formatDate(dateStr) {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
     return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+}
+
+function formatVnd(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    return `${new Intl.NumberFormat("vi-VN").format(Math.round(n))} ₫`;
 }
 
 function statusUi(status) {
@@ -660,6 +672,25 @@ export default function SchoolCampaignViewDetail() {
                                             <Typography variant="body2" sx={{ mt: 0.4, color: "#64748b", fontWeight: 500 }}>
                                                 {formatDate(row.startDate)} - {formatDate(row.endDate)}
                                             </Typography>
+                                            {row.allowReservationSubmission ? (
+                                                <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mt: 0.7 }}>
+                                                    <Chip
+                                                        size="small"
+                                                        label={`Phí giữ chỗ: ${formatVnd(row.reservationFee)}`}
+                                                        sx={{ bgcolor: "rgba(245, 158, 11, 0.16)", color: "#b45309", fontWeight: 700 }}
+                                                    />
+                                                    <Chip
+                                                        size="small"
+                                                        label={`Hạn đóng phí: ${formatDate(row.depositEndDate)}`}
+                                                        sx={{ bgcolor: "rgba(99, 102, 241, 0.14)", color: "#4338ca", fontWeight: 700 }}
+                                                    />
+                                                    <Chip
+                                                        size="small"
+                                                        label={`Hạn xác nhận: ${formatDate(row.confirmationEndDate)}`}
+                                                        sx={{ bgcolor: "rgba(14, 165, 233, 0.14)", color: "#0369a1", fontWeight: 700 }}
+                                                    />
+                                                </Stack>
+                                            ) : null}
                                             {row.description ? (
                                                 <Typography variant="body2" sx={{ mt: 0.7, color: "#475569" }}>
                                                     {row.description}
@@ -844,6 +875,50 @@ export default function SchoolCampaignViewDetail() {
                                                 </Typography>
                                             </Box>
 
+                                            {detail.allowReservationSubmission ? (
+                                                <Card
+                                                    variant="outlined"
+                                                    sx={{
+                                                        borderRadius: 2.5,
+                                                        borderColor: "rgba(245,158,11,0.35)",
+                                                        bgcolor: "#fff",
+                                                        boxShadow: "0 8px 18px rgba(245,158,11,0.08)",
+                                                    }}
+                                                >
+                                                    <CardContent sx={{ p: 1.6, "&:last-child": { pb: 1.6 } }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#b45309", mb: 1.1 }}>
+                                                            Thông tin giữ chỗ
+                                                        </Typography>
+                                                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 1 }}>
+                                                            <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "rgba(245,158,11,0.08)" }}>
+                                                                <Typography variant="caption" sx={{ color: "#92400e", fontWeight: 700 }}>
+                                                                    Phí giữ chỗ
+                                                                </Typography>
+                                                                <Typography sx={{ mt: 0.2, fontWeight: 800, color: "#78350f" }}>
+                                                                    {formatVnd(detail.reservationFee)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "rgba(99,102,241,0.08)" }}>
+                                                                <Typography variant="caption" sx={{ color: "#3730a3", fontWeight: 700 }}>
+                                                                    Hạn đóng phí
+                                                                </Typography>
+                                                                <Typography sx={{ mt: 0.2, fontWeight: 800, color: "#312e81" }}>
+                                                                    {formatDate(detail.depositEndDate)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "rgba(14,165,233,0.08)" }}>
+                                                                <Typography variant="caption" sx={{ color: "#0c4a6e", fontWeight: 700 }}>
+                                                                    Hạn xác nhận nhập học
+                                                                </Typography>
+                                                                <Typography sx={{ mt: 0.2, fontWeight: 800, color: "#075985" }}>
+                                                                    {formatDate(detail.confirmationEndDate)}
+                                                                </Typography>
+                                                            </Box>
+                                                        </Box>
+                                                    </CardContent>
+                                                </Card>
+                                            ) : null}
+
                                             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                                                 <Card
                                                     variant="outlined"
@@ -866,50 +941,56 @@ export default function SchoolCampaignViewDetail() {
                                                                 sx={{ bgcolor: "rgba(37,99,235,0.1)", color: "#1d4ed8", fontWeight: 700, ml: "auto" }}
                                                             />
                                                         </Stack>
-                                                        <Stack spacing={1}>
+                                                        <Stack spacing={1.2}>
                                                             {(detail.admissionProcessSteps || []).length > 0 ? (
-                                                                detail.admissionProcessSteps.map((s, sIdx) => (
-                                                                    <Card
-                                                                        key={`step-${sIdx}`}
-                                                                        variant="outlined"
-                                                                        sx={{
-                                                                            borderRadius: 2,
-                                                                            borderColor: "rgba(219,234,254,0.95)",
-                                                                            bgcolor: "rgba(248,250,252,0.95)",
-                                                                        }}
-                                                                    >
-                                                                        <CardContent sx={{ p: 1.25, "&:last-child": { pb: 1.25 } }}>
-                                                                            <Stack direction="row" spacing={1.1} alignItems="flex-start">
+                                                                detail.admissionProcessSteps.map((s, sIdx, arr) => (
+                                                                    <Stack key={`step-${sIdx}`} direction="row" spacing={1.2} sx={{ position: "relative" }}>
+                                                                        <Stack alignItems="center" sx={{ width: 28, pt: 0.35 }}>
+                                                                            <Box
+                                                                                sx={{
+                                                                                    width: 22,
+                                                                                    height: 22,
+                                                                                    borderRadius: "50%",
+                                                                                    bgcolor: "rgba(37,99,235,0.15)",
+                                                                                    color: "#1d4ed8",
+                                                                                    fontSize: 12,
+                                                                                    fontWeight: 800,
+                                                                                    display: "flex",
+                                                                                    alignItems: "center",
+                                                                                    justifyContent: "center",
+                                                                                    flexShrink: 0,
+                                                                                }}
+                                                                            >
+                                                                                {s.stepOrder ?? sIdx + 1}
+                                                                            </Box>
+                                                                            {sIdx < arr.length - 1 ? (
                                                                                 <Box
                                                                                     sx={{
-                                                                                        width: 26,
-                                                                                        height: 26,
-                                                                                        borderRadius: "50%",
-                                                                                        bgcolor: "rgba(37,99,235,0.15)",
-                                                                                        color: "#1d4ed8",
-                                                                                        fontSize: 12,
-                                                                                        fontWeight: 800,
-                                                                                        display: "flex",
-                                                                                        alignItems: "center",
-                                                                                        justifyContent: "center",
-                                                                                        flexShrink: 0,
+                                                                                        width: 2,
+                                                                                        flex: 1,
+                                                                                        minHeight: 44,
+                                                                                        mt: 0.45,
+                                                                                        bgcolor: "rgba(148,163,184,0.35)",
                                                                                     }}
-                                                                                >
-                                                                                    {s.stepOrder ?? sIdx + 1}
-                                                                                </Box>
-                                                                                <Box>
-                                                                                    <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
-                                                                                        {s.stepName || `Bước ${sIdx + 1}`}
-                                                                                    </Typography>
-                                                                                    {s.description ? (
-                                                                                        <Typography variant="body2" sx={{ color: "#64748b", mt: 0.25 }}>
-                                                                                            {s.description}
-                                                                                        </Typography>
-                                                                                    ) : null}
-                                                                                </Box>
-                                                                            </Stack>
-                                                                        </CardContent>
-                                                                    </Card>
+                                                                                />
+                                                                            ) : null}
+                                                                        </Stack>
+                                                                        <Box
+                                                                            sx={{
+                                                                                flex: 1,
+                                                                                py: 0.45,
+                                                                            }}
+                                                                        >
+                                                                            <Typography sx={{ fontWeight: 800, color: "#0f172a" }}>
+                                                                                {s.stepName || `Bước ${sIdx + 1}`}
+                                                                            </Typography>
+                                                                            {s.description ? (
+                                                                                <Typography variant="body2" sx={{ color: "#64748b", mt: 0.25 }}>
+                                                                                    {s.description}
+                                                                                </Typography>
+                                                                            ) : null}
+                                                                        </Box>
+                                                                    </Stack>
                                                                 ))
                                                             ) : (
                                                                 <Typography variant="body2" sx={{ color: "#94a3b8" }}>
