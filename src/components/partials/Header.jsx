@@ -1269,6 +1269,27 @@ function MainHeader() {
         return anchorId ?? lastMineId;
     }, [messageItems, peerReadReceiptAt, isParentMessageMine]);
 
+    const lastParentOutgoingMessageId = React.useMemo(() => {
+        if (!messageItems.length) return null;
+        for (let i = messageItems.length - 1; i >= 0; i--) {
+            const m = messageItems[i];
+            if (isParentMessageMine(m)) {
+                return String(m.id);
+            }
+        }
+        return null;
+    }, [messageItems, isParentMessageMine]);
+
+    const peerMessagedAfterLastParentOutgoing = React.useMemo(() => {
+        if (!lastParentOutgoingMessageId || !messageItems.length) return false;
+        const idx = messageItems.findIndex((m) => String(m.id) === lastParentOutgoingMessageId);
+        if (idx < 0) return false;
+        for (let j = idx + 1; j < messageItems.length; j++) {
+            if (!isParentMessageMine(messageItems[j])) return true;
+        }
+        return false;
+    }, [messageItems, lastParentOutgoingMessageId, isParentMessageMine]);
+
     /** Bubble tin từ tư vấn: vệt nền xanh theo unreadCount (N tin peer gần nhất). */
     const peerUnreadBubbleIdSet = React.useMemo(() => {
         const raw = Number(selectedConversationUnreadCount || 0) || 0;
@@ -3666,8 +3687,14 @@ function MainHeader() {
                                                                 const imageFiles = files.filter(isImageFile);
                                                                 const docFiles = files.filter((f) => !isImageFile(f));
                                                                 const hasText = !!(msg.text && String(msg.text).trim());
-                                                                const showReadReceipt =
+                                                                const isLastOutgoingMine =
                                                                     isMine &&
+                                                                    lastParentOutgoingMessageId != null &&
+                                                                    String(msg.id) === lastParentOutgoingMessageId;
+                                                                const showOutgoingStatusFooter =
+                                                                    isLastOutgoingMine && !peerMessagedAfterLastParentOutgoing;
+                                                                const showReadReceipt =
+                                                                    showOutgoingStatusFooter &&
                                                                     peerReadReceiptAt &&
                                                                     parentChatReadReceiptAnchorId != null &&
                                                                     String(parentChatReadReceiptAnchorId) === String(msg.id);
@@ -3949,24 +3976,62 @@ function MainHeader() {
                                                                             ) : null}
                                                                             </Box>
                                                                             </Tooltip>
-                                                                            {showReadReceipt ? (
-                                                                                <Tooltip title="Đã xem">
-                                                                                    <Avatar
-                                                                                        src={peerSchoolLogoUrl || undefined}
-                                                                                sx={{
-                                                                                            mt: 0.45,
-                                                                                            width: 18,
-                                                                                            height: 18,
-                                                                                            fontSize: 9,
-                                                                                            fontWeight: 700,
-                                                                                            bgcolor: selectedStudentTheme.peerAvatar,
-                                                                                            boxShadow: '0 0 0 1px rgba(255,255,255,0.95)',
+                                                                            {showOutgoingStatusFooter ? (
+                                                                                showReadReceipt ? (
+                                                                                    <Box
+                                                                                        sx={{
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: 0.5,
                                                                                             alignSelf: 'flex-end',
+                                                                                            flexShrink: 0,
+                                                                                            mt: 0.25
                                                                                         }}
                                                                                     >
-                                                                                        {peerChatInitial}
-                                                                                    </Avatar>
-                                                                                </Tooltip>
+                                                                                        <Typography
+                                                                                            component="span"
+                                                                                            sx={{
+                                                                                                fontSize: 11,
+                                                                                                color: '#64748b',
+                                                                                                fontWeight: 600,
+                                                                                                lineHeight: 1.2,
+                                                                                                whiteSpace: 'nowrap'
+                                                                                            }}
+                                                                                        >
+                                                                                            Đã xem
+                                                                                        </Typography>
+                                                                                        <Tooltip title="Tư vấn viên đã xem">
+                                                                                            <Avatar
+                                                                                                src={peerSchoolLogoUrl || undefined}
+                                                                                                sx={{
+                                                                                                    width: 18,
+                                                                                                    height: 18,
+                                                                                                    fontSize: 9,
+                                                                                                    fontWeight: 700,
+                                                                                                    bgcolor: selectedStudentTheme.peerAvatar,
+                                                                                                    boxShadow: '0 0 0 1px rgba(255,255,255,0.95)'
+                                                                                                }}
+                                                                                            >
+                                                                                                {peerChatInitial}
+                                                                                            </Avatar>
+                                                                                        </Tooltip>
+                                                                                    </Box>
+                                                                                ) : (
+                                                                                    <Typography
+                                                                                        component="span"
+                                                                                        sx={{
+                                                                                            alignSelf: 'flex-end',
+                                                                                            mt: 0.25,
+                                                                                            fontSize: 11,
+                                                                                            color: '#64748b',
+                                                                                            fontWeight: 600,
+                                                                                            lineHeight: 1.2,
+                                                                                            whiteSpace: 'nowrap'
+                                                                                        }}
+                                                                                    >
+                                                                                        Đã gửi
+                                                                                    </Typography>
+                                                                                )
                                                                             ) : null}
                                                                         </Box>
                                                                     </Box>

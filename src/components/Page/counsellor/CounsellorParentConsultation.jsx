@@ -372,6 +372,8 @@ const collectConversationReadActors = (obj, rawPayload) => {
       o.readByUser,
       o.reader,
       o.user,
+      o.lastReadBy,
+      o.readInitiator,
       o?.data?.readBy,
       o?.payload?.readBy,
     ];
@@ -393,6 +395,13 @@ const conversationReadByCounsellor = (root, rawPayload, counsellorIdentitySet) =
     if (counsellorIdentitySet.has(a)) return true;
   }
   return false;
+};
+
+const conversationReadByParent = (root, rawPayload, parentEmailPrincipal) => {
+  const pe = normalizeWsPrincipal(parentEmailPrincipal);
+  if (!pe) return false;
+  const actors = collectConversationReadActors(root, rawPayload);
+  return actors.has(pe);
 };
 
 const pickStudentProfileIdFromMerged = (merged) => {
@@ -1029,6 +1038,27 @@ export default function CounsellorParentConsultation() {
     return anchorId ?? lastMineId;
   }, [messageItems, parentReadReceiptAt, selectedConversation, isCounsellorOutgoingMessage]);
 
+  const lastCounsellorOutgoingMessageId = useMemo(() => {
+    if (!messageItems.length || !selectedConversation) return null;
+    for (let i = messageItems.length - 1; i >= 0; i--) {
+      const m = messageItems[i];
+      if (isCounsellorOutgoingMessage(m, selectedConversation)) {
+        return String(m.id);
+      }
+    }
+    return null;
+  }, [messageItems, selectedConversation, isCounsellorOutgoingMessage]);
+
+  const peerMessagedAfterLastCounsellorOutgoing = useMemo(() => {
+    if (!lastCounsellorOutgoingMessageId || !messageItems.length || !selectedConversation) return false;
+    const idx = messageItems.findIndex((m) => String(m.id) === lastCounsellorOutgoingMessageId);
+    if (idx < 0) return false;
+    for (let j = idx + 1; j < messageItems.length; j++) {
+      if (!isCounsellorOutgoingMessage(messageItems[j], selectedConversation)) return true;
+    }
+    return false;
+  }, [messageItems, selectedConversation, lastCounsellorOutgoingMessageId, isCounsellorOutgoingMessage]);
+
   useEffect(() => {
     setStudentProfileDetailForPanel(null);
     setStudentProfileDetailLoading(false);
@@ -1366,11 +1396,17 @@ export default function CounsellorParentConsultation() {
               unreadMessages: 0,
             }));
             const actors = collectConversationReadActors(root, payload);
-            if (
-              actors.size > 0 &&
-              !conversationReadByCounsellor(root, payload, identityLowerSet) &&
-              isSameConversationId(selectedConversationIdRef.current, cid)
-            ) {
+            const { parentEmail } = getConversationEmails(selectedConversationRef.current || {});
+            const readByParent = conversationReadByParent(root, payload, parentEmail);
+            const readByCounsellorSelf = conversationReadByCounsellor(
+              root,
+              payload,
+              identityLowerSet
+            );
+            const shouldShowParentSeen =
+              isSameConversationId(selectedConversationIdRef.current, cid) &&
+              (readByParent || (actors.size > 0 && !readByCounsellorSelf));
+            if (shouldShowParentSeen) {
               setParentReadReceiptAt(readTime);
             }
           }
@@ -2155,8 +2191,14 @@ export default function CounsellorParentConsultation() {
                       const nextIsMine =
                         next != null ? isCounsellorOutgoingMessage(next, selectedConversation) : null;
                       const showPeerAvatar = !isMine && (next == null || nextIsMine === true);
-                      const showReadReceipt =
+                      const isLastOutgoingMine =
                         isMine &&
+                        lastCounsellorOutgoingMessageId != null &&
+                        String(m.id) === lastCounsellorOutgoingMessageId;
+                      const showOutgoingStatusFooter =
+                        isLastOutgoingMine && !peerMessagedAfterLastCounsellorOutgoing;
+                      const showReadReceipt =
+                        showOutgoingStatusFooter &&
                         parentReadReceiptAt &&
                         counsellorReadReceiptAnchorId != null &&
                         String(counsellorReadReceiptAnchorId) === String(m.id);
@@ -2436,23 +2478,61 @@ export default function CounsellorParentConsultation() {
                             ) : null}
                               </Box>
                             </Tooltip>
-                            {showReadReceipt ? (
-                              <Tooltip title="Phụ huynh đã xem">
-                                <Avatar
-                                  src={selectedConversation.avatarUrl || undefined}
+                            {showOutgoingStatusFooter ? (
+                              showReadReceipt ? (
+                                <Box
                                   sx={{
-                                    mt: 0.45,
-                                    width: 18,
-                                    height: 18,
-                                    fontSize: 8,
-                                    bgcolor: selectedConversation.avatarColor,
-                                    boxShadow: "0 0 0 1px rgba(255,255,255,0.9)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
                                     alignSelf: "flex-end",
+                                    flexShrink: 0,
+                                    mt: 0.25,
                                   }}
                                 >
-                                  {getInitials(selectedConversation.name)}
-                                </Avatar>
-                              </Tooltip>
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      fontSize: 11,
+                                      color: "#64748b",
+                                      fontWeight: 600,
+                                      lineHeight: 1.2,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    Đã xem
+                                  </Typography>
+                                  <Tooltip title="Phụ huynh đã xem">
+                                    <Avatar
+                                      src={selectedConversation.avatarUrl || undefined}
+                                      sx={{
+                                        width: 18,
+                                        height: 18,
+                                        fontSize: 8,
+                                        bgcolor: selectedConversation.avatarColor,
+                                        boxShadow: "0 0 0 1px rgba(255,255,255,0.9)",
+                                      }}
+                                    >
+                                      {getInitials(selectedConversation.name)}
+                                    </Avatar>
+                                  </Tooltip>
+                                </Box>
+                              ) : (
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    alignSelf: "flex-end",
+                                    mt: 0.25,
+                                    fontSize: 11,
+                                    color: "#64748b",
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  Đã gửi
+                                </Typography>
+                              )
                             ) : null}
                           </Box>
                         </Box>
