@@ -21,6 +21,7 @@ import {
     Paper,
     Popover,
     Stack,
+    Switch,
     Tab,
     Table,
     TableBody,
@@ -2394,28 +2395,27 @@ export default function AdminPlatformSettings() {
                                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
                                             )}
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell align="center">
                                             {admissionTemplateEditing ? (
-                                                <TextField
-                                                    size="small"
-                                                    select
-                                                    fullWidth
-                                                    value={doc?.required === true ? "true" : "false"}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], required: value === "true" };
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
-                                                    sx={admissionInputSx}
-                                                >
-                                                    <MenuItem value="true">Bắt buộc</MenuItem>
-                                                    <MenuItem value="false">Tùy chọn</MenuItem>
-                                                </TextField>
+                                                <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
+                                                    <Switch
+                                                        size="small"
+                                                        checked={doc?.required === true}
+                                                        onChange={(_, checked) => {
+                                                            setAdmissionTemplateForm((prev) => {
+                                                                const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                                    ? [...prev.mandatoryAllDocumentRequirements]
+                                                                    : [];
+                                                                nextDocs[dIdx] = { ...nextDocs[dIdx], required: checked };
+                                                                return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
+                                                            });
+                                                        }}
+                                                        color="primary"
+                                                        inputProps={{
+                                                            "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
+                                                        }}
+                                                    />
+                                                </Tooltip>
                                             ) : (
                                                 <Chip
                                                     size="small"
@@ -2692,31 +2692,30 @@ export default function AdminPlatformSettings() {
                                                                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell align="center">
                                                                     {canEdit ? (
-                                                                        <TextField
-                                                                            size="small"
-                                                                            select
-                                                                            fullWidth
-                                                                            value={doc?.required === true ? "true" : "false"}
-                                                                            onChange={(e) => {
-                                                                                const value = e.target.value;
-                                                                                setAdmissionTemplateForm((prev) => {
-                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                    if (gIdx < 0) return prev;
-                                                                                    const currentGroup = { ...nextGroups[gIdx] };
-                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                    currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: value === "true" };
-                                                                                    nextGroups[gIdx] = currentGroup;
-                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                });
-                                                                            }}
-                                                                            sx={admissionInputSx}
-                                                                        >
-                                                                            <MenuItem value="true">Bắt buộc</MenuItem>
-                                                                            <MenuItem value="false">Tùy chọn</MenuItem>
-                                                                        </TextField>
+                                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
+                                                                            <Switch
+                                                                                size="small"
+                                                                                checked={doc?.required === true}
+                                                                                onChange={(_, checked) => {
+                                                                                    setAdmissionTemplateForm((prev) => {
+                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                        if (gIdx < 0) return prev;
+                                                                                        const currentGroup = { ...nextGroups[gIdx] };
+                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                        currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: checked };
+                                                                                        nextGroups[gIdx] = currentGroup;
+                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                    });
+                                                                                }}
+                                                                                color="primary"
+                                                                                inputProps={{
+                                                                                    "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
+                                                                                }}
+                                                                            />
+                                                                        </Tooltip>
                                                                     ) : (
                                                                         <Chip
                                                                             size="small"
