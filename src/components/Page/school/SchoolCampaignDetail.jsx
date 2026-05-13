@@ -131,6 +131,12 @@ function normalizeCampaignStatus(rawStatus) {
     return s;
 }
 
+function toNullableFiniteNumber(v) {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
 function mapTemplate(row) {
     if (!row) return null;
     const id = row.admissionCampaignTemplateId ?? row.id;
@@ -153,6 +159,8 @@ function mapTemplate(row) {
         admissionCampaignTemplateId: row.admissionCampaignTemplateId ?? row.id,
         status,
         admissionMethodTimelines: timelines,
+        campaignTotalQuota: toNullableFiniteNumber(row.campaignTotalQuota),
+        campaignRemainingQuota: toNullableFiniteNumber(row.campaignRemainingQuota),
     };
 }
 
@@ -422,9 +430,9 @@ export default function SchoolCampaignDetail() {
         };
     }, []);
 
-    const resolveCampaignFromApi = useCallback(async () => {
+    const resolveCampaignFromApi = useCallback(async (preferYear) => {
         if (!Number.isFinite(idNum)) return null;
-        for (const y of SCAN_YEARS) {
+        const tryYear = async (y) => {
             try {
                 const res = await getCampaignTemplatesByYear(y);
                 const raw = res?.data?.body ?? res?.data;
@@ -440,6 +448,17 @@ export default function SchoolCampaignDetail() {
             } catch {
                 /* continue */
             }
+            return null;
+        };
+        const py = Number(preferYear);
+        if (Number.isFinite(py) && py > 0) {
+            const hit = await tryYear(py);
+            if (hit) return hit;
+        }
+        for (const y of SCAN_YEARS) {
+            if (Number.isFinite(py) && py > 0 && Number(y) === py) continue;
+            const hit = await tryYear(y);
+            if (hit) return hit;
         }
         return null;
     }, [idNum]);
@@ -871,8 +890,8 @@ export default function SchoolCampaignDetail() {
         return Object.keys(errors).length === 0;
     };
 
-    const refreshCampaign = async () => {
-        const c = await resolveCampaignFromApi();
+    const refreshCampaign = async (preferYear) => {
+        const c = await resolveCampaignFromApi(preferYear);
         if (c) {
             setCampaign(c);
             setFormValues({
@@ -938,7 +957,7 @@ export default function SchoolCampaignDetail() {
                 setCampaign((prev) => (prev ? { ...prev, status: "OPEN" } : prev));
                 enqueueSnackbar("Đã công bố chiến dịch thành công.", { variant: "success" });
                 setConfirmPublishOpen(false);
-                const updated = await refreshCampaign();
+                const updated = await refreshCampaign(Number(campaign?.year));
                 if (updated && campaignId) {
                     navigate(`/school/campaigns/detail/${campaignId}`, {
                         replace: true,

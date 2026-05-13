@@ -71,6 +71,23 @@ function normalizeDateLikeToIso(v) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
 }
 
+function toNullableFiniteNumber(v) {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
+/** Hiển thị chỉ tiêu còn lại / tổng (theo API); còn lại có thể null. */
+function formatCampaignRemainingOverTotal(campaign) {
+    const total = toNullableFiniteNumber(campaign?.campaignTotalQuota);
+    const remaining = campaign?.campaignRemainingQuota;
+    const remNum = remaining == null || remaining === "" ? null : toNullableFiniteNumber(remaining);
+    if (total == null && remNum == null) return null;
+    const remStr = remNum == null ? "—" : remNum.toLocaleString("vi-VN");
+    const totStr = total == null ? "—" : total.toLocaleString("vi-VN");
+    return `${remStr}/${totStr}`;
+}
+
 function mapTemplate(row) {
     if (!row) return null;
     const sourceMethods = Array.isArray(row.admissionMethodDetails) && row.admissionMethodDetails.length > 0
@@ -122,6 +139,8 @@ function mapTemplate(row) {
         admissionMethodTimelines: timelines,
         admissionMethodDetails: details,
         mandatoryAll,
+        campaignTotalQuota: toNullableFiniteNumber(row.campaignTotalQuota),
+        campaignRemainingQuota: toNullableFiniteNumber(row.campaignRemainingQuota),
     };
 }
 
@@ -295,12 +314,35 @@ export default function SchoolCampaignViewDetail() {
 
     const status = useMemo(() => statusUi(campaign?.status), [campaign?.status]);
 
+    const campaignQuotaRatioLabel = useMemo(
+        () => (campaign ? formatCampaignRemainingOverTotal(campaign) : null),
+        [campaign],
+    );
+
     const handlePublishCampaign = useCallback(async () => {
         if (!campaign?.id || publishLoading) return;
         setPublishLoading(true);
         try {
             await updateCampaignTemplateStatus(campaign.id);
-            const latest = await resolveCampaignFromApi();
+            const yearNum = Number(campaign?.year);
+            let latest = null;
+            if (Number.isFinite(yearNum) && yearNum > 0) {
+                try {
+                    const res = await getCampaignTemplatesByYear(yearNum);
+                    const parsed = parseCampaignTemplateResponse(res);
+                    const list = parsed.campaigns.map((row) => ({
+                        ...row,
+                        campaignConfig: parsed.campaignConfig,
+                    }));
+                    const found = list.find(
+                        (row) => Number(row?.id ?? row?.admissionCampaignTemplateId) === idNum
+                    );
+                    if (found) latest = mapTemplate(found);
+                } catch {
+                    /* fallback below */
+                }
+            }
+            if (!latest) latest = await resolveCampaignFromApi();
             if (latest) setCampaign(latest);
             setConfirmPublishOpen(false);
             enqueueSnackbar("Công bố chiến dịch thành công.", { variant: "success" });
@@ -309,7 +351,7 @@ export default function SchoolCampaignViewDetail() {
         } finally {
             setPublishLoading(false);
         }
-    }, [campaign?.id, publishLoading, resolveCampaignFromApi]);
+    }, [campaign?.id, campaign?.year, idNum, publishLoading, resolveCampaignFromApi]);
 
     const handleCloneCampaign = useCallback(async () => {
         if (!campaign?.id || cloneLoading) return;
@@ -487,6 +529,14 @@ export default function SchoolCampaignViewDetail() {
                                     label={status.label}
                                     sx={{ bgcolor: "rgba(255,255,255,0.9)", color: status.color, fontWeight: 800 }}
                                 />
+                                {campaignQuotaRatioLabel ? (
+                                    <Chip
+                                        icon={<InsightsIcon sx={{ fontSize: 16 }} />}
+                                        size="small"
+                                        label={`Chỉ tiêu: ${campaignQuotaRatioLabel}`}
+                                        sx={{ bgcolor: "rgba(255,255,255,0.18)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }}
+                                    />
+                                ) : null}
                             </Stack>
                         </Box>
                         <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -706,13 +756,22 @@ export default function SchoolCampaignViewDetail() {
             </Card>
 
             {(() => {
-                const totalQuota = (campaign.admissionMethodTimelines || []).reduce((s, t) => s + (Number(t?.quota) || 0), 0);
+                const sumMethodQuota = (campaign.admissionMethodTimelines || []).reduce((s, t) => s + (Number(t?.quota) || 0), 0);
+                const apiTotal = toNullableFiniteNumber(campaign.campaignTotalQuota);
+                const totalQuota = apiTotal != null ? apiTotal : sumMethodQuota;
+                const quotaRatioLabel = campaignQuotaRatioLabel;
                 const totalApps = campaign.totalApplications ?? campaign.totalReservations ?? null;
                 const pending = campaign.pendingApplications ?? campaign.pendingCount ?? null;
                 const approved = campaign.approvedApplications ?? campaign.approvedCount ?? null;
                 const rejected = campaign.rejectedApplications ?? campaign.rejectedCount ?? null;
-                const hasStats = totalApps !== null || pending !== null || approved !== null || rejected !== null;
-                if (!hasStats && totalQuota === 0) return null;
+                const hasStats =
+                    totalApps !== null ||
+                    pending !== null ||
+                    approved !== null ||
+                    rejected !== null ||
+                    apiTotal != null ||
+                    sumMethodQuota > 0;
+                if (!hasStats) return null;
                 return (
                     <Card sx={{ borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
                         <CardContent sx={{ p: { xs: 2.2, md: 3 } }}>
@@ -724,7 +783,14 @@ export default function SchoolCampaignViewDetail() {
                             </Stack>
                             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: 1.5 }}>
                                 {[
-                                    { label: "Tổng quota", value: totalQuota > 0 ? totalQuota.toLocaleString("vi-VN") : "—", color: "#1d4ed8", bg: "rgba(59,130,246,0.08)" },
+                                    {
+                                        label: quotaRatioLabel ? "Chỉ tiêu (còn / tổng)" : "Tổng quota",
+                                        value:
+                                            quotaRatioLabel ||
+                                            (totalQuota > 0 ? totalQuota.toLocaleString("vi-VN") : "—"),
+                                        color: "#1d4ed8",
+                                        bg: "rgba(59,130,246,0.08)",
+                                    },
                                     { label: "Tổng hồ sơ", value: totalApps !== null ? Number(totalApps).toLocaleString("vi-VN") : "—", color: "#0f172a", bg: "rgba(148,163,184,0.1)" },
                                     { label: "Đang chờ xét", value: pending !== null ? Number(pending).toLocaleString("vi-VN") : "—", color: "#d97706", bg: "rgba(251,191,36,0.1)" },
                                     { label: "Đã duyệt", value: approved !== null ? Number(approved).toLocaleString("vi-VN") : "—", color: "#16a34a", bg: "rgba(34,197,94,0.1)" },
