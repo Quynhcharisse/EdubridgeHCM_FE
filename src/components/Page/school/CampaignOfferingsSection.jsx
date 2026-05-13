@@ -1676,37 +1676,51 @@ export default function CampaignOfferingsSection({
                                 </Typography>
                             </Box>
                         ) : null}
-                        {editingRow && (
-                            <TextField
-                                label="Chỉ tiêu mới *"
-                                name="quota"
-                                type="number"
-                                fullWidth
-                                size="small"
-                                value={formValues.quota}
-                                onChange={handleChange}
-                                placeholder={String(editingRow.quota ?? "")}
-                                inputProps={{
-                                    min: Math.max(
-                                        0,
-                                        (Number(editingRow?.quota) || 0) - (Number(editingRow?.remainingQuota) || 0)
-                                    ),
-                                    step: 1,
-                                }}
-                                error={!!formErrors.quota}
-                                helperText={
-                                    formErrors.quota ||
-                                    `${
-                                        Number.isFinite(selectedMethodQuota)
-                                            ? `Chỉ tiêu tối đa theo phương thức đang chọn: ${selectedMethodQuota} · `
-                                            : ""
-                                    }Đã dùng: ${Math.max(
-                                        0,
-                                        (Number(editingRow?.quota) || 0) - (Number(editingRow?.remainingQuota) || 0)
-                                    )} · Còn lại có thể dùng: ${Number(editingRow?.remainingQuota) || 0}`
-                                }
-                            />
-                        )}
+                {editingRow && (() => {
+
+                     const usedQuota = Math.max(
+                                                 0,
+                                                 (Number(editingRow?.quota) || 0) -
+                                                 (Number(editingRow?.remainingQuota) || 0)
+    );
+
+                     const currentQuota =
+                              formValues.quota !== "" &&
+                              formValues.quota !== null &&
+                              formValues.quota !== undefined
+                              ? Number(formValues.quota)
+                              : Number(editingRow?.quota) || 0;
+
+                    const previewRemainingQuota = Math.max(
+                              0,
+                              currentQuota - usedQuota
+                              );
+    return (
+        <TextField
+            label="Chỉ tiêu mới *"
+            name="quota"
+            type="number"
+            fullWidth
+            size="small"
+            value={formValues.quota}
+            onChange={handleChange}
+            placeholder={String(editingRow?.quota ?? "")}
+            inputProps={{
+                min: usedQuota,
+                step: 1,
+            }}
+            error={!!formErrors.quota}
+            helperText={
+                formErrors.quota ||
+                `${
+                    Number.isFinite(selectedMethodQuota)
+                        ? `Chỉ tiêu tối đa theo phương thức đang chọn: ${selectedMethodQuota} · `
+                        : ""
+                }Đã sử dụng: ${usedQuota} · Remaining sau cập nhật: ${previewRemainingQuota}`
+            }
+        />
+    );
+})()}
                         <TextField
                             label="Điều chỉnh học phí (%)"
                             name="priceAdjustmentPercentage"

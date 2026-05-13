@@ -8,12 +8,14 @@ import {
     Avatar,
     Fade,
     Slide,
-    CircularProgress
+    CircularProgress,
+    Tooltip
 } from '@mui/material';
 import {
     Send as SendIcon,
     Close as CloseIcon,
-    SmartToy as BotIcon
+    SmartToy as BotIcon,
+    ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import axiosClient from '../../configs/APIConfig.jsx';
 import { APP_PRIMARY_DARK, APP_PRIMARY_MAIN } from '../../constants/homeLandingTheme';
@@ -66,7 +68,20 @@ const normalizeBotPayload = (responseData) => {
               })
               .filter(Boolean)
         : [];
-    const source = String(body?.source || '').trim();
+    const source = Array.isArray(body?.source)
+        ? body.source
+              .map((item) => {
+                  if (item && typeof item === 'object') {
+                      return {
+                          fileName: String(item.fileName || '').trim(),
+                          fileUrl: String(item.fileUrl || '').trim()
+                      };
+                  }
+                  const url = String(item || '').trim();
+                  return url ? { fileName: url, fileUrl: url } : null;
+              })
+              .filter(Boolean)
+        : [];
     return { text, details, source };
 };
 
@@ -146,6 +161,14 @@ const CounsellorChatbot = () => {
     ]);
     const [inputMessage, setInputMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [copiedKey, setCopiedKey] = useState(null);
+
+    const handleCopy = (key, text) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedKey(key);
+            setTimeout(() => setCopiedKey(null), 1500);
+        });
+    };
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -182,7 +205,7 @@ const CounsellorChatbot = () => {
             const hasBotContent =
                 Boolean(normalized.text) ||
                 (Array.isArray(normalized.details) && normalized.details.length > 0) ||
-                Boolean(normalized.source);
+                (Array.isArray(normalized.source) && normalized.source.length > 0);
             if (!hasBotContent) return;
 
             setMessages((prev) => [
@@ -228,7 +251,7 @@ const CounsellorChatbot = () => {
                 onClick={() => setIsOpen(true)}
                 sx={{
                     position: 'fixed',
-                    bottom: 90,
+                    bottom: 24,
                     right: 24,
                     zIndex: 1000,
                     cursor: 'pointer',
@@ -340,7 +363,7 @@ const CounsellorChatbot = () => {
                             >
                                 {messages.map((message) => {
                                     const sourceUrls =
-                                        message.sender === 'bot' ? parseSourceUrls(message.source) : [];
+                                        message.sender === 'bot' && Array.isArray(message.source) ? message.source : [];
                                     return (
                                         <Box
                                             key={message.id}
@@ -377,16 +400,30 @@ const CounsellorChatbot = () => {
                                                 }}
                                             >
                                                 {message.text && (
-                                                    <Typography
-                                                        variant="body2"
-                                                        sx={{
-                                                            fontSize: '0.875rem',
-                                                            lineHeight: 1.5,
-                                                            wordBreak: 'break-word'
-                                                        }}
-                                                    >
-                                                        {message.text}
-                                                    </Typography>
+                                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{
+                                                                flex: 1,
+                                                                fontSize: '0.875rem',
+                                                                lineHeight: 1.5,
+                                                                wordBreak: 'break-word'
+                                                            }}
+                                                        >
+                                                            {message.text}
+                                                        </Typography>
+                                                        {message.sender === 'bot' && (
+                                                            <Tooltip title={copiedKey === `${message.id}-text` ? 'Đã copy!' : 'Copy'} placement="top">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleCopy(`${message.id}-text`, message.text)}
+                                                                    sx={{ p: 0.3, mt: 0.2, flexShrink: 0, color: '#94a3b8', '&:hover': { color: APP_PRIMARY_MAIN } }}
+                                                                >
+                                                                    <CopyIcon sx={{ fontSize: 13 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Box>
                                                 )}
                                                 {message.sender === 'bot' &&
                                                     Array.isArray(message.details) &&
@@ -399,6 +436,23 @@ const CounsellorChatbot = () => {
                                                                 gap: 0.5
                                                             }}
                                                         >
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                                    Chi tiết
+                                                                </Typography>
+                                                                <Tooltip title={copiedKey === `${message.id}-details` ? 'Đã copy!' : 'Copy tất cả'} placement="top">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={() => handleCopy(
+                                                                            `${message.id}-details`,
+                                                                            message.details.map(d => d.label ? `${d.label}: ${d.value}` : `• ${d.value}`).join('\n')
+                                                                        )}
+                                                                        sx={{ p: 0.3, color: '#94a3b8', '&:hover': { color: APP_PRIMARY_MAIN } }}
+                                                                    >
+                                                                        <CopyIcon sx={{ fontSize: 13 }} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Box>
                                                             {message.details.map((detail, index) => (
                                                                 <Box
                                                                     key={`${message.id}-detail-${index}`}
@@ -450,36 +504,47 @@ const CounsellorChatbot = () => {
                                                         </Box>
                                                     )}
                                                 {sourceUrls.length > 0 && (
-                                                    <Box
-                                                        sx={{
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: 0.35,
-                                                            mt: 0.9,
-                                                            alignItems: 'flex-start'
-                                                        }}
-                                                    >
-                                                        {sourceUrls.map((url, idx) => (
-                                                            <Typography
-                                                                key={`${message.id}-source-${idx}`}
-                                                                component="a"
-                                                                href={buildSourceViewUrl(url)}
-                                                                title={url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                variant="caption"
-                                                                sx={{
-                                                                    display: 'inline-block',
-                                                                    fontSize: '0.75rem',
-                                                                    textDecoration: 'underline',
-                                                                    color: APP_PRIMARY_MAIN,
-                                                                    wordBreak: 'break-word',
-                                                                    maxWidth: '100%'
-                                                                }}
-                                                            >
-                                                                {getSourceLinkLabel(url)}
-                                                            </Typography>
-                                                        ))}
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.9 }}>
+                                                        <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                            Tài liệu tham khảo
+                                                        </Typography>
+                                                        {sourceUrls.map((src, idx) => {
+                                                            const key = `${message.id}-source-${idx}`;
+                                                            const label = src.fileName || getSourceLinkLabel(src.fileUrl) || src.fileUrl;
+                                                            return (
+                                                                <Box
+                                                                    key={key}
+                                                                    sx={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 0.5,
+                                                                        px: 1,
+                                                                        py: 0.5,
+                                                                        borderRadius: 1.5,
+                                                                        bgcolor: 'rgba(59,130,246,0.08)',
+                                                                        border: '1px solid rgba(59,130,246,0.18)'
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        component="a"
+                                                                        href={buildSourceViewUrl(src.fileUrl)}
+                                                                        title={src.fileUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        variant="caption"
+                                                                        sx={{
+                                                                            flex: 1,
+                                                                            fontSize: '0.75rem',
+                                                                            textDecoration: 'underline',
+                                                                            color: APP_PRIMARY_MAIN,
+                                                                            wordBreak: 'break-word'
+                                                                        }}
+                                                                    >
+                                                                        {label}
+                                                                    </Typography>
+                                                                </Box>
+                                                            );
+                                                        })}
                                                     </Box>
                                                 )}
                                                 <Typography

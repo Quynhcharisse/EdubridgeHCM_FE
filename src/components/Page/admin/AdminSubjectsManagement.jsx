@@ -54,7 +54,7 @@ import {
 } from "../../../constants/adminTableStyles.js";
 
 const TAB_CONFIG = [
-    { type: "regular", postSubjectType: ADMIN_SUBJECT_TYPE.REGULAR_SUBJECT, label: "Môn học chính" },
+    { type: "regular", postSubjectType: ADMIN_SUBJECT_TYPE.REGULAR_SUBJECT, label: "Môn học THCS" },
     { type: "foreign_language", postSubjectType: ADMIN_SUBJECT_TYPE.FOREIGN_LANGUAGE_SUBJECT, label: "Ngoại ngữ" },
 ];
 

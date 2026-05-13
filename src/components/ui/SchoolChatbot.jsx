@@ -66,7 +66,20 @@ const normalizeBotPayload = (responseData) => {
               })
               .filter(Boolean)
         : [];
-    const source = String(body?.source || '').trim();
+    const source = Array.isArray(body?.source)
+        ? body.source
+              .map((item) => {
+                  if (item && typeof item === 'object') {
+                      return {
+                          fileName: String(item.fileName || '').trim(),
+                          fileUrl: String(item.fileUrl || '').trim()
+                      };
+                  }
+                  const url = String(item || '').trim();
+                  return url ? { fileName: url, fileUrl: url } : null;
+              })
+              .filter(Boolean)
+        : [];
     return { text, details, source };
 };
 
@@ -146,6 +159,7 @@ const SchoolChatbot = () => {
     ]);
     const [inputMessage, setInputMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [isInputDisabled, setIsInputDisabled] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -188,7 +202,7 @@ const SchoolChatbot = () => {
             const hasBotContent =
                 Boolean(normalized.text) ||
                 (Array.isArray(normalized.details) && normalized.details.length > 0) ||
-                Boolean(normalized.source);
+                (Array.isArray(normalized.source) && normalized.source.length > 0);
             if (!hasBotContent) return;
 
             setMessages((prev) => [
@@ -202,12 +216,16 @@ const SchoolChatbot = () => {
                     timestamp: new Date()
                 }
             ]);
-        } catch {
+        } catch (error) {
+            const status = error?.response?.status;
+            const serverMessage = error?.response?.data?.message;
+            const fallbackText = 'Hiện tại chatbot đang bận, vui lòng thử lại sau ít phút.';
+            if (status === 400) setIsInputDisabled(true);
             setMessages((prev) => [
                 ...prev,
                 {
                     id: Date.now() + 1,
-                    text: 'Hiện tại chatbot đang bận, vui lòng thử lại sau ít phút.',
+                    text: status === 400 && serverMessage ? serverMessage : fallbackText,
                     details: [],
                     source: '',
                     sender: 'bot',
@@ -346,7 +364,7 @@ const SchoolChatbot = () => {
                             >
                                 {messages.map((message) => {
                                     const sourceUrls =
-                                        message.sender === 'bot' ? parseSourceUrls(message.source) : [];
+                                        message.sender === 'bot' && Array.isArray(message.source) ? message.source : [];
                                     return (
                                         <Box
                                             key={message.id}
@@ -460,32 +478,47 @@ const SchoolChatbot = () => {
                                                         sx={{
                                                             display: 'flex',
                                                             flexDirection: 'column',
-                                                            gap: 0.35,
-                                                            mt: 0.9,
-                                                            alignItems: 'flex-start'
+                                                            gap: 0.5,
+                                                            mt: 0.9
                                                         }}
                                                     >
-                                                        {sourceUrls.map((url, idx) => (
-                                                            <Typography
-                                                                key={`${message.id}-source-${idx}`}
-                                                                component="a"
-                                                                href={buildSourceViewUrl(url)}
-                                                                title={url}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                variant="caption"
-                                                                sx={{
-                                                                    display: 'inline-block',
-                                                                    fontSize: '0.75rem',
-                                                                    textDecoration: 'underline',
-                                                                    color: APP_PRIMARY_MAIN,
-                                                                    wordBreak: 'break-word',
-                                                                    maxWidth: '100%'
-                                                                }}
-                                                            >
-                                                                {getSourceLinkLabel(url)}
-                                                            </Typography>
-                                                        ))}
+                                                        {sourceUrls.map((src, idx) => {
+                                                            const key = `${message.id}-source-${idx}`;
+                                                            const label = src.fileName || getSourceLinkLabel(src.fileUrl) || src.fileUrl;
+                                                            return (
+                                                                <Box
+                                                                    key={key}
+                                                                    sx={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 0.5,
+                                                                        px: 1,
+                                                                        py: 0.5,
+                                                                        borderRadius: 1.5,
+                                                                        bgcolor: 'rgba(59,130,246,0.08)',
+                                                                        border: '1px solid rgba(59,130,246,0.18)'
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        component="a"
+                                                                        href={buildSourceViewUrl(src.fileUrl)}
+                                                                        title={src.fileUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        variant="caption"
+                                                                        sx={{
+                                                                            flex: 1,
+                                                                            fontSize: '0.75rem',
+                                                                            textDecoration: 'underline',
+                                                                            color: APP_PRIMARY_MAIN,
+                                                                            wordBreak: 'break-word'
+                                                                        }}
+                                                                    >
+                                                                        {label}
+                                                                    </Typography>
+                                                                </Box>
+                                                            );
+                                                        })}
                                                     </Box>
                                                 )}
                                                 <Typography
@@ -542,6 +575,7 @@ const SchoolChatbot = () => {
                                     value={inputMessage}
                                     onChange={(e) => setInputMessage(e.target.value)}
                                     onKeyPress={handleKeyPress}
+                                    disabled={isInputDisabled}
                                     variant="outlined"
                                     size="small"
                                     sx={{
@@ -556,7 +590,7 @@ const SchoolChatbot = () => {
                                 />
                                 <IconButton
                                     onClick={handleSendMessage}
-                                    disabled={inputMessage.trim() === '' || isSending}
+                                    disabled={inputMessage.trim() === '' || isSending || isInputDisabled}
                                     sx={{
                                         bgcolor: APP_PRIMARY_MAIN,
                                         color: 'white',
