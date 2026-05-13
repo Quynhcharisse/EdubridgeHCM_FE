@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo, useRef} from "react";
+import React, {useState, useEffect, useLayoutEffect, useMemo, useRef} from "react";
 import {
     AppBar,
     Avatar,
@@ -24,6 +24,7 @@ import {
     MenuItem,
     Paper,
     Typography,
+    Tooltip,
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -565,15 +566,42 @@ const doesConversationMatchStudent = (conversation, student) => {
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
 const isImageFile = (f) => IMAGE_EXT_RE.test(String(f?.fileName || f?.fileUrl || ''));
 const UUID_PREFIX_RE = /^[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}_/i;
-const formatAttachmentName = (fileName, maxBase = 8) => {
+
+const displayChatAttachmentFileName = (fileName) => {
     let name = String(fileName || '').trim();
     let prev;
-    do { prev = name; name = name.replace(UUID_PREFIX_RE, ''); } while (name !== prev);
-    const dotIdx = name.lastIndexOf('.');
-    const base = dotIdx >= 0 ? name.slice(0, dotIdx) : name;
-    const ext = dotIdx >= 0 ? name.slice(dotIdx) : '';
-    if (base.length <= maxBase) return name;
-    return `${base.slice(0, maxBase)}...${ext}`;
+    do {
+        prev = name;
+        name = name.replace(UUID_PREFIX_RE, '');
+    } while (name !== prev);
+    return name || 'Tệp đính kèm';
+};
+
+/** Dung lượng từ BE (nếu có): fileSize, size, bytes, … */
+const formatChatAttachmentSize = (f) => {
+    if (!f || typeof f !== 'object') return '';
+    const raw = f.fileSize ?? f.size ?? f.fileSizeBytes ?? f.bytes ?? f.contentLength ?? f.length;
+    const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(String(raw ?? '').replace(/,/g, '').trim());
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n < 1024) return `${Math.round(n)} B`;
+    const kb = n / 1024;
+    if (n < 1024 * 1024) {
+        return `${kb.toLocaleString('vi-VN', {maximumFractionDigits: 2, minimumFractionDigits: 0})} KB`;
+    }
+    const mb = n / (1024 * 1024);
+    return `${mb.toLocaleString('vi-VN', {maximumFractionDigits: 2, minimumFractionDigits: 0})} MB`;
+};
+
+/** Viền + đổ bóng để hàng file nổi rõ trên nền vùng chat */
+const chatDocRowElevatedSx = {
+    border: '1px solid rgba(15, 23, 42, 0.12)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.07), 0 8px 24px -6px rgba(15, 23, 42, 0.18)',
+    transition: 'box-shadow 0.18s ease, transform 0.18s ease',
+    '&:hover': {
+        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.1), 0 12px 32px -8px rgba(15, 23, 42, 0.26)',
+        transform: 'translateY(-1px)',
+    },
+    '&:hover .chat-doc-name': {textDecoration: 'underline'},
 };
 
 const areStudentProfilesEquivalent = (a, b) => {
@@ -618,6 +646,47 @@ const areMessageListsEquivalent = (prev, next) => {
     return true;
 };
 
+const flattenReadActorValueParentWs = (v) => {
+    if (v == null) return [];
+    if (typeof v === 'object' && !Array.isArray(v)) {
+        return [v.email, v.username, v.userName, v.name, v.sub]
+            .map((x) => String(x ?? '').trim().toLowerCase())
+            .filter(Boolean);
+    }
+    const s = String(v ?? '').trim().toLowerCase();
+    return s ? [s] : [];
+};
+
+const collectConversationReadActorsParent = (obj, rawPayload) => {
+    const actorFields = (o) => {
+        if (!o || typeof o !== 'object') return [];
+        return [
+            o.readBy,
+            o.readerEmail,
+            o.readByEmail,
+            o.readerUsername,
+            o.username,
+            o.userEmail,
+            o.userName,
+            o.email,
+            o.actor,
+            o.markedBy,
+            o.readByUser,
+            o.reader,
+            o.user,
+            o?.data?.readBy,
+            o?.payload?.readBy
+        ];
+    };
+    const actors = new Set();
+    for (const v of [...actorFields(obj), ...actorFields(rawPayload)]) {
+        for (const a of flattenReadActorValueParentWs(v)) {
+            actors.add(a);
+        }
+    }
+    return actors;
+};
+
 function MainHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
@@ -654,6 +723,8 @@ function MainHeader() {
     const [pendingChatTarget, setPendingChatTarget] = useState(null);
     /** Badge khi BE không gửi conversationId trên WS nhưng tin đã vào queue phụ huynh. */
     const [parentWsUnreadBump, setParentWsUnreadBump] = useState(0);
+    /** Thời điểm đối phương (TVV/trường) mark-read — dùng hiển thị avatar “đã xem” trên tin gửi. */
+    const [peerReadReceiptAt, setPeerReadReceiptAt] = useState(null);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(() => readNotificationUnreadCount());
     const [notificationItems, setNotificationItems] = useState([]);
 
@@ -674,6 +745,8 @@ function MainHeader() {
     const loadConversationsRef = React.useRef(null);
     const forbiddenHistoryConversationIdsRef = React.useRef(new Set());
     const parentStickToBottomRef = React.useRef(true);
+    /** Sau khi vào hội thoại / mở lại cửa sổ — cuộn xuống tin mới nhất (layout xong). */
+    const parentPendingInitialBottomScrollRef = React.useRef(false);
     const sendingParentMessageRef = React.useRef(false);
     const messageHasMoreRef = React.useRef(false);
     const messageNextCursorIdRef = React.useRef(null);
@@ -1041,6 +1114,20 @@ function MainHeader() {
         return date.toLocaleTimeString("vi-VN", {hour: "2-digit", minute: "2-digit"});
     };
 
+    const formatMessageTooltipTime = (value) => {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleString("vi-VN", {
+            weekday: "long",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    };
+
     const formatNotificationTime = (value) => {
         if (!value) return "";
         const date = new Date(value);
@@ -1079,6 +1166,62 @@ function MainHeader() {
         return groups;
     }, [messageItems]);
 
+    /** Đổi khi có tin mới / đổi độ dài — dùng neo cuộn xuống đáy hội thoại. */
+    const parentMessageScrollKey = useMemo(() => {
+        if (!messageItems.length) return '0';
+        const m = messageItems[messageItems.length - 1];
+        return `${messageItems.length}:${String(m?.id ?? '')}:${m?.sentAt ?? ''}`;
+    }, [messageItems]);
+
+    const scrollParentChatListToBottom = React.useCallback(() => {
+        const node = chatListRef.current;
+        if (!node) return;
+        const prevBehavior = node.style.scrollBehavior;
+        node.style.scrollBehavior = 'auto';
+        const end = () => {
+            node.scrollTop = node.scrollHeight;
+        };
+        end();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                end();
+                window.setTimeout(() => {
+                    end();
+                    node.style.scrollBehavior = prevBehavior;
+                }, 0);
+            });
+        });
+    }, []);
+
+    React.useLayoutEffect(() => {
+        if (!chatWindowOpen || !selectedConversation) return;
+        if (messageLoading || loadingMoreRef.current) return;
+        if (!messageItems.length) return;
+        if (!parentStickToBottomRef.current && !parentPendingInitialBottomScrollRef.current) return;
+        scrollParentChatListToBottom();
+        if (parentPendingInitialBottomScrollRef.current) {
+            window.setTimeout(() => {
+                scrollParentChatListToBottom();
+            }, 40);
+            window.setTimeout(() => {
+                scrollParentChatListToBottom();
+                parentPendingInitialBottomScrollRef.current = false;
+            }, 150);
+        }
+    }, [
+        chatWindowOpen,
+        selectedConversation?.conversationId,
+        selectedConversation?.id,
+        messageLoading,
+        parentMessageScrollKey,
+        scrollParentChatListToBottom,
+    ]);
+
+    const selectedConversationIdForReadFx = selectedConversation?.conversationId ?? selectedConversation?.id;
+    React.useEffect(() => {
+        setPeerReadReceiptAt(null);
+    }, [selectedConversationIdForReadFx]);
+
     const isParentMessageMine = React.useCallback(
         (msg) => {
             const r = msg?.raw || {};
@@ -1110,6 +1253,21 @@ function MainHeader() {
         },
         [userIdentitySet, userInfo]
     );
+
+    const parentChatReadReceiptAnchorId = useMemo(() => {
+        if (!peerReadReceiptAt || !messageItems.length) return null;
+        const readMs = new Date(peerReadReceiptAt).getTime();
+        if (Number.isNaN(readMs)) return null;
+        let lastMineId = null;
+        let anchorId = null;
+        for (const m of messageItems) {
+            if (!isParentMessageMine(m)) continue;
+            lastMineId = String(m.id);
+            const t = m.sentAt ? new Date(m.sentAt).getTime() : 0;
+            if (!Number.isNaN(t) && t <= readMs) anchorId = String(m.id);
+        }
+        return anchorId ?? lastMineId;
+    }, [messageItems, peerReadReceiptAt, isParentMessageMine]);
 
     /** Bubble tin từ tư vấn: vệt nền xanh theo unreadCount (N tin peer gần nhất). */
     const peerUnreadBubbleIdSet = React.useMemo(() => {
@@ -1588,6 +1746,7 @@ function MainHeader() {
         parentComposerEngagedRef.current = false;
         setParentWsUnreadBump(0);
         parentStickToBottomRef.current = true;
+        parentPendingInitialBottomScrollRef.current = true;
         setSelectedConversationStudent(null);
         setStudentProfileDetailForPanel(null);
         setStudentProfileDetailLoading(false);
@@ -1605,6 +1764,9 @@ function MainHeader() {
         setChatWindowMinimized(false);
         hasMarkedReadRef.current = false;
         await loadMessageHistory({conversation});
+        scrollParentChatListToBottom();
+        window.setTimeout(scrollParentChatListToBottom, 50);
+        window.setTimeout(scrollParentChatListToBottom, 180);
         const convAfterHistory = selectedConversationRef.current || conversation;
         await markParentConversationRead(convAfterHistory, {force: true});
     };
@@ -1954,9 +2116,7 @@ function MainHeader() {
                         scheduleSilentConversationRefresh();
                         return;
                     }
-                    if (!conversationReadTargetsParentInbox(root, payload, emailForMatch)) {
-                        return;
-                    }
+                    if (conversationReadTargetsParentInbox(root, payload, emailForMatch)) {
                     const readTime = root?.timestamp ?? root?.sentAt ?? root?.time ?? null;
                     setConversationItems((prev) =>
                         prev.map((item) => {
@@ -1983,6 +2143,17 @@ function MainHeader() {
                         selectedConversationRef.current = next;
                         return next;
                     });
+                        return;
+                    }
+                    const actors = collectConversationReadActorsParent(root, payload);
+                    if (actors.size > 0) {
+                        const readTimePeer =
+                            root?.timestamp ?? root?.sentAt ?? root?.time ?? new Date().toISOString();
+                        const sid = selectedConversationRef.current?.conversationId ?? selectedConversationRef.current?.id;
+                        if (isSameConversationId(sid, readConversationId)) {
+                            setPeerReadReceiptAt(readTimePeer);
+                        }
+                    }
                     return;
                 }
 
@@ -2198,14 +2369,6 @@ function MainHeader() {
         };
     }, [isSignedIn, isParent]);
 
-    useEffect(() => {
-        if (!selectedConversation || messageItems.length === 0) return;
-        if (!chatListRef.current) return;
-        if (loadingMoreRef.current) return;
-        if (!parentStickToBottomRef.current) return;
-        chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-    }, [selectedConversation, messageItems.length]);
-
     const handleMobileMenuToggle = () => {
         setMobileMenuOpen(!mobileMenuOpen);
     };
@@ -2229,6 +2392,8 @@ function MainHeader() {
     const handleCloseChatWindow = () => {
         parentComposerEngagedRef.current = false;
         setParentWsUnreadBump(0);
+        parentStickToBottomRef.current = true;
+        parentPendingInitialBottomScrollRef.current = false;
         setChatWindowOpen(false);
         setChatWindowMinimized(false);
         setSelectedConversation(null);
@@ -2251,6 +2416,8 @@ function MainHeader() {
         parentComposerEngagedRef.current = false;
         setChatWindowMinimized(false);
         hasMarkedReadRef.current = false;
+        parentStickToBottomRef.current = true;
+        parentPendingInitialBottomScrollRef.current = true;
     };
 
     const fetchStudentProfileDetailForPanel = React.useCallback(async () => {
@@ -2339,7 +2506,12 @@ function MainHeader() {
             parentComposerEngagedRef.current = false;
             setParentWsUnreadBump(0);
             hasMarkedReadRef.current = false;
+            parentStickToBottomRef.current = true;
+            parentPendingInitialBottomScrollRef.current = true;
             await loadMessageHistory({conversation: draftConversation});
+            scrollParentChatListToBottom();
+            window.setTimeout(scrollParentChatListToBottom, 50);
+            window.setTimeout(scrollParentChatListToBottom, 180);
             let convAfterHistory = selectedConversationRef.current || draftConversation;
             let convId = convAfterHistory?.conversationId ?? convAfterHistory?.id ?? null;
             if (convId == null || String(convId).trim() === '') {
@@ -2359,7 +2531,7 @@ function MainHeader() {
                 await markParentConversationRead(convAfterHistory, {force: true});
             }
         },
-        [loadMessageHistory, markParentConversationRead, normalizeConversation, userInfo?.email]
+        [loadMessageHistory, markParentConversationRead, normalizeConversation, userInfo?.email, scrollParentChatListToBottom]
     );
 
     const openParentChatRef = React.useRef(null);
@@ -3405,9 +3577,9 @@ function MainHeader() {
                                             sx={{
                                                 flex: 1,
                                                 minHeight: 0,
-                                                px: 1.5,
+                                                px: {xs: 1, sm: 1.25},
                                                 pt: 1.5,
-                                                pb: 2,
+                                                pb: 0.75,
                                                 overflowY: 'auto',
                                                 overflowX: 'hidden',
                                                 background: parentChatHasUnread ? `
@@ -3486,8 +3658,19 @@ function MainHeader() {
                                                                     peerUnreadBubbleIdSet.has(String(msg.id ?? ''));
                                                                 const prev = idx > 0 ? group.items[idx - 1] : null;
                                                                 const prevIsMine = prev ? isParentMessageMine(prev) : null;
-                                                                const showPeerAvatar = !isMine && (idx === 0 || prevIsMine === true);
+                                                                const next = idx < group.items.length - 1 ? group.items[idx + 1] : null;
+                                                                const nextIsMine = next != null ? isParentMessageMine(next) : null;
+                                                                const showPeerAvatar = !isMine && (next == null || nextIsMine === true);
                                                                 const stackTight = idx > 0 && prevIsMine === isMine;
+                                                                const files = msg.files || [];
+                                                                const imageFiles = files.filter(isImageFile);
+                                                                const docFiles = files.filter((f) => !isImageFile(f));
+                                                                const hasText = !!(msg.text && String(msg.text).trim());
+                                                                const showReadReceipt =
+                                                                    isMine &&
+                                                                    peerReadReceiptAt &&
+                                                                    parentChatReadReceiptAnchorId != null &&
+                                                                    String(parentChatReadReceiptAnchorId) === String(msg.id);
                                                                 return (
                                                                     <Box
                                                                         key={`${group.key}-${idx}-${msg.id}-${msg.sentAt ?? ''}`}
@@ -3497,12 +3680,13 @@ function MainHeader() {
                                                                             alignItems: 'flex-end',
                                                                             gap: 0.75,
                                                                             mb: stackTight ? 0.35 : 1.1,
-                                                                            pl: isMine ? 3 : 0,
-                                                                            pr: isMine ? 0 : 0
+                                                                            pl: 0,
+                                                                            pr: 0,
+                                                                            width: isMine ? '100%' : 'auto'
                                                                         }}
                                                                     >
                                                                         {!isMine && (
-                                                                            <Box sx={{width: 32, flexShrink: 0, display: 'flex', justifyContent: 'center', pb: 0.25}}>
+                                                                            <Box sx={{width: 32, flexShrink: 0, display: 'flex', justifyContent: 'center'}}>
                                                                                 {showPeerAvatar ? (
                                                                                     <Avatar
                                                                                         src={peerSchoolLogoUrl || undefined}
@@ -3522,7 +3706,34 @@ function MainHeader() {
                                                                                 )}
                                                                             </Box>
                                                                         )}
-                                                                        <Box sx={{maxWidth: isMine ? '82%' : 'calc(100% - 40px)', minWidth: 0}}>
+                                                                        <Box
+                                                                            sx={{
+                                                                                maxWidth:
+                                                                                    docFiles.length > 0
+                                                                                        ? isMine
+                                                                                            ? 'min(92%, 920px)'
+                                                                                            : 'calc(100% - 40px)'
+                                                                                        : isMine
+                                                                                          ? 'min(360px, 96%)'
+                                                                                          : 'calc(100% - 40px)',
+                                                                                minWidth: 0,
+                                                                                display: 'flex',
+                                                                                flexDirection: 'column',
+                                                                                alignItems: isMine ? 'flex-end' : 'flex-start',
+                                                                            }}
+                                                                        >
+                                                                            <Tooltip
+                                                                                title={msg.sentAt ? formatMessageTooltipTime(msg.sentAt) : ''}
+                                                                                enterDelay={380}
+                                                                                placement={isMine ? 'left' : 'right'}
+                                                                                describeChild
+                                                                                disableHoverListener={!msg.sentAt}
+                                                                                disableFocusListener={!msg.sentAt}
+                                                                                disableTouchListener={!msg.sentAt}
+                                                                                slotProps={{ tooltip: { sx: { fontSize: 12 } } }}
+                                                                            >
+                                                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start', width: '100%' }}>
+                                                                            {hasText ? (
                                                                             <Box
                                                                                 sx={{
                                                                                     px: 1.6,
@@ -3530,31 +3741,24 @@ function MainHeader() {
                                                                                     borderRadius: 2.25,
                                                                                     borderTopLeftRadius: !isMine ? (stackTight ? 2.25 : 0.5) : 2.25,
                                                                                     borderTopRightRadius: isMine ? (stackTight ? 2.25 : 0.5) : 2.25,
-                                                                                    background: (msg.files && msg.files.length > 0)
-                                                                                        ? '#e5e5ea'
-                                                                                        : isMine
+                                                                                    background: isMine
                                                                                           ? selectedStudentTheme.bubbleGradient
                                                                                           : peerUnreadHighlight
                                                                                             ? 'linear-gradient(135deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.92) 100%)'
                                                                                             : '#ffffff',
-                                                                                    color: (isMine && !(msg.files && msg.files.length > 0)) ? '#ffffff' : '#1e293b',
-                                                                                    border: (msg.files && msg.files.length > 0)
-                                                                                        ? 'none'
-                                                                                        : isMine
+                                                                                    color: (isMine && (!files.length || hasText)) ? '#ffffff' : '#1e293b',
+                                                                                    border: isMine
                                                                                           ? 'none'
                                                                                           : peerUnreadHighlight
                                                                                             ? '1px solid rgba(37,99,235,0.42)'
                                                                                             : '1px solid rgba(148,163,184,0.4)',
-                                                                                    boxShadow: (msg.files && msg.files.length > 0)
-                                                                                        ? 'none'
-                                                                                        : isMine
+                                                                                    boxShadow: isMine
                                                                                           ? '0 2px 8px rgba(59,130,246,0.3), 0 1px 0 rgba(255,255,255,0.12) inset'
                                                                                           : peerUnreadHighlight
                                                                                             ? '0 2px 8px rgba(37,99,235,0.12)'
                                                                                             : '0 1px 3px rgba(51,65,85,0.06)'
                                                                                 }}
                                                                             >
-                                                                                {msg.text ? (
                                                                                 <Typography
                                                                                     sx={{
                                                                                         fontSize: 13.5,
@@ -3567,25 +3771,165 @@ function MainHeader() {
                                                                                 >
                                                                                     {msg.text}
                                                                                 </Typography>
-                                                                                ) : null}
-                                                                                {msg.files && msg.files.length > 0 && (
+                                                                                {docFiles.length > 0 ? (
                                                                                     <Box sx={{
-                                                                                        bgcolor: '#ffffff',
-                                                                                        border: '1px solid #e2e8f0',
-                                                                                        borderRadius: 1.5,
-                                                                                        p: 0.75,
-                                                                                        mt: msg.text ? 0.75 : 0,
+                                                                                        mt: 0.75,
+                                                                                        alignSelf: isMine ? 'flex-end' : 'flex-start',
+                                                                                        width: 'max-content',
+                                                                                        maxWidth: '100%',
+                                                                                        display: 'flex',
+                                                                                        flexDirection: 'column',
+                                                                                        gap: 0.65,
+                                                                                    }}>
+                                                                                        {docFiles.map((f, idx) => {
+                                                                                            const sizeLabel = formatChatAttachmentSize(f);
+                                                                                            return (
+                                                                                                <Box
+                                                                                                    key={idx}
+                                                                                                    component="a"
+                                                                                                    href={f.fileUrl}
+                                                                                                    target="_blank"
+                                                                                                    rel="noopener noreferrer"
+                                                                                                    sx={{
+                                                                                                        display: 'flex',
+                                                                                                        flexDirection: 'row',
+                                                                                                        alignItems: 'center',
+                                                                                                        gap: 0.85,
+                                                                                                        textDecoration: 'none',
+                                                                                                        width: 'max-content',
+                                                                                                        maxWidth: '100%',
+                                                                                                        py: 0.65,
+                                                                                                        px: 1.1,
+                                                                                                        borderRadius: 2,
+                                                                                                        bgcolor: '#ffffff',
+                                                                                                        color: '#0f172a',
+                                                                                                        ...chatDocRowElevatedSx,
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <InsertDriveFileOutlinedIcon
+                                                                                                        sx={{
+                                                                                                            fontSize: 22,
+                                                                                                            flexShrink: 0,
+                                                                                                            color: '#475569',
+                                                                                                        }}
+                                                                                                    />
+                                                                                                    <Box sx={{minWidth: 0}}>
+                                                                                                        <Typography
+                                                                                                            className="chat-doc-name"
+                                                                                                            sx={{
+                                                                                                                fontSize: 13,
+                                                                                                                fontWeight: 700,
+                                                                                                                lineHeight: 1.35,
+                                                                                                                whiteSpace: 'nowrap',
+                                                                                                                color: '#0f172a',
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            {displayChatAttachmentFileName(f.fileName)}
+                                                                                                        </Typography>
+                                                                                                        <Typography
+                                                                                                            sx={{
+                                                                                                                fontSize: 11.5,
+                                                                                                                mt: 0.15,
+                                                                                                                lineHeight: 1.25,
+                                                                                                                whiteSpace: 'nowrap',
+                                                                                                                color: '#64748b',
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            {sizeLabel || 'Nhấn để xem'}
+                                                                                                        </Typography>
+                                                                                                    </Box>
+                                                                                                </Box>
+                                                                                            );
+                                                                                        })}
+                                                                                    </Box>
+                                                                                ) : null}
+                                                                            </Box>
+                                                                            ) : null}
+                                                                            {!hasText && docFiles.length > 0 ? (
+                                                                                <Box sx={{
+                                                                                    alignSelf: isMine ? 'flex-end' : 'flex-start',
+                                                                                    width: 'max-content',
+                                                                                    maxWidth: '100%',
+                                                                                    display: 'flex',
+                                                                                    flexDirection: 'column',
+                                                                                    gap: 0.65,
+                                                                                }}>
+                                                                                    {docFiles.map((f, idx) => {
+                                                                                        const sizeLabel = formatChatAttachmentSize(f);
+                                                                                        return (
+                                                                                            <Box
+                                                                                                key={idx}
+                                                                                                component="a"
+                                                                                                href={f.fileUrl}
+                                                                                                target="_blank"
+                                                                                                rel="noopener noreferrer"
+                                                                                                sx={{
+                                                                                                    display: 'flex',
+                                                                                                    flexDirection: 'row',
+                                                                                                    alignItems: 'center',
+                                                                                                    gap: 0.85,
+                                                                                                    textDecoration: 'none',
+                                                                                                    width: 'max-content',
+                                                                                                    maxWidth: '100%',
+                                                                                                    py: 0.65,
+                                                                                                    px: 1.1,
+                                                                                                    borderRadius: 2,
+                                                                                                    bgcolor: '#ffffff',
+                                                                                                    color: '#0f172a',
+                                                                                                    ...chatDocRowElevatedSx,
+                                                                                                }}
+                                                                                            >
+                                                                                                <InsertDriveFileOutlinedIcon
+                                                                                                    sx={{
+                                                                                                        fontSize: 22,
+                                                                                                        flexShrink: 0,
+                                                                                                        color: '#475569',
+                                                                                                    }}
+                                                                                                />
+                                                                                                <Box sx={{minWidth: 0}}>
+                                                                                                    <Typography
+                                                                                                        className="chat-doc-name"
+                                                                                                        sx={{
+                                                                                                            fontSize: 13,
+                                                                                                            fontWeight: 700,
+                                                                                                            lineHeight: 1.35,
+                                                                                                            whiteSpace: 'nowrap',
+                                                                                                            color: '#0f172a',
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {displayChatAttachmentFileName(f.fileName)}
+                                                                                                    </Typography>
+                                                                                                    <Typography
+                                                                                                        sx={{
+                                                                                                            fontSize: 11.5,
+                                                                                                            mt: 0.15,
+                                                                                                            lineHeight: 1.25,
+                                                                                                            whiteSpace: 'nowrap',
+                                                                                                            color: '#64748b',
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        {sizeLabel || 'Nhấn để xem'}
+                                                                                                    </Typography>
+                                                                                                </Box>
+                                                                                            </Box>
+                                                                                        );
+                                                                                    })}
+                                                                                </Box>
+                                                                            ) : null}
+                                                                            {imageFiles.length > 0 ? (
+                                                                                <Box sx={{
+                                                                                    mt: hasText || docFiles.length > 0 ? 0.6 : 0,
                                                                                         width: 220,
+                                                                                    maxWidth: '100%',
                                                                                         display: 'flex',
                                                                                         flexDirection: 'column',
                                                                                         gap: 0.75,
                                                                                     }}>
-                                                                                        {msg.files.map((f, idx) => (
-                                                                                            isImageFile(f) ? (
+                                                                                    {imageFiles.map((f, idx) => (
                                                                                                 <Box
                                                                                                     key={idx}
                                                                                                     onClick={() => setLightboxUrl(f.fileUrl)}
-                                                                                                    sx={{display: 'block', cursor: 'pointer'}}
+                                                                                            sx={{display: 'block', cursor: 'pointer', lineHeight: 0}}
                                                                                                 >
                                                                                                     <Box
                                                                                                         component="img"
@@ -3595,58 +3939,35 @@ function MainHeader() {
                                                                                                             display: 'block',
                                                                                                             width: '100%',
                                                                                                             height: 160,
-                                                                                                            borderRadius: 1,
+                                                                                                    borderRadius: 0,
                                                                                                             objectFit: 'cover',
                                                                                                         }}
                                                                                                     />
                                                                                                 </Box>
-                                                                                            ) : (
-                                                                                                <Box
-                                                                                                    key={idx}
-                                                                                                    component="a"
-                                                                                                    href={f.fileUrl}
-                                                                                                    target="_blank"
-                                                                                                    rel="noopener noreferrer"
-                                                                                                    sx={{
-                                                                                                        display: 'flex',
-                                                                                                        alignItems: 'center',
-                                                                                                        gap: 1,
-                                                                                                        textDecoration: 'none',
-                                                                                                        width: '100%',
-                                                                                                        borderRadius: 1,
-                                                                                                        '&:hover': {opacity: 0.85},
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <InsertDriveFileOutlinedIcon sx={{fontSize: 22, color: selectedStudentTheme.accent, flexShrink: 0}}/>
-                                                                                                    <Box sx={{minWidth: 0, flex: 1}}>
-                                                                                                        <Typography sx={{fontSize: 12, fontWeight: 600, color: '#1e293b', lineHeight: 1.3, wordBreak: 'break-all'}}>
-                                                                                                            {formatAttachmentName(f.fileName)}
-                                                                                                        </Typography>
-                                                                                                        <Typography sx={{fontSize: 10, color: '#94a3b8', mt: 0.15}}>
-                                                                                                            Nhấn để xem
-                                                                                                        </Typography>
-                                                                                                    </Box>
-                                                                                                </Box>
-                                                                                            )
                                                                                         ))}
                                                                                     </Box>
-                                                                                )}
+                                                                            ) : null}
                                                                             </Box>
-                                                                            {msg.sentAt && (
-                                                                            <Typography
+                                                                            </Tooltip>
+                                                                            {showReadReceipt ? (
+                                                                                <Tooltip title="Đã xem">
+                                                                                    <Avatar
+                                                                                        src={peerSchoolLogoUrl || undefined}
                                                                                 sx={{
-                                                                                    mt: 0.35,
-                                                                                    fontSize: 10.5,
-                                                                                    fontWeight: 500,
-                                                                                    textAlign: isMine ? 'right' : 'left',
-                                                                                    color: '#94a3b8',
-                                                                                    lineHeight: 1.2,
-                                                                                    px: 0.35
-                                                                                }}
-                                                                            >
-                                                                                {formatMessageTime(msg.sentAt)}
-                                                                            </Typography>
-                                                                            )}
+                                                                                            mt: 0.45,
+                                                                                            width: 18,
+                                                                                            height: 18,
+                                                                                            fontSize: 9,
+                                                                                            fontWeight: 700,
+                                                                                            bgcolor: selectedStudentTheme.peerAvatar,
+                                                                                            boxShadow: '0 0 0 1px rgba(255,255,255,0.95)',
+                                                                                            alignSelf: 'flex-end',
+                                                                                        }}
+                                                                                    >
+                                                                                        {peerChatInitial}
+                                                                                    </Avatar>
+                                                                                </Tooltip>
+                                                                            ) : null}
                                                                         </Box>
                                                                     </Box>
                                                                 );
@@ -3745,14 +4066,6 @@ function MainHeader() {
                                                     </IconButton>
                                                 </Box>
                                             </Box>
-                                            <Typography sx={{ fontSize: 10.5, color: '#94a3b8', mt: 1.5, px: 0.5, userSelect: 'none' }}>
-                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
-                                                {' '}gửi tin nhắn{'  ·  '}
-                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Alt</Box>
-                                                {' + '}
-                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
-                                                {' '}xuống hàng
-                                            </Typography>
                                         </Box>
                                     </Box>
                                 )}
@@ -3761,10 +4074,27 @@ function MainHeader() {
                                         sx={{
                                             position: 'fixed',
                                             right: {xs: 24, sm: 24},
-                                            bottom: 98,
+                                            bottom: 24,
                                             zIndex: isStudentInfoOpen ? 1550 : 1500
                                         }}
                                     >
+                                        <Badge
+                                            badgeContent={parentHeaderUnreadDisplay}
+                                            color="error"
+                                            overlap="circular"
+                                            anchorOrigin={{vertical: 'top', horizontal: 'left'}}
+                                            invisible={parentHeaderUnreadDisplay === 0}
+                                            sx={{
+                                                '& .MuiBadge-badge': {
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    minWidth: 18,
+                                                    height: 18,
+                                                    borderRadius: 9,
+                                                    boxShadow: '0 2px 8px rgba(220,53,69,0.4)'
+                                                }
+                                            }}
+                                        >
                                         <Box
                                             sx={{
                                                 position: 'relative',
@@ -3824,6 +4154,7 @@ function MainHeader() {
                                                 <CloseIcon sx={{fontSize: 14}} />
                                             </IconButton>
                                         </Box>
+                                        </Badge>
                                     </Box>
                                 )}
                                 <Fade in={studentInfoOpen} timeout={220} unmountOnExit>
