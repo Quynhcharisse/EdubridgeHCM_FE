@@ -100,6 +100,23 @@ function normalizeCampaignStatus(rawStatus) {
     return s;
 }
 
+function toNullableFiniteNumber(v) {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
+/** Chỉ tiêu còn lại / tổng theo API; còn lại có thể null. */
+function formatCampaignRemainingOverTotal(campaign) {
+    const total = toNullableFiniteNumber(campaign?.campaignTotalQuota);
+    const remaining = campaign?.campaignRemainingQuota;
+    const remNum = remaining == null || remaining === "" ? null : toNullableFiniteNumber(remaining);
+    if (total == null && remNum == null) return null;
+    const remStr = remNum == null ? "—" : remNum.toLocaleString("vi-VN");
+    const totStr = total == null ? "—" : total.toLocaleString("vi-VN");
+    return `${remStr}/${totStr}`;
+}
+
 function mapTemplate(row) {
     if (!row) return null;
     const id = row.admissionCampaignTemplateId ?? row.id;
@@ -128,6 +145,8 @@ function mapTemplate(row) {
         numberOfOfferings: row.numberOfOfferings ?? 0,
         admissionMethodTimelines: normalizedTimelines,
         mandatoryAll: Array.isArray(row.mandatoryAll) ? row.mandatoryAll : [],
+        campaignTotalQuota: toNullableFiniteNumber(row.campaignTotalQuota),
+        campaignRemainingQuota: toNullableFiniteNumber(row.campaignRemainingQuota),
     };
 }
 
@@ -1021,15 +1040,29 @@ export default function SchoolCampaigns() {
     const handlePublishCampaign = async () => {
         if (!publishTargetCampaign?.id || publishLoading) return;
         setPublishLoading(true);
+        const target = publishTargetCampaign;
         try {
-            await updateCampaignTemplateStatus(publishTargetCampaign.id);
-            setCampaigns((prev) =>
-                prev.map((item) =>
-                    Number(item.id) === Number(publishTargetCampaign.id)
-                        ? { ...item, status: "OPEN" }
-                        : item
-                )
-            );
+            await updateCampaignTemplateStatus(target.id);
+            const y = Number(target.year);
+            let refetched = false;
+            if (Number.isFinite(y) && y > 0) {
+                try {
+                    const refetch = await getCampaignTemplatesByYear(y);
+                    const parsed = parseCampaignTemplateResponse(refetch);
+                    const freshList = mapCampaignsWithConfig(parsed.campaigns, parsed.campaignConfig);
+                    setCampaigns((prev) => mergeCampaignListsById([prev.filter((c) => Number(c.year) !== y), freshList]));
+                    refetched = true;
+                } catch {
+                    /* fallback: chỉ cập nhật trạng thái */
+                }
+            }
+            if (!refetched) {
+                setCampaigns((prev) =>
+                    prev.map((item) =>
+                        Number(item.id) === Number(target.id) ? { ...item, status: "OPEN" } : item
+                    )
+                );
+            }
             setConfirmPublishOpen(false);
             setPublishTargetCampaign(null);
             enqueueSnackbar("Công bố chiến dịch thành công.", { variant: "success" });
@@ -1523,6 +1556,9 @@ export default function SchoolCampaigns() {
                                 <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
                                     Bắt đầu — Kết thúc
                                 </TableCell>
+                                <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2, whiteSpace: "nowrap"}}>
+                                    Chỉ tiêu (còn / tổng)
+                                </TableCell>
                                 <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>
                                     Trạng thái
                                 </TableCell>
@@ -1543,13 +1579,14 @@ export default function SchoolCampaigns() {
                                         <TableCell><Skeleton variant="text" width="80%" /></TableCell>
                                         <TableCell><Skeleton variant="text" width={40} /></TableCell>
                                         <TableCell><Skeleton variant="text" width="70%" /></TableCell>
+                                        <TableCell><Skeleton variant="text" width="55%" /></TableCell>
                                         <TableCell><Skeleton variant="rounded" width={70} height={24} /></TableCell>
                                         {isPrimaryBranch && <TableCell><Skeleton variant="rounded" width={100} height={32} /></TableCell>}
                                     </TableRow>
                                 ))
                             ) : paginatedCampaigns.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={isPrimaryBranch ? 5 : 4} align="center" sx={{py: 8}}>
+                                    <TableCell colSpan={isPrimaryBranch ? 6 : 5} align="center" sx={{py: 8}}>
                                         <Box
                                             sx={{
                                                 display: "flex",
@@ -1621,6 +1658,9 @@ export default function SchoolCampaigns() {
                                             <TableCell sx={{color: "#64748b"}}>{row.year}</TableCell>
                                             <TableCell sx={{color: "#64748b", whiteSpace: "nowrap"}}>
                                                 {formatDate(row.startDate)} — {formatDate(row.endDate)}
+                                            </TableCell>
+                                            <TableCell sx={{color: "#64748b", fontWeight: 600, whiteSpace: "nowrap"}}>
+                                                {formatCampaignRemainingOverTotal(row) ?? "—"}
                                             </TableCell>
                                             <TableCell>
                                                 <Box

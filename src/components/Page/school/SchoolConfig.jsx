@@ -117,7 +117,7 @@ const SCHOOL_WORK_SHIFT_SELECT_CODES = WORK_SHIFT_TYPE_CODES.filter((code) => co
 /**
  * Danh sách phương thức hiển thị checkbox: từ API, không preset FE.
  * - `availableMethods` / `available_methods`: đủ lựa chọn (bật/tắt theo `allowedMethods`).
- * - Chỉ có `allowedMethods`: mỗi dòng tương ứng một phương thức đang cấu hình (có thể thêm bằng nút Thêm).
+ * - Chỉ có `allowedMethods`: mỗi dòng tương ứng một phương thức đang cấu hình.
  */
 function mergeAdmissionMethodCatalogRows(availableMethods, allowedMethods) {
   const map = new Map();
@@ -3224,18 +3224,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                     >
                       Lấy mẫu từ hệ thống
                     </Button>
-                    {admissionViewMode === "edit" ? (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<AddIcon/>}
-                        disabled={fieldDisabled}
-                        onClick={addAdmissionMethod}
-                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...admissionBlockPointerSx}}
-                      >
-                        Thêm
-                      </Button>
-                    ) : null}
                   </Stack>
                 </Stack>
                 <Alert severity="info" sx={{mb: 2, borderRadius: 2}}>
@@ -3617,15 +3605,11 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                       <Box sx={{flex: 1, minWidth: 220}}>
                         <Typography sx={{fontWeight: 800}}>Quy trình tuyển sinh theo phương thức</Typography>
                       </Box>
-                      <Button startIcon={<AddIcon/>} disabled={fieldDisabled} onClick={addMethodAdmissionProcess} sx={{textTransform: "none", flexShrink: 0, ...blockPointerSx}}>
-                        Thêm phương thức
-                      </Button>
                     </Stack>
                     <Stack spacing={2.5}>
                       {(config.admissionSettingsData.methodAdmissionProcess || []).length === 0 ? (
                         <Paper variant="outlined" sx={{p: 2, borderStyle: "dashed", color: "#64748b", borderRadius: 2}}>
-                          Chưa có quy trình theo phương thức. Nhấn &quot;Thêm phương thức&quot; và chọn đúng mã (vd. ACADEMIC_RECORD,
-                          INTERNAL_TEST).
+                          Chưa có quy trình theo phương thức. Dùng &quot;Lấy mẫu từ hệ thống&quot; ở trên để có danh sách.
                         </Paper>
                       ) : null}
                       {(config.admissionSettingsData.methodAdmissionProcess || []).map((group, gi) => {
@@ -4427,16 +4411,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                       <Button
                         variant="outlined"
                         size="small"
-                        startIcon={<AddIcon/>}
-                        onClick={addMandatoryDocument}
-                        disabled={fieldDisabled}
-                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
-                      >
-                        Thêm
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
                         onClick={() => void applySystemMandatoryAllTemplateToForm()}
                         disabled={loadingSystemAdmission || fieldDisabled}
                         sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
@@ -4537,16 +4511,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                     >
                       Lấy mẫu từ hệ thống
                     </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<AddIcon/>}
-                      disabled={fieldDisabled}
-                      onClick={addByMethodGroup}
-                      sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
-                    >
-                      Thêm nhóm phương thức
-                    </Button>
                   </Stack>
                 </Stack>
                 <Alert severity="info" sx={{borderRadius: 2, maxWidth: 1200, mb: 2.5}}>
@@ -4633,18 +4597,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                             </MenuItem>
                           ))}
                         </TextField>
-                        <Box sx={{display: "flex", justifyContent: "flex-end"}}>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<AddIcon/>}
-                            disabled={fieldDisabled}
-                            onClick={() => addDocumentToMethod(gIdx)}
-                            sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
-                          >
-                            Thêm hồ sơ
-                          </Button>
-                                </Box>
                         {(group.documents || []).map((doc, dIdx) => (
                           <Box
                             key={`by-method-${gIdx}-${dIdx}`}
