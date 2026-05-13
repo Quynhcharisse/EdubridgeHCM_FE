@@ -5,6 +5,7 @@ export const getPendingSchoolRegistrations = async () => {
     return response || null;
 };
 
+
 export const verifySchoolRegistration = async (requestId) => {
     const response = await axiosClient.post(`/admin/school/registrations/verify`, null, {
         params: { requestId },
