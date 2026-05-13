@@ -107,8 +107,16 @@ function mapTemplate(row) {
     const normalizedTimelines = Array.isArray(row.admissionMethodTimelines)
         ? row.admissionMethodTimelines.map((t) => ({
               ...t,
+              methodCode: String(t?.methodCode ?? "").trim(),
+              displayName: String(t?.displayName ?? t?.name ?? t?.methodCode ?? "").trim(),
+              description: String(t?.description ?? "").trim(),
               startDate: normalizeDateLikeToIso(t?.startDate),
               endDate: normalizeDateLikeToIso(t?.endDate),
+              depositEndDate: normalizeDateLikeToIso(t?.depositEndDate),
+              confirmationEndDate: normalizeDateLikeToIso(t?.confirmationEndDate),
+              reservationFee: t?.reservationFee != null ? Number(t?.reservationFee) : "",
+              admissionProcessSteps: Array.isArray(t?.admissionProcessSteps) ? t.admissionProcessSteps : [],
+              methodDocumentRequirements: Array.isArray(t?.methodDocumentRequirements) ? t.methodDocumentRequirements : [],
           }))
         : [];
 
@@ -166,7 +174,16 @@ const emptyForm = {
     year: new Date().getFullYear(),
     startDate: "",
     endDate: "",
-    admissionMethodTimelines: [{ methodCode: "", startDate: "", endDate: "", allowReservationSubmission: false, quota: "" }],
+    admissionMethodTimelines: [{
+        methodCode: "",
+        startDate: "",
+        endDate: "",
+        allowReservationSubmission: false,
+        quota: "",
+        reservationFee: "",
+        depositEndDate: "",
+        confirmationEndDate: "",
+    }],
 };
 
 function normalizeDateLikeToIso(v) {
@@ -594,8 +611,17 @@ export default function SchoolCampaigns() {
                 endDate: "",
                 allowReservationSubmission: false,
                 quota: "",
+                reservationFee: "",
+                depositEndDate: "",
+                confirmationEndDate: "",
             };
-            next[index] = { ...row, [field]: value };
+            const nextRow = { ...row, [field]: value };
+            if (field === "allowReservationSubmission" && !value) {
+                nextRow.reservationFee = "";
+                nextRow.depositEndDate = "";
+                nextRow.confirmationEndDate = "";
+            }
+            next[index] = nextRow;
             return { ...prev, admissionMethodTimelines: next };
         });
     };
@@ -609,7 +635,16 @@ export default function SchoolCampaigns() {
             ...prev,
             admissionMethodTimelines: [
                 ...(Array.isArray(prev.admissionMethodTimelines) ? prev.admissionMethodTimelines : []),
-                { methodCode: "", startDate: "", endDate: "", allowReservationSubmission: false, quota: "" },
+                {
+                    methodCode: "",
+                    startDate: "",
+                    endDate: "",
+                    allowReservationSubmission: false,
+                    quota: "",
+                    reservationFee: "",
+                    depositEndDate: "",
+                    confirmationEndDate: "",
+                },
             ],
         }));
     };
@@ -623,7 +658,16 @@ export default function SchoolCampaigns() {
                 admissionMethodTimelines:
                     next.length > 0
                         ? next
-                        : [{ methodCode: "", startDate: "", endDate: "", allowReservationSubmission: false, quota: "" }],
+                        : [{
+                            methodCode: "",
+                            startDate: "",
+                            endDate: "",
+                            allowReservationSubmission: false,
+                            quota: "",
+                            reservationFee: "",
+                            depositEndDate: "",
+                            confirmationEndDate: "",
+                        }],
             };
         });
     };
@@ -752,12 +796,18 @@ export default function SchoolCampaigns() {
                 const rowStartIso = String(row?.startDate ?? "").trim();
                 const rowEndIso = String(row?.endDate ?? "").trim();
                 const quotaNum = Number(row?.quota);
+                const allowReservationSubmission = Boolean(row?.allowReservationSubmission);
+                const depositEndIso = String(row?.depositEndDate ?? "").trim();
+                const confirmationEndIso = String(row?.confirmationEndDate ?? "").trim();
+                const reservationFeeNum = Number(row?.reservationFee);
                 if (!methodCode) rowErr.methodCode = "Chọn phương thức tuyển sinh";
                 if (!rowStartIso) rowErr.startDate = "Chọn ngày bắt đầu";
                 if (!rowEndIso) rowErr.endDate = "Chọn ngày kết thúc";
                 if (!Number.isFinite(quotaNum) || quotaNum <= 0) rowErr.quota = "Nhập quota lớn hơn 0";
                 const rowStart = parseLocalDate(rowStartIso);
                 const rowEnd = parseLocalDate(rowEndIso);
+                const depositEnd = parseLocalDate(depositEndIso);
+                const confirmationEnd = parseLocalDate(confirmationEndIso);
                 if (rowStartIso && !rowStart) rowErr.startDate = "Ngày bắt đầu không hợp lệ";
                 if (rowEndIso && !rowEnd) rowErr.endDate = "Ngày kết thúc không hợp lệ";
                 if (rowStart && rowEnd && rowEnd.getTime() < rowStart.getTime()) {
@@ -768,6 +818,24 @@ export default function SchoolCampaigns() {
                 }
                 if (campaignEnd && rowEnd && rowEnd.getTime() > campaignEnd.getTime()) {
                     rowErr.endDate = "Ngày kết thúc phải nằm trong chiến dịch";
+                }
+                if (allowReservationSubmission) {
+                    if (!Number.isFinite(reservationFeeNum) || reservationFeeNum <= 0) {
+                        rowErr.reservationFee = "Nhập phí giữ chỗ lớn hơn 0";
+                    }
+                    if (!depositEndIso) rowErr.depositEndDate = "Chọn hạn đóng phí";
+                    if (!confirmationEndIso) rowErr.confirmationEndDate = "Chọn hạn xác nhận nhập học";
+                    if (depositEndIso && !depositEnd) rowErr.depositEndDate = "Hạn đóng phí không hợp lệ";
+                    if (confirmationEndIso && !confirmationEnd) rowErr.confirmationEndDate = "Hạn xác nhận nhập học không hợp lệ";
+                    if (rowStart && rowEnd && depositEnd && depositEnd.getTime() < rowEnd.getTime()) {
+                        rowErr.depositEndDate = "Hạn đóng phí phải sau hoặc bằng ngày kết thúc phương thức";
+                    }
+                    if (depositEnd && confirmationEnd && confirmationEnd.getTime() < depositEnd.getTime()) {
+                        rowErr.confirmationEndDate = "Hạn xác nhận nhập học phải sau hoặc bằng hạn đóng phí";
+                    }
+                    if (campaignEnd && confirmationEnd && confirmationEnd.getTime() > campaignEnd.getTime()) {
+                        rowErr.confirmationEndDate = "Hạn xác nhận nhập học không được vượt quá ngày kết thúc chiến dịch";
+                    }
                 }
                 if (methodCode) {
                     if (usedCodes.has(methodCode)) {
@@ -805,6 +873,13 @@ export default function SchoolCampaigns() {
                 endDate: String(t?.endDate ?? "").trim(),
                 allowReservationSubmission: Boolean(t?.allowReservationSubmission),
                 quota: Number(t?.quota ?? 0),
+                ...(Boolean(t?.allowReservationSubmission)
+                    ? {
+                        reservationFee: Number(t?.reservationFee ?? 0),
+                        depositEndDate: String(t?.depositEndDate ?? "").trim(),
+                        confirmationEndDate: String(t?.confirmationEndDate ?? "").trim(),
+                    }
+                    : {}),
             })),
         };
     };
@@ -1905,7 +1980,13 @@ export default function SchoolCampaigns() {
                                         ? formErrors.admissionMethodTimelines[idx] || {}
                                         : {};
                                     const rowHasError = Boolean(
-                                        rowErr.methodCode || rowErr.quota || rowErr.startDate || rowErr.endDate
+                                        rowErr.methodCode ||
+                                        rowErr.quota ||
+                                        rowErr.startDate ||
+                                        rowErr.endDate ||
+                                        rowErr.reservationFee ||
+                                        rowErr.depositEndDate ||
+                                        rowErr.confirmationEndDate
                                     );
                                     const start = parseLocalDate(String(row?.startDate ?? "").trim());
                                     const end = parseLocalDate(String(row?.endDate ?? "").trim());
@@ -2093,6 +2174,45 @@ export default function SchoolCampaigns() {
                                                         </Stack>
                                                     </Box>
                                                 </Stack>
+                                                {!!row.allowReservationSubmission && (
+                                                    <Stack spacing={1} sx={{ mt: 1.5 }}>
+                                                        <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700 }}>
+                                                            Mốc nộp hồ sơ giữ chỗ
+                                                        </Typography>
+                                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                                                            <TextField
+                                                                label="Phí giữ chỗ"
+                                                                type="number"
+                                                                value={row.reservationFee ?? ""}
+                                                                onChange={(e) => handleTimelineChange(idx, "reservationFee", e.target.value)}
+                                                                inputProps={{ min: 1, step: 1000 }}
+                                                                error={!!rowErr.reservationFee}
+                                                                helperText={rowErr.reservationFee}
+                                                                fullWidth
+                                                            />
+                                                            <TextField
+                                                                label="Hạn đóng phí"
+                                                                type="date"
+                                                                value={row.depositEndDate || ""}
+                                                                onChange={(e) => handleTimelineChange(idx, "depositEndDate", e.target.value)}
+                                                                InputLabelProps={{ shrink: true }}
+                                                                error={!!rowErr.depositEndDate}
+                                                                helperText={rowErr.depositEndDate}
+                                                                fullWidth
+                                                            />
+                                                            <TextField
+                                                                label="Hạn xác nhận nhập học"
+                                                                type="date"
+                                                                value={row.confirmationEndDate || ""}
+                                                                onChange={(e) => handleTimelineChange(idx, "confirmationEndDate", e.target.value)}
+                                                                InputLabelProps={{ shrink: true }}
+                                                                error={!!rowErr.confirmationEndDate}
+                                                                helperText={rowErr.confirmationEndDate}
+                                                                fullWidth
+                                                            />
+                                                        </Stack>
+                                                    </Stack>
+                                                )}
                                             </Box>
                                         </Grow>
                                     );
