@@ -7,8 +7,7 @@ import {
     Typography,
     Avatar,
     Fade,
-    Slide,
-    CircularProgress
+    Slide
 } from '@mui/material';
 import {
     Send as SendIcon,
@@ -206,7 +205,7 @@ const Chatbot = () => {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, isSending]);
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
@@ -601,6 +600,84 @@ const Chatbot = () => {
                                     </Box>
                                     );
                                 })}
+                                {isSending && (
+                                    <Box
+                                        sx={{
+                                            display: 'flex',
+                                            justifyContent: 'flex-start',
+                                            gap: 1.5,
+                                            animation: 'fadeIn 0.3s ease'
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: APP_PRIMARY_MAIN,
+                                                width: 32,
+                                                height: 32,
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            <BotIcon sx={{ fontSize: 18 }} />
+                                        </Avatar>
+                                        <Box
+                                            sx={{
+                                                maxWidth: '75%',
+                                                bgcolor: '#ffffff',
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                            }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.75,
+                                                    minHeight: 22
+                                                }}
+                                            >
+                                                <Typography
+                                                    component="span"
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontSize: '0.875rem',
+                                                        lineHeight: 1.5,
+                                                        color: '#94a3b8',
+                                                        fontStyle: 'italic',
+                                                        animation: 'typingLabelPulse 2s ease-in-out infinite'
+                                                    }}
+                                                >
+                                                    Đang trả lời
+                                                </Typography>
+                                                <Box
+                                                    component="span"
+                                                    aria-hidden
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        gap: '5px',
+                                                        alignItems: 'center',
+                                                        height: 16
+                                                    }}
+                                                >
+                                                    {[0, 1, 2].map((i) => (
+                                                        <Box
+                                                            key={i}
+                                                            component="span"
+                                                            sx={{
+                                                                width: 5,
+                                                                height: 5,
+                                                                borderRadius: '50%',
+                                                                bgcolor: '#94a3b8',
+                                                                animation: 'typingDots 1.1s ease-in-out infinite',
+                                                                animationDelay: `${i * 0.18}s`
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                )}
                                 <div ref={messagesEndRef} />
                             </Box>
 
@@ -658,7 +735,7 @@ const Chatbot = () => {
                                         }
                                     }}
                                 >
-                                    {isSending ? <CircularProgress size={20} sx={{color: 'white'}} /> : <SendIcon />}
+                                    <SendIcon />
                                 </IconButton>
                             </Box>
                         </Paper>
@@ -700,6 +777,24 @@ const Chatbot = () => {
                         to {
                             opacity: 1;
                             transform: translateY(0);
+                        }
+                    }
+                    @keyframes typingDots {
+                        0%, 70%, 100% {
+                            transform: translateY(0);
+                            opacity: 0.35;
+                        }
+                        35% {
+                            transform: translateY(-5px);
+                            opacity: 1;
+                        }
+                    }
+                    @keyframes typingLabelPulse {
+                        0%, 100% {
+                            opacity: 0.72;
+                        }
+                        50% {
+                            opacity: 1;
                         }
                     }
                 `}
