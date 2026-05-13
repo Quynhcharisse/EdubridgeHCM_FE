@@ -1212,6 +1212,11 @@ export default function CounsellorConsultationManagement() {
     }
   }, [activeListStatus]);
 
+  const switchToListStatus = useCallback((status) => {
+    setActiveListStatus(status);
+    setPage(1);
+  }, []);
+
   useEffect(() => {
     void load(page);
   }, [load, page]);
@@ -1303,7 +1308,7 @@ export default function CounsellorConsultationManagement() {
         setDetailOpen(false);
         setDetailRow(null);
       }
-      await load(page);
+      switchToListStatus("cancelled");
     } catch (e) {
       const msg =
         e?.response?.data?.message ||
@@ -1440,7 +1445,7 @@ export default function CounsellorConsultationManagement() {
         { variant: "success" }
       );
       closeEdit();
-      await load(page);
+      switchToListStatus("confirmed");
     } catch (e) {
       const msg =
         e?.response?.data?.message ||

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from "react";
+import React, {useState, useEffect, useMemo, useRef} from "react";
 import {
     AppBar,
     Avatar,
@@ -23,7 +23,7 @@ import {
     Menu,
     MenuItem,
     Paper,
-    Typography
+    Typography,
 } from "@mui/material";
 import MenuIcon from '@mui/icons-material/Menu';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -33,17 +33,22 @@ import PersonIcon from '@mui/icons-material/Person';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
+import NoteAddOutlinedIcon from '@mui/icons-material/NoteAddOutlined';
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import CloseIcon from "@mui/icons-material/Close";
+import DownloadIcon from "@mui/icons-material/Download";
 import RemoveIcon from "@mui/icons-material/Remove";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Fade from '@mui/material/Fade';
 import Zoom from '@mui/material/Zoom';
 import {enqueueSnackbar} from "notistack";
 import {signout, getProfile} from "../../services/AccountService.jsx";
+import axiosClient from "../../configs/APIConfig.jsx";
 import {createParentConversation, getParentConversations} from "../../services/ConversationService.jsx";
 import {getParentMessagesHistory, markParentMessagesRead} from "../../services/MessageService.jsx";
 import {
@@ -557,6 +562,20 @@ const doesConversationMatchStudent = (conversation, student) => {
     );
 };
 
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+const isImageFile = (f) => IMAGE_EXT_RE.test(String(f?.fileName || f?.fileUrl || ''));
+const UUID_PREFIX_RE = /^[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}_/i;
+const formatAttachmentName = (fileName, maxBase = 8) => {
+    let name = String(fileName || '').trim();
+    let prev;
+    do { prev = name; name = name.replace(UUID_PREFIX_RE, ''); } while (name !== prev);
+    const dotIdx = name.lastIndexOf('.');
+    const base = dotIdx >= 0 ? name.slice(0, dotIdx) : name;
+    const ext = dotIdx >= 0 ? name.slice(dotIdx) : '';
+    if (base.length <= maxBase) return name;
+    return `${base.slice(0, maxBase)}...${ext}`;
+};
+
 const areStudentProfilesEquivalent = (a, b) => {
     if (!a && !b) return true;
     if (!a || !b) return false;
@@ -621,6 +640,7 @@ function MainHeader() {
     const [chatInput, setChatInput] = useState('');
     const [sendingParentMessage, setSendingParentMessage] = useState(false);
     const [chatWindowOpen, setChatWindowOpen] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState(null);
     const [chatWindowMinimized, setChatWindowMinimized] = useState(false);
     const [selectedConversationStudent, setSelectedConversationStudent] = useState(null);
     /** Chi tiết đầy đủ từ GET /parent/student/{id} khi bấm « i »; không lấy từ payload history sau khi BE tách. */
@@ -916,7 +936,8 @@ function MainHeader() {
                 conversation?.school ??
                 conversation?.otherUser ??
                 'Cuộc trò chuyện',
-            lastMessage: conversation?.lastMessage?.content ?? conversation?.lastMessage ?? conversation?.latestMessage ?? '',
+            lastMessageIsFile: !!(conversation?.lastMessageIsFile),
+            lastMessage: (conversation?.lastMessageIsFile && !(conversation?.lastMessage?.content ?? conversation?.lastMessage ?? conversation?.latestMessage ?? '')) ? 'Tệp đính kèm' : (conversation?.lastMessage?.content ?? conversation?.lastMessage ?? conversation?.latestMessage ?? ''),
             updatedAt: conversation?.updatedAt ?? conversation?.lastMessageTime ?? conversation?.time ?? null,
             childName: String(conversation?.childName ?? conversation?.student?.childName ?? '').trim(),
             studentName: String(
@@ -991,7 +1012,8 @@ function MainHeader() {
             message?.createdBy ||
             "";
         const sentAt = message?.sentAt || message?.createdAt || message?.timestamp || message?.time || null;
-        return {id, text, sender, sentAt, raw: message};
+        const files = Array.isArray(message?.files) ? message.files : [];
+        return {id, text, sender, sentAt, files, raw: message};
     };
 
     const mergeUniqueMessages = (messages) => {
@@ -1635,7 +1657,8 @@ function MainHeader() {
         const trimmed = chatInput.trim();
         const convFromRef = selectedConversationRef.current;
         const convEffective = convFromRef || selectedConversation;
-        if (!trimmed || !convEffective) return;
+        if (!trimmed) return;
+        if (!convEffective) return;
         sendingParentMessageRef.current = true;
         setSendingParentMessage(true);
 
@@ -1733,6 +1756,7 @@ function MainHeader() {
                 conversationId,
                 timestamp: payload.timestamp,
                 sentAt: new Date().toISOString(),
+                files: null,
             };
             setMessageItems((prev) => mergeUniqueMessages([...prev, normalizeMessage(optimisticRaw)]));
             setConversationItems((prev) =>
@@ -1976,7 +2000,9 @@ function MainHeader() {
 
                 /** Không gọi receiverMatchesParent: tin đã vào queue /user/... của phiên phụ huynh là đủ. */
 
-                const previewText = root?.message ?? root?.content ?? payload?.message ?? payload?.content ?? "";
+                const previewRaw = root?.message ?? root?.content ?? payload?.message ?? payload?.content ?? "";
+                const previewHasFiles = (root?.files ?? payload?.files ?? []).length > 0;
+                const previewText = previewRaw || (previewHasFiles ? "Tệp đính kèm" : "");
                 const previewTime = root?.timestamp ?? root?.sentAt ?? root?.time ?? payload?.timestamp ?? null;
 
                 const currentSelected = selectedConversationRef.current;
@@ -2140,9 +2166,16 @@ function MainHeader() {
                                 : root;
                         const normalizedIncoming = normalizeMessage(rootForNormalize);
                         let replacedOptimistic = false;
+                        const incomingFiles = normalizedIncoming.files ?? [];
                         const withoutMatchingOptimistic = prev.filter((m) => {
                             if (!String(m.id).startsWith('optimistic-')) return true;
-                            if (!normalizedIncoming.text || m.text !== normalizedIncoming.text) return true;
+                            const textMatch = normalizedIncoming.text && m.text === normalizedIncoming.text;
+                            const fileOnlyMatch =
+                                !normalizedIncoming.text &&
+                                incomingFiles.length > 0 &&
+                                (m.files ?? []).length === incomingFiles.length &&
+                                (m.files ?? []).every((f, i) => f.fileUrl === incomingFiles[i]?.fileUrl);
+                            if (!textMatch && !fileOnlyMatch) return true;
                             if (replacedOptimistic) return true;
                             replacedOptimistic = true;
                             return false;
@@ -2613,6 +2646,7 @@ function MainHeader() {
     });
 
     return (
+        <>
         <AppBar
             position="fixed"
             elevation={0}
@@ -3084,7 +3118,8 @@ function MainHeader() {
                                                     const studentDisplayName = String(
                                                         conversation?.studentName || conversation?.childName || ''
                                                     ).trim();
-                                                    const latestMessage = conversation?.lastMessage?.content || conversation?.lastMessage || conversation?.latestMessage || 'Chưa có nội dung';
+                                                    const latestMessage = conversation?.lastMessage || conversation?.latestMessage || 'Chưa có nội dung';
+                                                    const isFileMessage = !!(conversation?.lastMessageIsFile);
                                                     const unreadCount = Number(conversation?.unreadCount ?? conversation?.unreadMessages ?? 0) || 0;
                                                     const hasUnread = unreadCount > 0;
                                                     const listLogoUrl = pickConversationSchoolLogoUrl(conversation) || null;
@@ -3140,7 +3175,8 @@ function MainHeader() {
                                                                         Học sinh: {studentDisplayName}
                                                                     </Typography>
                                                                 ) : null}
-                                                                <Typography noWrap sx={{fontSize: 13, color: hasUnread ? '#1e40af' : '#475569', fontWeight: hasUnread ? 700 : 500}}>
+                                                                <Typography noWrap sx={{fontSize: 13, color: hasUnread ? '#1e40af' : '#475569', fontWeight: hasUnread ? 700 : 500, display: 'flex', alignItems: 'center', gap: '2px'}}>
+                                                                    {isFileMessage && <AttachFileRoundedIcon sx={{fontSize: 13, flexShrink: 0}} />}
                                                                     {latestMessage}
                                                                 </Typography>
                                                             </Box>
@@ -3494,24 +3530,31 @@ function MainHeader() {
                                                                                     borderRadius: 2.25,
                                                                                     borderTopLeftRadius: !isMine ? (stackTight ? 2.25 : 0.5) : 2.25,
                                                                                     borderTopRightRadius: isMine ? (stackTight ? 2.25 : 0.5) : 2.25,
-                                                                                    background: isMine
-                                                                                        ? selectedStudentTheme.bubbleGradient
-                                                                                        : peerUnreadHighlight
-                                                                                          ? 'linear-gradient(135deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.92) 100%)'
-                                                                                          : '#ffffff',
-                                                                                    color: isMine ? '#ffffff' : '#1e293b',
-                                                                                    border: isMine
+                                                                                    background: (msg.files && msg.files.length > 0)
+                                                                                        ? '#e5e5ea'
+                                                                                        : isMine
+                                                                                          ? selectedStudentTheme.bubbleGradient
+                                                                                          : peerUnreadHighlight
+                                                                                            ? 'linear-gradient(135deg, rgba(219,234,254,0.98) 0%, rgba(191,219,254,0.92) 100%)'
+                                                                                            : '#ffffff',
+                                                                                    color: (isMine && !(msg.files && msg.files.length > 0)) ? '#ffffff' : '#1e293b',
+                                                                                    border: (msg.files && msg.files.length > 0)
                                                                                         ? 'none'
-                                                                                        : peerUnreadHighlight
-                                                                                          ? '1px solid rgba(37,99,235,0.42)'
-                                                                                          : '1px solid rgba(148,163,184,0.4)',
-                                                                                    boxShadow: isMine
-                                                                                        ? '0 2px 8px rgba(59,130,246,0.3), 0 1px 0 rgba(255,255,255,0.12) inset'
-                                                                                        : peerUnreadHighlight
-                                                                                          ? '0 2px 8px rgba(37,99,235,0.12)'
-                                                                                          : '0 1px 3px rgba(51,65,85,0.06)'
+                                                                                        : isMine
+                                                                                          ? 'none'
+                                                                                          : peerUnreadHighlight
+                                                                                            ? '1px solid rgba(37,99,235,0.42)'
+                                                                                            : '1px solid rgba(148,163,184,0.4)',
+                                                                                    boxShadow: (msg.files && msg.files.length > 0)
+                                                                                        ? 'none'
+                                                                                        : isMine
+                                                                                          ? '0 2px 8px rgba(59,130,246,0.3), 0 1px 0 rgba(255,255,255,0.12) inset'
+                                                                                          : peerUnreadHighlight
+                                                                                            ? '0 2px 8px rgba(37,99,235,0.12)'
+                                                                                            : '0 1px 3px rgba(51,65,85,0.06)'
                                                                                 }}
                                                                             >
+                                                                                {msg.text ? (
                                                                                 <Typography
                                                                                     sx={{
                                                                                         fontSize: 13.5,
@@ -3524,6 +3567,70 @@ function MainHeader() {
                                                                                 >
                                                                                     {msg.text}
                                                                                 </Typography>
+                                                                                ) : null}
+                                                                                {msg.files && msg.files.length > 0 && (
+                                                                                    <Box sx={{
+                                                                                        bgcolor: '#ffffff',
+                                                                                        border: '1px solid #e2e8f0',
+                                                                                        borderRadius: 1.5,
+                                                                                        p: 0.75,
+                                                                                        mt: msg.text ? 0.75 : 0,
+                                                                                        width: 220,
+                                                                                        display: 'flex',
+                                                                                        flexDirection: 'column',
+                                                                                        gap: 0.75,
+                                                                                    }}>
+                                                                                        {msg.files.map((f, idx) => (
+                                                                                            isImageFile(f) ? (
+                                                                                                <Box
+                                                                                                    key={idx}
+                                                                                                    onClick={() => setLightboxUrl(f.fileUrl)}
+                                                                                                    sx={{display: 'block', cursor: 'pointer'}}
+                                                                                                >
+                                                                                                    <Box
+                                                                                                        component="img"
+                                                                                                        src={f.fileUrl}
+                                                                                                        alt=""
+                                                                                                        sx={{
+                                                                                                            display: 'block',
+                                                                                                            width: '100%',
+                                                                                                            height: 160,
+                                                                                                            borderRadius: 1,
+                                                                                                            objectFit: 'cover',
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </Box>
+                                                                                            ) : (
+                                                                                                <Box
+                                                                                                    key={idx}
+                                                                                                    component="a"
+                                                                                                    href={f.fileUrl}
+                                                                                                    target="_blank"
+                                                                                                    rel="noopener noreferrer"
+                                                                                                    sx={{
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        gap: 1,
+                                                                                                        textDecoration: 'none',
+                                                                                                        width: '100%',
+                                                                                                        borderRadius: 1,
+                                                                                                        '&:hover': {opacity: 0.85},
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <InsertDriveFileOutlinedIcon sx={{fontSize: 22, color: selectedStudentTheme.accent, flexShrink: 0}}/>
+                                                                                                    <Box sx={{minWidth: 0, flex: 1}}>
+                                                                                                        <Typography sx={{fontSize: 12, fontWeight: 600, color: '#1e293b', lineHeight: 1.3, wordBreak: 'break-all'}}>
+                                                                                                            {formatAttachmentName(f.fileName)}
+                                                                                                        </Typography>
+                                                                                                        <Typography sx={{fontSize: 10, color: '#94a3b8', mt: 0.15}}>
+                                                                                                            Nhấn để xem
+                                                                                                        </Typography>
+                                                                                                    </Box>
+                                                                                                </Box>
+                                                                                            )
+                                                                                        ))}
+                                                                                    </Box>
+                                                                                )}
                                                                             </Box>
                                                                             {msg.sentAt && (
                                                                             <Typography
@@ -3589,7 +3696,17 @@ function MainHeader() {
                                                         onFocus={handleMarkRead}
                                                         onKeyDown={(e) => {
                                                             parentComposerEngagedRef.current = true;
-                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                            if (e.key === 'Enter' && e.altKey) {
+                                                                e.preventDefault();
+                                                                const el = e.target;
+                                                                const start = el.selectionStart;
+                                                                const end = el.selectionEnd;
+                                                                const newVal = chatInput.slice(0, start) + '\n' + chatInput.slice(end);
+                                                                setChatInput(newVal);
+                                                                requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + 1; });
+                                                                return;
+                                                            }
+                                                            if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
                                                                 e.preventDefault();
                                                                 if (sendingParentMessage) return;
                                                                 handleSendMessage();
@@ -3628,6 +3745,14 @@ function MainHeader() {
                                                     </IconButton>
                                                 </Box>
                                             </Box>
+                                            <Typography sx={{ fontSize: 10.5, color: '#94a3b8', mt: 1.5, px: 0.5, userSelect: 'none' }}>
+                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
+                                                {' '}gửi tin nhắn{'  ·  '}
+                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Alt</Box>
+                                                {' + '}
+                                                <Box component="kbd" sx={{ fontFamily: 'inherit', bgcolor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
+                                                {' '}xuống hàng
+                                            </Typography>
                                         </Box>
                                     </Box>
                                 )}
@@ -3941,6 +4066,27 @@ function MainHeader() {
                                             <MenuItem
                                                 onClick={() => {
                                                     handleUserMenuClose();
+                                                    goTo('/parent/admission-hold-profile');
+                                                }}
+                                                sx={{
+                                                    fontSize: 15,
+                                                    fontWeight: 500,
+                                                    color: BRAND_NAVY,
+                                                    borderRadius: 1,
+                                                    gap: 1.5,
+                                                    mt: 0.5,
+                                                    '&:hover': {
+                                                        bgcolor: 'rgba(59,130,246,0.08)',
+                                                        color: APP_PRIMARY_DARK,
+                                                    },
+                                                    transition: 'background 0.2s, color 0.2s',
+                                                }}
+                                            >
+                                                <NoteAddOutlinedIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Hồ sơ giữ chỗ
+                                            </MenuItem>
+                                            <MenuItem
+                                                onClick={() => {
+                                                    handleUserMenuClose();
                                                     goTo('/parent/admission-reservations');
                                                 }}
                                                 sx={{
@@ -4243,6 +4389,15 @@ function MainHeader() {
                                                 />
                                             </ListItem>
                                             <ListItem
+                                                onClick={() => goTo('/parent/admission-hold-profile')}
+                                                sx={{cursor: 'pointer'}}
+                                            >
+                                                <ListItemText
+                                                    primary="Hồ sơ giữ chỗ"
+                                                    sx={{color: BRAND_NAVY, fontWeight: 600}}
+                                                />
+                                            </ListItem>
+                                            <ListItem
                                                 onClick={() => goTo('/parent/admission-reservations')}
                                                 sx={{cursor: 'pointer'}}
                                             >
@@ -4362,6 +4517,56 @@ function MainHeader() {
                 </DialogActions>
             </Dialog>
         </AppBar>
+
+        <Dialog open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} maxWidth={false}
+            sx={{ zIndex: 2000 }}
+            PaperProps={{ sx: { bgcolor: 'transparent', boxShadow: 'none', m: 1 } }}
+        >
+            <Box sx={{ position: 'relative' }}>
+                <Box sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    gap: 0.5,
+                    zIndex: 1
+                }}>
+                    <IconButton
+                        component="a"
+                        href={lightboxUrl || ''}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Tải xuống"
+                        size="small"
+                        sx={{
+                            bgcolor: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' }
+                        }}
+                    >
+                        <DownloadIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                        onClick={() => setLightboxUrl(null)}
+                        title="Đóng"
+                        size="small"
+                        sx={{
+                            bgcolor: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' }
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </Box>
+                <Box component="img" src={lightboxUrl || ''} alt=""
+                    onClick={() => setLightboxUrl(null)}
+                    sx={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 2, display: 'block', cursor: 'zoom-out' }}
+                />
+            </Box>
+        </Dialog>
+        </>
     );
 }
 

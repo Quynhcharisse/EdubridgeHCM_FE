@@ -53,6 +53,15 @@ export function sanitizeAdmissionSettingsForApi(adm) {
         })
         .filter((group) => group.methodCode || group.documents.length > 0)
     : [];
+  const mandatoryAll = Array.isArray(adm.mandatoryAllDocumentRequirements)
+    ? adm.mandatoryAllDocumentRequirements
+        .map((doc) => ({
+          code: String(doc?.code ?? "").trim(),
+          name: doc?.name != null ? String(doc.name) : "",
+          required: doc?.required === true,
+        }))
+        .filter((doc) => doc.code || doc.name)
+    : [];
   const autoCloseOnFull = typeof adm.autoCloseOnFull === "boolean" ? adm.autoCloseOnFull : true;
   const quotaAlertThresholdPercentRaw = Number(adm.quotaAlertThresholdPercent);
   const quotaAlertThresholdPercent = Number.isNaN(quotaAlertThresholdPercentRaw)
@@ -74,6 +83,15 @@ export function sanitizeAdmissionSettingsForApi(adm) {
     // Keep this key for backward-compatible BE readers if any.
     methodAdmissionProcess: filteredAdmissionProcesses,
     methodDocumentRequirements: filteredMethodDocumentRequirements,
+    documentRequirements: {
+      mandatoryAll,
+      byMethod: filteredMethodDocumentRequirements,
+    },
+    // Keep this key for backward-compatible BE readers if any.
+    documentRequirementsData: {
+      mandatoryAll,
+      byMethod: filteredMethodDocumentRequirements,
+    },
     autoCloseOnFull,
     quotaAlertThresholdPercent,
   };

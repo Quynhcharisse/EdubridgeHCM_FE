@@ -25,6 +25,7 @@
     "axios": "^1.13.6",
     "debounce": "^3.0.0",
     "firebase": "^12.12.1",
+    "framer-motion": "^12.38.0",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "notistack": "^3.0.2",

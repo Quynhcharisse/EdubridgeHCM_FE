@@ -36,6 +36,7 @@ import { enqueueSnackbar } from "notistack";
 import { ConfirmHighlight } from "../../ui/ConfirmDialog.jsx";
 import { getProfile, updateProfile } from "../../../services/AccountService.jsx";
 import {notifyAuthUserStorageChanged, sanitizeUserForLocalStorage} from "../../../utils/userRole.js";
+import {getSchoolConfigByKey, parseSchoolConfigResponseBody} from "../../../services/SchoolFacilityService.jsx";
 import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
 import { usePlatformMediaImageRules } from "../../../hooks/usePlatformMediaImageRules.js";
 import { CircleMarker, MapContainer, TileLayer, useMap } from "react-leaflet";
@@ -284,6 +285,19 @@ function imageItemIsUsage(item) {
     return true;
 }
 
+function buildVietQrImageUrl(bankInfo) {
+    const bankId = String(bankInfo?.bankId ?? "").trim();
+    const accountNo = String(bankInfo?.accountNo ?? "").trim();
+    if (!bankId || !accountNo) return "";
+    const template = "compact2";
+    const params = new URLSearchParams();
+    const accountName = String(bankInfo?.accountName ?? "").trim();
+    if (accountName) params.set("accountName", accountName);
+    const query = params.toString();
+    const base = `https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNo)}-${template}.png`;
+    return query ? `${base}?${query}` : base;
+}
+
 function RecenterMap({ center, zoom = 15 }) {
     const map = useMap();
 
@@ -427,6 +441,7 @@ export default function SchoolProfile() {
     const { loading: mediaImageRulesLoading, rules: mediaImageRules } = usePlatformMediaImageRules();
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
+    const [bankInfoData, setBankInfoData] = useState({bankId: "", bankName: "", accountNo: "", accountName: ""});
     const [editOpen, setEditOpen] = useState(false);
     const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -549,6 +564,19 @@ export default function SchoolProfile() {
                     hydrateFromBody(res?.data?.body);
                 } else {
                     enqueueSnackbar(res?.data?.message || "Không tải được thông tin hồ sơ", { variant: "error" });
+                }
+                try {
+                    const bankRes = await getSchoolConfigByKey("bankInfoData");
+                    const bankBody = parseSchoolConfigResponseBody(bankRes);
+                    const bank = bankBody?.bankInfoData && typeof bankBody.bankInfoData === "object" ? bankBody.bankInfoData : {};
+                    setBankInfoData({
+                        bankId: String(bank?.bankId ?? "").trim(),
+                        bankName: String(bank?.bankName ?? "").trim(),
+                        accountNo: String(bank?.accountNo ?? "").trim(),
+                        accountName: String(bank?.accountName ?? "").trim(),
+                    });
+                } catch {
+                    setBankInfoData({bankId: "", bankName: "", accountNo: "", accountName: ""});
                 }
             } catch {
                 enqueueSnackbar("Không tải được thông tin hồ sơ", { variant: "error" });
@@ -765,6 +793,7 @@ export default function SchoolProfile() {
     const campusLongitude = Number(campus.longitude);
     const hasCampusLatLng = Number.isFinite(campusLatitude) && Number.isFinite(campusLongitude);
     const campusMapCenter = hasCampusLatLng ? [campusLatitude, campusLongitude] : DEFAULT_MAP_CENTER;
+    const vietQrUrl = useMemo(() => buildVietQrImageUrl(bankInfoData), [bankInfoData]);
     const formLatitude = Number(formValues.latitude);
     const formLongitude = Number(formValues.longitude);
     const hasFormLatLng = Number.isFinite(formLatitude) && Number.isFinite(formLongitude);
@@ -1200,6 +1229,55 @@ export default function SchoolProfile() {
                                 Chưa có dữ liệu facility.
                             </Typography>
                         )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {!isBranchCampus && (
+                <Card
+                    elevation={0}
+                    sx={{
+                        borderRadius: 3,
+                        border: "1px solid #e2e8f0",
+                        boxShadow: "0 4px 20px rgba(13, 100, 222, 0.06)",
+                        bgcolor: "#F8FAFC",
+                    }}
+                >
+                    <CardContent sx={{ p: 3 }}>
+                        <SectionHeader icon={SettingsIcon} title="Tài khoản ngân hàng" />
+                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 0.8fr" }, gap: 2 }}>
+                            <Stack spacing={1}>
+                                <MiniInfoCard label="Mã ngân hàng" value={bankInfoData.bankId} />
+                                <MiniInfoCard label="Tên ngân hàng" value={bankInfoData.bankName} />
+                                <MiniInfoCard label="Số tài khoản" value={bankInfoData.accountNo} />
+                                <MiniInfoCard label="Tên chủ tài khoản" value={bankInfoData.accountName} />
+                            </Stack>
+                            <Box
+                                sx={{
+                                    minHeight: 220,
+                                    borderRadius: 2,
+                                    border: "1px dashed #cbd5e1",
+                                    bgcolor: "#fff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    p: 2,
+                                }}
+                            >
+                                {vietQrUrl ? (
+                                    <Box
+                                        component="img"
+                                        src={vietQrUrl}
+                                        alt="VietQR"
+                                        sx={{ width: "100%", maxWidth: 280, height: "auto", objectFit: "contain" }}
+                                    />
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                                        Chưa có thông tin tài khoản để tạo mã QR.
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Box>
                     </CardContent>
                 </Card>
             )}

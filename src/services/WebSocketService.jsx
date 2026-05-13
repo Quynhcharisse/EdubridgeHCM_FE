@@ -51,6 +51,7 @@ export const buildPrivateChatPayload = ({
     receiverName,
     campusId,
     studentProfileId,
+    files,
 }) => {
     const text = String(message ?? "").trim();
     const ts = toLocalDateTimeIso();
@@ -86,6 +87,9 @@ export const buildPrivateChatPayload = ({
         } else {
             out.studentProfileId = String(sp).trim();
         }
+    }
+    if (Array.isArray(files) && files.length > 0) {
+        out.files = files.map(({ fileName, fileUrl }) => ({ fileName, fileUrl }));
     }
     return out;
 };

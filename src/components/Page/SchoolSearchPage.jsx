@@ -71,6 +71,7 @@ const LOCATION_FALLBACK_WARD = "Tất cả";
 const FAVOURITE_SYNC_PAGE_SIZE = 200;
 const SEARCH_SCHOOLS_LIST_PATH = "/search-schools";
 const SEARCH_SCHOOLS_DETAIL_PATH = "/search-schools/detail";
+const BATCH_ADMISSION_SCHOOL_IDS_KEY = "edubridge_batch_admission_school_ids";
 const TUITION_FILTER_MAX = 100_000_000;
 
 function getSchoolUrlName(school) {
@@ -440,6 +441,103 @@ export default function SchoolSearchPage() {
         if (!detailKeyRaw) return null;
         return schools.find((s) => getSchoolStorageKey(s) === detailKeyRaw) ?? null;
     }, [detailKeyRaw, detailRouteActive, detailSchoolNameRaw, schools]);
+
+    /** Nộp hồ sơ theo lô chỉ dành cho PARENT — role khác bỏ query batch để không kích hoạt hàng đợi. */
+    React.useEffect(() => {
+        if (isParent) return;
+        const p = new URLSearchParams(location.search);
+        if (p.get("batchAdmission") !== "1") return;
+        p.delete("batchAdmission");
+        try {
+            sessionStorage.removeItem(BATCH_ADMISSION_SCHOOL_IDS_KEY);
+        } catch {
+            /* ignore */
+        }
+        const qs = p.toString();
+        navigate({pathname: location.pathname, search: qs ? `?${qs}` : ""}, {replace: true});
+    }, [isParent, location.pathname, location.search, navigate]);
+
+    React.useEffect(() => {
+        if (!isParent || !detailRouteActive || !detailKeyRaw || listLoading) return;
+        const keyTrim = String(detailKeyRaw).trim();
+        if (!keyTrim.startsWith("id:")) return;
+        if (schools.some((s) => getSchoolStorageKey(s) === keyTrim)) return;
+        const idNum = Number(keyTrim.slice(3));
+        if (!Number.isFinite(idNum) || idNum <= 0) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const detailBody = await getPublicSchoolDetail(idNum);
+                if (cancelled || !detailBody) return;
+                const mapped = mapPublicSchoolDetailToRow(detailBody);
+                if (!mapped) return;
+                setSchools((prev) => {
+                    if (prev.some((s) => getSchoolStorageKey(s) === keyTrim)) return prev;
+                    const favId = favouriteIdBySchool[idNum];
+                    return [
+                        {
+                            ...mapped,
+                            isFavourite: Boolean(favId || mapped.isFavourite),
+                        },
+                        ...prev,
+                    ];
+                });
+            } catch {
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isParent, detailRouteActive, detailKeyRaw, listLoading, schools, favouriteIdBySchool]);
+
+    const advanceBatchAdmissionAfterSubmit = React.useCallback(() => {
+        if (!isParent) return;
+        const p = new URLSearchParams(location.search);
+        if (p.get("batchAdmission") !== "1") return;
+        let ids = [];
+        try {
+            const raw = sessionStorage.getItem(BATCH_ADMISSION_SCHOOL_IDS_KEY);
+            ids = JSON.parse(raw || "[]");
+        } catch {
+            ids = [];
+        }
+        if (!Array.isArray(ids)) ids = [];
+        const currentId = Number(detailSchool?.id);
+        const rest = ids.filter((id) => Number(id) !== currentId);
+        if (rest.length === 0) {
+            try {
+                sessionStorage.removeItem(BATCH_ADMISSION_SCHOOL_IDS_KEY);
+            } catch {
+            }
+            showSuccessSnackbar("Đã hoàn tất nộp hồ sơ cho các trường đã chọn.");
+            navigate("/saved-schools", {replace: true});
+            return;
+        }
+        try {
+            sessionStorage.setItem(BATCH_ADMISSION_SCHOOL_IDS_KEY, JSON.stringify(rest));
+        } catch {
+        }
+        const nextId = Number(rest[0]);
+        if (!Number.isFinite(nextId) || nextId <= 0) {
+            try {
+                sessionStorage.removeItem(BATCH_ADMISSION_SCHOOL_IDS_KEY);
+            } catch {
+            }
+            p.delete("batchAdmission");
+            navigate(
+                {pathname: SEARCH_SCHOOLS_DETAIL_PATH, search: p.toString() ? `?${p.toString()}` : ""},
+                {replace: true}
+            );
+            return;
+        }
+        navigate(
+            {
+                pathname: SEARCH_SCHOOLS_DETAIL_PATH,
+                search: `?detail=${encodeURIComponent(`id:${nextId}`)}&batchAdmission=1`,
+            },
+            {replace: true}
+        );
+    }, [isParent, detailSchool?.id, location.search, navigate]);
 
     React.useEffect(() => {
         if (!detailSchool?.id || detailSchool?.hasDetailLoaded) {
@@ -1495,6 +1593,9 @@ export default function SchoolSearchPage() {
                     detailInCompare={detailInCompare}
                     toggleCompare={toggleCompare}
                     toggleSave={toggleSave}
+                    onAfterAdmissionReservationSubmitted={
+                        isParent ? advanceBatchAdmissionAfterSubmit : undefined
+                    }
                 />
             )}
         </Box>
