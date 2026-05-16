@@ -44,7 +44,6 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
 import {
     confirmSystemConfigImport,
     getSystemConfig,
@@ -480,7 +479,9 @@ export default function AdminPlatformSettings() {
     const [confirmingAdmissionImport, setConfirmingAdmissionImport] = useState(false);
     const [admissionImportConfirmOpen, setAdmissionImportConfirmOpen] = useState(false);
     const [admissionImportPreviewOpen, setAdmissionImportPreviewOpen] = useState(false);
-    const [admissionTemplateEditing, setAdmissionTemplateEditing] = useState(false);
+    const [admissionMethodsEditing, setAdmissionMethodsEditing] = useState(false);
+    const [admissionMandatoryEditing, setAdmissionMandatoryEditing] = useState(false);
+    const [admissionDocumentsEditing, setAdmissionDocumentsEditing] = useState(false);
     const [admissionImportPreview, setAdmissionImportPreview] = useState(null);
     const [importingAdmissionTemplate, setImportingAdmissionTemplate] = useState(false);
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
@@ -963,7 +964,9 @@ export default function AdminPlatformSettings() {
         });
         setAdmissionImportRows([]);
         rowValidationVersionRef.current = {};
-        setAdmissionTemplateEditing(false);
+        setAdmissionMethodsEditing(false);
+        setAdmissionMandatoryEditing(false);
+        setAdmissionDocumentsEditing(false);
         setMandatoryOcrExpandedIdxs([]);
     }, [configBody]);
 
@@ -971,7 +974,11 @@ export default function AdminPlatformSettings() {
         if (activeTabKey !== "business") setBusinessEditing(false);
         if (activeTabKey !== "media") setMediaEditing(false);
         if (activeTabKey !== "limits") setQuotaEditing(false);
-        if (activeTabKey !== "admission") setAdmissionTemplateEditing(false);
+        if (activeTabKey !== "admission") {
+            setAdmissionMethodsEditing(false);
+            setAdmissionMandatoryEditing(false);
+            setAdmissionDocumentsEditing(false);
+        }
     }, [activeTabKey]);
 
     useEffect(() => {
@@ -1497,32 +1504,97 @@ export default function AdminPlatformSettings() {
         return ok;
     };
 
-    const cancelAdmissionTemplate = () => {
+    const ADMISSION_EDIT_SECTION = {
+        METHODS: "methods",
+        MANDATORY: "mandatory",
+        DOCUMENTS: "documents",
+    };
+
+    const isAdmissionImportEditingDraft = (type) => {
+        switch (String(type || "").trim()) {
+            case "ALLOWED_METHODS":
+                return admissionMethodsEditing;
+            case "MANDATORY_ALL":
+                return admissionMandatoryEditing;
+            case "METHOD_DOCUMENTS":
+            case "ADMISSION_PROCESSES":
+                return admissionDocumentsEditing;
+            default:
+                return false;
+        }
+    };
+
+    const cancelAdmissionSection = (section) => {
         if (!configBody) return;
-        setAdmissionTemplateForm(getAdmissionInitialForm(configBody));
+        const base = getAdmissionInitialForm(configBody);
+        setAdmissionTemplateForm((prev) => {
+            switch (section) {
+                case ADMISSION_EDIT_SECTION.METHODS:
+                    return { ...prev, allowedMethods: base.allowedMethods };
+                case ADMISSION_EDIT_SECTION.MANDATORY:
+                    return { ...prev, mandatoryAllDocumentRequirements: base.mandatoryAllDocumentRequirements };
+                case ADMISSION_EDIT_SECTION.DOCUMENTS:
+                    return {
+                        ...prev,
+                        methodDocumentRequirements: base.methodDocumentRequirements,
+                        methodAdmissionProcess: base.methodAdmissionProcess,
+                    };
+                default:
+                    return prev;
+            }
+        });
+        if (section === ADMISSION_EDIT_SECTION.MANDATORY) {
+            setMandatoryOcrExpandedIdxs([]);
+        }
         setStatus({ type: "", message: "" });
     };
 
-    const saveAdmissionTemplate = async () => {
-        if (!configBody) return;
+    const buildAdmissionPayloadForSection = (section) => {
+        const base = getAdmissionInitialForm(configBody);
+        const form = admissionTemplateForm;
+        switch (section) {
+            case ADMISSION_EDIT_SECTION.METHODS:
+                return sanitizeAdmissionSettingsForApi({ ...base, allowedMethods: form.allowedMethods });
+            case ADMISSION_EDIT_SECTION.MANDATORY:
+                return sanitizeAdmissionSettingsForApi({
+                    ...base,
+                    mandatoryAllDocumentRequirements: form.mandatoryAllDocumentRequirements,
+                });
+            case ADMISSION_EDIT_SECTION.DOCUMENTS:
+                return sanitizeAdmissionSettingsForApi({
+                    ...base,
+                    methodDocumentRequirements: form.methodDocumentRequirements,
+                    methodAdmissionProcess: form.methodAdmissionProcess,
+                });
+            default:
+                return sanitizeAdmissionSettingsForApi(base);
+        }
+    };
+
+    const saveAdmissionSection = async (section) => {
+        if (!configBody) return false;
+        const successMessages = {
+            [ADMISSION_EDIT_SECTION.METHODS]: "Đã cập nhật phương thức tuyển sinh.",
+            [ADMISSION_EDIT_SECTION.MANDATORY]: "Đã cập nhật hồ sơ bắt buộc chung.",
+            [ADMISSION_EDIT_SECTION.DOCUMENTS]: "Đã cập nhật hồ sơ và quy trình tuyển sinh.",
+        };
         setSaving(true);
         setStatus({ type: "", message: "" });
         try {
-            const sanitized = sanitizeAdmissionSettingsForApi(admissionTemplateForm);
+            const sanitized = buildAdmissionPayloadForSection(section);
             const updateRes = await updateSystemConfig({ admissionSettingsData: sanitized });
             assertSystemConfigUpdateSuccess(updateRes);
-            enqueueSnackbar(
-                "Đã cập nhật mẫu phương thức. Các trường đang dùng bản riêng không tự đổi.",
-                { variant: "success" }
-            );
-            setStatus({ type: "success", message: "Mẫu hệ thống đã lưu." });
+            const msg = successMessages[section] || "Đã lưu cấu hình tuyển sinh.";
+            enqueueSnackbar(msg, { variant: "success" });
+            setStatus({ type: "success", message: msg });
             await fetchConfig();
-            setAdmissionTemplateEditing(false);
+            return true;
         } catch (e) {
-            console.error("saveAdmissionTemplate failed", e);
+            console.error("saveAdmissionSection failed", e);
             const msg = apiErrorMessage(e, "Cập nhật thất bại. Vui lòng thử lại.");
             enqueueSnackbar(msg, { variant: "error" });
             setStatus({ type: "error", message: msg });
+            return false;
         } finally {
             setSaving(false);
         }
@@ -1704,7 +1776,7 @@ export default function AdminPlatformSettings() {
                 enqueueSnackbar("File không có dữ liệu để nhập.", { variant: "warning" });
             } else if (errorCount === 0) {
                 enqueueSnackbar(
-                    admissionTemplateEditing
+                    isAdmissionImportEditingDraft(importType)
                         ? "Dữ liệu hợp lệ. Kiểm tra trong bảng, sau đó nhấn Xác nhận nhập để áp dụng vào bản nháp."
                         : "Dữ liệu hợp lệ, bạn có thể xác nhận nhập ngay.",
                     { variant: "success" }
@@ -1795,9 +1867,9 @@ export default function AdminPlatformSettings() {
                     isError: Boolean(item?.isError),
                 }))
                 : payloadRows;
-            if (admissionTemplateEditing) {
+            if (isAdmissionImportEditingDraft(importType)) {
                 setAdmissionTemplateForm((prev) => applyImportedRowsToAdmissionDraft(prev, importType, rowsForConfirm));
-                enqueueSnackbar("Đã áp dụng dữ liệu vào bản nháp. Nhấn Lưu để cập nhật hệ thống.", { variant: "success" });
+                enqueueSnackbar("Đã áp dụng dữ liệu vào bản nháp. Nhấn Lưu ở mục tương ứng để cập nhật hệ thống.", { variant: "success" });
                 setStatus({ type: "success", message: "Đã áp dụng vào bản nháp." });
             } else {
                 const res = await confirmSystemConfigImport({ type: importType, rows: rowsForConfirm });
@@ -1828,10 +1900,11 @@ export default function AdminPlatformSettings() {
     };
 
     const renderAdmissionTab = () => {
-        const rowDisabled = !admissionTemplateEditing || saving;
+        const methodsRowDisabled = !admissionMethodsEditing || saving;
+        const mandatoryRowDisabled = !admissionMandatoryEditing || saving;
         const methods = admissionTemplateForm.allowedMethods || [];
         const preview = admissionImportPreview;
-        const mandatoryDocsSource = admissionTemplateEditing
+        const mandatoryDocsSource = admissionMandatoryEditing
             ? Array.isArray(admissionTemplateForm.mandatoryAllDocumentRequirements)
                 ? admissionTemplateForm.mandatoryAllDocumentRequirements
                 : []
@@ -1840,14 +1913,14 @@ export default function AdminPlatformSettings() {
                 : Array.isArray(preview?.documentRequirementsData?.mandatoryAll)
                     ? preview.documentRequirementsData.mandatoryAll
                     : [];
-        const docsSource = admissionTemplateEditing
+        const docsSource = admissionDocumentsEditing
             ? Array.isArray(admissionTemplateForm.methodDocumentRequirements)
                 ? admissionTemplateForm.methodDocumentRequirements
                 : []
             : Array.isArray(preview?.documentRequirementsData?.byMethod)
                 ? preview.documentRequirementsData.byMethod
                 : [];
-        const processSource = admissionTemplateEditing
+        const processSource = admissionDocumentsEditing
             ? Array.isArray(admissionTemplateForm.methodAdmissionProcess)
                 ? admissionTemplateForm.methodAdmissionProcess
                 : []
@@ -1899,155 +1972,174 @@ export default function AdminPlatformSettings() {
                 color: "#374151",
             },
         };
-        const mandatoryTableColSpan = admissionTemplateEditing ? 4 : 3;
         const isMandatoryOcrExpanded = (idx) => mandatoryOcrExpandedIdxs.includes(idx);
         const toggleMandatoryOcrExpanded = (idx) => {
             setMandatoryOcrExpandedIdxs((prev) =>
                 prev.includes(idx) ? prev.filter((item) => item !== idx) : [...prev, idx],
             );
         };
-        const renderMandatoryOcrCriteriaPanel = (doc, dIdx) => {
-            const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria);
-            if (!admissionTemplateEditing) {
-                return (
-                    <Box sx={{ px: 1.5, py: 1.25, bgcolor: "#f8fbff", borderRadius: 1.5, border: "1px dashed #bfdbfe" }}>
-                        {criteria.length === 0 ? (
-                            <Typography variant="body2" sx={{ color: "#64748b", fontStyle: "italic" }}>
-                                Chưa có tiêu chí OCR cho hồ sơ này.
-                            </Typography>
-                        ) : (
-                            <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.25, bgcolor: "#ffffff" }}>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ bgcolor: "#eef4ff" }}>
-                                            <TableCell sx={{ width: 48, fontWeight: 700, color: "#374151" }}>STT</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tiêu chí</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Quy tắc kiểm tra</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {criteria.map((item, cIdx) => (
-                                            <TableRow key={`mandatory-ocr-view-${dIdx}-${cIdx}`}>
-                                                <TableCell>{cIdx + 1}</TableCell>
-                                                <TableCell>
-                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e3a8a" }}>
-                                                        {item.label || "—"}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography variant="body2" sx={{ color: "#475569" }}>
-                                                        {item.validations[0] || "—"}
-                                                    </Typography>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        )}
-                    </Box>
-                );
-            }
-            return (
-                <Box sx={{ px: 1, py: 1.25, bgcolor: "#f8fbff", borderRadius: 1.5, border: "1px dashed #bfdbfe" }}>
-                    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.25, bgcolor: "#ffffff" }}>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow sx={{ bgcolor: "#eef4ff" }}>
-                                    <TableCell sx={{ width: 48, fontWeight: 700, color: "#374151" }}>STT</TableCell>
-                                    <TableCell sx={{ width: 220, fontWeight: 700, color: "#374151" }}>Tiêu chí</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Quy tắc kiểm tra</TableCell>
-                                    <TableCell align="center" sx={{ width: 56, fontWeight: 700, color: "#374151" }}>
-                                        Thao tác
-                                    </TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {criteria.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={4} sx={{ py: 2.5, textAlign: "center", color: "#64748b" }}>
-                                            Chưa có tiêu chí. Nhấn &quot;Thêm tiêu chí&quot; để bắt đầu.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    criteria.map((item, cIdx) => (
-                                        <TableRow key={`mandatory-ocr-edit-${dIdx}-${cIdx}`} hover>
-                                            <TableCell>{cIdx + 1}</TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    value={item.label}
-                                                    placeholder="VD: Họ và tên"
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
-                                                            const nextCriteria = [...criteria];
-                                                            nextCriteria[cIdx] = {...nextCriteria[cIdx], label: value};
-                                                            return nextCriteria;
-                                                        });
-                                                    }}
-                                                    sx={admissionInputSx}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    value={item.validations[0] ?? ""}
-                                                    placeholder="VD: Họ tên phải khớp với hồ sơ học sinh"
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
-                                                            const nextCriteria = [...criteria];
-                                                            const trimmed = value.trim();
-                                                            nextCriteria[cIdx] = {
-                                                                ...nextCriteria[cIdx],
-                                                                validations: trimmed ? [value] : [],
-                                                            };
-                                                            return nextCriteria;
-                                                        });
-                                                    }}
-                                                    sx={admissionInputSx}
-                                                />
-                                            </TableCell>
-                                            <TableCell align="center">
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => {
-                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
-                                                            const nextCriteria = [...criteria];
-                                                            nextCriteria.splice(cIdx, 1);
-                                                            return nextCriteria;
-                                                        });
-                                                    }}
-                                                >
-                                                    <DeleteOutlineIcon fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+        const countMandatoryOcrCriteria = (doc) =>
+            normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+                (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
+            ).length;
+        const renderSectionEditActions = (section, editing, setEditing) => (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {!editing ? (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={saving}
+                        onClick={() => setEditing(true)}
+                        sx={admissionToolbarSmallOutlinedSx}
+                    >
+                        Chỉnh sửa
+                    </Button>
+                ) : (
+                    <>
                         <Button
                             size="small"
                             variant="outlined"
-                            startIcon={<AddIcon fontSize="small" />}
+                            disabled={saving}
                             onClick={() => {
-                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => [
-                                    ...criteria,
-                                    {label: "", validations: []},
-                                ]);
+                                cancelAdmissionSection(section);
+                                setEditing(false);
                             }}
-                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                            sx={admissionToolbarSmallOutlinedSx}
                         >
-                            Thêm tiêu chí
+                            Hủy
                         </Button>
-                    </Box>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            disabled={saving}
+                            onClick={() => {
+                                void saveAdmissionSection(section).then((ok) => {
+                                    if (ok) setEditing(false);
+                                });
+                            }}
+                            sx={admissionToolbarSmallPrimarySx}
+                        >
+                            Lưu
+                        </Button>
+                    </>
+                )}
+            </Stack>
+        );
+        const renderMandatoryOcrBlock = (doc, dIdx) => {
+            const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria);
+            const filledCount = countMandatoryOcrCriteria(doc);
+            if (!admissionMandatoryEditing && filledCount === 0) return null;
+
+            return (
+                <Box sx={{ px: 1.5, py: 1.25, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", display: "block", mb: 1 }}>
+                        Tiêu chí kiểm tra
+                    </Typography>
+                    {admissionMandatoryEditing ? (
+                        <Stack spacing={1}>
+                            {criteria.length === 0 ? (
+                                <Typography variant="body2" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
+                                    Chưa có tiêu chí — thêm nếu cần kiểm tra OCR.
+                                </Typography>
+                            ) : (
+                                criteria.map((item, cIdx) => (
+                                    <Stack
+                                        key={`mandatory-ocr-${dIdx}-${cIdx}`}
+                                        direction={{ xs: "column", sm: "row" }}
+                                        spacing={1}
+                                        alignItems={{ sm: "flex-start" }}
+                                    >
+                                        <TextField
+                                            size="small"
+                                            label="Tiêu chí"
+                                            fullWidth
+                                            value={item.label}
+                                            placeholder="VD: Họ và tên"
+                                            disabled={mandatoryRowDisabled}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                    const next = [...list];
+                                                    next[cIdx] = { ...next[cIdx], label: value };
+                                                    return next;
+                                                });
+                                            }}
+                                            sx={{ ...admissionInputSx, flex: 1, minWidth: 0 }}
+                                        />
+                                        <TextField
+                                            size="small"
+                                            label="Quy tắc"
+                                            fullWidth
+                                            value={item.validations[0] ?? ""}
+                                            placeholder="VD: Khớp với hồ sơ học sinh"
+                                            disabled={mandatoryRowDisabled}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                    const next = [...list];
+                                                    const trimmed = value.trim();
+                                                    next[cIdx] = {
+                                                        ...next[cIdx],
+                                                        validations: trimmed ? [value] : [],
+                                                    };
+                                                    return next;
+                                                });
+                                            }}
+                                            sx={{ ...admissionInputSx, flex: 2, minWidth: 0 }}
+                                        />
+                                        <IconButton
+                                            size="small"
+                                            color="error"
+                                            disabled={mandatoryRowDisabled}
+                                            aria-label="Xóa tiêu chí"
+                                            onClick={() => {
+                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                    const next = [...list];
+                                                    next.splice(cIdx, 1);
+                                                    return next;
+                                                });
+                                            }}
+                                            sx={{ mt: { sm: 0.5 } }}
+                                        >
+                                            <DeleteOutlineIcon fontSize="small" />
+                                        </IconButton>
+                                    </Stack>
+                                ))
+                            )}
+                            <Button
+                                size="small"
+                                variant="text"
+                                startIcon={<AddIcon fontSize="small" />}
+                                disabled={mandatoryRowDisabled}
+                                onClick={() => {
+                                    updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => [
+                                        ...list,
+                                        { label: "", validations: [] },
+                                    ]);
+                                }}
+                                sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 700, color: "#2563eb" }}
+                            >
+                                Thêm tiêu chí
+                            </Button>
+                        </Stack>
+                    ) : (
+                        <Stack spacing={0.75}>
+                            {criteria
+                                .filter(
+                                    (item) =>
+                                        String(item.label || "").trim() ||
+                                        item.validations.some((rule) => String(rule).trim()),
+                                )
+                                .map((item, cIdx) => (
+                                    <Typography key={`mandatory-ocr-view-${dIdx}-${cIdx}`} variant="body2" sx={{ color: "#475569", lineHeight: 1.5 }}>
+                                        <Box component="span" sx={{ fontWeight: 600, color: "#334155" }}>
+                                            {item.label || "—"}:
+                                        </Box>{" "}
+                                        {item.validations[0] || "—"}
+                                    </Typography>
+                                ))}
+                        </Stack>
+                    )}
                 </Box>
             );
         };
@@ -2112,19 +2204,6 @@ export default function AdminPlatformSettings() {
 
         return (
             <Stack spacing={2.5} sx={{ width: "100%" }}>
-                {!admissionTemplateEditing ? (
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={saving}
-                            onClick={() => setAdmissionTemplateEditing(true)}
-                            sx={admissionToolbarSmallOutlinedSx}
-                        >
-                            Chỉnh sửa
-                        </Button>
-                    </Box>
-                ) : null}
                 <Box>
                     <input
                         ref={admissionImportInputRef}
@@ -2302,8 +2381,32 @@ export default function AdminPlatformSettings() {
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1d4ed8" }}>
                                 Phương thức tuyển sinh
                             </Typography>
-                            {admissionTemplateEditing ? (
-                                <Stack direction="row" spacing={1}>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                                {admissionMethodsEditing ? (
+                                    <>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Tài liệu mẫu
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                            disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
+                                            onClick={() => {
+                                                setImportType("ALLOWED_METHODS");
+                                                setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                            }}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Tải lên
+                                        </Button>
+                                    </>
+                                ) : (
                                     <Button
                                         size="small"
                                         variant="outlined"
@@ -2312,30 +2415,13 @@ export default function AdminPlatformSettings() {
                                     >
                                         Tài liệu mẫu
                                     </Button>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                        disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
-                                        onClick={() => {
-                                            setImportType("ALLOWED_METHODS");
-                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                        }}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                    >
-                                        Tải lên
-                                    </Button>
-                                </Stack>
-                            ) : (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tài liệu mẫu
-                                </Button>
-                            )}
+                                )}
+                                {renderSectionEditActions(
+                                    ADMISSION_EDIT_SECTION.METHODS,
+                                    admissionMethodsEditing,
+                                    setAdmissionMethodsEditing,
+                                )}
+                            </Stack>
                         </Box>
                         {methods.length === 0 ? (
                             <Box
@@ -2360,7 +2446,7 @@ export default function AdminPlatformSettings() {
                                             <TableCell sx={{ width: 170, fontWeight: 700, color: "#374151" }}>Mã phương thức</TableCell>
                                             <TableCell sx={{ width: 220, fontWeight: 700, color: "#374151" }}>Tên hiển thị</TableCell>
                                             <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Mô tả</TableCell>
-                                            {admissionTemplateEditing ? (
+                                            {admissionMethodsEditing ? (
                                                 <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
                                                     Xóa
                                                 </TableCell>
@@ -2371,13 +2457,13 @@ export default function AdminPlatformSettings() {
                                         {methods.map((row, idx) => (
                                             <TableRow key={`adm-${idx}-${row.code ?? "row"}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
                                                             placeholder="VD: HOC_BA"
                                                             value={row.code}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2422,13 +2508,13 @@ export default function AdminPlatformSettings() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
                                                             placeholder="Tên trên giao diện"
                                                             value={row.displayName}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2446,7 +2532,7 @@ export default function AdminPlatformSettings() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
@@ -2455,7 +2541,7 @@ export default function AdminPlatformSettings() {
                                                             maxRows={4}
                                                             placeholder="Mô tả ngắn cho tư vấn / trường"
                                                             value={row.description}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2472,14 +2558,14 @@ export default function AdminPlatformSettings() {
                                                         </Typography>
                                                     )}
                                                 </TableCell>
-                                                {admissionTemplateEditing ? (
+                                                {admissionMethodsEditing ? (
                                                     <TableCell align="center" sx={{ py: 1.35 }}>
                                                         <Tooltip title="Xóa dòng" placement="left">
                                                             <span>
                                                                 <IconButton
                                                                     size="small"
                                                                     color="error"
-                                                                    disabled={rowDisabled}
+                                                                    disabled={methodsRowDisabled}
                                                                     aria-label="Xóa dòng"
                                                                     onClick={() =>
                                                                         setAdmissionTemplateForm((p) => {
@@ -2501,6 +2587,28 @@ export default function AdminPlatformSettings() {
                                 </Table>
                             </TableContainer>
                         )}
+                        {admissionMethodsEditing ? (
+                            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<AddIcon fontSize="small" />}
+                                    disabled={methodsRowDisabled}
+                                    onClick={() =>
+                                        setAdmissionTemplateForm((prev) => ({
+                                            ...prev,
+                                            allowedMethods: [
+                                                ...(Array.isArray(prev.allowedMethods) ? prev.allowedMethods : []),
+                                                { code: "", displayName: "", description: "" },
+                                            ],
+                                        }))
+                                    }
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Thêm phương thức
+                                </Button>
+                            </Box>
+                        ) : null}
                     </Box>
                 </Box>
 
@@ -2522,20 +2630,32 @@ export default function AdminPlatformSettings() {
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1d4ed8" }}>
                             Hồ sơ bắt buộc chung
                         </Typography>
-                        {admissionTemplateEditing ? (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                    onClick={() => {
-                                        setImportType("MANDATORY_ALL");
-                                        setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                    }}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tải hồ sơ chung
-                                </Button>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                            {admissionMandatoryEditing ? (
+                                <>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                        disabled={mandatoryRowDisabled}
+                                        onClick={() => {
+                                            setImportType("MANDATORY_ALL");
+                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                        }}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tải hồ sơ chung
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                </>
+                            ) : (
                                 <Button
                                     size="small"
                                     variant="outlined"
@@ -2544,196 +2664,194 @@ export default function AdminPlatformSettings() {
                                 >
                                     Tài liệu mẫu
                                 </Button>
-                            </Stack>
-                        ) : (
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
-                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                            >
-                                Tài liệu mẫu
-                            </Button>
-                        )}
+                            )}
+                            {renderSectionEditActions(
+                                ADMISSION_EDIT_SECTION.MANDATORY,
+                                admissionMandatoryEditing,
+                                setAdmissionMandatoryEditing,
+                            )}
+                        </Stack>
                     </Box>
-                    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.5, bgcolor: "#ffffff" }}>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow sx={{ bgcolor: "#eef4ff" }}>
-                                    <TableCell sx={{ width: 64, fontWeight: 700, color: "#374151" }}>STT</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
-                                    <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
-                                    {admissionTemplateEditing ? (
-                                        <TableCell align="center" sx={{ width: 96, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
-                                            Thao tác
-                                        </TableCell>
-                                    ) : null}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {mandatoryDocsSource.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={admissionTemplateEditing ? 4 : 3} sx={{ py: 4, textAlign: "center", color: "#64748b" }}>
-                                            <InfoOutlinedIcon sx={{ fontSize: 22, color: "#94a3b8", mb: 0.5 }} />
-                                            <Typography variant="body2">Chưa có hồ sơ bắt buộc chung.</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : mandatoryDocsSource.map((doc, dIdx) => {
-                                    const ocrCriteriaCount = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
-                                        (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
-                                    ).length;
-                                    const ocrExpanded = isMandatoryOcrExpanded(dIdx);
-                                    return (
-                                        <React.Fragment key={`mandatory-doc-${dIdx}`}>
-                                            <TableRow hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
-                                                <TableCell>
-                                                    <Stack direction="row" spacing={0.25} alignItems="center">
-                                                        {!admissionTemplateEditing ? (
-                                                            <Tooltip
-                                                                title={
-                                                                    ocrCriteriaCount > 0
-                                                                        ? ocrExpanded
-                                                                            ? "Thu gọn tiêu chí OCR"
-                                                                            : `Xem ${ocrCriteriaCount} tiêu chí OCR`
-                                                                        : "Không có tiêu chí OCR"
-                                                                }
-                                                            >
-                                                                <span>
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        disabled={ocrCriteriaCount === 0}
-                                                                        onClick={() => toggleMandatoryOcrExpanded(dIdx)}
-                                                                        sx={{ color: "#2563eb" }}
-                                                                    >
-                                                                        {ocrExpanded ? (
-                                                                            <ExpandLessIcon fontSize="small" />
-                                                                        ) : (
-                                                                            <ExpandMoreIcon fontSize="small" />
-                                                                        )}
-                                                                    </IconButton>
-                                                                </span>
-                                                            </Tooltip>
-                                                        ) : null}
-                                                        <Typography variant="body2" component="span">
-                                                            {dIdx + 1}
-                                                        </Typography>
-                                                    </Stack>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {admissionTemplateEditing ? (
-                                                        <TextField
+                    {mandatoryDocsSource.length === 0 ? (
+                        <Box
+                            sx={{
+                                py: 4,
+                                px: 2,
+                                borderRadius: 2,
+                                border: "1px dashed #cbd5e1",
+                                bgcolor: "#ffffff",
+                                textAlign: "center",
+                            }}
+                        >
+                            <InfoOutlinedIcon sx={{ fontSize: 22, color: "#94a3b8", mb: 0.5 }} />
+                            <Typography variant="body2" sx={{ color: "#64748b" }}>
+                                Chưa có hồ sơ bắt buộc chung.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Stack spacing={1.25}>
+                            {mandatoryDocsSource.map((doc, dIdx) => {
+                                const ocrCriteriaCount = countMandatoryOcrCriteria(doc);
+                                const ocrExpanded = isMandatoryOcrExpanded(dIdx);
+                                const showOcrBlock =
+                                    admissionMandatoryEditing || (ocrCriteriaCount > 0 && ocrExpanded);
+
+                                return (
+                                    <Box
+                                        key={`mandatory-doc-${dIdx}`}
+                                        sx={{
+                                            border: "1px solid #dbeafe",
+                                            borderRadius: 2,
+                                            overflow: "hidden",
+                                            bgcolor: "#ffffff",
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                alignItems: { xs: "stretch", sm: "center" },
+                                                gap: 1.25,
+                                                p: 1.5,
+                                            }}
+                                        >
+                                            {admissionMandatoryEditing ? (
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    label="Tên hồ sơ"
+                                                    value={doc?.name ?? ""}
+                                                    disabled={mandatoryRowDisabled}
+                                                    onChange={(e) => {
+                                                        updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                            name: e.target.value,
+                                                        });
+                                                    }}
+                                                    placeholder="VD: Bản sao Giấy khai sinh"
+                                                    sx={{ ...admissionInputSx, flex: 1, minWidth: 0 }}
+                                                />
+                                            ) : (
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Typography sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.4 }}>
+                                                        {doc?.name || "—"}
+                                                    </Typography>
+                                                    {ocrCriteriaCount > 0 ? (
+                                                        <Button
                                                             size="small"
-                                                            fullWidth
-                                                            value={doc?.name ?? ""}
-                                                            onChange={(e) => {
-                                                                updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
-                                                                    name: e.target.value,
-                                                                });
-                                                            }}
-                                                            placeholder="Nhập tên hồ sơ"
-                                                            sx={admissionInputSx}
-                                                        />
-                                                    ) : (
-                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                            {doc?.name || "-"}
-                                                        </Typography>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    {admissionTemplateEditing ? (
-                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
-                                                            <Switch
-                                                                size="small"
-                                                                checked={doc?.required === true}
-                                                                onChange={(_, checked) => {
-                                                                    updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
-                                                                        required: checked,
-                                                                    });
-                                                                }}
-                                                                color="primary"
-                                                                inputProps={{
-                                                                    "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
-                                                                }}
-                                                            />
-                                                        </Tooltip>
-                                                    ) : (
-                                                        <Chip
-                                                            size="small"
-                                                            label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                            variant="text"
+                                                            onClick={() => toggleMandatoryOcrExpanded(dIdx)}
+                                                            endIcon={
+                                                                ocrExpanded ? (
+                                                                    <ExpandLessIcon fontSize="small" />
+                                                                ) : (
+                                                                    <ExpandMoreIcon fontSize="small" />
+                                                                )
+                                                            }
                                                             sx={{
-                                                                height: 24,
-                                                                fontWeight: 700,
-                                                                fontSize: 11,
-                                                                color: doc?.required ? "#b91c1c" : "#166534",
-                                                                bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                                mt: 0.25,
+                                                                px: 0,
+                                                                minWidth: 0,
+                                                                textTransform: "none",
+                                                                fontWeight: 600,
+                                                                fontSize: "0.8125rem",
+                                                                color: "#2563eb",
                                                             }}
-                                                        />
-                                                    )}
-                                                </TableCell>
-                                                {admissionTemplateEditing ? (
-                                                    <TableCell align="center">
-                                                        <Stack direction="row" spacing={0.25} justifyContent="center">
-                                                            <Tooltip title={ocrExpanded ? "Thu gọn tiêu chí OCR" : "Thêm / chỉnh tiêu chí OCR"}>
+                                                        >
+                                                            {ocrExpanded
+                                                                ? "Ẩn tiêu chí kiểm tra"
+                                                                : `${ocrCriteriaCount} tiêu chí kiểm tra`}
+                                                        </Button>
+                                                    ) : null}
+                                                </Box>
+                                            )}
+                                            <Stack
+                                                direction="row"
+                                                spacing={1}
+                                                alignItems="center"
+                                                justifyContent={{ xs: "space-between", sm: "flex-end" }}
+                                                flexShrink={0}
+                                            >
+                                                {admissionMandatoryEditing ? (
+                                                    <>
+                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"}>
+                                                            <Stack direction="row" spacing={0.75} alignItems="center">
+                                                                <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                                                                    Bắt buộc
+                                                                </Typography>
+                                                                <Switch
+                                                                    size="small"
+                                                                    checked={doc?.required === true}
+                                                                    disabled={mandatoryRowDisabled}
+                                                                    onChange={(_, checked) => {
+                                                                        updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                            required: checked,
+                                                                        });
+                                                                    }}
+                                                                    color="primary"
+                                                                />
+                                                            </Stack>
+                                                        </Tooltip>
+                                                        <Tooltip title="Xóa hồ sơ">
+                                                            <span>
                                                                 <IconButton
                                                                     size="small"
-                                                                    color="primary"
+                                                                    color="error"
+                                                                    disabled={mandatoryRowDisabled}
                                                                     onClick={() => {
-                                                                        if (!ocrExpanded) {
-                                                                            if (normalizeOcrCriteriaList(doc?.ocrCriteria).length === 0) {
-                                                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, () => [
-                                                                                    { label: "", validations: [] },
-                                                                                ]);
-                                                                            }
-                                                                            toggleMandatoryOcrExpanded(dIdx);
-                                                                            return;
-                                                                        }
-                                                                        toggleMandatoryOcrExpanded(dIdx);
+                                                                        setAdmissionTemplateForm((prev) => {
+                                                                            const nextDocs = Array.isArray(
+                                                                                prev.mandatoryAllDocumentRequirements,
+                                                                            )
+                                                                                ? [...prev.mandatoryAllDocumentRequirements]
+                                                                                : [];
+                                                                            nextDocs.splice(dIdx, 1);
+                                                                            return {
+                                                                                ...prev,
+                                                                                mandatoryAllDocumentRequirements: nextDocs,
+                                                                            };
+                                                                        });
+                                                                        setMandatoryOcrExpandedIdxs((prev) =>
+                                                                            prev
+                                                                                .filter((item) => item !== dIdx)
+                                                                                .map((item) => (item > dIdx ? item - 1 : item)),
+                                                                        );
                                                                     }}
                                                                 >
-                                                                    <PlaylistAddCheckIcon fontSize="small" />
+                                                                    <DeleteOutlineIcon fontSize="small" />
                                                                 </IconButton>
-                                                            </Tooltip>
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => {
-                                                                    setAdmissionTemplateForm((prev) => {
-                                                                        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                            ? [...prev.mandatoryAllDocumentRequirements]
-                                                                            : [];
-                                                                        nextDocs.splice(dIdx, 1);
-                                                                        return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                                    });
-                                                                    setMandatoryOcrExpandedIdxs((prev) =>
-                                                                        prev
-                                                                            .filter((item) => item !== dIdx)
-                                                                            .map((item) => (item > dIdx ? item - 1 : item)),
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <DeleteOutlineIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Stack>
-                                                    </TableCell>
-                                                ) : null}
-                                            </TableRow>
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={mandatoryTableColSpan}
-                                                    sx={{ py: 0, borderBottom: ocrExpanded ? undefined : "none" }}
-                                                >
-                                                    <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
-                                                        {renderMandatoryOcrCriteriaPanel(doc, dIdx)}
-                                                    </Collapse>
-                                                </TableCell>
-                                            </TableRow>
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    {admissionTemplateEditing ? (
+                                                            </span>
+                                                        </Tooltip>
+                                                    </>
+                                                ) : (
+                                                    <Chip
+                                                        size="small"
+                                                        label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                        sx={{
+                                                            height: 24,
+                                                            fontWeight: 700,
+                                                            fontSize: 11,
+                                                            color: doc?.required ? "#b91c1c" : "#166534",
+                                                            bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                        }}
+                                                    />
+                                                )}
+                                            </Stack>
+                                        </Box>
+                                        {showOcrBlock ? (
+                                            admissionMandatoryEditing ? (
+                                                renderMandatoryOcrBlock(doc, dIdx)
+                                            ) : (
+                                                <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
+                                                    {renderMandatoryOcrBlock(doc, dIdx)}
+                                                </Collapse>
+                                            )
+                                        ) : null}
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    )}
+                    {admissionMandatoryEditing ? (
                         <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
                             <Button
                                 size="small"
@@ -2767,12 +2885,13 @@ export default function AdminPlatformSettings() {
                         ? docsSource[selectedDocGroupIndex].documents
                         : [];
                     const selectedSteps = selectedMethodCode ? (processByMethodMap[selectedMethodCode] || []) : [];
-                    const canEdit = admissionTemplateEditing;
+                    const canEdit = admissionDocumentsEditing;
 
                     return (
                         <Box sx={previewSectionCardSx}>
                             <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between" alignItems={{ md: "center" }} sx={{ mb: 1.5 }}>
                                 <Typography sx={previewSectionTitleSx}>Hồ sơ tuyển sinh</Typography>
+                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" justifyContent={{ xs: "flex-start", md: "flex-end" }}>
                                 {canEdit ? (
                                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                         <Tooltip title={methods.length === 0 ? "Phải upload danh sách phương thức tuyển sinh đầu tiên" : ""} arrow>
@@ -2846,6 +2965,12 @@ export default function AdminPlatformSettings() {
                                         </Button>
                                     </Stack>
                                 )}
+                                {renderSectionEditActions(
+                                    ADMISSION_EDIT_SECTION.DOCUMENTS,
+                                    admissionDocumentsEditing,
+                                    setAdmissionDocumentsEditing,
+                                )}
+                                </Stack>
                             </Stack>
 
                             {methods.length === 0 ? (
@@ -3226,41 +3351,6 @@ export default function AdminPlatformSettings() {
                         </Box>
                     );
                 })() : null}
-
-                {admissionTemplateEditing ? (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            gap: 1,
-                            flexWrap: "wrap",
-                            pt: 0.5,
-                            pb: 0.25,
-                        }}
-                    >
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={saving}
-                            onClick={() => {
-                                cancelAdmissionTemplate();
-                                setAdmissionTemplateEditing(false);
-                            }}
-                            sx={admissionToolbarSmallOutlinedSx}
-                        >
-                            Hủy
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="contained"
-                            disabled={saving}
-                            onClick={() => void saveAdmissionTemplate()}
-                            sx={admissionToolbarSmallPrimarySx}
-                        >
-                            Lưu
-                        </Button>
-                    </Box>
-                ) : null}
             </Stack>
         );
     };
