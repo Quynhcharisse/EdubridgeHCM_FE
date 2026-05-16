@@ -4499,7 +4499,7 @@ function MainHeader() {
                                                     transition: 'background 0.2s, color 0.2s',
                                                 }}
                                             >
-                                                <AssignmentTurnedInRoundedIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Quản lý đơn đăng ký
+                                                <AssignmentTurnedInRoundedIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Quản lý hồ sơ giữ chỗ
                                             </MenuItem>
                                             <MenuItem
                                                 onClick={() => {
@@ -4798,7 +4798,7 @@ function MainHeader() {
                                                 sx={{cursor: 'pointer'}}
                                             >
                                                 <ListItemText
-                                                    primary="Quản lý đơn đăng ký"
+                                                    primary="Quản lý hồ sơ giữ chỗ"
                                                     sx={{color: BRAND_NAVY, fontWeight: 600}}
                                                 />
                                             </ListItem>
