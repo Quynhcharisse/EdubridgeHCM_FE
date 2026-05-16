@@ -157,6 +157,43 @@ export const getParentAdmissionReservationForms = async () => {
     return response || null;
 };
 
+export const putParentAdmissionSchoolsAvailability = async (studentProfileId, schoolIds) => {
+    const sid = Number(studentProfileId);
+    if (!Number.isFinite(sid) || sid <= 0) {
+        throw new Error('studentProfileId is required');
+    }
+    const ids = (Array.isArray(schoolIds) ? schoolIds : [])
+        .map((x) => Number(x))
+        .filter((n) => Number.isFinite(n) && n > 0);
+    const response = await axiosClient.put('/parent/admission/schools/availability', ids, {
+        params: {studentProfileId: sid},
+        headers: {'Content-Type': 'application/json'},
+    });
+    return response || null;
+};
+
+export function pickAdmissionSchoolsAvailabilityFromResponse(response) {
+    const data = response?.data;
+    const topMessage = typeof data?.message === 'string' ? data.message : '';
+    if (data == null) {
+        return {unavailable: [], available: [], message: topMessage};
+    }
+    let inner = data.body ?? data;
+    if (typeof inner === 'string') {
+        try {
+            inner = JSON.parse(inner);
+        } catch {
+            return {unavailable: [], available: [], message: topMessage};
+        }
+    }
+    if (inner && typeof inner === 'object' && inner.body != null && typeof inner.body === 'object' && !Array.isArray(inner.body)) {
+        inner = inner.body;
+    }
+    const unavailable = Array.isArray(inner?.unavailable) ? inner.unavailable : [];
+    const available = Array.isArray(inner?.available) ? inner.available : [];
+    return {unavailable, available, message: topMessage || (typeof inner?.message === 'string' ? inner.message : '')};
+}
+
 export function pickAdmissionReservationFormsFromResponse(response) {
     const data = response?.data;
     if (data == null) return [];
