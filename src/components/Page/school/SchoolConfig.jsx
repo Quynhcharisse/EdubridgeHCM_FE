@@ -45,6 +45,7 @@ import {
 } from "@mui/material";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
@@ -64,19 +65,20 @@ import {motion} from "framer-motion";
 import {extractCampusListBody, listCampuses} from "../../../services/CampusService.jsx";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {
-  confirmMandatoryDocImportRows,
   getCampusConfig,
   getSchoolConfig,
   getSchoolConfigByKey,
   parseSchoolConfigResponseBody,
-  previewMandatoryDocsImport,
   updateCampusConfig,
   updateSchoolConfig,
-  validateMandatoryDocImportRow,
 } from "../../../services/SchoolFacilityService.jsx";
 import {fetchSystemAdmissionSettingsData, getSystemConfigByKey} from "../../../services/SystemConfigService.jsx";
 import {getCurrentSchoolSubscription} from "../../../services/SchoolSubscriptionService.jsx";
-import {admissionSettingsComparableJson, sanitizeAdmissionSettingsForApi} from "../../../utils/admissionSettingsShared.js";
+import {
+  admissionSettingsComparableJson,
+  normalizeOcrCriteriaList,
+  sanitizeAdmissionSettingsForApi,
+} from "../../../utils/admissionSettingsShared.js";
 import {SchoolFacilityFacilityForm} from "./SchoolFacilityConfiguration.jsx";
 import SchoolWideScheduleReadOnlyPanel from "./SchoolWideScheduleReadOnlyPanel.jsx";
 import {HqScalarDiffChip, HqVsCampusSlotBufferSummary, SchoolSlotCycleHint} from "./CampusOperationHqHints.jsx";
@@ -410,40 +412,88 @@ function normalizeDocItem(d) {
   };
 }
 
-function normalizeMandatoryImportRow(item, fallbackIndex = 1) {
-  const raw = item && typeof item === "object" ? item : {};
-  const sourceRowData = raw.rowData && typeof raw.rowData === "object" ? raw.rowData : raw;
-  const normalizedDoc = normalizeDocItem(sourceRowData);
-  const resolvedIndex = sourceRowData.index != null && !Number.isNaN(Number(sourceRowData.index))
-    ? Number(sourceRowData.index)
-    : fallbackIndex;
+/** Hồ sơ bắt buộc chung (hệ thống): thêm ocrCriteria, luôn required. */
+function normalizeMandatoryDocItem(d) {
+  if (!d || typeof d !== "object") return {code: "", name: "", required: true, ocrCriteria: []};
   return {
-    rowData: {
-      index: resolvedIndex,
-      code: normalizedDoc.code,
-      name: normalizedDoc.name,
-      required: true,
-    },
-    error: raw.error && typeof raw.error === "object" ? raw.error : null,
-    isError: Boolean(raw.isError),
+    ...normalizeDocItem(d),
+    required: true,
+    ocrCriteria: normalizeOcrCriteriaList(d.ocrCriteria),
   };
 }
 
-function mandatoryImportRowErrorText(row) {
-  const fields = Array.isArray(row?.error?.fields) ? row.error.fields : [];
-  if (!fields.length) return "";
-  return fields
-    .map((f) => String(f?.message ?? "").trim())
-    .filter(Boolean)
-    .join(". ");
+function parseSystemMandatoryAllFromApiBody(body) {
+  if (!body || typeof body !== "object") return [];
+  const admissionRoot =
+    body.admissionSettingsData && typeof body.admissionSettingsData === "object" ? body.admissionSettingsData : body;
+  const docRoot =
+    admissionRoot?.documentRequirementsData && typeof admissionRoot.documentRequirementsData === "object"
+      ? admissionRoot.documentRequirementsData
+      : admissionRoot;
+  const mandatoryRaw = Array.isArray(docRoot?.mandatoryAll) ? docRoot.mandatoryAll : [];
+  return mandatoryRaw.map(normalizeMandatoryDocItem);
 }
 
-function mandatoryImportFieldErrorText(row, fieldName) {
-  const fields = Array.isArray(row?.error?.fields) ? row.error.fields : [];
-  const normalizedField = String(fieldName ?? "").trim();
-  if (!normalizedField) return "";
-  const hit = fields.find((f) => String(f?.name ?? "").trim() === normalizedField);
-  return hit?.message != null ? String(hit.message) : "";
+async function fetchSystemMandatoryAllDocuments() {
+  const res = await getSystemConfigByKey("admissionSettingsData");
+  const body = res?.data?.body ?? res?.data?.data ?? res?.data ?? {};
+  return parseSystemMandatoryAllFromApiBody(body);
+}
+
+function MandatoryOcrCriteriaReadOnlyPanel({doc}) {
+  const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+    (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
+  );
+  if (criteria.length === 0) {
+    return (
+      <Typography variant="body2" sx={{color: "#64748b", fontStyle: "italic"}}>
+        Chưa có tiêu chí OCR cho hồ sơ này.
+      </Typography>
+    );
+  }
+  return (
+    <Stack component="ul" spacing={1} sx={{m: 0, p: 0, listStyle: "none"}}>
+      {criteria.map((item, cIdx) => {
+        const rule = String(item.validations[0] ?? "").trim();
+        return (
+          <Box
+            component="li"
+            key={`mandatory-ocr-${doc?.code || cIdx}-${cIdx}`}
+            sx={{
+              display: "flex",
+              gap: 1,
+              alignItems: "flex-start",
+              p: 1.25,
+              borderRadius: 1.25,
+              bgcolor: "#ffffff",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <Typography
+              variant="caption"
+              component="span"
+              sx={{fontWeight: 700, color: "#94a3b8", minWidth: 18, lineHeight: 1.6}}
+            >
+              {cIdx + 1}.
+            </Typography>
+            <Box sx={{minWidth: 0, flex: 1}}>
+              <Typography variant="body2" sx={{fontWeight: 600, color: "#1e3a8a", lineHeight: 1.5}}>
+                {item.label || "—"}
+              </Typography>
+              {rule ? (
+                <Typography variant="body2" sx={{color: "#475569", mt: 0.35, lineHeight: 1.55}}>
+                  <Box component="span" sx={{fontWeight: 600, color: "#64748b"}}>
+                    Quy tắc kiểm tra:{" "}
+                  </Box>
+                  {rule}
+                </Typography>
+              ) : null}
+            </Box>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
 }
 
 /**
@@ -706,15 +756,9 @@ function parseMethodAdmissionProcessFromOperation(op) {
   return [];
 }
 
-/** Gửi PUT đúng shape, bỏ field thừa */
+/** Gửi PUT /school/config — chỉ byMethod (mandatoryAll do hệ thống quản lý). */
 function sanitizeDocumentRequirementsForApi(data) {
-  if (!data || typeof data !== "object") return {mandatoryAll: [], byMethod: []};
-  const mandatoryAll = Array.isArray(data.mandatoryAll)
-    ? data.mandatoryAll.map((d) => {
-        const x = normalizeDocItem(d);
-        return {code: x.code.trim(), name: x.name.trim(), required: true};
-      })
-    : [];
+  if (!data || typeof data !== "object") return {byMethod: []};
   const byMethod = Array.isArray(data.byMethod)
     ? data.byMethod.map((g) => {
         const ng = normalizeByMethodGroup(g);
@@ -728,7 +772,18 @@ function sanitizeDocumentRequirementsForApi(data) {
         };
       })
     : [];
-  return {mandatoryAll, byMethod};
+  return {byMethod};
+}
+
+function documentRequirementsDirty(current, initial) {
+  try {
+    return (
+      JSON.stringify(sanitizeDocumentRequirementsForApi(current)) !==
+      JSON.stringify(sanitizeDocumentRequirementsForApi(initial))
+    );
+  } catch {
+    return true;
+  }
 }
 
 function sanitizeQuotaConfigForApi(q) {
@@ -1206,7 +1261,7 @@ function normalizeFromApi(body) {
     documentRequirementsData: {
       ...d.documentRequirementsData,
       mandatoryAll: Array.isArray(doc.mandatoryAll)
-        ? doc.mandatoryAll.map((item) => ({...normalizeDocItem(item), required: true}))
+        ? doc.mandatoryAll.map(normalizeMandatoryDocItem)
         : d.documentRequirementsData.mandatoryAll,
       byMethod: Array.isArray(doc.byMethod) ? doc.byMethod.map(normalizeByMethodGroup) : d.documentRequirementsData.byMethod,
     },
@@ -1260,6 +1315,12 @@ function buildPartialPayload(current, initial) {
       } catch {
         const partialFin = buildPartialFinancePolicyPayload(current.financePolicyData, initial.financePolicyData);
         if (Object.keys(partialFin).length > 0) out[k] = partialFin;
+      }
+      continue;
+    }
+    if (k === "documentRequirementsData") {
+      if (documentRequirementsDirty(current[k], initial[k])) {
+        out[k] = sanitizeDocumentRequirementsForApi(current[k]);
       }
       continue;
     }
@@ -1815,9 +1876,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const initialRef = useRef(null);
   const facilityFormRef = useRef(null);
   const methodAdmissionProcessGroupRefs = useRef({});
-  const mandatoryDocsImportInputRef = useRef(null);
-  const mandatoryImportValidateTimersRef = useRef({});
-  const mandatoryImportValidateSeqRef = useRef({});
   const [pendingScrollToProcessIdx, setPendingScrollToProcessIdx] = useState(null);
   const [lastLoadedAt, setLastLoadedAt] = useState(null);
   const [admissionMethodExpanded, setAdmissionMethodExpanded] = useState({});
@@ -1831,10 +1889,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const [loadingSystemAdmission, setLoadingSystemAdmission] = useState(false);
   const [resourceSummaryReport, setResourceSummaryReport] = useState(null);
   const [resourceSummaryLoading, setResourceSummaryLoading] = useState(false);
-  const [mandatoryImportDialogOpen, setMandatoryImportDialogOpen] = useState(false);
-  const [mandatoryImportLoading, setMandatoryImportLoading] = useState(false);
-  const [mandatoryImportConfirming, setMandatoryImportConfirming] = useState(false);
-  const [mandatoryImportRows, setMandatoryImportRows] = useState([]);
+  const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
   const [vietQrBanks, setVietQrBanks] = useState([]);
   const [loadingVietQrBanks, setLoadingVietQrBanks] = useState(false);
   const [vietQrBanksLoaded, setVietQrBanksLoaded] = useState(false);
@@ -1891,21 +1946,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     config.documentRequirementsData?.byMethod,
     config.admissionSettingsData?.methodAdmissionProcess,
   ]);
-
-  useEffect(() => () => {
-    Object.values(mandatoryImportValidateTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
-    mandatoryImportValidateTimersRef.current = {};
-  }, []);
-
-  const mandatoryImportErrorCount = useMemo(
-    () => (mandatoryImportRows || []).reduce((total, row) => total + (row?.isError ? 1 : 0), 0),
-    [mandatoryImportRows]
-  );
-  const mandatoryImportValidatingCount = useMemo(
-    () => (mandatoryImportRows || []).reduce((total, row) => total + (row?._isValidating ? 1 : 0), 0),
-    [mandatoryImportRows]
-  );
-  const mandatoryImportHasAnyError = mandatoryImportErrorCount > 0 || mandatoryImportValidatingCount > 0;
 
   const schoolAdmissionComparable = useMemo(
     () => admissionSettingsComparableJson(config.admissionSettingsData),
@@ -2076,6 +2116,21 @@ export default function SchoolConfig({variant = "platform"} = {}) {
             campusAssignments: qa,
           },
         };
+      }
+
+      try {
+        const systemMandatoryAll = await fetchSystemMandatoryAllDocuments();
+        if (systemMandatoryAll.length > 0) {
+          next = {
+            ...next,
+            documentRequirementsData: {
+              ...next.documentRequirementsData,
+              mandatoryAll: systemMandatoryAll,
+            },
+          };
+        }
+      } catch {
+        // Giữ mandatoryAll từ GET school/config nếu không tải được mẫu hệ thống.
       }
 
       setConfig(next);
@@ -2291,26 +2346,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     let schoolPayload = Object.fromEntries(
       Object.entries(schoolPayloadRaw).filter(([key]) => allowedSectionKeys.has(key))
     );
-    if (schoolPayload.admissionSettingsData != null) {
-      const docReq = sanitizeDocumentRequirementsForApi(config.documentRequirementsData);
-      schoolPayload = {
-        ...schoolPayload,
-        admissionSettingsData: {
-          ...schoolPayload.admissionSettingsData,
-          // Đồng bộ mandatoryAll theo nguồn dữ liệu tab Cài đặt hồ sơ.
-          documentRequirements: {
-            ...(schoolPayload.admissionSettingsData.documentRequirements || {}),
-            mandatoryAll: docReq.mandatoryAll,
-          },
-          // Giữ key cũ để tương thích BE reader hiện tại.
-          documentRequirementsData: {
-            ...(schoolPayload.admissionSettingsData.documentRequirementsData || {}),
-            mandatoryAll: docReq.mandatoryAll,
-          },
-        },
-      };
-    }
-
     if (Object.keys(schoolPayload).length === 0) {
       enqueueSnackbar("Không có thay đổi để lưu", {variant: "info"});
       return;
@@ -2522,50 +2557,21 @@ export default function SchoolConfig({variant = "platform"} = {}) {
         ...g,
         documents: (g.documents || []).map((d) => ({...normalizeDocItem(d), required: true})),
       }));
+      const mandatoryAllFromTemplate = Array.isArray(docRoot.mandatoryAll)
+        ? docRoot.mandatoryAll.map(normalizeMandatoryDocItem)
+        : [];
 
       setConfig((c) => ({
         ...c,
         documentRequirementsData: {
           ...c.documentRequirementsData,
-          // Nút trong section "Theo phương thức tuyển sinh" chỉ áp dụng template cho byMethod.
-          // Giữ nguyên mandatoryAll để tránh mất dữ liệu vừa import/chỉnh tay.
-          mandatoryAll: c.documentRequirementsData?.mandatoryAll || [],
+          mandatoryAll: mandatoryAllFromTemplate.length
+            ? mandatoryAllFromTemplate
+            : c.documentRequirementsData?.mandatoryAll || [],
           byMethod,
         },
       }));
       enqueueSnackbar("Đã áp dụng mẫu hệ thống cho Cài đặt hồ sơ (chưa lưu DB).", {variant: "success"});
-    } finally {
-      setLoadingSystemAdmission(false);
-    }
-  }, []);
-
-  const applySystemMandatoryAllTemplateToForm = useCallback(async () => {
-    setLoadingSystemAdmission(true);
-    try {
-      const res = await getSystemConfigByKey("admissionSettingsData");
-      const body = res?.data?.body ?? res?.data?.data ?? res?.data ?? {};
-      const admissionRoot =
-        body?.admissionSettingsData && typeof body.admissionSettingsData === "object" ? body.admissionSettingsData : body;
-      const docRoot =
-        admissionRoot?.documentRequirementsData && typeof admissionRoot.documentRequirementsData === "object"
-          ? admissionRoot.documentRequirementsData
-          : admissionRoot;
-      const mandatoryRaw = Array.isArray(docRoot?.mandatoryAll) ? docRoot.mandatoryAll : [];
-      if (!mandatoryRaw.length) {
-        enqueueSnackbar("Không có dữ liệu Hồ sơ bắt buộc chung trên hệ thống.", {variant: "info"});
-        return;
-      }
-      const mandatoryAll = mandatoryRaw.map((item) => ({...normalizeDocItem(item), required: true}));
-      setConfig((c) => ({
-        ...c,
-        documentRequirementsData: {
-          ...c.documentRequirementsData,
-          mandatoryAll,
-        },
-      }));
-      enqueueSnackbar("Đã lấy mẫu Hồ sơ bắt buộc chung từ hệ thống (chưa lưu DB).", {variant: "success"});
-    } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Không thể lấy mẫu từ hệ thống", {variant: "error"});
     } finally {
       setLoadingSystemAdmission(false);
     }
@@ -2781,183 +2787,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
           allocations: rows,
         },
       };
-    });
-  }, []);
-
-  const onImportMandatoryDocsClick = useCallback(() => {
-    if (fieldDisabled) return;
-    mandatoryDocsImportInputRef.current?.click();
-  }, [fieldDisabled]);
-
-  const exportMandatoryDocsTemplate = useCallback(() => {
-    const fileName = "hồ_sơ_bắt_buộc.xlsx";
-    const anchor = document.createElement("a");
-    anchor.href = encodeURI(`/templates/${fileName}`);
-    anchor.setAttribute("download", fileName);
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  }, []);
-
-  const addMandatoryDocument = useCallback(() => {
-    if (fieldDisabled) return;
-    setConfig((c) => ({
-      ...c,
-      documentRequirementsData: {
-        ...c.documentRequirementsData,
-        mandatoryAll: [...(c.documentRequirementsData.mandatoryAll || []), {code: "", name: "", required: true}],
-      },
-    }));
-  }, [fieldDisabled]);
-
-  const onMandatoryDocsFileChange = useCallback(
-    async (e) => {
-      const file = e?.target?.files?.[0];
-      e.target.value = "";
-      if (!file) return;
-      if (fieldDisabled) return;
-      try {
-        setMandatoryImportLoading(true);
-        const res = await previewMandatoryDocsImport(file);
-        const rows = Array.isArray(res?.data?.body)
-          ? res.data.body.map((item, idx) => ({
-            ...normalizeMandatoryImportRow(item, idx + 1),
-            _key: `import-row-${idx + 1}-${Date.now()}`,
-            _isValidating: false,
-          }))
-          : [];
-        setMandatoryImportRows(rows);
-        setMandatoryImportDialogOpen(true);
-        enqueueSnackbar(res?.data?.message || "Đọc file hồ sơ thành công", {variant: "success"});
-      } catch (err) {
-        enqueueSnackbar(err?.response?.data?.message || err?.message || "Không thể import file hồ sơ bắt buộc chung", {
-          variant: "error",
-        });
-      } finally {
-        setMandatoryImportLoading(false);
-      }
-    },
-    [fieldDisabled]
-  );
-
-  const closeMandatoryImportDialog = useCallback(() => {
-    if (mandatoryImportConfirming) return;
-    Object.values(mandatoryImportValidateTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
-    mandatoryImportValidateTimersRef.current = {};
-    setMandatoryImportDialogOpen(false);
-  }, [mandatoryImportConfirming]);
-
-  const validateMandatoryImportRowAt = useCallback(async (rowKey, rowPayload) => {
-    try {
-      const res = await validateMandatoryDocImportRow([rowPayload]);
-      const validated = normalizeMandatoryImportRow(res?.data?.body ?? rowPayload, rowPayload?.rowData?.index ?? 1);
-      setMandatoryImportRows((prev) =>
-        prev.map((r) => {
-          if (r._key !== rowKey) return r;
-          const latestSeq = mandatoryImportValidateSeqRef.current[rowKey] ?? 0;
-          if (latestSeq !== rowPayload._seq) return r;
-          return {...r, ...validated, _isValidating: false};
-        })
-      );
-    } catch (err) {
-      const fallbackMessage = err?.response?.data?.message || "Không thể validate dòng";
-      setMandatoryImportRows((prev) =>
-        prev.map((r) => {
-          if (r._key !== rowKey) return r;
-          const latestSeq = mandatoryImportValidateSeqRef.current[rowKey] ?? 0;
-          if (latestSeq !== rowPayload._seq) return r;
-          return {
-            ...r,
-            isError: true,
-            _isValidating: false,
-            error: {
-              fields: [{name: "row", message: fallbackMessage}],
-            },
-          };
-        })
-      );
-    }
-  }, []);
-
-  const updateMandatoryImportRowCell = useCallback((rowKey, field, value) => {
-    setMandatoryImportRows((prev) =>
-      prev.map((r) => {
-        if (r._key !== rowKey) return r;
-        return {
-          ...r,
-          rowData: {
-            ...r.rowData,
-            [field]: value,
-            required: true,
-          },
-          _isValidating: true,
-        };
-      })
-    );
-
-    const oldTimer = mandatoryImportValidateTimersRef.current[rowKey];
-    if (oldTimer) window.clearTimeout(oldTimer);
-
-    const nextSeq = (mandatoryImportValidateSeqRef.current[rowKey] ?? 0) + 1;
-    mandatoryImportValidateSeqRef.current[rowKey] = nextSeq;
-
-    mandatoryImportValidateTimersRef.current[rowKey] = window.setTimeout(() => {
-      setMandatoryImportRows((currentRows) => {
-        const latest = currentRows.find((r) => r._key === rowKey);
-        if (!latest) return currentRows;
-        const payload = {
-          rowData: {
-            index: latest.rowData?.index,
-            code: String(latest.rowData?.code ?? ""),
-            name: String(latest.rowData?.name ?? ""),
-            required: true,
-          },
-          error: latest.error ?? null,
-          isError: Boolean(latest.isError),
-          _seq: nextSeq,
-        };
-        void validateMandatoryImportRowAt(rowKey, payload);
-        return currentRows;
-      });
-    }, 400);
-  }, [validateMandatoryImportRowAt]);
-
-  const confirmMandatoryImportRows = useCallback(async () => {
-    if (mandatoryImportHasAnyError || mandatoryImportLoading || mandatoryImportConfirming) return;
-    try {
-      setMandatoryImportConfirming(true);
-      const payloadRows = (mandatoryImportRows || []).map((row, idx) => {
-        const normalized = normalizeMandatoryImportRow(row, idx + 1);
-        return {
-          rowData: normalized.rowData,
-          error: normalized.error,
-          isError: normalized.isError,
-        };
-      });
-      const res = await confirmMandatoryDocImportRows(payloadRows);
-      const importedDocs = payloadRows.map((row) => ({...normalizeDocItem(row.rowData), required: true}));
-      setConfig((c) => ({
-        ...c,
-        documentRequirementsData: {
-          ...c.documentRequirementsData,
-          mandatoryAll: importedDocs,
-        },
-      }));
-      setMandatoryImportDialogOpen(false);
-      enqueueSnackbar(res?.data?.message || "Import hồ sơ bắt buộc thành công", {variant: "success"});
-    } catch (err) {
-      enqueueSnackbar(err?.response?.data?.message || err?.message || "Không thể lưu dữ liệu import", {variant: "error"});
-    } finally {
-      setMandatoryImportConfirming(false);
-    }
-  }, [mandatoryImportConfirming, mandatoryImportHasAnyError, mandatoryImportLoading, mandatoryImportRows]);
-
-  const removeMandatoryDocumentAt = useCallback((idx) => {
-    setConfig((c) => {
-      const list = [...(c.documentRequirementsData.mandatoryAll || [])];
-      if (!list[idx]) return c;
-      list.splice(idx, 1);
-      return {...c, documentRequirementsData: {...c.documentRequirementsData, mandatoryAll: list}};
     });
   }, []);
 
@@ -4405,96 +4234,102 @@ export default function SchoolConfig({variant = "platform"} = {}) {
             <Card sx={{borderRadius: "12px", border: "1px solid rgba(226,232,240,1)", boxShadow: "0 8px 24px rgba(15,23,42,0.06)"}}>
               <CardContent sx={{p: 3}}>
                 <Stack spacing={1.25} sx={{mb: 2}}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography sx={{fontWeight: 800}}>Hồ sơ bắt buộc chung</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => void applySystemMandatoryAllTemplateToForm()}
-                        disabled={loadingSystemAdmission || fieldDisabled}
-                        sx={{textTransform: "none", fontWeight: 700, borderRadius: 2, ...blockPointerSx}}
-                      >
-                        Lấy mẫu từ hệ thống
-                      </Button>
-                    </Stack>
-                  </Stack>
+                  <Typography sx={{fontWeight: 800}}>Hồ sơ bắt buộc chung</Typography>
                   <Alert severity="info" sx={{borderRadius: 2, maxWidth: 1200}}>
                     <Typography variant="body2" component="div" sx={{fontWeight: 700, mb: 0.75}}>
                       Lưu ý:
                     </Typography>
                     <Typography variant="body2" component="div" sx={{lineHeight: 1.65}}>
-                      Đây là danh sách hồ sơ bắt buộc cho <strong>TẤT CẢ</strong> thí sinh, dù chọn bất kỳ phương
-                      thức xét tuyển nào.
+                      Danh sách này áp dụng cho <strong>TẤT CẢ</strong> thí sinh và do nền tảng quản lý (không chỉnh
+                      sửa tại trường). Tiêu chí OCR hiển thị kèm từng loại hồ sơ.
                     </Typography>
                   </Alert>
                 </Stack>
                 <Stack spacing={1}>
-                  {(config.documentRequirementsData.mandatoryAll || []).map((doc, idx) => (
-                    <Box
-                      key={`mandatory-${idx}`}
-                      sx={{
-                        display: "flex",
-                        flexDirection: {xs: "column", sm: "row"},
-                        alignItems: {xs: "stretch", sm: "center"},
-                        justifyContent: "space-between",
-                        gap: 1.5,
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 2,
-                        p: 1.5,
-                      }}
-                    >
-                      {fieldDisabled ? (
-                        <Typography sx={{fontWeight: 600}}>{doc.name || doc.code || "—"}</Typography>
-                      ) : (
-                        <Stack direction={{xs: "column", sm: "row"}} spacing={1} sx={{flex: 1, minWidth: 0}}>
-                          <TextField
-                            size="small"
-                            label="Mã"
-                            value={doc.code ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setConfig((c) => {
-                                const list = [...(c.documentRequirementsData.mandatoryAll || [])];
-                                list[idx] = {...list[idx], code: v, required: true};
-                                return {...c, documentRequirementsData: {...c.documentRequirementsData, mandatoryAll: list}};
-                              });
-                            }}
-                            sx={{minWidth: {sm: 140}}}
-                          />
-                          <TextField
-                            size="small"
-                            label="Tên"
-                            value={doc.name ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setConfig((c) => {
-                                const list = [...(c.documentRequirementsData.mandatoryAll || [])];
-                                list[idx] = {...list[idx], name: v, required: true};
-                                return {...c, documentRequirementsData: {...c.documentRequirementsData, mandatoryAll: list}};
-                              });
-                            }}
-                            fullWidth
-                          />
-                        </Stack>
-                      )}
-                      <Stack direction="row" alignItems="center" spacing={1} sx={{flexShrink: 0}}>
-                        <Typography variant="caption" sx={{color: "#3b82f6", fontWeight: 700}}>
-                          Bắt buộc
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => removeMandatoryDocumentAt(idx)}
-                          aria-label="Xoá hồ sơ bắt buộc chung"
-                          disabled={fieldDisabled}
-                          sx={blockPointerSx}
+                  {(config.documentRequirementsData.mandatoryAll || []).length === 0 ? (
+                    <Typography variant="body2" sx={{color: "#64748b", fontStyle: "italic", py: 1}}>
+                      Chưa có dữ liệu hồ sơ bắt buộc chung từ hệ thống.
+                    </Typography>
+                  ) : (
+                    (config.documentRequirementsData.mandatoryAll || []).map((doc, idx) => {
+                      const ocrCriteriaCount = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+                        (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
+                      ).length;
+                      const ocrExpanded = mandatoryOcrExpandedIdxs.includes(idx);
+                      return (
+                        <Box
+                          key={`mandatory-${doc.code || idx}`}
+                          sx={{border: "1px solid #e2e8f0", borderRadius: 2, overflow: "hidden"}}
                         >
-                          <DeleteOutlineIcon fontSize="small"/>
-                        </IconButton>
-                      </Stack>
-                    </Box>
-                  ))}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: {xs: "column", sm: "row"},
+                              alignItems: {xs: "stretch", sm: "center"},
+                              justifyContent: "space-between",
+                              gap: 1.5,
+                              p: 1.5,
+                              bgcolor: "#fff",
+                            }}
+                          >
+                            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{flex: 1, minWidth: 0}}>
+                              <Tooltip
+                                title={
+                                  ocrCriteriaCount > 0
+                                    ? ocrExpanded
+                                      ? "Thu gọn tiêu chí OCR"
+                                      : `Xem ${ocrCriteriaCount} tiêu chí OCR`
+                                    : "Không có tiêu chí OCR"
+                                }
+                              >
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    disabled={ocrCriteriaCount === 0}
+                                    onClick={() =>
+                                      setMandatoryOcrExpandedIdxs((prev) =>
+                                        prev.includes(idx) ? prev.filter((item) => item !== idx) : [...prev, idx],
+                                      )
+                                    }
+                                    sx={{color: "#2563eb", mt: 0.25}}
+                                  >
+                                    {ocrExpanded ? <ExpandLessIcon fontSize="small"/> : <ExpandMoreIcon fontSize="small"/>}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Box sx={{minWidth: 0}}>
+                                <Typography sx={{fontWeight: 700, color: "#0f172a"}}>
+                                  {doc.name || doc.code || "—"}
+                                </Typography>
+                                {doc.code ? (
+                                  <Typography variant="caption" sx={{color: "#64748b", display: "block", mt: 0.25}}>
+                                    Mã: {doc.code}
+                                  </Typography>
+                                ) : null}
+                              </Box>
+                            </Stack>
+                            <Chip
+                              size="small"
+                              label="Bắt buộc"
+                              sx={{
+                                height: 24,
+                                fontWeight: 700,
+                                fontSize: 11,
+                                color: "#b91c1c",
+                                bgcolor: "#fee2e2",
+                                alignSelf: {xs: "flex-start", sm: "center"},
+                              }}
+                            />
+                          </Box>
+                          <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
+                            <Box sx={{px: 1.5, pb: 1.5, pt: 1.25, bgcolor: "#f8fbff", borderTop: "1px dashed #bfdbfe"}}>
+                              <MandatoryOcrCriteriaReadOnlyPanel doc={doc}/>
+                            </Box>
+                          </Collapse>
+                        </Box>
+                      );
+                    })
+                  )}
                 </Stack>
 
                 <Divider sx={{my: 3}}/>
@@ -5619,147 +5454,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
             </Button>
             <Button variant="contained" color="error" onClick={confirmRemoveAdmissionRow} sx={{textTransform: "none", fontWeight: 700}}>
               Xoá
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Dialog
-          open={mandatoryImportDialogOpen}
-          onClose={closeMandatoryImportDialog}
-          maxWidth="lg"
-          fullWidth
-          PaperProps={{
-            sx: {
-              borderRadius: 3,
-            },
-          }}
-        >
-          <DialogTitle sx={{fontWeight: 800}}>Import hồ sơ bắt buộc</DialogTitle>
-          <DialogContent dividers sx={{p: 0}}>
-            {mandatoryImportLoading ? (
-              <Stack alignItems="center" justifyContent="center" spacing={2} sx={{minHeight: 280}}>
-                <CircularProgress/>
-                <Typography variant="body2" color="text.secondary">Đang đọc file...</Typography>
-              </Stack>
-            ) : (
-              <Stack spacing={2} sx={{p: 2.5}}>
-                <Typography variant="body2" color="text.secondary">
-                  Tải file Excel để hệ thống kiểm tra và nhập dữ liệu. Bạn có thể chỉnh sửa trực tiếp trên bảng nếu có lỗi.
-                </Typography>
-
-                <Box
-                  sx={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 2,
-                    maxHeight: 480,
-                    overflow: "auto",
-                  }}
-                >
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{minWidth: 64}}>STT</TableCell>
-                        <TableCell sx={{minWidth: 170}}>Mã hồ sơ</TableCell>
-                        <TableCell>Tên hồ sơ</TableCell>
-                        <TableCell sx={{minWidth: 120}}>Bắt buộc</TableCell>
-                        <TableCell sx={{minWidth: 120}}>Trạng thái</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {mandatoryImportRows.map((row) => {
-                        const rowErrorText = mandatoryImportRowErrorText(row);
-                        const codeError = mandatoryImportFieldErrorText(row, "code");
-                        const nameError = mandatoryImportFieldErrorText(row, "name");
-                        return (
-                          <TableRow
-                            key={row._key}
-                            sx={{
-                              bgcolor: row.isError ? "#FFF1F0" : "#fff",
-                              "& td:first-of-type": {
-                                borderLeft: row.isError ? "3px solid #FF4D4F" : "3px solid transparent",
-                              },
-                              transition: "background-color 0.2s ease",
-                            }}
-                          >
-                            <TableCell>{row.rowData?.index ?? "-"}</TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                value={row.rowData?.code ?? ""}
-                                onChange={(e) => updateMandatoryImportRowCell(row._key, "code", e.target.value)}
-                                error={Boolean(codeError)}
-                                helperText={codeError || " "}
-                                fullWidth
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <TextField
-                                size="small"
-                                value={row.rowData?.name ?? ""}
-                                onChange={(e) => updateMandatoryImportRowCell(row._key, "name", e.target.value)}
-                                error={Boolean(nameError)}
-                                helperText={nameError || " "}
-                                fullWidth
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Checkbox checked disabled/>
-                            </TableCell>
-                            <TableCell>
-                              {row._isValidating ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <CircularProgress size={14}/>
-                                  <Typography variant="caption" color="text.secondary">Đang kiểm tra</Typography>
-                                </Stack>
-                              ) : row.isError ? (
-                                <Tooltip title={rowErrorText || "Dòng dữ liệu chưa hợp lệ"}>
-                                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{color: "#FF4D4F"}}>
-                                    <ErrorOutlineIcon fontSize="small"/>
-                                    <Typography variant="caption" sx={{fontWeight: 700}}>Lỗi</Typography>
-                                  </Stack>
-                                </Tooltip>
-                              ) : (
-                                <Stack direction="row" spacing={0.75} alignItems="center" sx={{color: "#52C41A"}}>
-                                  <CheckCircleOutlineIcon fontSize="small"/>
-                                  <Typography variant="caption" sx={{fontWeight: 700}}>Hợp lệ</Typography>
-                                </Stack>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </Box>
-
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    Tổng số dòng: <strong>{mandatoryImportRows.length}</strong> | Dòng lỗi:{" "}
-                    <Box component="span" sx={{color: mandatoryImportErrorCount > 0 ? "#FF4D4F" : "inherit", fontWeight: 700}}>
-                      {mandatoryImportErrorCount}
-                    </Box>
-                  </Typography>
-                  {mandatoryImportValidatingCount > 0 ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Đang validate {mandatoryImportValidatingCount} dòng...
-                    </Typography>
-                  ) : null}
-                </Stack>
-              </Stack>
-            )}
-          </DialogContent>
-          <DialogActions sx={{px: 3, py: 2}}>
-            <Button onClick={closeMandatoryImportDialog} disabled={mandatoryImportConfirming} sx={{textTransform: "none", fontWeight: 700}}>
-              Huỷ
-            </Button>
-            <Button
-              variant="contained"
-              onClick={confirmMandatoryImportRows}
-              disabled={mandatoryImportHasAnyError || mandatoryImportLoading || mandatoryImportConfirming || !mandatoryImportRows.length}
-              sx={{textTransform: "none", fontWeight: 700}}
-            >
-              {mandatoryImportConfirming ? <CircularProgress size={16} sx={{mr: 1, color: "#fff"}}/> : null}
-              Lưu dữ liệu
             </Button>
           </DialogActions>
         </Dialog>
