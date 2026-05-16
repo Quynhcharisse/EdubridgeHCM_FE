@@ -1,4 +1,5 @@
 import axiosClient from '../configs/APIConfig.jsx';
+import {pickBankInfoData} from '../utils/vietQr.js';
 
 export const getParentStudent = async () => {
     const response = await axiosClient.get('/parent/student');
@@ -239,6 +240,113 @@ export const getParentAdmissionReservationForms = async () => {
     const response = await axiosClient.get('/parent/admission/reservation/form');
     return response || null;
 };
+
+/**
+ * PUT /parent/admission/reservation/form — nộp minh chứng thanh toán giữ chỗ.
+ * @param {{ admissionFormId: number, campusProgramOfferingId: number, paymentUrl: string }} payload
+ */
+export const putParentAdmissionReservationFormPayment = async (payload) => {
+    const admissionFormId = normalizeAdmissionFormId(payload?.admissionFormId);
+    const offeringId = Number(payload?.campusProgramOfferingId);
+    if (!Number.isFinite(offeringId) || offeringId <= 0) {
+        throw new Error('campusProgramOfferingId is required');
+    }
+    const paymentUrl = String(payload?.paymentUrl ?? '').trim();
+    if (!paymentUrl) {
+        throw new Error('paymentUrl is required');
+    }
+    const body = {
+        admissionFormId,
+        action: 'payment',
+        paymentUrl,
+        campusProgramOfferingId: Math.trunc(offeringId),
+    };
+    const response = await axiosClient.put('/parent/admission/reservation/form', body);
+    return response || null;
+};
+
+function normalizeAdmissionFormId(admissionFormId) {
+    const id = Number(admissionFormId);
+    if (!Number.isFinite(id) || id <= 0) {
+        throw new Error('admissionFormId is required');
+    }
+    return Math.trunc(id);
+}
+
+/** GET /parent/programs/offering?admissionFormId= */
+export const getParentProgramsOffering = async (admissionFormId) => {
+    const id = normalizeAdmissionFormId(admissionFormId);
+    const response = await axiosClient.get('/parent/programs/offering', {
+        params: {admissionFormId: id},
+    });
+    return response || null;
+};
+
+/** GET /parent/qrCodeInfo?admissionFormId= */
+export const getParentQrCodeInfo = async (admissionFormId) => {
+    const id = normalizeAdmissionFormId(admissionFormId);
+    const response = await axiosClient.get('/parent/qrCodeInfo', {
+        params: {admissionFormId: id},
+    });
+    return response || null;
+};
+
+export function pickParentProgramsOfferingFromResponse(response) {
+    const data = response?.data;
+    if (data == null) return [];
+    let inner = data.body ?? data;
+    if (typeof inner === 'string') {
+        try {
+            inner = JSON.parse(inner);
+        } catch {
+            return [];
+        }
+    }
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && Array.isArray(inner.body)) {
+        inner = inner.body;
+    }
+    if (!Array.isArray(inner)) return [];
+    return inner
+        .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const campusProgramOfferingId = Number(item.campusProgramOfferingId);
+            if (!Number.isFinite(campusProgramOfferingId) || campusProgramOfferingId <= 0) return null;
+            return {
+                campusProgramOfferingId: Math.trunc(campusProgramOfferingId),
+                programName: String(item.programName ?? '').trim(),
+                admissionMethod: String(item.admissionMethod ?? '').trim(),
+                openDate: item.openDate ?? null,
+                closeDate: item.closeDate ?? null,
+                quota: item.quota != null ? Number(item.quota) : null,
+                remainingQuota: item.remainingQuota != null ? Number(item.remainingQuota) : null,
+                canSubmit: item.canSubmit !== false,
+                unavailableReason: item.unavailableReason != null ? String(item.unavailableReason).trim() : null,
+            };
+        })
+        .filter(Boolean);
+}
+
+export function pickParentQrCodeInfoFromResponse(response) {
+    const data = response?.data;
+    if (data == null) return {bankInfo: null, reservationFee: null};
+    let inner = data.body ?? data;
+    if (typeof inner === 'string') {
+        try {
+            inner = JSON.parse(inner);
+        } catch {
+            return {bankInfo: null, reservationFee: null};
+        }
+    }
+    if (inner && typeof inner === 'object' && inner.body != null && typeof inner.body === 'object' && !Array.isArray(inner.body)) {
+        inner = inner.body;
+    }
+    const bankInfo = pickBankInfoData(inner);
+    const fee = Number(inner?.reservationFee);
+    return {
+        bankInfo,
+        reservationFee: Number.isFinite(fee) && fee > 0 ? fee : null,
+    };
+}
 
 export const putParentAdmissionSchoolsAvailability = async (studentProfileId, schoolIds = []) => {
     const sid = Number(studentProfileId);

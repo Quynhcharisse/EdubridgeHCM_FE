@@ -21,6 +21,7 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import {enqueueSnackbar} from "notistack";
 import {
@@ -28,7 +29,9 @@ import {
     pickAdmissionReservationFormsFromResponse
 } from "../../services/ParentService.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
+import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
 import {
+    isReservationConfirmed,
     normalizeParentAdmissionReservationRow,
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
@@ -42,6 +45,11 @@ const FILTERS = [
         value: "CONFIRMED",
         label: "Đã xác nhận",
         statuses: ["RESERVATION_APPROVAL", "RESERVATION_CONFIRMED", "CONFIRMED", "APPROVED", "ACCEPTED"]
+    },
+    {
+        value: "PAYMENT_PENDING",
+        label: "Chờ duyệt thanh toán",
+        statuses: ["RESERVATION_PAYMENT_PENDING"]
     },
     {value: "REJECTED", label: "Từ chối", statuses: ["RESERVATION_REJECTED", "REJECTED"]},
     {value: "CANCELLED", label: "Đã hủy", statuses: ["RESERVATION_CANCELLED", "CANCELLED"]}
@@ -83,6 +91,12 @@ const STATUS_META = {
         color: "#047857",
         bg: "#d1fae5",
         border: "#a7f3d0"
+    },
+    RESERVATION_PAYMENT_PENDING: {
+        label: "Chờ duyệt thanh toán",
+        color: "#1d4ed8",
+        bg: "#dbeafe",
+        border: "#93c5fd"
     },
     REJECTED: {
         label: "Từ chối",
@@ -218,8 +232,9 @@ function DetailLineRow({label, value}) {
     );
 }
 
-function ReservationCard({reservation, onOpenDetail}) {
+function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
     const statusMeta = getStatusMeta(reservation?.status);
+    const showPayment = isReservationConfirmed(reservation?.status);
     const cardTitle = isDisplayableValue(reservation?.schoolName)
         ? reservation.schoolName
         : isDisplayableValue(reservation?.studentName)
@@ -302,21 +317,45 @@ function ReservationCard({reservation, onOpenDetail}) {
                         </Stack>
                     </Box>
                 </Stack>
-                <Button
-                    variant="outlined"
-                    startIcon={<ArticleOutlinedIcon />}
-                    onClick={() => onOpenDetail(reservation)}
-                    sx={{
-                        borderRadius: 999,
-                        px: 2.4,
-                        fontWeight: 500,
-                        borderColor: "#bfdbfe",
-                        color: BRAND_NAVY,
-                        flex: {xs: "1 1 auto", sm: "0 0 auto"}
-                    }}
+                <Stack
+                    direction={{xs: "column", sm: "row"}}
+                    spacing={1}
+                    sx={{flex: {xs: "1 1 auto", md: "0 0 auto"}, width: {xs: "100%", md: "auto"}}}
                 >
-                    Xem chi tiết
-                </Button>
+                    {showPayment ? (
+                        <Button
+                            variant="contained"
+                            startIcon={<PaymentsRoundedIcon />}
+                            onClick={() => onOpenPayment(reservation)}
+                            sx={{
+                                borderRadius: 999,
+                                px: 2.4,
+                                fontWeight: 600,
+                                bgcolor: "#059669",
+                                boxShadow: "0 8px 18px rgba(5, 150, 105, 0.22)",
+                                "&:hover": {bgcolor: "#047857"},
+                                flex: {xs: "1 1 auto", sm: "0 0 auto"},
+                            }}
+                        >
+                            Thanh toán
+                        </Button>
+                    ) : null}
+                    <Button
+                        variant="outlined"
+                        startIcon={<ArticleOutlinedIcon />}
+                        onClick={() => onOpenDetail(reservation)}
+                        sx={{
+                            borderRadius: 999,
+                            px: 2.4,
+                            fontWeight: 500,
+                            borderColor: "#bfdbfe",
+                            color: BRAND_NAVY,
+                            flex: {xs: "1 1 auto", sm: "0 0 auto"},
+                        }}
+                    >
+                        Xem chi tiết
+                    </Button>
+                </Stack>
             </Stack>
         </Paper>
     );
@@ -469,6 +508,7 @@ export default function ParentAdmissionReservationsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
     const [selectedReservation, setSelectedReservation] = useState(null);
+    const [paymentReservation, setPaymentReservation] = useState(null);
     const mountedRef = useRef(true);
 
     const loadReservations = useCallback(async ({silent = false} = {}) => {
@@ -639,6 +679,7 @@ export default function ParentAdmissionReservationsPage() {
                                         key={reservation?.id ?? `${reservation?.studentName || "reservation"}-${index}`}
                                         reservation={reservation}
                                         onOpenDetail={setSelectedReservation}
+                                        onOpenPayment={setPaymentReservation}
                                     />
                                 ))}
                             </Stack>
@@ -647,6 +688,14 @@ export default function ParentAdmissionReservationsPage() {
                 </Paper>
             </Container>
             <DetailDialog reservation={selectedReservation} onClose={() => setSelectedReservation(null)} />
+            <ReservationPaymentDialog
+                reservation={paymentReservation}
+                onClose={() => setPaymentReservation(null)}
+                onSubmitted={() => {
+                    setPaymentReservation(null);
+                    void loadReservations({silent: true});
+                }}
+            />
         </Box>
     );
 }

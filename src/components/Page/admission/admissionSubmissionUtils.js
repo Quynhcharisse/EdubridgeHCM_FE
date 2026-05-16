@@ -411,15 +411,37 @@ function pickReservationNumericId(value) {
     return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
 }
 
+export const CONFIRMED_RESERVATION_STATUSES = new Set([
+    'RESERVATION_APPROVAL',
+    'RESERVATION_CONFIRMED',
+    'CONFIRMED',
+    'APPROVED',
+    'ACCEPTED',
+]);
+
+export function isReservationConfirmed(status) {
+    const key = String(status || '').trim().toUpperCase();
+    return CONFIRMED_RESERVATION_STATUSES.has(key);
+}
+
 export function normalizeParentAdmissionReservationRow(item, index = 0) {
     if (!item || typeof item !== 'object') return null;
     const profileMetadata = pickProfileMetaDataFromTemplate(item);
     const transcriptImages = Array.isArray(item.transcriptImages) ? item.transcriptImages : [];
     const campusProgramOfferingId = pickReservationNumericId(item.campusProgramOfferingId);
+    const schoolId = pickReservationNumericId(
+        item.schoolId ?? item.school?.id ?? item.school?.schoolId,
+    );
+
+    const admissionFormId = pickReservationNumericId(
+        item.admissionFormId ?? item.id ?? item.formId,
+    );
 
     return {
         ...item,
-        id: pickReservationNumericId(item.id ?? item.formId) ?? index,
+        id: admissionFormId ?? index,
+        admissionFormId,
+        schoolId,
         studentProfileId: pickReservationNumericId(item.studentProfileId),
         parentProfileId: pickReservationNumericId(item.parentProfileId),
         studentName: pickReservationField(item, 'studentName', 'childName', 'studentProfileName'),

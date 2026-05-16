@@ -1,4 +1,6 @@
 import axiosClient from "../configs/APIConfig.jsx";
+import {getSchoolConfig, parseSchoolConfigResponseBody} from "./SchoolFacilityService.jsx";
+import {pickBankInfoData} from "../utils/vietQr.js";
 
 export async function getPublicSchoolList() {
     const response = await axiosClient.get("/school/public/list");
@@ -216,4 +218,59 @@ export async function getLanguageOptions() {
     const body = response?.data?.body;
     if (Array.isArray(body)) return body;
     return [];
+}
+
+/** Gộp các gói campusProgramOffering từ danh sách chiến dịch public (dedupe theo id). */
+export function collectOfferingsFromPublicCampaigns(campaigns) {
+    const map = new Map();
+    for (const campaign of Array.isArray(campaigns) ? campaigns : []) {
+        const campaignName = String(campaign?.name ?? "").trim();
+        for (const offering of Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : []) {
+            const id = Number(offering?.id);
+            if (!Number.isFinite(id) || id <= 0) continue;
+            if (!map.has(id)) {
+                map.set(id, {...offering, campaignName});
+            }
+        }
+    }
+    return [...map.values()];
+}
+
+/**
+ * Lấy thông tin tài khoản ngân hàng của trường (để hiển thị VietQR cho phụ huynh).
+ * Thử lần lượt các endpoint public/parent rồi fallback GET /school/config/{id}.
+ */
+export async function getPublicSchoolBankInfo(schoolId) {
+    const sid = Number(schoolId);
+    if (!Number.isFinite(sid) || sid <= 0) return null;
+
+    const endpoints = [`/school/${sid}/public/bank`, `/parent/school/${sid}/bank`];
+    for (const path of endpoints) {
+        try {
+            const response = await axiosClient.get(path);
+            const body = response?.data?.body ?? response?.data;
+            const bank = pickBankInfoData(body);
+            if (bank) return bank;
+        } catch {
+            // thử endpoint kế tiếp
+        }
+    }
+
+    try {
+        const configRes = await getSchoolConfig(sid);
+        const bank = pickBankInfoData(parseSchoolConfigResponseBody(configRes));
+        if (bank) return bank;
+    } catch {
+        // fallback public detail
+    }
+
+    try {
+        const detail = await getPublicSchoolDetail(sid);
+        const bank = pickBankInfoData(detail);
+        if (bank) return bank;
+    } catch {
+        // không có dữ liệu
+    }
+
+    return null;
 }
