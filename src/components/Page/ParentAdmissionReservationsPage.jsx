@@ -550,7 +550,7 @@ export default function ParentAdmissionReservationsPage() {
                                 variant="h5"
                                 sx={{fontWeight: 600, letterSpacing: -0.2, lineHeight: 1.25}}
                             >
-                                Quản lý đơn đăng ký
+                                Quản lý hồ sơ giữ chỗ
                             </Typography>
                             <Typography sx={{mt: 0.85, color: "rgba(255,255,255,0.86)", fontSize: 14, fontWeight: 400}}>
                                 Xem lại các đơn tuyển sinh đã nộp theo từng trạng thái.
