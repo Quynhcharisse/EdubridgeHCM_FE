@@ -14,6 +14,7 @@ import {
     applyStudentBodyToState,
     buildStudentPayload,
     emptyGrades,
+    validateStudentCode,
     GRADE_LEVELS,
     findPersonalityByCode,
     findPersonalityById,
@@ -72,7 +73,7 @@ export function useChildrenInfoPage() {
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({name: '', gender: ''});
+    const [form, setForm] = useState({name: '', gender: '', studentCode: ''});
 
     const [personalityGroups, setPersonalityGroups] = useState(null);
     const [personalityLoading, setPersonalityLoading] = useState(true);
@@ -373,6 +374,11 @@ export function useChildrenInfoPage() {
 
     const handleChange = (e) => {
         const {name, value} = e.target;
+        if (name === 'studentCode') {
+            const digits = String(value).replace(/\D/g, '').slice(0, 12);
+            setForm((prev) => ({...prev, studentCode: digits}));
+            return;
+        }
         setForm((prev) => ({...prev, [name]: value}));
     };
 
@@ -620,6 +626,12 @@ export function useChildrenInfoPage() {
     };
 
     const handleSave = async () => {
+        const studentCodeError = validateStudentCode(form.studentCode);
+        if (studentCodeError) {
+            enqueueSnackbar(studentCodeError, {variant: 'error'});
+            return;
+        }
+
         setSaving(true);
         try {
             const transcriptImages = await uploadTranscriptImages();

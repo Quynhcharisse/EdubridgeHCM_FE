@@ -1,3 +1,54 @@
+export function normalizeOcrCriterion(item) {
+  if (!item || typeof item !== "object") {
+    return {label: "", validations: []};
+  }
+  const validations = Array.isArray(item?.validations)
+    ? item.validations.map((v) => String(v ?? "").trim()).filter(Boolean)
+    : [];
+  return {
+    label: item?.label != null ? String(item.label) : "",
+    validations: validations.length > 0 ? [validations[0]] : [],
+  };
+}
+
+export function normalizeOcrCriteriaList(criteria) {
+  if (!Array.isArray(criteria)) return [];
+  return criteria.map((item) => normalizeOcrCriterion(item));
+}
+
+/** Áp dụng dòng import Excel: chỉ đổi code/name/required, giữ ocrCriteria cũ (khớp theo code rồi name). */
+export function mergeMandatoryDocFromImport(imported, existingDocs) {
+  const code = String(imported?.code ?? "").trim();
+  const name = String(imported?.name ?? "").trim();
+  const required = imported?.required === true;
+  const existingList = Array.isArray(existingDocs) ? existingDocs : [];
+  const byCode = new Map();
+  const byName = new Map();
+  for (const doc of existingList) {
+    const existingCode = String(doc?.code ?? "").trim();
+    const existingName = String(doc?.name ?? "").trim();
+    if (existingCode && !byCode.has(existingCode)) byCode.set(existingCode, doc);
+    if (existingName && !byName.has(existingName)) byName.set(existingName, doc);
+  }
+  const matched = (code && byCode.get(code)) || (name && byName.get(name)) || null;
+  return {
+    code,
+    name,
+    required,
+    ocrCriteria: matched ? normalizeOcrCriteriaList(matched.ocrCriteria) : [],
+  };
+}
+
+function sanitizeOcrCriteriaForApi(criteria) {
+  const normalized = normalizeOcrCriteriaList(criteria)
+    .map((item) => ({
+      label: String(item.label ?? "").trim(),
+      validations: item.validations.map((v) => String(v).trim()).filter(Boolean),
+    }))
+    .filter((item) => item.label);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 /**
  * Chuẩn hoá payload PUT admissionSettingsData (trường + nền tảng).
  * @param {Record<string, unknown>} adm
@@ -55,11 +106,16 @@ export function sanitizeAdmissionSettingsForApi(adm) {
     : [];
   const mandatoryAll = Array.isArray(adm.mandatoryAllDocumentRequirements)
     ? adm.mandatoryAllDocumentRequirements
-        .map((doc) => ({
-          code: String(doc?.code ?? "").trim(),
-          name: doc?.name != null ? String(doc.name) : "",
-          required: doc?.required === true,
-        }))
+        .map((doc) => {
+          const base = {
+            code: String(doc?.code ?? "").trim(),
+            name: doc?.name != null ? String(doc.name) : "",
+            required: doc?.required === true,
+          };
+          const ocrCriteria = sanitizeOcrCriteriaForApi(doc?.ocrCriteria);
+          if (ocrCriteria) base.ocrCriteria = ocrCriteria;
+          return base;
+        })
         .filter((doc) => doc.code || doc.name)
     : [];
   const autoCloseOnFull = typeof adm.autoCloseOnFull === "boolean" ? adm.autoCloseOnFull : true;

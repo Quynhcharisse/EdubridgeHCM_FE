@@ -63,6 +63,7 @@ export function normalizeStudentDetailBodyForPanel(body) {
         academicInfos: Array.isArray(body.academicInfos) ? body.academicInfos : [],
         favouriteJob: body.favouriteJob ?? body.favoriteJob ?? '',
         gender: body.gender ?? '',
+        studentCode: body.studentCode != null ? String(body.studentCode) : '',
         subjectsInSystem,
     };
 }
@@ -117,17 +118,35 @@ export const deleteParentFavouriteSchool = async (schoolId) => {
     return response || null;
 };
 
+/**
+ * GET /parent/documents — danh mục hồ sơ (mẫu giữ chỗ không cần campusProgramOfferingId).
+ * Khi nộp theo gói tuyển sinh, truyền campusProgramOfferingId.
+ */
 export const getParentAdmissionDocuments = async (campusProgramOfferingId) => {
     const id = campusProgramOfferingId != null ? String(campusProgramOfferingId).trim() : '';
-    if (!id) {
-        throw new Error('campusProgramOfferingId is required');
+    const config = {};
+    if (id) {
+        config.params = {campusProgramOfferingId: id};
     }
-    const response = await axiosClient.get('/parent/documents', {
-        params: {campusProgramOfferingId: id},
-    });
+    const response = await axiosClient.get('/parent/documents', config);
     return response || null;
 };
 
+function normalizeAdmissionDocItem(item) {
+    if (!item || typeof item !== 'object') return null;
+    const code = item.code ?? item.key ?? item.documentCode;
+    if (code == null || String(code).trim() === '') return null;
+    return {
+        code: String(code).trim(),
+        name: String(item.name || item.label || item.documentName || code).trim(),
+        required: item.required !== false,
+    };
+}
+
+/**
+ * Parse GET /parent/documents — hỗ trợ body là mảng [{ code, name, required }]
+ * hoặc object { required, optional }.
+ */
 export function pickAdmissionDocumentsFromResponse(response) {
     const data = response?.data;
     if (data == null) return {required: [], optional: []};
@@ -139,16 +158,59 @@ export function pickAdmissionDocumentsFromResponse(response) {
             return {required: [], optional: []};
         }
     }
-    if (inner && typeof inner === 'object' && inner.body && typeof inner.body === 'object' && !Array.isArray(inner.body)) {
-        inner = inner.body;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && inner.body != null) {
+        const nested = inner.body;
+        inner = Array.isArray(nested) || (nested && typeof nested === 'object') ? nested : inner;
     }
-    const required = Array.isArray(inner?.required) ? inner.required : [];
-    const optional = Array.isArray(inner?.optional) ? inner.optional : [];
-    return {required, optional};
+
+    if (Array.isArray(inner)) {
+        const required = [];
+        const optional = [];
+        for (const raw of inner) {
+            const item = normalizeAdmissionDocItem(raw);
+            if (!item) continue;
+            if (item.required) required.push(item);
+            else optional.push(item);
+        }
+        return {required, optional};
+    }
+
+    if (inner && typeof inner === 'object') {
+        const required = (Array.isArray(inner.required) ? inner.required : [])
+            .map(normalizeAdmissionDocItem)
+            .filter(Boolean);
+        const optional = (Array.isArray(inner.optional) ? inner.optional : [])
+            .map(normalizeAdmissionDocItem)
+            .filter(Boolean);
+        if (required.length || optional.length) {
+            return {required, optional};
+        }
+    }
+
+    return {required: [], optional: []};
 }
 
 export const postParentAdmissionReservationForm = async (payload) => {
     const response = await axiosClient.post('/parent/admission/reservation/form', payload);
+    return response || null;
+};
+
+/** GET mẫu hồ sơ giữ chỗ (danh sách minh chứng / bản nháp theo học sinh). */
+export const getParentAdmissionReservationFormTemplate = async (studentProfileId) => {
+    const sid = Number(studentProfileId);
+    const config = {};
+    if (Number.isFinite(sid) && sid > 0) {
+        config.params = {studentProfileId: sid};
+    }
+    const response = await axiosClient.get('/parent/admission/reservation/form/template', config);
+    return response || null;
+};
+
+/**
+ * POST lưu mẫu hồ sơ giữ chỗ — body: { studentProfileId, submissionDocuments: [{ key, imageUrl[] }] }.
+ */
+export const postParentAdmissionReservationFormTemplate = async (payload) => {
+    const response = await axiosClient.post('/parent/admission/reservation/form/template', payload);
     return response || null;
 };
 

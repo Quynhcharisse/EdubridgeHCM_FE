@@ -341,6 +341,24 @@ export default function ChildrenInfoPage() {
                                 </Grid>
                                 <Grid size={{xs: 12, sm: 6}}>
                                     <TextField
+                                        label="Căn cước công dân học sinh"
+                                        name="studentCode"
+                                        value={form.studentCode}
+                                        onChange={handleChange}
+                                        fullWidth
+                                        size="medium"
+                                        placeholder="Nhập 12 chữ số"
+                                        disabled={fieldsDisabled}
+                                        inputProps={{
+                                            inputMode: 'numeric',
+                                            maxLength: 12,
+                                            pattern: '[0-9]*',
+                                        }}
+                                        sx={formTextFieldSx}
+                                    />
+                                </Grid>
+                                <Grid size={{xs: 12, sm: 6}}>
+                                    <TextField
                                         select
                                         label="Giới tính"
                                         name="gender"
