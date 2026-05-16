@@ -4,6 +4,16 @@ export const genderOptions = [
     {value: 'OTHER', label: 'Khác'},
 ];
 
+export const STUDENT_CODE_LENGTH = 12;
+export const STUDENT_CODE_PATTERN = /^[0-9]{12}$/;
+
+export function validateStudentCode(value) {
+    const trimmed = value != null ? String(value).trim() : '';
+    if (!trimmed) return 'Vui lòng nhập căn cước công dân học sinh (12 chữ số)';
+    if (!STUDENT_CODE_PATTERN.test(trimmed)) return 'Căn cước công dân học sinh phải gồm đúng 12 chữ số';
+    return '';
+}
+
 export const GRADE_LEVELS = [
     {key: 'g06', label: 'Lớp 06', gradeLevelEnum: 'GRADE_06'},
     {key: 'g07', label: 'Lớp 07', gradeLevelEnum: 'GRADE_07'},
@@ -348,7 +358,7 @@ export function normalizeForeignFromApi(input) {
 
 export function getEmptyStudentState() {
     return {
-        form: {name: '', gender: ''},
+        form: {name: '', gender: '', studentCode: ''},
         selectedPersonalityId: '',
         favoriteMajorCodes: [],
         regularGrades: {},
@@ -370,6 +380,7 @@ export function applyStudentBodyToState(body) {
     }
     const name = raw.studentName ?? raw.name ?? raw.fullName ?? '';
     const gender = raw.gender != null ? String(raw.gender) : '';
+    const studentCode = raw.studentCode != null ? String(raw.studentCode).replace(/\D/g, '').slice(0, STUDENT_CODE_LENGTH) : '';
 
     const pid =
         raw.personalityTypeId ?? raw.personalityId ?? raw.mbtiTypeId ?? raw.personalityTypeCode;
@@ -443,7 +454,7 @@ export function applyStudentBodyToState(body) {
     }
 
     return {
-        form: {name, gender},
+        form: {name, gender, studentCode},
         selectedPersonalityId,
         favoriteMajorCodes,
         regularGrades,
@@ -515,6 +526,7 @@ export function buildStudentPayload({
 
     const payload = {
         studentName: form.name != null ? String(form.name) : '',
+        studentCode: form.studentCode != null ? String(form.studentCode).trim() : '',
         gender: form.gender != null ? String(form.gender) : '',
         personalityTypeCode,
         favouriteJob,

@@ -9,6 +9,7 @@ import {
     CardContent,
     Chip,
     CircularProgress,
+    Collapse,
     LinearProgress,
     IconButton,
     InputAdornment,
@@ -40,7 +41,10 @@ import AddIcon from "@mui/icons-material/Add";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PlaylistAddCheckIcon from "@mui/icons-material/PlaylistAddCheck";
 import {
     confirmSystemConfigImport,
     getSystemConfig,
@@ -53,7 +57,54 @@ import { autoFillAdminSchoolQuotas } from "../../../services/AdminService.jsx";
 import { getPublicSchoolList } from "../../../services/SchoolPublicService.jsx";
 import { enqueueSnackbar } from "notistack";
 import { adminSttChipSx } from "../../../constants/adminTableStyles.js";
-import { sanitizeAdmissionSettingsForApi } from "../../../utils/admissionSettingsShared.js";
+import {
+    mergeMandatoryDocFromImport,
+    normalizeOcrCriteriaList,
+    sanitizeAdmissionSettingsForApi,
+} from "../../../utils/admissionSettingsShared.js";
+
+function mapMandatoryDocFromApi(doc) {
+    return {
+        code: doc?.code != null ? String(doc.code) : "",
+        name: doc?.name != null ? String(doc.name) : "",
+        required: doc?.required === true,
+        ocrCriteria: normalizeOcrCriteriaList(doc?.ocrCriteria),
+    };
+}
+
+function updateMandatoryDocScalars(setAdmissionTemplateForm, docIdx, patch) {
+    setAdmissionTemplateForm((prev) => {
+        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+            ? [...prev.mandatoryAllDocumentRequirements]
+            : [];
+        if (!nextDocs[docIdx]) return prev;
+        const current = nextDocs[docIdx];
+        nextDocs[docIdx] = {
+            code: patch.code !== undefined ? String(patch.code) : String(current?.code ?? ""),
+            name: patch.name !== undefined ? String(patch.name) : String(current?.name ?? ""),
+            required: patch.required !== undefined ? patch.required === true : current?.required === true,
+            ocrCriteria: normalizeOcrCriteriaList(current?.ocrCriteria),
+        };
+        return {...prev, mandatoryAllDocumentRequirements: nextDocs};
+    });
+}
+
+function updateMandatoryDocOcrAt(setAdmissionTemplateForm, docIdx, patcher) {
+    setAdmissionTemplateForm((prev) => {
+        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+            ? [...prev.mandatoryAllDocumentRequirements]
+            : [];
+        if (!nextDocs[docIdx]) return prev;
+        const current = nextDocs[docIdx];
+        nextDocs[docIdx] = {
+            code: String(current?.code ?? ""),
+            name: String(current?.name ?? ""),
+            required: current?.required === true,
+            ocrCriteria: normalizeOcrCriteriaList(patcher(normalizeOcrCriteriaList(current?.ocrCriteria))),
+        };
+        return {...prev, mandatoryAllDocumentRequirements: nextDocs};
+    });
+}
 function getAdmissionQuotaMap(cfg) {
     if (!cfg || typeof cfg !== "object") return {};
     const raw = cfg.admissionQuota;
@@ -433,6 +484,7 @@ export default function AdminPlatformSettings() {
     const [admissionImportPreview, setAdmissionImportPreview] = useState(null);
     const [importingAdmissionTemplate, setImportingAdmissionTemplate] = useState(false);
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
+    const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
     const admissionImportInputRef = useRef(null);
     const rowValidationVersionRef = useRef({});
     const validateRowDebouncedRef = useRef(null);
@@ -801,11 +853,7 @@ export default function AdminPlatformSettings() {
                             }))
                           : [],
                   })),
-            mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => ({
-                code: doc?.code != null ? String(doc.code) : "",
-                name: doc?.name != null ? String(doc.name) : "",
-                required: doc?.required === true,
-            })),
+            mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => mapMandatoryDocFromApi(doc)),
         };
     };
 
@@ -916,6 +964,7 @@ export default function AdminPlatformSettings() {
         setAdmissionImportRows([]);
         rowValidationVersionRef.current = {};
         setAdmissionTemplateEditing(false);
+        setMandatoryOcrExpandedIdxs([]);
     }, [configBody]);
 
     useEffect(() => {
@@ -1568,12 +1617,20 @@ export default function AdminPlatformSettings() {
 
         switch (String(type || "").trim()) {
             case "MANDATORY_ALL": {
+                const existingMandatory = Array.isArray(prevForm.mandatoryAllDocumentRequirements)
+                    ? prevForm.mandatoryAllDocumentRequirements
+                    : [];
                 const mandatoryAllDocumentRequirements = rowDataList
-                    .map((row) => ({
-                        code: String(row?.documentCode ?? row?.code ?? "").trim(),
-                        name: String(row?.documentName ?? row?.name ?? "").trim(),
-                        required: parseRequiredValue(row?.required),
-                    }))
+                    .map((row) =>
+                        mergeMandatoryDocFromImport(
+                            {
+                                code: String(row?.documentCode ?? row?.code ?? "").trim(),
+                                name: String(row?.documentName ?? row?.name ?? "").trim(),
+                                required: parseRequiredValue(row?.required),
+                            },
+                            existingMandatory,
+                        ),
+                    )
                     .filter((doc) => doc.code || doc.name);
                 return { ...prevForm, mandatoryAllDocumentRequirements };
             }
@@ -1841,6 +1898,158 @@ export default function AdminPlatformSettings() {
                 WebkitTextFillColor: "#374151",
                 color: "#374151",
             },
+        };
+        const mandatoryTableColSpan = admissionTemplateEditing ? 4 : 3;
+        const isMandatoryOcrExpanded = (idx) => mandatoryOcrExpandedIdxs.includes(idx);
+        const toggleMandatoryOcrExpanded = (idx) => {
+            setMandatoryOcrExpandedIdxs((prev) =>
+                prev.includes(idx) ? prev.filter((item) => item !== idx) : [...prev, idx],
+            );
+        };
+        const renderMandatoryOcrCriteriaPanel = (doc, dIdx) => {
+            const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria);
+            if (!admissionTemplateEditing) {
+                return (
+                    <Box sx={{ px: 1.5, py: 1.25, bgcolor: "#f8fbff", borderRadius: 1.5, border: "1px dashed #bfdbfe" }}>
+                        {criteria.length === 0 ? (
+                            <Typography variant="body2" sx={{ color: "#64748b", fontStyle: "italic" }}>
+                                Chưa có tiêu chí OCR cho hồ sơ này.
+                            </Typography>
+                        ) : (
+                            <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.25, bgcolor: "#ffffff" }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ bgcolor: "#eef4ff" }}>
+                                            <TableCell sx={{ width: 48, fontWeight: 700, color: "#374151" }}>STT</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tiêu chí</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Quy tắc kiểm tra</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {criteria.map((item, cIdx) => (
+                                            <TableRow key={`mandatory-ocr-view-${dIdx}-${cIdx}`}>
+                                                <TableCell>{cIdx + 1}</TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#1e3a8a" }}>
+                                                        {item.label || "—"}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ color: "#475569" }}>
+                                                        {item.validations[0] || "—"}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </Box>
+                );
+            }
+            return (
+                <Box sx={{ px: 1, py: 1.25, bgcolor: "#f8fbff", borderRadius: 1.5, border: "1px dashed #bfdbfe" }}>
+                    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.25, bgcolor: "#ffffff" }}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: "#eef4ff" }}>
+                                    <TableCell sx={{ width: 48, fontWeight: 700, color: "#374151" }}>STT</TableCell>
+                                    <TableCell sx={{ width: 220, fontWeight: 700, color: "#374151" }}>Tiêu chí</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Quy tắc kiểm tra</TableCell>
+                                    <TableCell align="center" sx={{ width: 56, fontWeight: 700, color: "#374151" }}>
+                                        Thao tác
+                                    </TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {criteria.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} sx={{ py: 2.5, textAlign: "center", color: "#64748b" }}>
+                                            Chưa có tiêu chí. Nhấn &quot;Thêm tiêu chí&quot; để bắt đầu.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    criteria.map((item, cIdx) => (
+                                        <TableRow key={`mandatory-ocr-edit-${dIdx}-${cIdx}`} hover>
+                                            <TableCell>{cIdx + 1}</TableCell>
+                                            <TableCell>
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    value={item.label}
+                                                    placeholder="VD: Họ và tên"
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
+                                                            const nextCriteria = [...criteria];
+                                                            nextCriteria[cIdx] = {...nextCriteria[cIdx], label: value};
+                                                            return nextCriteria;
+                                                        });
+                                                    }}
+                                                    sx={admissionInputSx}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    value={item.validations[0] ?? ""}
+                                                    placeholder="VD: Họ tên phải khớp với hồ sơ học sinh"
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
+                                                            const nextCriteria = [...criteria];
+                                                            const trimmed = value.trim();
+                                                            nextCriteria[cIdx] = {
+                                                                ...nextCriteria[cIdx],
+                                                                validations: trimmed ? [value] : [],
+                                                            };
+                                                            return nextCriteria;
+                                                        });
+                                                    }}
+                                                    sx={admissionInputSx}
+                                                />
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => {
+                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => {
+                                                            const nextCriteria = [...criteria];
+                                                            nextCriteria.splice(cIdx, 1);
+                                                            return nextCriteria;
+                                                        });
+                                                    }}
+                                                >
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AddIcon fontSize="small" />}
+                            onClick={() => {
+                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (criteria) => [
+                                    ...criteria,
+                                    {label: "", validations: []},
+                                ]);
+                            }}
+                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                        >
+                            Thêm tiêu chí
+                        </Button>
+                    </Box>
+                </Box>
+            );
         };
         const previewHeaderRowSx = {
             display: "grid",
@@ -2355,7 +2564,7 @@ export default function AdminPlatformSettings() {
                                     <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
                                     <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
                                     {admissionTemplateEditing ? (
-                                        <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
+                                        <TableCell align="center" sx={{ width: 96, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
                                             Thao tác
                                         </TableCell>
                                     ) : null}
@@ -2369,88 +2578,158 @@ export default function AdminPlatformSettings() {
                                             <Typography variant="body2">Chưa có hồ sơ bắt buộc chung.</Typography>
                                         </TableCell>
                                     </TableRow>
-                                ) : mandatoryDocsSource.map((doc, dIdx) => (
-                                    <TableRow key={`mandatory-doc-${dIdx}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
-                                        <TableCell>{dIdx + 1}</TableCell>
-                                        <TableCell>
-                                            {admissionTemplateEditing ? (
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    value={doc?.name ?? ""}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], name: value };
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
-                                                    placeholder="Nhập tên hồ sơ"
-                                                    sx={admissionInputSx}
-                                                />
-                                            ) : (
-                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            {admissionTemplateEditing ? (
-                                                <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
-                                                    <Switch
-                                                        size="small"
-                                                        checked={doc?.required === true}
-                                                        onChange={(_, checked) => {
-                                                            setAdmissionTemplateForm((prev) => {
-                                                                const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                    ? [...prev.mandatoryAllDocumentRequirements]
-                                                                    : [];
-                                                                nextDocs[dIdx] = { ...nextDocs[dIdx], required: checked };
-                                                                return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                            });
-                                                        }}
-                                                        color="primary"
-                                                        inputProps={{
-                                                            "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
-                                                        }}
-                                                    />
-                                                </Tooltip>
-                                            ) : (
-                                                <Chip
-                                                    size="small"
-                                                    label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
-                                                    sx={{
-                                                        height: 24,
-                                                        fontWeight: 700,
-                                                        fontSize: 11,
-                                                        color: doc?.required ? "#b91c1c" : "#166534",
-                                                        bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
-                                                    }}
-                                                />
-                                            )}
-                                        </TableCell>
-                                        {admissionTemplateEditing ? (
-                                            <TableCell align="center">
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => {
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs.splice(dIdx, 1);
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
+                                ) : mandatoryDocsSource.map((doc, dIdx) => {
+                                    const ocrCriteriaCount = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+                                        (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
+                                    ).length;
+                                    const ocrExpanded = isMandatoryOcrExpanded(dIdx);
+                                    return (
+                                        <React.Fragment key={`mandatory-doc-${dIdx}`}>
+                                            <TableRow hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={0.25} alignItems="center">
+                                                        {!admissionTemplateEditing ? (
+                                                            <Tooltip
+                                                                title={
+                                                                    ocrCriteriaCount > 0
+                                                                        ? ocrExpanded
+                                                                            ? "Thu gọn tiêu chí OCR"
+                                                                            : `Xem ${ocrCriteriaCount} tiêu chí OCR`
+                                                                        : "Không có tiêu chí OCR"
+                                                                }
+                                                            >
+                                                                <span>
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        disabled={ocrCriteriaCount === 0}
+                                                                        onClick={() => toggleMandatoryOcrExpanded(dIdx)}
+                                                                        sx={{ color: "#2563eb" }}
+                                                                    >
+                                                                        {ocrExpanded ? (
+                                                                            <ExpandLessIcon fontSize="small" />
+                                                                        ) : (
+                                                                            <ExpandMoreIcon fontSize="small" />
+                                                                        )}
+                                                                    </IconButton>
+                                                                </span>
+                                                            </Tooltip>
+                                                        ) : null}
+                                                        <Typography variant="body2" component="span">
+                                                            {dIdx + 1}
+                                                        </Typography>
+                                                    </Stack>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {admissionTemplateEditing ? (
+                                                        <TextField
+                                                            size="small"
+                                                            fullWidth
+                                                            value={doc?.name ?? ""}
+                                                            onChange={(e) => {
+                                                                updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                    name: e.target.value,
+                                                                });
+                                                            }}
+                                                            placeholder="Nhập tên hồ sơ"
+                                                            sx={admissionInputSx}
+                                                        />
+                                                    ) : (
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                            {doc?.name || "-"}
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    {admissionTemplateEditing ? (
+                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
+                                                            <Switch
+                                                                size="small"
+                                                                checked={doc?.required === true}
+                                                                onChange={(_, checked) => {
+                                                                    updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                        required: checked,
+                                                                    });
+                                                                }}
+                                                                color="primary"
+                                                                inputProps={{
+                                                                    "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
+                                                                }}
+                                                            />
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Chip
+                                                            size="small"
+                                                            label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                            sx={{
+                                                                height: 24,
+                                                                fontWeight: 700,
+                                                                fontSize: 11,
+                                                                color: doc?.required ? "#b91c1c" : "#166534",
+                                                                bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                            }}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                                {admissionTemplateEditing ? (
+                                                    <TableCell align="center">
+                                                        <Stack direction="row" spacing={0.25} justifyContent="center">
+                                                            <Tooltip title={ocrExpanded ? "Thu gọn tiêu chí OCR" : "Thêm / chỉnh tiêu chí OCR"}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="primary"
+                                                                    onClick={() => {
+                                                                        if (!ocrExpanded) {
+                                                                            if (normalizeOcrCriteriaList(doc?.ocrCriteria).length === 0) {
+                                                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, () => [
+                                                                                    { label: "", validations: [] },
+                                                                                ]);
+                                                                            }
+                                                                            toggleMandatoryOcrExpanded(dIdx);
+                                                                            return;
+                                                                        }
+                                                                        toggleMandatoryOcrExpanded(dIdx);
+                                                                    }}
+                                                                >
+                                                                    <PlaylistAddCheckIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => {
+                                                                    setAdmissionTemplateForm((prev) => {
+                                                                        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                                            ? [...prev.mandatoryAllDocumentRequirements]
+                                                                            : [];
+                                                                        nextDocs.splice(dIdx, 1);
+                                                                        return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
+                                                                    });
+                                                                    setMandatoryOcrExpandedIdxs((prev) =>
+                                                                        prev
+                                                                            .filter((item) => item !== dIdx)
+                                                                            .map((item) => (item > dIdx ? item - 1 : item)),
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <DeleteOutlineIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Stack>
+                                                    </TableCell>
+                                                ) : null}
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={mandatoryTableColSpan}
+                                                    sx={{ py: 0, borderBottom: ocrExpanded ? undefined : "none" }}
                                                 >
-                                                    <DeleteOutlineIcon fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
-                                        ) : null}
-                                    </TableRow>
-                                ))}
+                                                    <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
+                                                        {renderMandatoryOcrCriteriaPanel(doc, dIdx)}
+                                                    </Collapse>
+                                                </TableCell>
+                                            </TableRow>
+                                        </React.Fragment>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </TableContainer>
@@ -2467,7 +2746,7 @@ export default function AdminPlatformSettings() {
                                             ...(Array.isArray(prev.mandatoryAllDocumentRequirements)
                                                 ? prev.mandatoryAllDocumentRequirements
                                                 : []),
-                                            { code: "", name: "", required: false },
+                                            { code: "", name: "", required: false, ocrCriteria: [] },
                                         ],
                                     }))
                                 }
