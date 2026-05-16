@@ -57,6 +57,15 @@ import {
     processAdmissionReservationForm,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
+import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
+import {
+    HOC_BA_THCS_CODE,
+    HOC_BA_THCS_GRADE_LABELS,
+    pickCheckedDocumentsFromReservation,
+    pickProfileMetaDataFromTemplate,
+    reservationToReadonlyDocs,
+    sanitizeReservationDisplayValue,
+} from "../admission/admissionSubmissionUtils.js";
 
 const STATUS_OPTIONS = [
     {value: "ALL", label: "Tất cả"},
@@ -111,13 +120,6 @@ const toStatusKey = (value) => {
 
 const statusMeta = (status) => STATUS_STYLES[toStatusKey(status)] ?? STATUS_STYLES.RESERVATION_PENDING;
 
-const formatDateTime = (value) => {
-    if (!value) return "—";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString("vi-VN");
-};
-
 const formatDateOnly = (value) => {
     if (!value) return "—";
     const d = new Date(value);
@@ -162,12 +164,20 @@ const StatusChip = ({ status }) => {
     );
 };
 
-const flattenAttachments = (metadata = []) => {
+const displayOrDash = (value) => sanitizeReservationDisplayValue(value) ?? "—";
+
+const flattenAttachments = (row) => {
+    if (!row) return [];
     const files = [];
-    metadata.forEach((item) => {
-        const urls = Array.isArray(item?.imageUrl) ? item.imageUrl : [];
-        urls.forEach((url) => {
-            if (url) files.push({ key: item?.key || "Tệp", url });
+    reservationToReadonlyDocs(row).forEach((doc) => {
+        const label = doc.name || doc.code || "Minh chứng";
+        (doc.slots || []).forEach((url, slotIndex) => {
+            if (!url) return;
+            const slotLabel =
+                doc.code === HOC_BA_THCS_CODE && HOC_BA_THCS_GRADE_LABELS[slotIndex]
+                    ? `${label} — ${HOC_BA_THCS_GRADE_LABELS[slotIndex]}`
+                    : label;
+            files.push({key: slotLabel, url});
         });
     });
     return files;
@@ -178,15 +188,19 @@ const mapRow = (item, index) => {
     const parentName = item?.parentName ?? item?.guardianName ?? "Phụ huynh";
     const status = String(item?.status ?? item?.formStatus ?? "").trim().toUpperCase();
     const submittedAt = item?.submittedAt ?? item?.createdTime ?? item?.createdAt ?? item?.createdDate;
+    const profileMetadata = pickProfileMetaDataFromTemplate(item);
+    const transcriptImages = Array.isArray(item?.transcriptImages) ? item.transcriptImages : [];
     return {
         id: Number(item?.formId ?? item?.id ?? index + 1),
         campusId: Number(item?.campusId),
-        campusName: String(item?.campusName ?? "—"),
+        campusName: displayOrDash(item?.campusName),
         studentName: String(studentName),
-        currentSchool: String(item?.schoolName ?? item?.currentSchool ?? item?.currentSchoolName ?? "—"),
-        registerClass: String(item?.registerClass ?? item?.gradeName ?? item?.targetGrade ?? "—"),
-        programName: String(item?.programName ?? "—"),
-        methodName: String(item?.methodName ?? item?.admissionMethodCode ?? "—"),
+        studentCode: displayOrDash(item?.studentCode),
+        currentSchool: displayOrDash(item?.schoolName ?? item?.currentSchool ?? item?.currentSchoolName),
+        registerClass: displayOrDash(item?.registerClass ?? item?.gradeName ?? item?.targetGrade),
+        programName: displayOrDash(item?.programName),
+        methodName: displayOrDash(item?.methodName ?? item?.admissionMethodCode),
+        campusProgramOfferingId: displayOrDash(item?.campusProgramOfferingId),
         submittedAt,
         parentName: String(parentName),
         phone: String(item?.parentPhone ?? item?.phone ?? "—"),
@@ -194,9 +208,12 @@ const mapRow = (item, index) => {
         address: String(item?.address ?? "—"),
         gender: String(item?.gender ?? "—"),
         identityCard: String(item?.identityCard ?? "—"),
-        profileMetadata: Array.isArray(item?.profileMetadata) ? item.profileMetadata : [],
+        profileMetadata,
+        transcriptImages,
+        paymentProofUrl: item?.paymentProofUrl ?? null,
         note: String(item?.note ?? item?.message ?? "").trim(),
         rejectReason: String(item?.rejectReason ?? "").trim(),
+        cancelReason: String(item?.cancelReason ?? "").trim(),
         status,
         raw: item,
     };
@@ -204,7 +221,7 @@ const mapRow = (item, index) => {
 
 function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onViewDetail, onOpenPreview }) {
     const isPending = row.status === "RESERVATION_PENDING";
-    const attachmentFiles = flattenAttachments(row.profileMetadata);
+    const attachmentFiles = flattenAttachments(row);
     const meta = statusMeta(row.status);
     const StatusIcon = meta.icon;
 
@@ -367,11 +384,13 @@ function DetailInfoRow({ label, value }) {
     );
 }
 
-function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onReject, isSubmitting, onOpenPreview, fullScreen }) {
-    const docs = Array.isArray(row?.profileMetadata) ? row.profileMetadata : [];
+function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onReject, isSubmitting, fullScreen }) {
     const isPending = row?.status === "RESERVATION_PENDING";
     const status = statusMeta(row?.status);
-    const flattened = flattenAttachments(row?.profileMetadata || []);
+    const readonlyDocs = React.useMemo(
+        () => (row ? reservationToReadonlyDocs(row) : []),
+        [row],
+    );
     return (
         <Dialog
             open={open}
@@ -427,7 +446,8 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         <Stack spacing={0}>
                             <DetailInfoRow label="Học sinh" value={row?.studentName} />
                             <DetailInfoRow label="Giới tính" value={formatGender(row?.gender)} />
-                            <DetailInfoRow label="CCCD" value={row?.identityCard} />
+                            <DetailInfoRow label="CCCD học sinh" value={row?.studentCode !== "—" ? row?.studentCode : undefined} />
+                            <DetailInfoRow label="Trường đang học" value={row?.currentSchool !== "—" ? row?.currentSchool : undefined} />
                         </Stack>
                     </Paper>
 
@@ -437,6 +457,7 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         </Typography>
                         <Stack spacing={0}>
                             <DetailInfoRow label="Phụ huynh" value={row?.parentName} />
+                            <DetailInfoRow label="CCCD phụ huynh" value={row?.identityCard} />
                             <DetailInfoRow label="Số điện thoại" value={row?.phone} />
                             <DetailInfoRow label="Email" value={row?.parentEmail} />
                             <DetailInfoRow label="Địa chỉ" value={row?.address} />
@@ -448,67 +469,79 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                             Thông tin hồ sơ tuyển sinh
                         </Typography>
                         <Stack spacing={0}>
-                            <DetailInfoRow label="Chương trình" value={row?.programName} />
-                            <DetailInfoRow label="Phương thức xét tuyển" value={row?.methodName} />
+                            <DetailInfoRow label="Chương trình" value={row?.programName !== "—" ? row?.programName : undefined} />
+                            <DetailInfoRow label="Phương thức xét tuyển" value={row?.methodName !== "—" ? row?.methodName : undefined} />
+                            <DetailInfoRow
+                                label="Mã gói tuyển sinh"
+                                value={row?.campusProgramOfferingId !== "—" ? row?.campusProgramOfferingId : undefined}
+                            />
                         </Stack>
                     </Paper>
 
-                    {docs.length === 0 ? (
-                        <Paper elevation={0} sx={{p: 4, textAlign: "center", borderRadius: 3, border: "1px dashed #b8d8f4", bgcolor: "#eef7ff"}}>
-                            <Typography sx={{fontWeight: 700, color: "#475569"}}>
-                                Chưa có ảnh minh chứng trong hồ sơ này.
+                    <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+                        <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
+                            Minh chứng đính kèm
+                        </Typography>
+                        <AdmissionDocumentsSection
+                            docs={readonlyDocs}
+                            docsLoading={false}
+                            docsError=""
+                            cloudinaryReady
+                            uploadingSlots={new Set()}
+                            disabled
+                            readOnly
+                            onPickFile={() => {}}
+                            onRemoveSlot={() => {}}
+                            emptyMessage="Chưa có ảnh minh chứng trong hồ sơ này."
+                        />
+                    </Paper>
+
+                    {row?.paymentProofUrl ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+                            <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 0.5}}>
+                                Minh chứng thanh toán
+                            </Typography>
+                            <Typography
+                                component="a"
+                                href={row.paymentProofUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{fontWeight: 600, color: "#2563eb"}}
+                            >
+                                Xem ảnh / tệp
                             </Typography>
                         </Paper>
-                    ) : (
-                        docs.map((doc, docIndex) => {
-                            const images = Array.isArray(doc?.imageUrl) ? doc.imageUrl.filter(Boolean) : [];
-                            const startIndex = docs
-                                .slice(0, docIndex)
-                                .reduce((sum, item) => sum + (Array.isArray(item?.imageUrl) ? item.imageUrl.filter(Boolean).length : 0), 0);
-                            return (
-                                <Paper key={`${doc?.key || "document"}-${docIndex}`} elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}>
-                                    <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                        <Typography sx={{fontWeight: 700, color: "#1e3a8a"}}>
-                                            {doc?.key || "Minh chứng"}
-                                        </Typography>
-                                        <Chip label={`${images.length} ảnh`} size="small" sx={{bgcolor: "#eff6ff", color: "#1e3a8a", fontWeight: 800}} />
-                                    </Stack>
-                                    <Grid container spacing={1.5}>
-                                        {images.map((imageUrl, imageIndex) => (
-                                            <Grid key={`${imageUrl}-${imageIndex}`} item xs={6} sm={4} md={3}>
-                                                <Box
-                                                    component="button"
-                                                    type="button"
-                                                    onClick={() => onOpenPreview(row, startIndex + imageIndex)}
-                                                    sx={{
-                                                        display: "block",
-                                                        width: "100%",
-                                                        height: 150,
-                                                        p: 0,
-                                                        borderRadius: 2.5,
-                                                        overflow: "hidden",
-                                                        border: "1px solid #dbeafe",
-                                                        bgcolor: "#f1f5f9",
-                                                        cursor: "zoom-in",
-                                                    }}
-                                                >
-                                                    <Box component="img" src={imageUrl} alt={`${doc?.key || "Minh chứng"} ${imageIndex + 1}`} sx={{width: "100%", height: "100%", objectFit: "cover", display: "block"}} />
-                                                </Box>
-                                            </Grid>
-                                        ))}
-                                    </Grid>
-                                </Paper>
-                            );
-                        })
-                    )}
+                    ) : null}
 
-                    {(row?.status === "RESERVATION_REJECTED" && row?.rejectReason) || row?.note ? (
+                    {row?.status === "RESERVATION_REJECTED" && row?.rejectReason ? (
                         <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fecaca", bgcolor: "#fef2f2"}}>
                             <Typography sx={{fontWeight: 800, color: "#b91c1c", mb: 0.8}}>
-                                {row?.status === "RESERVATION_REJECTED" ? "Lý do từ chối" : "Ghi chú"}
+                                Lý do từ chối
                             </Typography>
                             <Typography variant="body2" sx={{color: "#7f1d1d"}}>
-                                {row?.status === "RESERVATION_REJECTED" ? row?.rejectReason : row?.note}
+                                {row.rejectReason}
+                            </Typography>
+                        </Paper>
+                    ) : null}
+
+                    {row?.status === "RESERVATION_CANCELLED" && row?.cancelReason ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "#f8fafc"}}>
+                            <Typography sx={{fontWeight: 800, color: "#475569", mb: 0.8}}>
+                                Lý do hủy
+                            </Typography>
+                            <Typography variant="body2" sx={{color: "#334155"}}>
+                                {row.cancelReason}
+                            </Typography>
+                        </Paper>
+                    ) : null}
+
+                    {row?.note ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}>
+                            <Typography sx={{fontWeight: 800, color: "#1e3a8a", mb: 0.8}}>
+                                Ghi chú
+                            </Typography>
+                            <Typography variant="body2" sx={{color: "#334155"}}>
+                                {row.note}
                             </Typography>
                         </Paper>
                     ) : null}
@@ -555,7 +588,7 @@ function ImagePreviewModal({ open, images, selectedIndex, onChangeIndex, onClose
 export default function SchoolCampusAdmissionReservations() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-    const {currentCampusId, loading: schoolCtxLoading} = useSchool();
+    const {loading: schoolCtxLoading} = useSchool();
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
@@ -603,12 +636,14 @@ export default function SchoolCampusAdmissionReservations() {
                 ? allRows.filter((row) =>
                     [
                         row.studentName,
+                        row.studentCode,
                         row.parentName,
                         row.phone,
                         row.parentEmail,
                         row.currentSchool,
                         row.programName,
                         row.methodName,
+                        row.identityCard,
                     ].some((field) => String(field || "").toLowerCase().includes(kw))
                 )
                 : allRows;
@@ -642,7 +677,7 @@ export default function SchoolCampusAdmissionReservations() {
         setDetailOpen(true);
     };
     const openImagePreview = (row, index = 0) => {
-        const files = flattenAttachments(row?.profileMetadata || []);
+        const files = flattenAttachments(row);
         if (files.length === 0) return;
         setPreviewImages(files);
         setSelectedImageIndex(Math.max(0, Math.min(index, files.length - 1)));
@@ -651,14 +686,14 @@ export default function SchoolCampusAdmissionReservations() {
 
     const handleApprove = async () => {
         const form = confirmState.form;
-        const resolvedCampusId = Number(currentCampusId ?? form?.campusId ?? form?.raw?.campusId);
         if (!form) return;
+        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
-                campusId: Number.isFinite(resolvedCampusId) ? resolvedCampusId : undefined,
                 action: "APPROVE",
+                checkedDocuments,
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
             setConfirmState({open: false, form: null});
@@ -673,19 +708,19 @@ export default function SchoolCampusAdmissionReservations() {
     const handleRejectSubmit = async () => {
         const form = rejectState.form;
         const reason = String(rejectState.reason || "").trim();
-        const resolvedCampusId = Number(currentCampusId ?? form?.campusId ?? form?.raw?.campusId);
         if (!form) return;
         if (!reason) {
             setRejectState((prev) => ({...prev, touched: true}));
             return;
         }
+        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
-                campusId: Number.isFinite(resolvedCampusId) ? resolvedCampusId : undefined,
                 action: "REJECT",
                 rejectReason: reason,
+                checkedDocuments,
             });
             enqueueSnackbar("Từ chối thành công", {variant: "success"});
             setRejectState({open: false, form: null, reason: "", touched: false});
@@ -870,9 +905,7 @@ export default function SchoolCampusAdmissionReservations() {
                                                                 <CancelRoundedIcon fontSize="small" />
                                                             </IconButton>
                                                         </>
-                                                    ) : (
-                                                        <Chip label="Đã xử lý" size="small" sx={{borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800}} />
-                                                    )}
+                                                    ) : null}
                                                 </Stack>
                                             </TableCell>
                                         </TableRow>
@@ -940,7 +973,6 @@ export default function SchoolCampusAdmissionReservations() {
                     setRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
                     if (isMobile) setDetailOpen(false);
                 }}
-                onOpenPreview={openImagePreview}
             />
 
             <ImagePreviewModal
