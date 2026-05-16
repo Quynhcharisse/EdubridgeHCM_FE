@@ -25,9 +25,6 @@ function InfoRow({label, value}) {
     );
 }
 
-/**
- * Nội dung form nộp hồ sơ — dùng chung dialog (trường) và trang hồ sơ giữ chỗ mẫu.
- */
 export default function AdmissionSubmissionFormContent({
     students,
     studentLoading,
@@ -41,6 +38,7 @@ export default function AdmissionSubmissionFormContent({
     cloudinaryReady,
     uploadingSlots,
     disabled,
+    studentPickerDisabled,
     onPickFile,
     onRemoveSlot,
     documentsSectionTitle = 'Hồ sơ cần nộp',
@@ -52,11 +50,7 @@ export default function AdmissionSubmissionFormContent({
     showParentInfo = false,
     parentInfo,
 }) {
-    const studentTitle =
-        studentSectionTitle ||
-        (students.length > 1
-            ? `Học sinh nộp đơn (chọn 1 trong ${students.length})`
-            : 'Học sinh nộp đơn');
+    const studentTitle = studentSectionTitle ?? 'Học sinh';
 
     return (
         <Stack spacing={2.5}>
@@ -100,7 +94,7 @@ export default function AdmissionSubmissionFormContent({
                     error={studentError}
                     selectedStudentId={selectedStudentId}
                     onSelect={onSelectStudent}
-                    disabled={disabled}
+                    disabled={studentPickerDisabled ?? disabled}
                 />
             </Box>
 

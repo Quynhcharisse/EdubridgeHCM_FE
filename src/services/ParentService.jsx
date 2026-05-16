@@ -118,10 +118,6 @@ export const deleteParentFavouriteSchool = async (schoolId) => {
     return response || null;
 };
 
-/**
- * GET /parent/documents — danh mục hồ sơ (mẫu giữ chỗ không cần campusProgramOfferingId).
- * Khi nộp theo gói tuyển sinh, truyền campusProgramOfferingId.
- */
 export const getParentAdmissionDocuments = async (campusProgramOfferingId) => {
     const id = campusProgramOfferingId != null ? String(campusProgramOfferingId).trim() : '';
     const config = {};
@@ -143,10 +139,6 @@ function normalizeAdmissionDocItem(item) {
     };
 }
 
-/**
- * Parse GET /parent/documents — hỗ trợ body là mảng [{ code, name, required }]
- * hoặc object { required, optional }.
- */
 export function pickAdmissionDocumentsFromResponse(response) {
     const data = response?.data;
     if (data == null) return {required: [], optional: []};
@@ -191,26 +183,55 @@ export function pickAdmissionDocumentsFromResponse(response) {
 }
 
 export const postParentAdmissionReservationForm = async (payload) => {
-    const response = await axiosClient.post('/parent/admission/reservation/form', payload);
+    const sid = Number(payload?.studentProfileId);
+    const schoolIds = (Array.isArray(payload?.schoolIds) ? payload.schoolIds : [])
+        .map((x) => Number(x))
+        .filter((n) => Number.isFinite(n) && n > 0);
+    const body = {
+        studentProfileId: Math.trunc(sid),
+        schoolIds,
+        submissionDocuments: Array.isArray(payload?.submissionDocuments)
+            ? payload.submissionDocuments
+            : [],
+    };
+    const offeringId = Number(payload?.campusProgramOfferingId);
+    if (Number.isFinite(offeringId) && offeringId > 0) {
+        body.campusProgramOfferingId = Math.trunc(offeringId);
+    }
+    const response = await axiosClient.post('/parent/admission/reservation/form', body);
     return response || null;
 };
 
-/** GET mẫu hồ sơ giữ chỗ (danh sách minh chứng / bản nháp theo học sinh). */
 export const getParentAdmissionReservationFormTemplate = async (studentProfileId) => {
     const sid = Number(studentProfileId);
-    const config = {};
-    if (Number.isFinite(sid) && sid > 0) {
-        config.params = {studentProfileId: sid};
+    if (!Number.isFinite(sid) || sid <= 0) {
+        throw new Error('studentProfileId is required');
     }
-    const response = await axiosClient.get('/parent/admission/reservation/form/template', config);
+    const response = await axiosClient.get('/parent/admission/reservation/form/template', {
+        params: {studentProfileId: sid},
+    });
     return response || null;
 };
 
-/**
- * POST lưu mẫu hồ sơ giữ chỗ — body: { studentProfileId, submissionDocuments: [{ key, imageUrl[] }] }.
- */
+function normalizeTemplateStudentProfileId(studentProfileId) {
+    const sid = Number(studentProfileId);
+    if (!Number.isFinite(sid) || sid <= 0) {
+        throw new Error('studentProfileId is required');
+    }
+    return Math.trunc(sid);
+}
+
 export const postParentAdmissionReservationFormTemplate = async (payload) => {
-    const response = await axiosClient.post('/parent/admission/reservation/form/template', payload);
+    const sid = normalizeTemplateStudentProfileId(payload?.studentProfileId);
+    const body = {
+        studentProfileId: sid,
+        submissionDocuments: Array.isArray(payload?.submissionDocuments)
+            ? payload.submissionDocuments
+            : [],
+    };
+    const response = await axiosClient.post('/parent/admission/reservation/form/template', body, {
+        params: {studentProfileId: sid},
+    });
     return response || null;
 };
 
@@ -219,7 +240,7 @@ export const getParentAdmissionReservationForms = async () => {
     return response || null;
 };
 
-export const putParentAdmissionSchoolsAvailability = async (studentProfileId, schoolIds) => {
+export const putParentAdmissionSchoolsAvailability = async (studentProfileId, schoolIds = []) => {
     const sid = Number(studentProfileId);
     if (!Number.isFinite(sid) || sid <= 0) {
         throw new Error('studentProfileId is required');
@@ -227,12 +248,44 @@ export const putParentAdmissionSchoolsAvailability = async (studentProfileId, sc
     const ids = (Array.isArray(schoolIds) ? schoolIds : [])
         .map((x) => Number(x))
         .filter((n) => Number.isFinite(n) && n > 0);
-    const response = await axiosClient.put('/parent/admission/schools/availability', ids, {
-        params: {studentProfileId: sid},
-        headers: {'Content-Type': 'application/json'},
-    });
+    const response = await axiosClient.put(
+        '/parent/admission/schools/availability',
+        ids,
+        {
+            params: {studentProfileId: Math.trunc(sid)},
+            headers: {'Content-Type': 'application/json'},
+        },
+    );
     return response || null;
 };
+
+export function flattenAdmissionSchoolsUnavailable(unavailable) {
+    const out = [];
+    for (const item of Array.isArray(unavailable) ? unavailable : []) {
+        if (!item || typeof item !== 'object') continue;
+        if (Array.isArray(item.schools)) {
+            const reason = String(item.reason || item.message || '').trim() || 'Không đủ điều kiện.';
+            for (const s of item.schools) {
+                if (!s || typeof s !== 'object') continue;
+                out.push({
+                    schoolId: s.schoolId,
+                    schoolName: String(s.schoolName || '').trim() || `Trường #${s.schoolId ?? '—'}`,
+                    reason,
+                });
+            }
+            continue;
+        }
+        const schoolId = item.schoolId ?? item.id;
+        const schoolName = String(item.schoolName || item.name || '').trim();
+        if (schoolId == null && !schoolName) continue;
+        out.push({
+            schoolId,
+            schoolName: schoolName || `Trường #${schoolId ?? '—'}`,
+            reason: String(item.reason || item.message || '').trim() || 'Không đủ điều kiện.',
+        });
+    }
+    return out;
+}
 
 export function pickAdmissionSchoolsAvailabilityFromResponse(response) {
     const data = response?.data;

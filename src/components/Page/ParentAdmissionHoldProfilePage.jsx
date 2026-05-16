@@ -2,26 +2,26 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
     Box,
     Button,
-    CircularProgress,
     Container,
-    Link,
     Paper,
     Stack,
     Typography,
 } from '@mui/material';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
-import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
-import ListAltRoundedIcon from '@mui/icons-material/ListAltRounded';
-import {Link as RouterLink, useNavigate} from 'react-router-dom';
+import {Link as RouterLink} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
 import AdmissionSubmissionFormContent from './admission/AdmissionSubmissionFormContent.jsx';
 import {useAdmissionDocumentUpload} from './admission/useAdmissionDocumentUpload.js';
 import {
-    applySubmissionPrefillToDocs,
+    applyReservationTemplateToDocs,
     buildInitialDocsState,
     buildSubmissionDocumentsPayload,
+    cloneEmptyCatalogDocs,
+    hasSavedReservationTemplateForStudent,
     mapStudentsForPicker,
-    pickSubmissionDocumentsFromTemplateResponse,
+    pickReservationTemplateBodyFromResponse,
+    pickStudentProfileIdForTemplateApi,
+    pickStudentProfileIdFromTemplateBody,
     validateDocsForSubmit,
 } from './admission/admissionSubmissionUtils.js';
 import {
@@ -34,8 +34,8 @@ import {
 import {APP_PRIMARY_DARK, BRAND_NAVY, BRAND_PASTEL_AURA} from '../../constants/homeLandingTheme';
 
 export default function ParentAdmissionHoldProfilePage() {
-    const navigate = useNavigate();
     const catalogRef = useRef([]);
+    const templateLoadSeqRef = useRef(0);
 
     const [studentLoading, setStudentLoading] = useState(true);
     const [studentError, setStudentError] = useState('');
@@ -47,12 +47,18 @@ export default function ParentAdmissionHoldProfilePage() {
     const [prefillLoading, setPrefillLoading] = useState(false);
     const [docs, setDocs] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+    const [templateAlreadySaved, setTemplateAlreadySaved] = useState(false);
 
     const {cloudinaryReady, uploadingSlots, anyUploading, handlePickFile, handleRemoveSlot} =
         useAdmissionDocumentUpload(setDocs);
 
     const docsLoading = catalogLoading || prefillLoading;
     const docsError = catalogError;
+
+    const activeStudent = useMemo(
+        () => students.find((s) => s.id === selectedStudentId) ?? null,
+        [students, selectedStudentId],
+    );
 
     const loadCatalog = useCallback(async () => {
         setCatalogLoading(true);
@@ -61,10 +67,7 @@ export default function ParentAdmissionHoldProfilePage() {
             const res = await getParentAdmissionDocuments();
             const {required, optional} = pickAdmissionDocumentsFromResponse(res);
             const initial = buildInitialDocsState(required, optional);
-            catalogRef.current = initial.map((d) => ({
-                ...d,
-                slots: d.slots.map(() => null),
-            }));
+            catalogRef.current = cloneEmptyCatalogDocs(initial);
             setDocs(catalogRef.current);
             if (initial.length === 0) {
                 setCatalogError(
@@ -83,19 +86,42 @@ export default function ParentAdmissionHoldProfilePage() {
         }
     }, []);
 
-    const applyPrefill = useCallback(async (studentProfileId) => {
+    const loadTemplateForStudent = useCallback(async (studentProfileId) => {
         const sid = Number(studentProfileId);
         if (!Number.isFinite(sid) || sid <= 0 || !catalogRef.current.length) return;
+
+        const seq = ++templateLoadSeqRef.current;
         setPrefillLoading(true);
+        setTemplateAlreadySaved(false);
+        setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+
         try {
             const templateRes = await getParentAdmissionReservationFormTemplate(sid);
-            const existing = pickSubmissionDocumentsFromTemplateResponse(templateRes);
-            setDocs(applySubmissionPrefillToDocs(catalogRef.current, existing));
+            if (seq !== templateLoadSeqRef.current) return;
+
+            const body = pickReservationTemplateBodyFromResponse(templateRes);
+            const bodySid = pickStudentProfileIdFromTemplateBody(body);
+
+            if (bodySid != null && bodySid !== sid) {
+                setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+                setTemplateAlreadySaved(false);
+                return;
+            }
+
+            setDocs(applyReservationTemplateToDocs(catalogRef.current, body, sid));
+            setTemplateAlreadySaved(hasSavedReservationTemplateForStudent(body, sid));
         } catch (err) {
-            console.warn('[ParentAdmissionHoldProfilePage] prefill:', err);
-            setDocs(catalogRef.current);
+            if (seq !== templateLoadSeqRef.current) return;
+            const status = err?.response?.status;
+            setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+            setTemplateAlreadySaved(false);
+            if (status !== 404) {
+                console.warn('[ParentAdmissionHoldProfilePage] load template:', err);
+            }
         } finally {
-            setPrefillLoading(false);
+            if (seq === templateLoadSeqRef.current) {
+                setPrefillLoading(false);
+            }
         }
     }, []);
 
@@ -140,25 +166,20 @@ export default function ParentAdmissionHoldProfilePage() {
 
     useEffect(() => {
         if (!selectedStudentId || catalogLoading) return undefined;
-        let cancelled = false;
-        (async () => {
-            await applyPrefill(selectedStudentId);
-            if (cancelled) return;
-        })();
+        loadTemplateForStudent(selectedStudentId);
         return () => {
-            cancelled = true;
+            templateLoadSeqRef.current += 1;
         };
-    }, [selectedStudentId, catalogLoading, applyPrefill]);
+    }, [selectedStudentId, catalogLoading, loadTemplateForStudent]);
 
-    const handleSelectStudent = useCallback(
-        (id) => {
-            setSelectedStudentId(id);
-            if (catalogRef.current.length) {
-                setDocs(catalogRef.current);
-            }
-        },
-        [],
-    );
+    const handleSelectStudent = useCallback((id) => {
+        templateLoadSeqRef.current += 1;
+        setSelectedStudentId(id);
+        setTemplateAlreadySaved(false);
+        if (catalogRef.current.length) {
+            setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+        }
+    }, []);
 
     const validation = useMemo(
         () => validateDocsForSubmit(docs, {selectedStudentId}),
@@ -166,6 +187,13 @@ export default function ParentAdmissionHoldProfilePage() {
     );
 
     const handleSubmit = async () => {
+        const sid = pickStudentProfileIdForTemplateApi(activeStudent?.raw ?? {}) ?? Number(selectedStudentId);
+        if (!Number.isFinite(sid) || sid <= 0) {
+            enqueueSnackbar('Không xác định được mã hồ sơ học sinh. Vui lòng chọn lại học sinh.', {
+                variant: 'warning',
+            });
+            return;
+        }
         if (!validation.ok) {
             enqueueSnackbar(validation.message, {variant: 'warning'});
             return;
@@ -183,30 +211,53 @@ export default function ParentAdmissionHoldProfilePage() {
         setSubmitting(true);
         try {
             await postParentAdmissionReservationFormTemplate({
-                studentProfileId: Number(selectedStudentId),
+                studentProfileId: sid,
                 submissionDocuments,
             });
-            enqueueSnackbar('Đã lưu hồ sơ giữ chỗ thành công.', {variant: 'success'});
-            navigate('/parent/admission-reservations');
+            const templateRes = await getParentAdmissionReservationFormTemplate(sid);
+            const body = pickReservationTemplateBodyFromResponse(templateRes);
+            const bodySid = pickStudentProfileIdFromTemplateBody(body);
+            if (bodySid == null || bodySid === sid) {
+                setDocs(applyReservationTemplateToDocs(catalogRef.current, body, sid));
+                setTemplateAlreadySaved(hasSavedReservationTemplateForStudent(body, sid));
+            } else {
+                setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+                setTemplateAlreadySaved(false);
+            }
+            enqueueSnackbar(
+                templateRes?.data?.message || 'Đã lưu hồ sơ giữ chỗ thành công.',
+                {variant: 'success'},
+            );
         } catch (err) {
             console.error('[ParentAdmissionHoldProfilePage] submit:', err);
+            const serverMsg = err?.response?.data?.message || err?.message || 'Lưu hồ sơ thất bại.';
+            const alreadyExists = String(serverMsg).toLowerCase().includes('đã có mẫu');
             enqueueSnackbar(
-                err?.response?.data?.message || err?.message || 'Lưu hồ sơ thất bại.',
-                {variant: 'error'},
+                alreadyExists
+                    ? `${serverMsg} (đang lưu cho học sinh mã ${sid} — kiểm tra request POST có studentProfileId=${sid} trong body và query).`
+                    : serverMsg,
+                {variant: 'error', autoHideDuration: alreadyExists ? 9000 : 5000},
             );
         } finally {
             setSubmitting(false);
         }
     };
 
-    const formDisabled = submitting || anyUploading || !selectedStudentId || catalogLoading;
+    const studentPickerDisabled = submitting || anyUploading || studentLoading;
+    const documentsDisabled =
+        submitting ||
+        anyUploading ||
+        !selectedStudentId ||
+        catalogLoading ||
+        prefillLoading ||
+        templateAlreadySaved;
 
     return (
         <Box
             sx={{
                 minHeight: '100%',
                 pt: {xs: 14, md: 13},
-                pb: {xs: 12, md: 4},
+                pb: {xs: 4, md: 4},
                 bgcolor: '#f0f6fc',
                 backgroundImage: BRAND_PASTEL_AURA,
             }}
@@ -243,10 +294,6 @@ export default function ParentAdmissionHoldProfilePage() {
                                 Nộp hồ sơ giữ chỗ
                             </Typography>
                         </Stack>
-                        <Typography sx={{mt: 0.75, fontSize: 14, color: '#475569', pl: 4.25}}>
-                            Chọn học sinh, tải ảnh minh chứng theo từng loại hồ sơ bên dưới (giống khi nộp tại trang
-                            trường).
-                        </Typography>
                     </Box>
 
                     <Box sx={{px: {xs: 2, md: 2.5}, py: 2.5}}>
@@ -256,21 +303,21 @@ export default function ParentAdmissionHoldProfilePage() {
                             studentError={studentError}
                             selectedStudentId={selectedStudentId}
                             onSelectStudent={handleSelectStudent}
-                            studentSectionTitle={
-                                students.length > 1
-                                    ? `Học sinh (chọn 1 trong ${students.length})`
-                                    : 'Học sinh'
-                            }
+                            studentSectionTitle="Học sinh"
                             docs={docs}
                             docsLoading={docsLoading}
                             docsError={docsError}
                             cloudinaryReady={cloudinaryReady}
                             uploadingSlots={uploadingSlots}
-                            disabled={formDisabled}
+                            disabled={documentsDisabled}
+                            studentPickerDisabled={studentPickerDisabled}
                             onPickFile={handlePickFile}
                             onRemoveSlot={handleRemoveSlot}
-                            documentsSectionTitle="Hồ sơ cần nộp"
-                            documentsHint="Ảnh JPG / PNG / WEBP, tối đa 5MB. Bấm ô « Tải ảnh lên » cho từng loại hồ sơ bắt buộc."
+                            documentsSectionTitle={
+                                activeStudent
+                                    ? `Hồ sơ cần nộp — ${activeStudent.name}${activeStudent.subLabel ? ` (${activeStudent.subLabel})` : ''}`
+                                    : 'Hồ sơ cần nộp'
+                            }
                         />
 
                         {!studentLoading && students.length === 0 ? (
@@ -285,66 +332,43 @@ export default function ParentAdmissionHoldProfilePage() {
                         ) : null}
                     </Box>
 
-                    <Stack
-                        direction={{xs: 'column', sm: 'row'}}
-                        spacing={1.25}
-                        alignItems={{sm: 'center'}}
-                        justifyContent="space-between"
-                        sx={{
-                            px: {xs: 2, md: 2.5},
-                            py: 1.75,
-                            borderTop: '1px solid rgba(148, 163, 184, 0.22)',
-                            bgcolor: '#fafbff',
-                        }}
-                    >
-                        <Link
-                            component={RouterLink}
-                            to="/parent/admission-reservations"
-                            underline="hover"
+                    {!templateAlreadySaved ? (
+                        <Box
                             sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                fontWeight: 600,
-                                color: BRAND_NAVY,
-                                fontSize: 14,
+                                px: {xs: 2, md: 2.5},
+                                py: 1.75,
+                                borderTop: '1px solid rgba(148, 163, 184, 0.22)',
+                                bgcolor: '#fafbff',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
                             }}
                         >
-                            <ListAltRoundedIcon sx={{fontSize: 18}} />
-                            Xem đơn đã nộp
-                        </Link>
-                        <Button
-                            variant="contained"
-                            size="large"
-                            startIcon={
-                                submitting ? (
-                                    <CircularProgress size={18} color="inherit" />
-                                ) : (
-                                    <SaveRoundedIcon />
-                                )
-                            }
-                            disabled={
-                                submitting ||
-                                anyUploading ||
-                                docsLoading ||
-                                studentLoading ||
-                                !validation.ok
-                            }
-                            onClick={handleSubmit}
-                            sx={{
-                                textTransform: 'none',
-                                fontWeight: 800,
-                                borderRadius: 2,
-                                px: 3,
-                                py: 1.1,
-                                bgcolor: APP_PRIMARY_DARK,
-                                boxShadow: '0 8px 20px rgba(37, 99, 235, 0.28)',
-                                width: {xs: '100%', sm: 'auto'},
-                            }}
-                        >
-                            {submitting ? 'Đang lưu...' : 'Lưu hồ sơ'}
-                        </Button>
-                    </Stack>
+                            <Button
+                                variant="contained"
+                                size="large"
+                                disabled={
+                                    submitting ||
+                                    anyUploading ||
+                                    docsLoading ||
+                                    studentLoading ||
+                                    !validation.ok
+                                }
+                                onClick={handleSubmit}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 800,
+                                    borderRadius: 2,
+                                    px: 3,
+                                    py: 1.1,
+                                    bgcolor: APP_PRIMARY_DARK,
+                                    boxShadow: '0 8px 20px rgba(37, 99, 235, 0.28)',
+                                    width: {xs: '100%', sm: 'auto'},
+                                }}
+                            >
+                                {submitting ? 'Đang lưu...' : 'Lưu hồ sơ'}
+                            </Button>
+                        </Box>
+                    ) : null}
                 </Paper>
             </Container>
         </Box>
