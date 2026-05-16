@@ -22,15 +22,14 @@ export const getCampusAdmissionReservationForms = async ({
     };
 };
 
-export const processAdmissionReservationForm = async ({formId, campusId, action, rejectReason}) => {
+export const processAdmissionReservationForm = async ({formId, action, rejectReason, checkedDocuments}) => {
     const payload = {
         formId: Number(formId),
         action: String(action || "").toUpperCase(),
+        checkedDocuments: Array.isArray(checkedDocuments)
+            ? checkedDocuments.map((key) => String(key || "").trim()).filter(Boolean)
+            : [],
     };
-    const normalizedCampusId = Number(campusId);
-    if (Number.isFinite(normalizedCampusId) && normalizedCampusId > 0) {
-        payload.campusId = normalizedCampusId;
-    }
     if (payload.action === "REJECT") {
         payload.rejectReason = String(rejectReason || "").trim();
     }

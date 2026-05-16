@@ -363,6 +363,24 @@ export function pickProfileMetaDataFromTemplate(body) {
     return Array.isArray(raw) ? raw : [];
 }
 
+/** Keys gửi khi duyệt/từ chối đơn (profileMetaData + HOC_BA nếu có học bạ). */
+export function pickCheckedDocumentsFromReservation(item) {
+    if (!item || typeof item !== 'object') return [];
+    const keys = new Set();
+    for (const doc of pickProfileMetaDataFromTemplate(item)) {
+        const key = String(doc?.key ?? doc?.code ?? '').trim();
+        if (!key) continue;
+        const urls = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
+        const hasImage = urls.some((u) => u != null && String(u).trim() !== '');
+        if (hasImage) keys.add(key);
+    }
+    const transcripts = Array.isArray(item.transcriptImages) ? item.transcriptImages : [];
+    if (transcripts.some((t) => t?.imageUrl != null && String(t.imageUrl).trim() !== '')) {
+        keys.add(HOC_BA_THCS_CODE);
+    }
+    return Array.from(keys);
+}
+
 export function pickSubmissionDocumentsFromTemplateResponse(response) {
     const inner = pickReservationTemplateBodyFromResponse(response);
     if (!inner) return [];
