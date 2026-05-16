@@ -112,6 +112,39 @@ export function pickStudentGenderLabel(student) {
     return GENDER_LABELS[key] || (typeof raw === 'string' ? raw : '');
 }
 
+export function pickStudentCode(student) {
+    if (!student || typeof student !== 'object') return '';
+    const raw = student.studentCode ?? student.student_code;
+    return raw != null ? String(raw).trim() : '';
+}
+
+const TRANSCRIPT_GRADE_ORDER = ['GRADE_06', 'GRADE_07', 'GRADE_08', 'GRADE_09'];
+
+/** Map BE `transcriptImages` → 4 slot URL (lớp 6–9). */
+export function mapTranscriptImagesToSlots(transcripts) {
+    const slots = buildEmptySlots(HOC_BA_THCS_GRADE_LABELS.length);
+    for (const row of Array.isArray(transcripts) ? transcripts : []) {
+        const grade = String(row?.grade ?? row?.gradeLevel ?? '').trim().toUpperCase();
+        const slotIndex = TRANSCRIPT_GRADE_ORDER.indexOf(grade);
+        const url = row?.imageUrl ?? row?.url;
+        if (slotIndex >= 0 && url != null && String(url).trim() !== '') {
+            slots[slotIndex] = String(url).trim();
+        }
+    }
+    return slots;
+}
+
+export function mapStudentProfileForAvailabilitySummary(student) {
+    if (!student || typeof student !== 'object') return null;
+    const genderLabel = pickStudentGenderLabel(student);
+    const studentCode = pickStudentCode(student);
+    return {
+        genderLabel: genderLabel || '—',
+        studentCode: studentCode || '—',
+        transcriptSlots: mapTranscriptImagesToSlots(student.transcriptImages),
+    };
+}
+
 export function pickStudentBirthYear(student) {
     const raw = student?.dateOfBirth || student?.dob || student?.birthday;
     if (!raw) return '';
@@ -423,8 +456,6 @@ export function submissionDocumentsToReadonlyDocs(submissionDocuments) {
         .filter(Boolean);
 }
 
-const TRANSCRIPT_GRADE_ORDER = ['GRADE_06', 'GRADE_07', 'GRADE_08', 'GRADE_09'];
-
 export function reservationToReadonlyDocs(reservation) {
     if (!reservation || typeof reservation !== 'object') return [];
     let docs = submissionDocumentsToReadonlyDocs(
@@ -434,15 +465,7 @@ export function reservationToReadonlyDocs(reservation) {
     const transcripts = Array.isArray(reservation.transcriptImages) ? reservation.transcriptImages : [];
     if (!transcripts.length) return docs;
 
-    const slots = buildEmptySlots(HOC_BA_THCS_GRADE_LABELS.length);
-    for (const row of transcripts) {
-        const grade = String(row?.grade ?? row?.gradeLevel ?? '').trim().toUpperCase();
-        const slotIndex = TRANSCRIPT_GRADE_ORDER.indexOf(grade);
-        const url = row?.imageUrl ?? row?.url;
-        if (slotIndex >= 0 && url != null && String(url).trim() !== '') {
-            slots[slotIndex] = String(url).trim();
-        }
-    }
+    const slots = mapTranscriptImagesToSlots(transcripts);
     if (!slots.some((u) => u != null && String(u).trim() !== '')) return docs;
 
     const hocBaIndex = docs.findIndex((d) => d.code === HOC_BA_THCS_CODE);
@@ -482,15 +505,7 @@ export function applyReservationTemplateToDocs(catalogDocs, templateBody, studen
     const hocBaIndex = next.findIndex((d) => d.code === HOC_BA_THCS_CODE);
     if (hocBaIndex < 0) return next;
 
-    const slots = next[hocBaIndex].slots.slice();
-    for (const row of transcripts) {
-        const grade = String(row?.grade ?? row?.gradeLevel ?? '').trim().toUpperCase();
-        const slotIndex = TRANSCRIPT_GRADE_ORDER.indexOf(grade);
-        const url = row?.imageUrl ?? row?.url;
-        if (slotIndex >= 0 && url != null && String(url).trim() !== '') {
-            slots[slotIndex] = String(url).trim();
-        }
-    }
+    const slots = mapTranscriptImagesToSlots(transcripts);
     next = next.slice();
     next[hocBaIndex] = {...next[hocBaIndex], slots};
     return next;
