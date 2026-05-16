@@ -9,9 +9,8 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    Grid,
     IconButton,
-    Modal,
+    Link,
     Paper,
     Stack,
     Tab,
@@ -28,6 +27,12 @@ import {
     getParentAdmissionReservationForms,
     pickAdmissionReservationFormsFromResponse
 } from "../../services/ParentService.jsx";
+import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
+import {
+    normalizeParentAdmissionReservationRow,
+    reservationToReadonlyDocs,
+    sanitizeReservationDisplayValue,
+} from "./admission/admissionSubmissionUtils.js";
 import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
 
 const FILTERS = [
@@ -105,34 +110,17 @@ const STATUS_META = {
     }
 };
 
-const DOCUMENT_LABELS = {
-    HOC_BA: "Học bạ",
-    GIAY_KSTN: "Giấy khai sinh",
-    ANH_THE: "Ảnh thẻ",
-    HB12: "Học bạ lớp 12",
-    CCCD: "CCCD/CMND"
-};
-
 const hasText = (value) => value != null && String(value).trim() !== "";
 
-const formatDateTime = (value) => {
-    if (!hasText(value)) return "Chưa cập nhật";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value).trim();
-    return date.toLocaleString("vi-VN", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-    });
-};
+const isDisplayableValue = (value) => sanitizeReservationDisplayValue(value) != null;
 
 const formatDateOnly = (value) => {
-    if (!hasText(value)) return "Chưa cập nhật";
+    if (!hasText(value)) return null;
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value).trim();
+    if (Number.isNaN(date.getTime())) {
+        const raw = String(value).trim();
+        return isDisplayableValue(raw) ? raw : null;
+    }
     return date.toLocaleDateString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
@@ -141,21 +129,18 @@ const formatDateOnly = (value) => {
 };
 
 const getGenderLabel = (gender) => {
-    const key = String(gender || "").trim().toUpperCase();
+    if (!hasText(gender)) return null;
+    const key = String(gender).trim().toUpperCase();
     if (key === "MALE") return "Nam";
     if (key === "FEMALE") return "Nữ";
-    return hasText(gender) ? String(gender).trim() : "Chưa cập nhật";
-};
-
-const getDocumentLabel = (key) => {
-    const normalized = String(key || "").trim().toUpperCase();
-    return DOCUMENT_LABELS[normalized] || normalized || "Minh chứng";
+    const raw = String(gender).trim();
+    return isDisplayableValue(raw) ? raw : null;
 };
 
 const getStatusMeta = (status) => {
     const key = String(status || "").trim().toUpperCase();
     return STATUS_META[key] || {
-        label: hasText(status) ? String(status).replaceAll("_", " ") : "Chưa cập nhật",
+        label: hasText(status) ? String(status).replaceAll("_", " ") : "Đang xử lý",
         color: "#334155",
         bg: "#e2e8f0",
         border: "#cbd5e1"
@@ -169,6 +154,7 @@ const getFilterCount = (rows, filter) => {
 };
 
 function InfoRow({label, value}) {
+    if (!isDisplayableValue(value)) return null;
     return (
         <Stack
             spacing={0.45}
@@ -185,13 +171,34 @@ function InfoRow({label, value}) {
                 {label}
             </Typography>
             <Typography sx={{fontSize: 14.5, color: "#1e293b", fontWeight: 600}}>
-                {hasText(value) ? value : "Chưa cập nhật"}
+                {value}
             </Typography>
         </Stack>
     );
 }
 
-function DetailLineRow({ label, value }) {
+function DetailSection({title, chip, children}) {
+    const rows = React.Children.toArray(children).filter((child) => child != null);
+    if (rows.length === 0) return null;
+    return (
+        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+            <Stack
+                direction={{xs: "column", sm: "row"}}
+                alignItems={{xs: "flex-start", sm: "center"}}
+                justifyContent="space-between"
+                gap={1.5}
+                sx={{mb: 1.5}}
+            >
+                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>{title}</Typography>
+                {chip ?? null}
+            </Stack>
+            <Stack spacing={1}>{rows}</Stack>
+        </Paper>
+    );
+}
+
+function DetailLineRow({label, value}) {
+    if (!isDisplayableValue(value)) return null;
     return (
         <Box
             sx={{
@@ -199,12 +206,12 @@ function DetailLineRow({ label, value }) {
                 borderBottom: "1px dashed #c7d8ea"
             }}
         >
-            <Typography sx={{ fontSize: 14.5, color: "#1e293b" }}>
-                <Box component="span" sx={{ color: "#2563eb", fontWeight: 700 }}>
+            <Typography sx={{fontSize: 14.5, color: "#1e293b"}}>
+                <Box component="span" sx={{color: "#2563eb", fontWeight: 700}}>
                     {label}:
                 </Box>{" "}
-                <Box component="span" sx={{ fontWeight: 600 }}>
-                    {hasText(value) ? value : "Chưa cập nhật"}
+                <Box component="span" sx={{fontWeight: 600}}>
+                    {value}
                 </Box>
             </Typography>
         </Box>
@@ -213,6 +220,12 @@ function DetailLineRow({ label, value }) {
 
 function ReservationCard({reservation, onOpenDetail}) {
     const statusMeta = getStatusMeta(reservation?.status);
+    const cardTitle = isDisplayableValue(reservation?.schoolName)
+        ? reservation.schoolName
+        : isDisplayableValue(reservation?.studentName)
+          ? reservation.studentName
+          : "Đơn đăng ký";
+    const submittedDate = formatDateOnly(reservation?.createdTime);
 
     return (
         <Paper
@@ -248,7 +261,7 @@ function ReservationCard({reservation, onOpenDetail}) {
                     <Box sx={{minWidth: 0}}>
                         <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{mb: 0.6}}>
                             <Typography sx={{fontSize: 17, fontWeight: 600, color: BRAND_NAVY, lineHeight: 1.3}}>
-                                {reservation?.schoolName || "Trường đang cập nhật"}
+                                {cardTitle}
                             </Typography>
                             <Chip
                                 label={statusMeta.label}
@@ -262,19 +275,30 @@ function ReservationCard({reservation, onOpenDetail}) {
                                 }}
                             />
                         </Stack>
-                        <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
-                            {reservation?.programName || "Chương trình tuyển sinh đang cập nhật"}
-                        </Typography>
-                        <Stack spacing={0.75}>
-                            <Stack direction="row" alignItems="center" spacing={0.75}>
-                                <LocationOnRoundedIcon sx={{fontSize: 18, color: "#64748b"}} />
-                                <Typography sx={{fontSize: 13.5, color: "#475569"}}>
-                                    {reservation?.campusName || "Cơ sở chưa cập nhật"}
-                                </Typography>
-                            </Stack>
-                            <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
-                                Ngày nộp: {formatDateOnly(reservation?.createdTime)}
+                        {isDisplayableValue(reservation?.programName) ? (
+                            <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
+                                {reservation.programName}
                             </Typography>
+                        ) : null}
+                        {isDisplayableValue(reservation?.studentCode) ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
+                                CCCD học sinh: {reservation.studentCode}
+                            </Typography>
+                        ) : null}
+                        <Stack spacing={0.75}>
+                            {isDisplayableValue(reservation?.campusName) ? (
+                                <Stack direction="row" alignItems="center" spacing={0.75}>
+                                    <LocationOnRoundedIcon sx={{fontSize: 18, color: "#64748b"}} />
+                                    <Typography sx={{fontSize: 13.5, color: "#475569"}}>
+                                        {reservation.campusName}
+                                    </Typography>
+                                </Stack>
+                            ) : null}
+                            {submittedDate ? (
+                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
+                                    Ngày nộp: {submittedDate}
+                                </Typography>
+                            ) : null}
                         </Stack>
                     </Box>
                 </Stack>
@@ -299,14 +323,17 @@ function ReservationCard({reservation, onOpenDetail}) {
 }
 
 function DetailDialog({reservation, onClose}) {
-    const documents = Array.isArray(reservation?.profileMetadata) ? reservation.profileMetadata : [];
     const open = Boolean(reservation);
     const statusMeta = getStatusMeta(reservation?.status);
-    const [previewImage, setPreviewImage] = useState(null);
-
-    useEffect(() => {
-        if (!open) setPreviewImage(null);
-    }, [open]);
+    const readonlyDocs = useMemo(
+        () => (reservation ? reservationToReadonlyDocs(reservation) : []),
+        [reservation],
+    );
+    const detailTitleSuffix = isDisplayableValue(reservation?.studentName)
+        ? ` — ${reservation.studentName}`
+        : isDisplayableValue(reservation?.schoolName)
+          ? ` — ${reservation.schoolName}`
+          : "";
 
     return (
         <>
@@ -335,170 +362,104 @@ function DetailDialog({reservation, onClose}) {
                         borderBottom: "1px solid #b8d8f4"
                     }}
                 >
-                    <Box>
+                    <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1}>
                         <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
-                            Chi tiết đơn giữ chỗ
+                            Chi tiết đơn giữ chỗ{detailTitleSuffix}
                         </Typography>
-                    </Box>
+                        <Chip
+                            label={statusMeta.label}
+                            size="small"
+                            sx={{
+                                bgcolor: statusMeta.bg,
+                                color: statusMeta.color,
+                                border: `1px solid ${statusMeta.border}`,
+                                fontWeight: 600,
+                                borderRadius: 999,
+                            }}
+                        />
+                    </Stack>
                     <IconButton onClick={onClose}>
                         <CloseRoundedIcon />
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
                     <Stack spacing={2.5}>
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Stack direction={{xs: "column", sm: "row"}} alignItems={{xs: "flex-start", sm: "center"}} justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>Thông tin học sinh</Typography>
-                                <Chip
-                                    label={statusMeta.label}
-                                    size="small"
-                                    sx={{ bgcolor: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.border}`, fontWeight: 600, borderRadius: 999 }}
-                                />
-                            </Stack>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Học sinh" value={reservation?.studentName} />
-                                <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
-                                <DetailLineRow label="Phương thức xét tuyển" value={reservation?.methodName || reservation?.admissionMethodCode} />
-                            </Stack>
-                        </Paper>
+                        <DetailSection title="Thông tin học sinh">
+                            <DetailLineRow label="Học sinh" value={reservation?.studentName} />
+                            <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
+                            <DetailLineRow label="CCCD học sinh" value={reservation?.studentCode} />
+                            <DetailLineRow
+                                label="Phương thức xét tuyển"
+                                value={reservation?.methodName ?? reservation?.admissionMethodCode}
+                            />
+                        </DetailSection>
 
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>Thông tin phụ huynh</Typography>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Phụ huynh" value={reservation?.parentName} />
-                                <DetailLineRow label="Email" value={reservation?.parentEmail} />
-                                <DetailLineRow label="Điện thoại" value={reservation?.parentPhone} />
-                                <DetailLineRow label="Địa chỉ" value={reservation?.address} />
-                            </Stack>
-                        </Paper>
+                        <DetailSection title="Thông tin phụ huynh">
+                            <DetailLineRow label="Phụ huynh" value={reservation?.parentName} />
+                            <DetailLineRow label="CCCD phụ huynh" value={reservation?.identityCard} />
+                            <DetailLineRow label="Email" value={reservation?.parentEmail} />
+                            <DetailLineRow label="Điện thoại" value={reservation?.parentPhone} />
+                            <DetailLineRow label="Địa chỉ" value={reservation?.address} />
+                        </DetailSection>
 
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>Thông tin hồ sơ tuyển sinh</Typography>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Chương trình" value={reservation?.programName} />
-                                <DetailLineRow label="Cơ sở học" value={reservation?.campusName} />
-                                <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime)} />
-                                {hasText(reservation?.rejectReason) && (
-                                    <DetailLineRow label="Lý do từ chối" value={reservation.rejectReason} />
-                                )}
-                                {hasText(reservation?.cancelReason) && (
-                                    <DetailLineRow label="Lý do hủy" value={reservation.cancelReason} />
-                                )}
-                            </Stack>
-                        </Paper>
+                        <DetailSection title="Thông tin đơn tuyển sinh">
+                            <DetailLineRow label="Trường" value={reservation?.schoolName} />
+                            <DetailLineRow label="Chương trình" value={reservation?.programName} />
+                            <DetailLineRow label="Cơ sở học" value={reservation?.campusName} />
+                            <DetailLineRow
+                                label="Mã gói tuyển sinh"
+                                value={
+                                    reservation?.campusProgramOfferingId != null
+                                        ? String(reservation.campusProgramOfferingId)
+                                        : null
+                                }
+                            />
+                            <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime) ?? undefined} />
+                            <DetailLineRow label="Mã chuyển" value={reservation?.transferCode} />
+                            <DetailLineRow label="Lý do từ chối" value={reservation?.rejectReason} />
+                            <DetailLineRow label="Lý do hủy" value={reservation?.cancelReason} />
+                            {isDisplayableValue(reservation?.paymentProofUrl) ? (
+                                <Box sx={{py: 0.8, borderBottom: "1px dashed #c7d8ea"}}>
+                                    <Typography sx={{fontSize: 14.5, color: "#1e293b"}}>
+                                        <Box component="span" sx={{color: "#2563eb", fontWeight: 700}}>
+                                            Minh chứng thanh toán:
+                                        </Box>{" "}
+                                        <Link
+                                            href={reservation.paymentProofUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{fontWeight: 600}}
+                                        >
+                                            Xem ảnh / tệp
+                                        </Link>
+                                    </Typography>
+                                </Box>
+                            ) : null}
+                        </DetailSection>
 
-                        {documents.length === 0 ? (
-                            <Paper elevation={0} sx={{p: 4, textAlign: "center", borderRadius: 3, border: "1px dashed #b8d8f4", bgcolor: "#eef7ff"}}>
-                                <ArticleOutlinedIcon sx={{fontSize: 48, color: "#94a3b8", mb: 1}} />
-                                <Typography sx={{fontWeight: 800, color: "#475569"}}>
-                                    Chưa có ảnh minh chứng trong đơn này.
-                                </Typography>
-                            </Paper>
-                        ) : (
-                            documents.map((doc, docIndex) => {
-                                const images = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
-                                return (
-                                    <Paper
-                                        key={`${doc?.key || "document"}-${docIndex}`}
-                                        elevation={0}
-                                        sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}
-                                    >
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                <ArticleOutlinedIcon sx={{color: BRAND_NAVY}} />
-                                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>
-                                                    {getDocumentLabel(doc?.key)}
-                                                </Typography>
-                                            </Stack>
-                                            <Chip
-                                                label={`${images.length} ảnh`}
-                                                size="small"
-                                                sx={{bgcolor: "#eff6ff", color: BRAND_NAVY, fontWeight: 800}}
-                                            />
-                                        </Stack>
-                                        <Grid container spacing={1.5}>
-                                            {images.map((imageUrl, imageIndex) => (
-                                                <Grid key={`${imageUrl}-${imageIndex}`} size={{xs: 6, sm: 4, md: 3}}>
-                                                    <Box
-                                                        component="button"
-                                                        type="button"
-                                                        onClick={() => setPreviewImage({url: imageUrl, title: `${getDocumentLabel(doc?.key)} ${imageIndex + 1}`})}
-                                                        sx={{
-                                                            display: "block",
-                                                            width: "100%",
-                                                            height: 150,
-                                                            p: 0,
-                                                            borderRadius: 2.5,
-                                                            overflow: "hidden",
-                                                            border: "1px solid #dbeafe",
-                                                            bgcolor: "#f1f5f9",
-                                                            cursor: "zoom-in"
-                                                        }}
-                                                    >
-                                                        <Box
-                                                            component="img"
-                                                            src={imageUrl}
-                                                            alt={`${getDocumentLabel(doc?.key)} ${imageIndex + 1}`}
-                                                            sx={{
-                                                                width: "100%",
-                                                                height: "100%",
-                                                                objectFit: "cover",
-                                                                display: "block"
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                </Grid>
-                                            ))}
-                                        </Grid>
-                                    </Paper>
-                                );
-                            })
-                        )}
+                        <Paper
+                            elevation={0}
+                            sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}
+                        >
+                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
+                                Minh chứng đính kèm
+                            </Typography>
+                            <AdmissionDocumentsSection
+                                docs={readonlyDocs}
+                                docsLoading={false}
+                                docsError=""
+                                cloudinaryReady
+                                uploadingSlots={new Set()}
+                                disabled
+                                readOnly
+                                onPickFile={() => {}}
+                                onRemoveSlot={() => {}}
+                                emptyMessage="Chưa có ảnh minh chứng trong đơn này."
+                            />
+                        </Paper>
                     </Stack>
                 </DialogContent>
             </Dialog>
-
-            <Modal
-                open={Boolean(previewImage)}
-                onClose={() => setPreviewImage(null)}
-                slotProps={{
-                    backdrop: {
-                        sx: {
-                            backdropFilter: "blur(8px)",
-                            bgcolor: "rgba(15, 23, 42, 0.24)"
-                        }
-                    }
-                }}
-                sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    p: {xs: 2, md: 4}
-                }}
-            >
-                <Box
-                    sx={{
-                        outline: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                    }}
-                >
-                    <Box
-                        component="img"
-                        src={previewImage?.url || ""}
-                        alt={previewImage?.title || "Minh chứng"}
-                        sx={{
-                            maxWidth: "92vw",
-                            maxHeight: "84vh",
-                            objectFit: "contain",
-                            display: "block",
-                            bgcolor: "transparent",
-                            visibility: previewImage?.url ? "visible" : "hidden"
-                        }}
-                    />
-                </Box>
-            </Modal>
         </>
     );
 }
@@ -514,7 +475,10 @@ export default function ParentAdmissionReservationsPage() {
         if (!silent) setLoading(true);
         try {
             const response = await getParentAdmissionReservationForms();
-            const rows = pickAdmissionReservationFormsFromResponse(response);
+            const raw = pickAdmissionReservationFormsFromResponse(response);
+            const rows = raw
+                .map((item, index) => normalizeParentAdmissionReservationRow(item, index))
+                .filter(Boolean);
             if (mountedRef.current) setReservations(rows);
         } catch (error) {
             console.error("[ParentAdmissionReservationsPage] load error:", error);

@@ -3,7 +3,6 @@ import {enqueueSnackbar} from 'notistack';
 import {isCloudinaryConfigured, uploadFileToCloudinary} from '../../../utils/cloudinaryUpload.js';
 import {formatBytes, isAllowedImage, MAX_IMAGE_BYTES} from './admissionSubmissionUtils.js';
 
-/** Upload ảnh Cloudinary + cập nhật state `docs` (giống form nộp hồ sơ trường). */
 export function useAdmissionDocumentUpload(setDocs) {
     const cloudinaryReady = isCloudinaryConfigured();
     const [uploadingSlots, setUploadingSlots] = useState(() => new Set());

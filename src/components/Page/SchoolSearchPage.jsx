@@ -59,7 +59,7 @@ import {
     MAX_COMPARE_SCHOOLS,
     setCompareSchools
 } from "../../utils/compareSchoolsStorage";
-import {showSuccessSnackbar, showWarningSnackbar} from "../ui/AppSnackbar.jsx";
+import {showErrorSnackbar, showSuccessSnackbar, showWarningSnackbar} from "../ui/AppSnackbar.jsx";
 import {
     getSchoolStorageKey,
     getUserIdentity
@@ -71,12 +71,26 @@ import {
 } from "../../services/SchoolPublicService.jsx";
 import {
     deleteParentFavouriteSchool,
+    getParentAdmissionDocuments,
+    getParentAdmissionReservationFormTemplate,
+    putParentAdmissionSchoolsAvailability,
     getParentFavouriteSchools,
     getParentStudent,
+    pickAdmissionDocumentsFromResponse,
     pickAdmissionSchoolsAvailabilityFromResponse,
-    putParentAdmissionSchoolsAvailability,
+    postParentAdmissionReservationForm,
     postParentFavouriteSchool
 } from "../../services/ParentService.jsx";
+import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
+import {
+    applyReservationTemplateToDocs,
+    buildInitialDocsState,
+    buildSubmissionDocumentsPayload,
+    cloneEmptyCatalogDocs,
+    hasSavedReservationTemplateForStudent,
+    pickReservationTemplateBodyFromResponse,
+    pickStudentProfileIdFromTemplateBody,
+} from "./admission/admissionSubmissionUtils.js";
 import SchoolSearchDetailView from "./SchoolSearchDetailView.jsx";
 import {DEFAULT_SCHOOL_IMAGE, mapPublicSchoolDetailToRow, normalizeProvinceName} from "../../utils/schoolPublicMapper.js";
 
@@ -86,6 +100,7 @@ const FAVOURITE_SYNC_PAGE_SIZE = 200;
 const SEARCH_SCHOOLS_LIST_PATH = "/search-schools";
 const SEARCH_SCHOOLS_DETAIL_PATH = "/search-schools/detail";
 const BATCH_ADMISSION_SCHOOL_IDS_KEY = "edubridge_batch_admission_school_ids";
+const PARENT_ADMISSION_RESERVATIONS_PATH = "/parent/admission-reservations";
 const TUITION_FILTER_MAX = 100_000_000;
 
 function getSchoolUrlName(school) {
@@ -831,6 +846,9 @@ export default function SchoolSearchPage() {
     const [batchAdmissionPickerProfileId, setBatchAdmissionPickerProfileId] = React.useState(null);
     const [batchAdmissionPickerError, setBatchAdmissionPickerError] = React.useState("");
 
+    const availabilityCatalogRef = React.useRef([]);
+    const availabilityModalSeqRef = React.useRef(0);
+
     const [availabilityDialogOpen, setAvailabilityDialogOpen] = React.useState(false);
     const [availabilityPendingSchoolIds, setAvailabilityPendingSchoolIds] = React.useState([]);
     const [availabilityStudentProfileId, setAvailabilityStudentProfileId] = React.useState(null);
@@ -842,6 +860,9 @@ export default function SchoolSearchPage() {
         available: [],
         message: ""
     });
+    const [availabilityTemplateDocs, setAvailabilityTemplateDocs] = React.useState([]);
+    const [availabilityTemplateError, setAvailabilityTemplateError] = React.useState("");
+    const [availabilitySubmitting, setAvailabilitySubmitting] = React.useState(false);
 
     const closeStudentPickerForAdmission = React.useCallback(() => {
         setBatchAdmissionPickerOpen(false);
@@ -852,13 +873,17 @@ export default function SchoolSearchPage() {
     }, []);
 
     const closeAdmissionAvailabilityDialog = React.useCallback(() => {
+        availabilityModalSeqRef.current += 1;
         setAvailabilityDialogOpen(false);
         setAvailabilityPendingSchoolIds([]);
         setAvailabilityStudentProfileId(null);
         setAvailabilityStudentDisplayName("");
         setAvailabilityCheckLoading(false);
+        setAvailabilitySubmitting(false);
         setAvailabilityError("");
+        setAvailabilityTemplateError("");
         setAvailabilityResult({unavailable: [], available: [], message: ""});
+        setAvailabilityTemplateDocs([]);
     }, []);
 
     const handleBatchSubmitFromSearchList = React.useCallback(() => {
@@ -887,6 +912,8 @@ export default function SchoolSearchPage() {
         setAvailabilityPendingSchoolIds([...batchPageSchoolIds]);
         setAvailabilityResult({unavailable: [], available: [], message: ""});
         setAvailabilityError("");
+        setAvailabilityTemplateError("");
+        setAvailabilityTemplateDocs([]);
         setBatchAdmissionPickerOpen(false);
         setAvailabilityDialogOpen(true);
     }, [batchAdmissionPickerOptions, batchAdmissionPickerProfileId, batchPageSchoolIds]);
@@ -931,52 +958,131 @@ export default function SchoolSearchPage() {
         };
     }, [batchAdmissionPickerOpen]);
 
-    const fetchAdmissionSchoolsAvailability = React.useCallback(async () => {
-        if (availabilityStudentProfileId == null || availabilityPendingSchoolIds.length === 0) return;
+    const loadAvailabilityCatalogOnce = React.useCallback(async () => {
+        if (availabilityCatalogRef.current.length > 0) return availabilityCatalogRef.current;
+        const res = await getParentAdmissionDocuments();
+        const {required, optional} = pickAdmissionDocumentsFromResponse(res);
+        const initial = buildInitialDocsState(required, optional);
+        availabilityCatalogRef.current = cloneEmptyCatalogDocs(initial);
+        return availabilityCatalogRef.current;
+    }, []);
+
+    const fetchAvailabilityModalData = React.useCallback(async () => {
+        const sid = Number(availabilityStudentProfileId);
+        if (!Number.isFinite(sid) || sid <= 0) return;
+        if (availabilityPendingSchoolIds.length === 0) return;
+
+        const seq = ++availabilityModalSeqRef.current;
         setAvailabilityCheckLoading(true);
         setAvailabilityError("");
+        setAvailabilityTemplateError("");
         setAvailabilityResult({unavailable: [], available: [], message: ""});
+        setAvailabilityTemplateDocs([]);
+
         try {
-            const res = await putParentAdmissionSchoolsAvailability(
-                availabilityStudentProfileId,
-                availabilityPendingSchoolIds
-            );
-            setAvailabilityResult(pickAdmissionSchoolsAvailabilityFromResponse(res));
+            const catalog = await loadAvailabilityCatalogOnce();
+            if (seq !== availabilityModalSeqRef.current) return;
+
+            const [templateSettled, availabilitySettled] = await Promise.allSettled([
+                getParentAdmissionReservationFormTemplate(sid),
+                putParentAdmissionSchoolsAvailability(sid, availabilityPendingSchoolIds),
+            ]);
+            if (seq !== availabilityModalSeqRef.current) return;
+
+            if (availabilitySettled.status === "fulfilled") {
+                setAvailabilityResult(
+                    pickAdmissionSchoolsAvailabilityFromResponse(availabilitySettled.value),
+                );
+            } else {
+                setAvailabilityResult({unavailable: [], available: [], message: ""});
+                const availErr = availabilitySettled.reason;
+                setAvailabilityError(
+                    availErr?.response?.data?.message ||
+                        availErr?.message ||
+                        "Không kiểm tra được trạng thái trường.",
+                );
+            }
+
+            if (templateSettled.status === "fulfilled") {
+                const body = pickReservationTemplateBodyFromResponse(templateSettled.value);
+                const bodySid = pickStudentProfileIdFromTemplateBody(body);
+                if (bodySid != null && bodySid !== sid) {
+                    setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
+                    setAvailabilityTemplateError(
+                        "Không tải được hồ sơ giữ chỗ của học sinh này. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+                    );
+                } else {
+                    const applied = applyReservationTemplateToDocs(catalog, body, sid);
+                    setAvailabilityTemplateDocs(applied);
+                    if (!hasSavedReservationTemplateForStudent(body, sid)) {
+                        setAvailabilityTemplateError(
+                            "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                        );
+                    }
+                }
+            } else {
+                const templateErr = templateSettled.reason;
+                setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
+                if (templateErr?.response?.status === 404) {
+                    setAvailabilityTemplateError(
+                        "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                    );
+                } else {
+                    setAvailabilityTemplateError(
+                        templateErr?.response?.data?.message ||
+                            templateErr?.message ||
+                            "Không tải được hồ sơ giữ chỗ.",
+                    );
+                }
+            }
         } catch (e) {
-            setAvailabilityResult({unavailable: [], available: [], message: ""});
+            if (seq !== availabilityModalSeqRef.current) return;
             setAvailabilityError(
-                e?.response?.data?.message || e?.message || "Không kiểm tra được trạng thái trường."
+                e?.response?.data?.message || e?.message || "Không tải được dữ liệu kiểm tra hồ sơ.",
             );
         } finally {
-            setAvailabilityCheckLoading(false);
+            if (seq === availabilityModalSeqRef.current) {
+                setAvailabilityCheckLoading(false);
+            }
         }
-    }, [availabilityStudentProfileId, availabilityPendingSchoolIds]);
+    }, [availabilityStudentProfileId, availabilityPendingSchoolIds, loadAvailabilityCatalogOnce]);
 
     React.useEffect(() => {
         if (!availabilityDialogOpen) return undefined;
         if (availabilityStudentProfileId == null || availabilityPendingSchoolIds.length === 0) {
             return undefined;
         }
-        fetchAdmissionSchoolsAvailability();
-        return undefined;
+        fetchAvailabilityModalData();
+        return () => {
+            availabilityModalSeqRef.current += 1;
+        };
     }, [
         availabilityDialogOpen,
         availabilityStudentProfileId,
         availabilityPendingSchoolIds,
-        fetchAdmissionSchoolsAvailability
+        fetchAvailabilityModalData,
     ]);
 
     const availabilityUnavailableRows = React.useMemo(() => {
-        const out = [];
         const groups = Array.isArray(availabilityResult.unavailable) ? availabilityResult.unavailable : [];
+        const out = [];
         for (const g of groups) {
-            const reason = String(g?.reason || "").trim() || "Không đủ điều kiện.";
-            for (const s of Array.isArray(g?.schools) ? g.schools : []) {
+            if (Array.isArray(g?.schools)) {
+                const reason = String(g?.reason || "").trim() || "Không đủ điều kiện.";
+                for (const s of g.schools) {
+                    out.push({
+                        key: `${reason}-${s?.schoolId ?? s?.schoolName}`,
+                        schoolId: s?.schoolId,
+                        schoolName: String(s?.schoolName || "").trim() || `Trường #${s?.schoolId ?? "—"}`,
+                        reason,
+                    });
+                }
+            } else if (g?.schoolId != null || g?.schoolName) {
                 out.push({
-                    key: `${reason}-${s?.schoolId ?? s?.schoolName}`,
-                    schoolId: s?.schoolId,
-                    schoolName: String(s?.schoolName || "").trim() || `Trường #${s?.schoolId ?? "—"}`,
-                    reason,
+                    key: `u-${g?.schoolId ?? g?.schoolName}`,
+                    schoolId: g.schoolId,
+                    schoolName: String(g.schoolName || "").trim() || `Trường #${g.schoolId ?? "—"}`,
+                    reason: String(g.reason || g.message || "").trim() || "Không đủ điều kiện.",
                 });
             }
         }
@@ -1007,7 +1113,7 @@ export default function SchoolSearchPage() {
                         kind: "available",
                         key: `a-${id}`,
                         schoolId: id,
-                        schoolName: String(a?.schoolName || "").trim() || `Trường #${id}`
+                        schoolName: String(a?.schoolName || "").trim() || `Trường #${id}`,
                     };
                 }
                 if (unavailableById.has(id)) {
@@ -1017,7 +1123,7 @@ export default function SchoolSearchPage() {
                         key: `u-${id}`,
                         schoolId: id,
                         schoolName: u.schoolName,
-                        reason: u.reason
+                        reason: u.reason,
                     };
                 }
                 const school = schools.find((s) => Number(s?.id) === id);
@@ -1027,7 +1133,7 @@ export default function SchoolSearchPage() {
                     key: `i-${id}`,
                     schoolId: id,
                     schoolName,
-                    reason: "Hệ thống không trả về trạng thái kiểm tra cho trường này."
+                    reason: "Hệ thống không trả về trạng thái kiểm tra cho trường này.",
                 };
             })
             .filter(Boolean);
@@ -1039,33 +1145,68 @@ export default function SchoolSearchPage() {
         availabilityPendingSchoolIds,
         availabilityResult.available,
         availabilityUnavailableRows,
-        schools
+        schools,
     ]);
 
     const orderedAvailableAdmissionIds = React.useMemo(() => {
         const availableIds = new Set(
             (Array.isArray(availabilityResult.available) ? availabilityResult.available : [])
                 .map((a) => Number(a?.schoolId))
-                .filter((id) => Number.isFinite(id))
+                .filter((id) => Number.isFinite(id) && id > 0),
         );
         return availabilityPendingSchoolIds.filter((id) => availableIds.has(Number(id)));
     }, [availabilityPendingSchoolIds, availabilityResult.available]);
 
-    const handleConfirmAdmissionAfterAvailability = React.useCallback(() => {
+    const handleConfirmAdmissionAfterAvailability = React.useCallback(async () => {
+        const sid = Number(availabilityStudentProfileId);
+        if (!Number.isFinite(sid) || sid <= 0) {
+            showWarningSnackbar("Vui lòng chọn hồ sơ học sinh.");
+            return;
+        }
         if (orderedAvailableAdmissionIds.length === 0) {
-            showWarningSnackbar("Không có trường nào đủ điều kiện để tiếp tục nộp hồ sơ.");
+            showWarningSnackbar("Không có trường nào đủ điều kiện để nộp hồ sơ.");
             return;
         }
+        if (availabilityTemplateError) {
+            showWarningSnackbar(availabilityTemplateError);
+            return;
+        }
+        const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
+        if (submissionDocuments.length === 0) {
+            showWarningSnackbar(
+                "Hồ sơ giữ chỗ chưa có minh chứng. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+            );
+            return;
+        }
+
+        setAvailabilitySubmitting(true);
         try {
-            sessionStorage.setItem(BATCH_ADMISSION_SCHOOL_IDS_KEY, JSON.stringify(orderedAvailableAdmissionIds));
-        } catch {
-            showWarningSnackbar("Trình duyệt không cho lưu hàng đợi nộp hồ sơ. Vui lòng thử lại.");
-            return;
+            const res = await postParentAdmissionReservationForm({
+                studentProfileId: sid,
+                schoolIds: orderedAvailableAdmissionIds,
+                submissionDocuments,
+            });
+            showSuccessSnackbar(
+                res?.data?.message || "Nộp hồ sơ vào trường thành công.",
+            );
+            closeAdmissionAvailabilityDialog();
+            navigate(PARENT_ADMISSION_RESERVATIONS_PATH);
+        } catch (e) {
+            console.error("[SchoolSearchPage] submit admission form:", e);
+            showErrorSnackbar(
+                e?.response?.data?.message || e?.message || "Nộp hồ sơ thất bại, vui lòng thử lại.",
+            );
+        } finally {
+            setAvailabilitySubmitting(false);
         }
-        const first = orderedAvailableAdmissionIds[0];
-        closeAdmissionAvailabilityDialog();
-        navigate(`${SEARCH_SCHOOLS_DETAIL_PATH}?detail=${encodeURIComponent(`id:${first}`)}&batchAdmission=1`);
-    }, [closeAdmissionAvailabilityDialog, navigate, orderedAvailableAdmissionIds]);
+    }, [
+        availabilityStudentProfileId,
+        availabilityTemplateDocs,
+        availabilityTemplateError,
+        closeAdmissionAvailabilityDialog,
+        navigate,
+        orderedAvailableAdmissionIds,
+    ]);
 
     const detailKeyForActions = detailSchool ? getSchoolStorageKey(detailSchool) : "";
     const detailIsSaved = Boolean(detailSchool?.isFavourite);
@@ -2141,6 +2282,40 @@ export default function SchoolSearchPage() {
                             mb: 1.25
                         }}
                     >
+                        Hồ sơ giữ chỗ
+                    </Typography>
+
+                    {availabilityTemplateError ? (
+                        <Alert severity="warning" sx={{mb: 2, borderRadius: 2}}>
+                            {availabilityTemplateError}
+                        </Alert>
+                    ) : null}
+
+                    <Box sx={{mb: 2.75}}>
+                        <AdmissionDocumentsSection
+                            docs={availabilityTemplateDocs}
+                            docsLoading={availabilityCheckLoading}
+                            docsError={availabilityTemplateError && !availabilityCheckLoading ? "" : ""}
+                            cloudinaryReady
+                            uploadingSlots={new Set()}
+                            disabled
+                            readOnly
+                            onPickFile={() => {}}
+                            onRemoveSlot={() => {}}
+                            emptyMessage="Chưa có hồ sơ giữ chỗ cho học sinh này."
+                        />
+                    </Box>
+
+                    <Typography
+                        sx={{
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            letterSpacing: "0.06em",
+                            color: "#64748b",
+                            textTransform: "uppercase",
+                            mb: 1.25
+                        }}
+                    >
                         Kết quả kiểm tra
                     </Typography>
 
@@ -2170,10 +2345,9 @@ export default function SchoolSearchPage() {
                     {!availabilityCheckLoading &&
                     availabilityStudentProfileId != null &&
                     !availabilityError &&
-                    availabilityOrderedDisplayRows.length === 0 &&
-                    availabilityPendingSchoolIds.length > 0 ? (
+                    availabilityOrderedDisplayRows.length === 0 ? (
                         <Typography sx={{fontSize: "0.9rem", color: "#64748b", fontStyle: "italic", lineHeight: 1.55}}>
-                            Chưa có kết quả. Vui lòng đóng và thử lại.
+                            Chưa có trường nào trong kết quả kiểm tra.
                         </Typography>
                     ) : null}
 
@@ -2360,6 +2534,7 @@ export default function SchoolSearchPage() {
                     <Button
                         variant="outlined"
                         onClick={closeAdmissionAvailabilityDialog}
+                        disabled={availabilitySubmitting}
                         sx={{
                             textTransform: "none",
                             fontWeight: 700,
@@ -2378,6 +2553,8 @@ export default function SchoolSearchPage() {
                         onClick={handleConfirmAdmissionAfterAvailability}
                         disabled={
                             availabilityCheckLoading ||
+                            availabilitySubmitting ||
+                            Boolean(availabilityTemplateError) ||
                             orderedAvailableAdmissionIds.length === 0 ||
                             availabilityStudentProfileId == null
                         }
@@ -2393,7 +2570,7 @@ export default function SchoolSearchPage() {
                             "&.Mui-disabled": {bgcolor: "#e2e8f0", color: "#94a3b8", boxShadow: "none"}
                         }}
                     >
-                        Tiếp tục nộp hồ sơ
+                        {availabilitySubmitting ? "Đang nộp..." : "Nộp hồ sơ"}
                     </Button>
                 </DialogActions>
             </Dialog>

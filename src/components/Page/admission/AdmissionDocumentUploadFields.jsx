@@ -1,18 +1,91 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
     Box,
     CircularProgress,
     IconButton,
+    Modal,
     Stack,
     Tooltip,
     Typography,
 } from '@mui/material';
 import {
+    Close as CloseIcon,
     CloudUpload as CloudUploadIcon,
     DeleteOutline as DeleteOutlineIcon,
     InsertPhoto as InsertPhotoIcon,
+    ZoomIn as ZoomInIcon,
 } from '@mui/icons-material';
 import {HOC_BA_THCS_GRADE_LABELS} from './admissionSubmissionUtils.js';
+
+function ImagePreviewModal({preview, onClose}) {
+    const open = Boolean(preview?.url);
+    return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            slotProps={{
+                backdrop: {
+                    sx: {
+                        backdropFilter: 'blur(8px)',
+                        bgcolor: 'rgba(15, 23, 42, 0.5)',
+                    },
+                },
+            }}
+            sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: {xs: 2, md: 3},
+            }}
+        >
+            <Box sx={{position: 'relative', outline: 'none', maxWidth: '100%'}}>
+                <IconButton
+                    aria-label="Đóng"
+                    onClick={onClose}
+                    sx={{
+                        position: 'absolute',
+                        top: -44,
+                        right: 0,
+                        color: '#fff',
+                        bgcolor: 'rgba(15, 23, 42, 0.55)',
+                        '&:hover': {bgcolor: 'rgba(15, 23, 42, 0.75)'},
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
+                {preview?.title ? (
+                    <Typography
+                        sx={{
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: 15,
+                            mb: 1,
+                            textAlign: 'center',
+                            textShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                        }}
+                    >
+                        {preview.title}
+                    </Typography>
+                ) : null}
+                <Box
+                    component="img"
+                    src={preview?.url || ''}
+                    alt={preview?.title || 'Minh chứng'}
+                    sx={{
+                        display: 'block',
+                        maxWidth: 'min(92vw, 900px)',
+                        maxHeight: '82vh',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
+                        borderRadius: 2,
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
+                    }}
+                />
+            </Box>
+        </Modal>
+    );
+}
 
 export function AdmissionDocumentsSection({
     docs,
@@ -23,9 +96,12 @@ export function AdmissionDocumentsSection({
     disabled,
     onPickFile,
     onRemoveSlot,
+    readOnly = false,
     emptyMessage = 'Không có hồ sơ nào cần nộp.',
 }) {
-    if (!cloudinaryReady) {
+    const [preview, setPreview] = useState(null);
+
+    if (!readOnly && !cloudinaryReady) {
         return (
             <Box
                 sx={{
@@ -63,24 +139,39 @@ export function AdmissionDocumentsSection({
     }
 
     return (
-        <Stack spacing={2}>
-            {docs.map((doc, docIndex) => (
-                <DocumentItem
-                    key={`${doc.code}-${docIndex}`}
-                    ordinal={docIndex + 1}
-                    doc={doc}
-                    docIndex={docIndex}
-                    uploadingSlots={uploadingSlots}
-                    disabled={disabled}
-                    onPickFile={onPickFile}
-                    onRemoveSlot={onRemoveSlot}
-                />
-            ))}
-        </Stack>
+        <>
+            <Stack spacing={2}>
+                {docs.map((doc, docIndex) => (
+                    <DocumentItem
+                        key={`${doc.code}-${docIndex}`}
+                        ordinal={docIndex + 1}
+                        doc={doc}
+                        docIndex={docIndex}
+                        uploadingSlots={uploadingSlots}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                        onPickFile={onPickFile}
+                        onRemoveSlot={onRemoveSlot}
+                        onViewImage={(url, title) => setPreview({url, title})}
+                    />
+                ))}
+            </Stack>
+            <ImagePreviewModal preview={preview} onClose={() => setPreview(null)} />
+        </>
     );
 }
 
-function DocumentItem({ordinal, doc, docIndex, uploadingSlots, disabled, onPickFile, onRemoveSlot}) {
+function DocumentItem({
+    ordinal,
+    doc,
+    docIndex,
+    uploadingSlots,
+    disabled,
+    readOnly,
+    onPickFile,
+    onRemoveSlot,
+    onViewImage,
+}) {
     const slotCount = doc.slots.length;
     const isMultiSlot = slotCount > 1;
 
@@ -120,9 +211,9 @@ function DocumentItem({ordinal, doc, docIndex, uploadingSlots, disabled, onPickF
                     display: 'grid',
                     gridTemplateColumns: isMultiSlot
                         ? {xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 1fr))'}
-                        : {xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'minmax(0, 220px)'},
+                        : {xs: 'auto'},
+                    justifyContent: isMultiSlot ? undefined : 'flex-start',
                     gap: 1.25,
-                    maxWidth: isMultiSlot ? 'none' : {md: 240},
                 }}
             >
                 {doc.slots.map((url, slotIndex) => {
@@ -131,6 +222,7 @@ function DocumentItem({ordinal, doc, docIndex, uploadingSlots, disabled, onPickF
                     const slotLabel = isMultiSlot
                         ? HOC_BA_THCS_GRADE_LABELS[slotIndex] || `Ảnh ${slotIndex + 1}`
                         : 'Ảnh hồ sơ';
+                    const viewTitle = isMultiSlot ? `${doc.name} — ${slotLabel}` : doc.name;
                     return (
                         <UploadSlot
                             key={slotKey}
@@ -138,8 +230,10 @@ function DocumentItem({ordinal, doc, docIndex, uploadingSlots, disabled, onPickF
                             url={url}
                             uploading={isUploading}
                             disabled={disabled}
+                            readOnly={readOnly}
                             onPick={(file) => onPickFile(docIndex, slotIndex, file)}
                             onRemove={() => onRemoveSlot(docIndex, slotIndex)}
+                            onView={() => onViewImage(url, viewTitle)}
                         />
                     );
                 })}
@@ -148,9 +242,10 @@ function DocumentItem({ordinal, doc, docIndex, uploadingSlots, disabled, onPickF
     );
 }
 
-function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
+function UploadSlot({label, url, uploading, disabled, readOnly, onPick, onRemove, onView}) {
     const inputRef = React.useRef(null);
-    const handleClickPicker = () => {
+    const handleClickPicker = (e) => {
+        e?.stopPropagation?.();
         if (disabled || uploading) return;
         inputRef.current?.click();
     };
@@ -159,38 +254,94 @@ function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
         e.target.value = '';
         if (file) onPick(file);
     };
+    const handleView = (e) => {
+        e?.stopPropagation?.();
+        if (uploading || !hasUrl) return;
+        onView();
+    };
     const hasUrl = typeof url === 'string' && url.trim() !== '';
+
+    if (readOnly && !hasUrl) {
+        return (
+            <Box>
+                <Typography sx={{fontSize: '0.74rem', fontWeight: 600, color: '#64748b', mb: 0.4}}>
+                    {label}
+                </Typography>
+                <Box
+                    sx={{
+                        px: 1.5,
+                        py: 1.25,
+                        borderRadius: 1.5,
+                        border: '1px dashed rgba(148,163,184,0.55)',
+                        bgcolor: '#f8fafc',
+                    }}
+                >
+                    <Typography sx={{fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600}}>
+                        Chưa có
+                    </Typography>
+                </Box>
+            </Box>
+        );
+    }
 
     return (
         <Box>
             <Typography sx={{fontSize: '0.74rem', fontWeight: 600, color: '#64748b', mb: 0.4}}>
                 {label}
             </Typography>
-            <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={handleChange}
-                disabled={disabled || uploading}
-            />
+            {!readOnly ? (
+                <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={handleChange}
+                    disabled={disabled || uploading}
+                />
+            ) : null}
             {hasUrl ? (
                 <Box
                     sx={{
                         position: 'relative',
+                        display: 'inline-block',
+                        maxWidth: '100%',
+                        lineHeight: 0,
                         borderRadius: 1.5,
                         overflow: 'hidden',
-                        border: '1px solid rgba(34,197,94,0.45)',
-                        bgcolor: '#f0fdf4',
-                        aspectRatio: '1',
+                        border: '1px solid rgba(34, 197, 94, 0.45)',
+                        bgcolor: '#fff',
                     }}
                 >
                     <Box
-                        component="img"
-                        src={url}
-                        alt={label}
-                        sx={{width: '100%', height: '100%', objectFit: 'cover', display: 'block'}}
-                    />
+                        component="button"
+                        type="button"
+                        onClick={handleView}
+                        disabled={uploading}
+                        aria-label={`Xem ảnh ${label}`}
+                        sx={{
+                            border: 'none',
+                            p: 0,
+                            m: 0,
+                            display: 'block',
+                            lineHeight: 0,
+                            bgcolor: 'transparent',
+                            cursor: uploading ? 'default' : 'zoom-in',
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src={url}
+                            alt={label}
+                            sx={{
+                                display: 'block',
+                                maxWidth: 'min(100vw - 64px, 320px)',
+                                maxHeight: 320,
+                                width: 'auto',
+                                height: 'auto',
+                            }}
+                        />
+                    </Box>
+
                     {uploading ? (
                         <Box
                             sx={{
@@ -200,12 +351,57 @@ function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                zIndex: 2,
                             }}
                         >
                             <CircularProgress size={26} sx={{color: '#fff'}} />
                         </Box>
+                    ) : readOnly ? (
+                        <Tooltip title="Xem ảnh">
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    onClick={handleView}
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 6,
+                                        right: 6,
+                                        zIndex: 3,
+                                        bgcolor: 'rgba(255,255,255,0.92)',
+                                        color: '#1e3a8a',
+                                        border: '1px solid rgba(148,163,184,0.4)',
+                                        width: 28,
+                                        height: 28,
+                                    }}
+                                >
+                                    <ZoomInIcon sx={{fontSize: 16}} />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
                     ) : (
-                        <Stack direction="row" spacing={0.5} sx={{position: 'absolute', top: 6, right: 6}}>
+                        <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{position: 'absolute', top: 6, right: 6, zIndex: 3}}
+                        >
+                            <Tooltip title="Xem ảnh">
+                                <span>
+                                    <IconButton
+                                        size="small"
+                                        onClick={handleView}
+                                        disabled={disabled}
+                                        sx={{
+                                            bgcolor: 'rgba(255,255,255,0.92)',
+                                            color: '#1e3a8a',
+                                            border: '1px solid rgba(148,163,184,0.4)',
+                                            width: 28,
+                                            height: 28,
+                                        }}
+                                    >
+                                        <ZoomInIcon sx={{fontSize: 16}} />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
                             <Tooltip title="Thay ảnh">
                                 <span>
                                     <IconButton
@@ -228,7 +424,10 @@ function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
                                 <span>
                                     <IconButton
                                         size="small"
-                                        onClick={onRemove}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemove();
+                                        }}
                                         disabled={disabled}
                                         sx={{
                                             bgcolor: 'rgba(254,242,242,0.95)',
@@ -245,7 +444,7 @@ function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
                         </Stack>
                     )}
                 </Box>
-            ) : (
+            ) : readOnly ? null : (
                 <Box
                     role="button"
                     tabIndex={disabled || uploading ? -1 : 0}
@@ -258,7 +457,8 @@ function UploadSlot({label, url, uploading, disabled, onPick, onRemove}) {
                         }
                     }}
                     sx={{
-                        aspectRatio: '1',
+                        aspectRatio: '4 / 3',
+                        minHeight: 120,
                         borderRadius: 1.5,
                         border: '2px dashed rgba(59,130,246,0.4)',
                         bgcolor: uploading ? 'rgba(219,234,254,0.4)' : '#f8fafc',

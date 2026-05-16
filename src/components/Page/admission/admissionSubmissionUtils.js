@@ -81,11 +81,20 @@ export function pickStudentName(student) {
 }
 
 export function pickStudentId(student) {
+    return pickStudentProfileIdForTemplateApi(student);
+}
+
+export function pickStudentProfileIdForTemplateApi(student) {
     if (!student || typeof student !== 'object') return null;
-    const raw = student.studentProfileId ?? student.id ?? student.studentId ?? null;
+    const raw =
+        student.studentProfileId ??
+        student.profileId ??
+        student.id ??
+        student.studentId ??
+        null;
     if (raw == null) return null;
     const num = Number(raw);
-    return Number.isFinite(num) && num > 0 ? num : null;
+    return Number.isFinite(num) && num > 0 ? Math.trunc(num) : null;
 }
 
 const GENDER_LABELS = {
@@ -111,14 +120,7 @@ export function pickStudentBirthYear(student) {
 }
 
 export function pickStudentSubLabel(student) {
-    const parts = [];
-    const gender = pickStudentGenderLabel(student);
-    if (gender) parts.push(gender);
-    const birthYear = pickStudentBirthYear(student);
-    if (birthYear) parts.push(`Sinh năm ${birthYear}`);
-    const code = student?.studentCode;
-    if (code != null && String(code).trim() !== '') parts.push(`CCCD: ${String(code).trim()}`);
-    return parts.join(' • ');
+    return pickStudentGenderLabel(student);
 }
 
 export function mapStudentsForPicker(response) {
@@ -184,7 +186,6 @@ function docsFromMandatoryAll(mandatoryAll) {
     return {required, optional};
 }
 
-/** GET template / documents — required + optional. */
 export function pickTemplateFormDocumentsFromResponse(response) {
     const data = response?.data;
     if (data == null) return {required: [], optional: []};
@@ -257,16 +258,242 @@ export function pickTemplateFormDocumentsFromResponse(response) {
     return {required: [], optional: []};
 }
 
-export function pickSubmissionDocumentsFromTemplateResponse(response) {
+export function pickReservationTemplateBodyFromResponse(response) {
     const data = response?.data;
-    const inner = unwrapApiBody(data);
-    if (!inner) return [];
+    return unwrapApiBody(data);
+}
+
+export function pickStudentProfileIdFromTemplateBody(body) {
+    if (!body || typeof body !== 'object') return null;
+    const raw = body.studentProfileId ?? body.studentId;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function templateBodyBelongsToStudent(body, studentProfileId) {
+    const expected = Number(studentProfileId);
+    if (!Number.isFinite(expected) || expected <= 0) return false;
+    const actual = pickStudentProfileIdFromTemplateBody(body);
+    if (actual == null) return false;
+    return actual === expected;
+}
+
+export function cloneEmptyCatalogDocs(catalogDocs) {
+    return (catalogDocs || []).map((d) => ({
+        ...d,
+        slots: d.slots.map(() => null),
+    }));
+}
+
+function templateBodyHasSavedContent(body) {
+    if (!body || typeof body !== 'object') return false;
+    if (body.isApplied === true || body.isApplied === 'true') return true;
+    const meta = pickProfileMetaDataFromTemplate(body);
+    if (
+        meta.some(
+            (d) =>
+                Array.isArray(d?.imageUrl) &&
+                d.imageUrl.some((u) => typeof u === 'string' && u.trim() !== ''),
+        )
+    ) {
+        return true;
+    }
+    const transcripts = body.transcriptImages;
+    return (
+        Array.isArray(transcripts) &&
+        transcripts.some((t) => t?.imageUrl != null && String(t.imageUrl).trim() !== '')
+    );
+}
+
+export function hasSavedReservationTemplate(body) {
+    return templateBodyHasSavedContent(body);
+}
+
+export function hasSavedReservationTemplateForStudent(body, studentProfileId) {
+    const sid = Number(studentProfileId);
+    if (!Number.isFinite(sid) || sid <= 0) return false;
+    if (!templateBodyHasSavedContent(body)) return false;
+    const bodySid = pickStudentProfileIdFromTemplateBody(body);
+    if (bodySid != null && bodySid !== sid) return false;
+    if (bodySid === sid) return true;
+    return templateBodyBelongsToStudent(body, sid);
+}
+
+export function pickProfileMetaDataFromTemplate(body) {
+    if (!body || typeof body !== 'object') return [];
     const raw =
-        inner.submissionDocuments ||
-        inner.profileMetadata ||
-        inner.documents ||
-        inner.submittedDocuments;
+        body.profileMetaData ||
+        body.profileMetadata ||
+        body.submissionDocuments ||
+        body.documents ||
+        body.submittedDocuments;
     return Array.isArray(raw) ? raw : [];
+}
+
+export function pickSubmissionDocumentsFromTemplateResponse(response) {
+    const inner = pickReservationTemplateBodyFromResponse(response);
+    if (!inner) return [];
+    return pickProfileMetaDataFromTemplate(inner);
+}
+
+const RESERVATION_NA_LITERALS = new Set(['n/a', 'na', 'null', 'undefined', '-', '—', 'none']);
+
+export function sanitizeReservationDisplayValue(value) {
+    if (value == null) return null;
+    const s = String(value).trim();
+    if (!s) return null;
+    if (RESERVATION_NA_LITERALS.has(s.toLowerCase())) return null;
+    return s;
+}
+
+function pickReservationField(item, ...keys) {
+    if (!item || typeof item !== 'object') return null;
+    for (const key of keys) {
+        const v = sanitizeReservationDisplayValue(item[key]);
+        if (v != null) return v;
+    }
+    return null;
+}
+
+function pickReservationNumericId(value) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
+export function normalizeParentAdmissionReservationRow(item, index = 0) {
+    if (!item || typeof item !== 'object') return null;
+    const profileMetadata = pickProfileMetaDataFromTemplate(item);
+    const transcriptImages = Array.isArray(item.transcriptImages) ? item.transcriptImages : [];
+    const campusProgramOfferingId = pickReservationNumericId(item.campusProgramOfferingId);
+
+    return {
+        ...item,
+        id: pickReservationNumericId(item.id ?? item.formId) ?? index,
+        studentProfileId: pickReservationNumericId(item.studentProfileId),
+        parentProfileId: pickReservationNumericId(item.parentProfileId),
+        studentName: pickReservationField(item, 'studentName', 'childName', 'studentProfileName'),
+        studentCode: pickReservationField(item, 'studentCode'),
+        gender: item.gender ?? null,
+        identityCard: pickReservationField(item, 'identityCard'),
+        schoolName: pickReservationField(item, 'schoolName'),
+        programName: pickReservationField(item, 'programName'),
+        campusName: pickReservationField(item, 'campusName'),
+        campusProgramOfferingId,
+        parentName: pickReservationField(item, 'parentName', 'guardianName'),
+        parentPhone: pickReservationField(item, 'parentPhone', 'phone'),
+        parentEmail: pickReservationField(item, 'parentEmail'),
+        address: pickReservationField(item, 'address'),
+        methodName: pickReservationField(item, 'methodName'),
+        admissionMethodCode: pickReservationField(item, 'admissionMethodCode', 'methodCode'),
+        createdTime: item.createdTime ?? item.submittedAt ?? item.createdAt ?? item.createdDate ?? null,
+        updatedTime: item.updatedTime ?? null,
+        status: sanitizeReservationDisplayValue(item.status ?? item.formStatus),
+        rejectReason: pickReservationField(item, 'rejectReason'),
+        cancelReason: pickReservationField(item, 'cancelReason'),
+        transferCode: pickReservationField(item, 'transferCode'),
+        paymentProofUrl: pickReservationField(item, 'paymentProofUrl'),
+        profileMetadata,
+        transcriptImages,
+    };
+}
+
+export function submissionDocumentsToReadonlyDocs(submissionDocuments) {
+    if (!Array.isArray(submissionDocuments)) return [];
+    return submissionDocuments
+        .map((doc) => {
+            const code = String(doc?.key ?? doc?.code ?? '').trim();
+            if (!code) return null;
+            let urls = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
+            urls = urls
+                .map((u) => (typeof u === 'string' ? u.trim() : ''))
+                .filter((u) => u !== '');
+            if (!urls.length && doc?.url != null && String(doc.url).trim() !== '') {
+                urls = [String(doc.url).trim()];
+            }
+            if (!urls.length) return null;
+            const slotCount = code === HOC_BA_THCS_CODE ? HOC_BA_THCS_GRADE_LABELS.length : urls.length;
+            const slots = Array.from({length: slotCount}, (_, i) => urls[i] ?? null);
+            return {
+                code,
+                name: documentLabelForCode(code),
+                required: true,
+                slots,
+            };
+        })
+        .filter(Boolean);
+}
+
+const TRANSCRIPT_GRADE_ORDER = ['GRADE_06', 'GRADE_07', 'GRADE_08', 'GRADE_09'];
+
+export function reservationToReadonlyDocs(reservation) {
+    if (!reservation || typeof reservation !== 'object') return [];
+    let docs = submissionDocumentsToReadonlyDocs(
+        reservation.profileMetadata ?? pickProfileMetaDataFromTemplate(reservation),
+    );
+
+    const transcripts = Array.isArray(reservation.transcriptImages) ? reservation.transcriptImages : [];
+    if (!transcripts.length) return docs;
+
+    const slots = buildEmptySlots(HOC_BA_THCS_GRADE_LABELS.length);
+    for (const row of transcripts) {
+        const grade = String(row?.grade ?? row?.gradeLevel ?? '').trim().toUpperCase();
+        const slotIndex = TRANSCRIPT_GRADE_ORDER.indexOf(grade);
+        const url = row?.imageUrl ?? row?.url;
+        if (slotIndex >= 0 && url != null && String(url).trim() !== '') {
+            slots[slotIndex] = String(url).trim();
+        }
+    }
+    if (!slots.some((u) => u != null && String(u).trim() !== '')) return docs;
+
+    const hocBaIndex = docs.findIndex((d) => d.code === HOC_BA_THCS_CODE);
+    if (hocBaIndex >= 0) {
+        docs = docs.slice();
+        docs[hocBaIndex] = {...docs[hocBaIndex], slots};
+    } else {
+        docs = [
+            ...docs,
+            {
+                code: HOC_BA_THCS_CODE,
+                name: documentLabelForCode(HOC_BA_THCS_CODE),
+                required: true,
+                slots,
+            },
+        ];
+    }
+    return docs;
+}
+
+export function applyReservationTemplateToDocs(catalogDocs, templateBody, studentProfileId) {
+    if (!Array.isArray(catalogDocs) || !catalogDocs.length) return catalogDocs || [];
+    const empty = cloneEmptyCatalogDocs(catalogDocs);
+    if (!templateBody || typeof templateBody !== 'object') return empty;
+    if (
+        studentProfileId != null &&
+        !templateBodyBelongsToStudent(templateBody, studentProfileId)
+    ) {
+        return empty;
+    }
+    const meta = pickProfileMetaDataFromTemplate(templateBody);
+    let next = applySubmissionPrefillToDocs(empty, meta);
+
+    const transcripts = Array.isArray(templateBody?.transcriptImages) ? templateBody.transcriptImages : [];
+    if (!transcripts.length) return next;
+
+    const hocBaIndex = next.findIndex((d) => d.code === HOC_BA_THCS_CODE);
+    if (hocBaIndex < 0) return next;
+
+    const slots = next[hocBaIndex].slots.slice();
+    for (const row of transcripts) {
+        const grade = String(row?.grade ?? row?.gradeLevel ?? '').trim().toUpperCase();
+        const slotIndex = TRANSCRIPT_GRADE_ORDER.indexOf(grade);
+        const url = row?.imageUrl ?? row?.url;
+        if (slotIndex >= 0 && url != null && String(url).trim() !== '') {
+            slots[slotIndex] = String(url).trim();
+        }
+    }
+    next = next.slice();
+    next[hocBaIndex] = {...next[hocBaIndex], slots};
+    return next;
 }
 
 export function applySubmissionPrefillToDocs(docs, submissionDocuments) {
