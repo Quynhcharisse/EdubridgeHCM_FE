@@ -44,6 +44,8 @@ function formatBytes(n) {
  * @param {boolean} [props.mediaImageRulesLoading]
  * @param {boolean} [props.disabled]
  * @param {string} [props.inputId]
+ * @param {"cover" | "contain"} [props.previewFit="cover"] — contain: xem đủ chiều dài ảnh (biên lai)
+ * @param {boolean} [props.receiptPreview] — khung preview cao theo ảnh, không crop 1:1
  */
 export default function ImageUpload({
     value,
@@ -54,6 +56,8 @@ export default function ImageUpload({
     mediaImageRulesLoading = false,
     disabled = false,
     inputId: inputIdProp,
+    previewFit = "cover",
+    receiptPreview = false,
 }) {
     const genId = useId();
     const inputId = inputIdProp ?? `image-upload-${genId.replace(/:/g, "")}`;
@@ -323,22 +327,25 @@ export default function ImageUpload({
                             sx={{
                                 position: "relative",
                                 width: "100%",
-                                maxWidth: 280,
+                                maxWidth: receiptPreview ? 420 : 280,
                                 borderRadius: 3,
                                 overflow: "hidden",
                                 bgcolor: "#e2e8f0",
                                 boxShadow: "0 8px 24px rgba(15, 23, 42, 0.1)",
-                                aspectRatio: "1",
+                                ...(receiptPreview
+                                    ? {maxHeight: "min(72vh, 640px)", overflowY: "auto"}
+                                    : {aspectRatio: "1"}),
                             }}
                         >
                             <Box
                                 component="img"
                                 src={previewSrc}
-                                alt="Xem trước ảnh đại diện"
+                                alt="Xem trước ảnh"
                                 sx={{
                                     width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
+                                    height: receiptPreview ? "auto" : "100%",
+                                    maxHeight: receiptPreview ? "none" : "100%",
+                                    objectFit: previewFit,
                                     display: "block",
                                 }}
                             />
