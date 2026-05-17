@@ -22,6 +22,19 @@ export const getCampusAdmissionReservationForms = async ({
     };
 };
 
+export const confirmAdmissionReservationPayment = async ({formId, action, rejectReason}) => {
+    const payload = {
+        formId: Number(formId),
+        action: String(action || "").trim().toUpperCase(),
+    };
+    if (payload.action === "REJECT_PAYMENT") {
+        payload.rejectReason = String(rejectReason || "").trim();
+    }
+    return axiosClient.put("/campus/confirm/admission/reservation/payment", payload, {
+        headers: {"X-Device-Type": "web"},
+    });
+};
+
 export const processAdmissionReservationForm = async ({formId, action, rejectReason, checkedDocuments}) => {
     const payload = {
         formId: Number(formId),

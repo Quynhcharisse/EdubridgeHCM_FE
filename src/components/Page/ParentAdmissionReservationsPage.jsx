@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Avatar,
+    Backdrop,
     Box,
     Button,
     Chip,
@@ -9,8 +10,8 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    Fade,
     IconButton,
-    Link,
     Paper,
     Stack,
     Tab,
@@ -29,7 +30,7 @@ import {
     pickAdmissionReservationFormsFromResponse
 } from "../../services/ParentService.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
-import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
+import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
 import {
     isReservationConfirmed,
     normalizeParentAdmissionReservationRow,
@@ -37,92 +38,16 @@ import {
     sanitizeReservationDisplayValue,
 } from "./admission/admissionSubmissionUtils.js";
 import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
+import {
+    PARENT_RESERVATION_FILTERS,
+    RESERVATION_STATUS,
+    getReservationStatusLabel,
+    getReservationStatusStyle,
+    normalizeReservationStatus,
+    reservationStatusMatchesFilter,
+} from "../../constants/reservationStatusConfig.js";
 
-const FILTERS = [
-    {value: "ALL", label: "Tất cả"},
-    {value: "PENDING", label: "Chờ duyệt", statuses: ["RESERVATION_PENDING", "PENDING"]},
-    {
-        value: "CONFIRMED",
-        label: "Đã xác nhận",
-        statuses: ["RESERVATION_APPROVAL", "RESERVATION_CONFIRMED", "CONFIRMED", "APPROVED", "ACCEPTED"]
-    },
-    {
-        value: "PAYMENT_PENDING",
-        label: "Chờ duyệt thanh toán",
-        statuses: ["RESERVATION_PAYMENT_PENDING"]
-    },
-    {value: "REJECTED", label: "Từ chối", statuses: ["RESERVATION_REJECTED", "REJECTED"]},
-    {value: "CANCELLED", label: "Đã hủy", statuses: ["RESERVATION_CANCELLED", "CANCELLED"]}
-];
-
-const STATUS_META = {
-    RESERVATION_PENDING: {
-        label: "Chờ duyệt",
-        color: "#c2410c",
-        bg: "#ffedd5",
-        border: "#fed7aa"
-    },
-    PENDING: {
-        label: "Chờ duyệt",
-        color: "#c2410c",
-        bg: "#ffedd5",
-        border: "#fed7aa"
-    },
-    RESERVATION_CONFIRMED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    RESERVATION_APPROVAL: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    CONFIRMED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    APPROVED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    RESERVATION_PAYMENT_PENDING: {
-        label: "Chờ duyệt thanh toán",
-        color: "#1d4ed8",
-        bg: "#dbeafe",
-        border: "#93c5fd"
-    },
-    REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fecaca"
-    },
-    RESERVATION_REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fecaca"
-    },
-    CANCELLED: {
-        label: "Đã hủy",
-        color: "#475569",
-        bg: "#e2e8f0",
-        border: "#cbd5e1"
-    },
-    RESERVATION_CANCELLED: {
-        label: "Đã hủy",
-        color: "#475569",
-        bg: "#e2e8f0",
-        border: "#cbd5e1"
-    }
-};
+const FILTERS = PARENT_RESERVATION_FILTERS;
 
 const hasText = (value) => value != null && String(value).trim() !== "";
 
@@ -152,20 +77,18 @@ const getGenderLabel = (gender) => {
 };
 
 const getStatusMeta = (status) => {
-    const key = String(status || "").trim().toUpperCase();
-    return STATUS_META[key] || {
-        label: hasText(status) ? String(status).replaceAll("_", " ") : "Đang xử lý",
+    const style = getReservationStatusStyle(status);
+    if (style) return style;
+    return {
+        label: getReservationStatusLabel(status) || "Đang xử lý",
         color: "#334155",
         bg: "#e2e8f0",
-        border: "#cbd5e1"
+        border: "#cbd5e1",
     };
 };
 
-const getFilterCount = (rows, filter) => {
-    if (filter.value === "ALL") return rows.length;
-    const allowed = new Set(filter.statuses || []);
-    return rows.filter((row) => allowed.has(String(row?.status || "").trim().toUpperCase())).length;
-};
+const getFilterCount = (rows, filter) =>
+    rows.filter((row) => reservationStatusMatchesFilter(row?.status, filter)).length;
 
 function InfoRow({label, value}) {
     if (!isDisplayableValue(value)) return null;
@@ -232,9 +155,17 @@ function DetailLineRow({label, value}) {
     );
 }
 
-function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
+function ReservationCard({reservation, onOpenDetail}) {
+    const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
-    const showPayment = isReservationConfirmed(reservation?.status);
+    const statusHint =
+        normalizedStatus === RESERVATION_STATUS.APPROVAL
+            ? "Vui lòng thanh toán phí giữ chỗ theo hướng dẫn của trường."
+            : normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING
+              ? "Trường đang xác nhận minh chứng thanh toán của bạn."
+              : normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED
+                ? "Minh chứng thanh toán bị từ chối — vui lòng nộp lại."
+                : null;
     const cardTitle = isDisplayableValue(reservation?.schoolName)
         ? reservation.schoolName
         : isDisplayableValue(reservation?.studentName)
@@ -300,6 +231,11 @@ function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
                                 CCCD học sinh: {reservation.studentCode}
                             </Typography>
                         ) : null}
+                        {statusHint ? (
+                            <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mb: 0.75}}>
+                                {statusHint}
+                            </Typography>
+                        ) : null}
                         <Stack spacing={0.75}>
                             {isDisplayableValue(reservation?.campusName) ? (
                                 <Stack direction="row" alignItems="center" spacing={0.75}>
@@ -361,13 +297,37 @@ function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
     );
 }
 
+function PaymentProofImageModal({open, url, onClose}) {
+    if (!url) return null;
+    return (
+        <Backdrop open={open} onClick={onClose} sx={{zIndex: 1400, bgcolor: "rgba(15, 23, 42, 0.38)", backdropFilter: "blur(6px)"}}>
+            <Fade in={open}>
+                <Box onClick={(e) => e.stopPropagation()} sx={{display: "flex", justifyContent: "center", alignItems: "center", p: {xs: 2, md: 4}}}>
+                    <Box
+                        component="img"
+                        src={url}
+                        alt="Minh chứng thanh toán"
+                        sx={{maxWidth: "92vw", maxHeight: "84vh", objectFit: "contain", display: "block"}}
+                    />
+                </Box>
+            </Fade>
+        </Backdrop>
+    );
+}
+
 function DetailDialog({reservation, onClose}) {
     const open = Boolean(reservation);
+    const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
+    const [paymentPreviewOpen, setPaymentPreviewOpen] = useState(false);
     const readonlyDocs = useMemo(
         () => (reservation ? reservationToReadonlyDocs(reservation) : []),
         [reservation],
     );
+
+    useEffect(() => {
+        if (!open) setPaymentPreviewOpen(false);
+    }, [open, reservation?.id]);
     const detailTitleSuffix = isDisplayableValue(reservation?.studentName)
         ? ` — ${reservation.studentName}`
         : isDisplayableValue(reservation?.schoolName)
@@ -455,26 +415,33 @@ function DetailDialog({reservation, onClose}) {
                             />
                             <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime) ?? undefined} />
                             <DetailLineRow label="Mã chuyển" value={reservation?.transferCode} />
-                            <DetailLineRow label="Lý do từ chối" value={reservation?.rejectReason} />
-                            <DetailLineRow label="Lý do hủy" value={reservation?.cancelReason} />
-                            {isDisplayableValue(reservation?.paymentProofUrl) ? (
-                                <Box sx={{py: 0.8, borderBottom: "1px dashed #c7d8ea"}}>
-                                    <Typography sx={{fontSize: 14.5, color: "#1e293b"}}>
-                                        <Box component="span" sx={{color: "#2563eb", fontWeight: 700}}>
-                                            Minh chứng thanh toán:
-                                        </Box>{" "}
-                                        <Link
-                                            href={reservation.paymentProofUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{fontWeight: 600}}
-                                        >
-                                            Xem ảnh / tệp
-                                        </Link>
-                                    </Typography>
-                                </Box>
+                            {normalizedStatus === RESERVATION_STATUS.REJECTED ? (
+                                <DetailLineRow label="Lý do từ chối hồ sơ" value={reservation?.rejectReason} />
+                            ) : null}
+                            {normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED ? (
+                                <DetailLineRow label="Lý do từ chối thanh toán" value={reservation?.rejectReason} />
                             ) : null}
                         </DetailSection>
+
+                        {normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING ||
+                        isDisplayableValue(reservation?.paymentProofUrl) ? (
+                            <Paper
+                                elevation={0}
+                                sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}
+                            >
+                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
+                                    Minh chứng thanh toán
+                                </Typography>
+                                <PaymentProofPreview
+                                    url={reservation?.paymentProofUrl}
+                                    onPreview={
+                                        isDisplayableValue(reservation?.paymentProofUrl)
+                                            ? () => setPaymentPreviewOpen(true)
+                                            : undefined
+                                    }
+                                />
+                            </Paper>
+                        ) : null}
 
                         <Paper
                             elevation={0}
@@ -499,6 +466,11 @@ function DetailDialog({reservation, onClose}) {
                     </Stack>
                 </DialogContent>
             </Dialog>
+            <PaymentProofImageModal
+                open={paymentPreviewOpen}
+                url={reservation?.paymentProofUrl}
+                onClose={() => setPaymentPreviewOpen(false)}
+            />
         </>
     );
 }
@@ -563,10 +535,8 @@ export default function ParentAdmissionReservationsPage() {
     }, [loadReservations]);
 
     const filteredReservations = useMemo(() => {
-        if (filter === "ALL") return reservations;
-        const currentFilter = FILTERS.find((item) => item.value === filter);
-        const allowed = new Set(currentFilter?.statuses || []);
-        return reservations.filter((row) => allowed.has(String(row?.status || "").trim().toUpperCase()));
+        const currentFilter = FILTERS.find((item) => item.value === filter) ?? FILTERS[0];
+        return reservations.filter((row) => reservationStatusMatchesFilter(row?.status, currentFilter));
     }, [filter, reservations]);
 
     return (

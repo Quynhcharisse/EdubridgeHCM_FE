@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from "react";
+import TableActionIconButton, {TABLE_ACTION_ICON_SIZE} from "../../ui/TableActionIconButton.jsx";
 import {
     Box,
     Card,
@@ -517,30 +518,14 @@ export default function AdminSchoolVerification() {
                                             <TableCell align="center" sx={{px: 0.5}}>
                                                 <Tooltip title="Xem chi tiết hồ sơ">
                                                     <span>
-                                                        <IconButton
-                                                            size="small"
+                                                        <TableActionIconButton
+                                                            variant="view"
                                                             disabled={!!verifyingId}
                                                             onClick={() => openDetail(item)}
                                                             aria-label="Xem chi tiết hồ sơ"
-                                                            sx={{
-                                                                background: "rgba(37,99,235,0.10)",
-                                                                color: "#3b82f6",
-                                                                border: "1px solid rgba(59,130,246,0.28)",
-                                                                boxShadow: "none",
-                                                                "&:hover": {
-                                                                    background: "rgba(37,99,235,0.16)",
-                                                                    color: "#2563eb",
-                                                                    borderColor: "rgba(37,99,235,0.38)",
-                                                                },
-                                                                "&.Mui-disabled": {
-                                                                    background: "#e2e8f0",
-                                                                    color: "#94a3b8",
-                                                                    boxShadow: "none",
-                                                                },
-                                                            }}
                                                         >
-                                                            <VisibilityRoundedIcon fontSize="small"/>
-                                                        </IconButton>
+                                                            <VisibilityRoundedIcon sx={{fontSize: TABLE_ACTION_ICON_SIZE}}/>
+                                                        </TableActionIconButton>
                                                     </span>
                                                 </Tooltip>
                                             </TableCell>
