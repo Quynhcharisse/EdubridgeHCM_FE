@@ -27,6 +27,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
     useMediaQuery,
 } from "@mui/material";
@@ -53,11 +54,14 @@ import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {
+    confirmAdmissionReservationPayment,
     getCampusAdmissionReservationForms,
     processAdmissionReservationForm,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
+import {PaymentProofPreview} from "../admission/PaymentProofPreview.jsx";
+import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
 import {
     HOC_BA_THCS_CODE,
     HOC_BA_THCS_GRADE_LABELS,
@@ -66,59 +70,38 @@ import {
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
 } from "../admission/admissionSubmissionUtils.js";
+import {
+    RESERVATION_STATUS,
+    RESERVATION_STATUS_FILTER_OPTIONS,
+    RESERVATION_STATUS_FILTER_VALUES,
+    getReservationStatusLabel,
+    getReservationStatusStyle,
+    normalizeReservationStatus,
+} from "../../../constants/reservationStatusConfig.js";
 
-const STATUS_OPTIONS = [
-    {value: "ALL", label: "Tất cả"},
-    {value: "RESERVATION_PENDING", label: "Chờ duyệt"},
-    {value: "RESERVATION_APPROVAL", label: "Đã duyệt"},
-    {value: "RESERVATION_REJECTED", label: "Từ chối"},
-    {value: "RESERVATION_CANCELLED", label: "Đã hủy"},
-];
+const STATUS_ICONS = {
+    [RESERVATION_STATUS.PENDING]: AccessTimeRoundedIcon,
+    [RESERVATION_STATUS.APPROVAL]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.PAYMENT_PENDING]: AccessTimeRoundedIcon,
+    [RESERVATION_STATUS.DEPOSITED]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.REJECTED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.PAYMENT_REJECTED]: CancelRoundedIcon,
+};
 
-const VALID_STATUSES = new Set([
-    "RESERVATION_PENDING",
-    "RESERVATION_APPROVAL",
-    "RESERVATION_REJECTED",
-    "RESERVATION_CANCELLED",
-]);
-
-const STATUS_STYLES = {
-    RESERVATION_PENDING: {
-        label: "Chờ duyệt",
-        color: "#b45309",
-        bg: "#fff7ed",
-        border: "#fdba74",
-        icon: AccessTimeRoundedIcon,
-    },
-    RESERVATION_APPROVAL: {
-        label: "Đã duyệt",
-        color: "#166534",
-        bg: "#dcfce7",
-        border: "#86efac",
-        icon: CheckCircleRoundedIcon,
-    },
-    RESERVATION_REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fca5a5",
-        icon: CancelRoundedIcon,
-    },
-    RESERVATION_CANCELLED: {
-        label: "Đã hủy",
+const statusMeta = (status) => {
+    const key = normalizeReservationStatus(status);
+    const style = getReservationStatusStyle(status);
+    const icon = STATUS_ICONS[key] ?? AccessTimeRoundedIcon;
+    if (style) return {...style, icon};
+    if (!key) return {...getReservationStatusStyle(RESERVATION_STATUS.PENDING), icon};
+    return {
+        label: getReservationStatusLabel(status),
         color: "#475569",
-        bg: "#e2e8f0",
+        bg: "#f1f5f9",
         border: "#cbd5e1",
-        icon: CancelRoundedIcon,
-    },
+        icon,
+    };
 };
-
-const toStatusKey = (value) => {
-    const v = String(value || "").toUpperCase();
-    return VALID_STATUSES.has(v) ? v : "RESERVATION_PENDING";
-};
-
-const statusMeta = (status) => STATUS_STYLES[toStatusKey(status)] ?? STATUS_STYLES.RESERVATION_PENDING;
 
 const formatDateOnly = (value) => {
     if (!value) return "—";
@@ -166,6 +149,71 @@ const StatusChip = ({ status }) => {
 
 const displayOrDash = (value) => sanitizeReservationDisplayValue(value) ?? "—";
 
+const ROW_ACTION_BTN_BASE = {
+    width: 32,
+    height: 32,
+    borderRadius: 1.25,
+    border: "1px solid",
+    p: 0,
+    transition: "background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.15s ease, box-shadow 0.15s ease",
+    "& .MuiSvgIcon-root": {fontSize: 18},
+    "&.Mui-disabled": {opacity: 0.45},
+};
+
+const ROW_ACTION_VARIANTS = {
+    view: {
+        color: "#1d4ed8",
+        bgcolor: "#eff6ff",
+        borderColor: "#bfdbfe",
+        "&:hover": {
+            bgcolor: "#dbeafe",
+            borderColor: "#60a5fa",
+            boxShadow: "0 2px 8px rgba(37, 99, 235, 0.2)",
+            transform: "translateY(-1px)",
+        },
+    },
+    success: {
+        color: "#047857",
+        bgcolor: "#ecfdf5",
+        borderColor: "#86efac",
+        "&:hover": {
+            bgcolor: "#d1fae5",
+            borderColor: "#4ade80",
+            boxShadow: "0 2px 8px rgba(5, 150, 105, 0.22)",
+            transform: "translateY(-1px)",
+        },
+    },
+    danger: {
+        color: "#b91c1c",
+        bgcolor: "#fef2f2",
+        borderColor: "#fecaca",
+        "&:hover": {
+            bgcolor: "#fee2e2",
+            borderColor: "#f87171",
+            boxShadow: "0 2px 8px rgba(220, 38, 38, 0.2)",
+            transform: "translateY(-1px)",
+        },
+    },
+};
+
+function RowActionButton({variant = "view", title, disabled, onClick, children}) {
+    return (
+        <Tooltip title={title} arrow placement="top">
+            <span>
+                <IconButton
+                    size="small"
+                    disabled={disabled}
+                    onClick={onClick}
+                    aria-label={title}
+                    sx={{...ROW_ACTION_BTN_BASE, ...ROW_ACTION_VARIANTS[variant]}}
+                >
+                    {children}
+                </IconButton>
+            </span>
+        </Tooltip>
+    );
+}
+
 const flattenAttachments = (row) => {
     if (!row) return [];
     const files = [];
@@ -186,7 +234,7 @@ const flattenAttachments = (row) => {
 const mapRow = (item, index) => {
     const studentName = item?.studentName ?? item?.childName ?? item?.studentProfileName ?? "Học sinh chưa có tên";
     const parentName = item?.parentName ?? item?.guardianName ?? "Phụ huynh";
-    const status = String(item?.status ?? item?.formStatus ?? "").trim().toUpperCase();
+    const status = normalizeReservationStatus(item?.status ?? item?.formStatus);
     const submittedAt = item?.submittedAt ?? item?.createdTime ?? item?.createdAt ?? item?.createdDate;
     const profileMetadata = pickProfileMetaDataFromTemplate(item);
     const transcriptImages = Array.isArray(item?.transcriptImages) ? item.transcriptImages : [];
@@ -219,8 +267,9 @@ const mapRow = (item, index) => {
     };
 };
 
-function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onViewDetail, onOpenPreview }) {
-    const isPending = row.status === "RESERVATION_PENDING";
+function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onConfirmPayment, onRejectPayment, onViewDetail, onOpenPreview }) {
+    const isPending = row.status === RESERVATION_STATUS.PENDING;
+    const isPaymentPending = row.status === RESERVATION_STATUS.PAYMENT_PENDING;
     const attachmentFiles = flattenAttachments(row);
     const meta = statusMeta(row.status);
     const StatusIcon = meta.icon;
@@ -314,6 +363,34 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                             Từ chối
                         </Button>
                     </Stack>
+                ) : isPaymentPending ? (
+                    <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 200 }, flexShrink: 0 }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<VisibilityRoundedIcon />}
+                            onClick={onViewDetail}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700, borderColor: "#bfdbfe", color: "#1e3a8a" }}
+                        >
+                            Xem chi tiết
+                        </Button>
+                        <Button
+                            variant="contained"
+                            disabled={isSubmitting}
+                            onClick={onConfirmPayment}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 800, background: "linear-gradient(90deg, #0D64DE 0%, #2563eb 100%)" }}
+                        >
+                            Xác nhận hoàn thành
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            disabled={isSubmitting}
+                            onClick={onRejectPayment}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700 }}
+                        >
+                            Từ chối thanh toán
+                        </Button>
+                    </Stack>
                 ) : (
                     <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 180 }, flexShrink: 0 }}>
                         <Button
@@ -324,10 +401,6 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                         >
                             Xem chi tiết
                         </Button>
-                        <Chip
-                            label="Đã xử lý"
-                            sx={{ borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800 }}
-                        />
                     </Stack>
                 )}
             </Stack>
@@ -384,8 +457,20 @@ function DetailInfoRow({ label, value }) {
     );
 }
 
-function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onReject, isSubmitting, fullScreen }) {
-    const isPending = row?.status === "RESERVATION_PENDING";
+function AdmissionReservationDetailDrawer({
+    open,
+    row,
+    onClose,
+    onApprove,
+    onReject,
+    onConfirmPayment,
+    onRejectPayment,
+    onPreviewPaymentProof,
+    isSubmitting,
+    fullScreen,
+}) {
+    const isPending = row?.status === RESERVATION_STATUS.PENDING;
+    const isPaymentPending = row?.status === RESERVATION_STATUS.PAYMENT_PENDING;
     const status = statusMeta(row?.status);
     const readonlyDocs = React.useMemo(
         () => (row ? reservationToReadonlyDocs(row) : []),
@@ -496,27 +581,22 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         />
                     </Paper>
 
-                    {row?.paymentProofUrl ? (
+                    {isPaymentPending || row?.paymentProofUrl ? (
                         <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 0.5}}>
+                            <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
                                 Minh chứng thanh toán
                             </Typography>
-                            <Typography
-                                component="a"
-                                href={row.paymentProofUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                sx={{fontWeight: 600, color: "#2563eb"}}
-                            >
-                                Xem ảnh / tệp
-                            </Typography>
+                            <PaymentProofPreview
+                                url={row?.paymentProofUrl}
+                                onPreview={row?.paymentProofUrl ? onPreviewPaymentProof : undefined}
+                            />
                         </Paper>
                     ) : null}
 
-                    {row?.status === "RESERVATION_REJECTED" && row?.rejectReason ? (
+                    {row?.status === RESERVATION_STATUS.REJECTED && row?.rejectReason ? (
                         <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fecaca", bgcolor: "#fef2f2"}}>
                             <Typography sx={{fontWeight: 800, color: "#b91c1c", mb: 0.8}}>
-                                Lý do từ chối
+                                Lý do từ chối hồ sơ
                             </Typography>
                             <Typography variant="body2" sx={{color: "#7f1d1d"}}>
                                 {row.rejectReason}
@@ -524,13 +604,13 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         </Paper>
                     ) : null}
 
-                    {row?.status === "RESERVATION_CANCELLED" && row?.cancelReason ? (
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "#f8fafc"}}>
-                            <Typography sx={{fontWeight: 800, color: "#475569", mb: 0.8}}>
-                                Lý do hủy
+                    {row?.status === RESERVATION_STATUS.PAYMENT_REJECTED && row?.rejectReason ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fda4af", bgcolor: "#fff1f2"}}>
+                            <Typography sx={{fontWeight: 800, color: "#9f1239", mb: 0.8}}>
+                                Lý do từ chối thanh toán
                             </Typography>
-                            <Typography variant="body2" sx={{color: "#334155"}}>
-                                {row.cancelReason}
+                            <Typography variant="body2" sx={{color: "#881337"}}>
+                                {row.rejectReason}
                             </Typography>
                         </Paper>
                     ) : null}
@@ -547,7 +627,7 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                     ) : null}
                 </Stack>
             </DialogContent>
-            <DialogActions sx={{p: 2, borderTop: "1px solid #b8d8f4", bgcolor: "#eef7ff"}}>
+            <DialogActions sx={{p: 2, borderTop: "1px solid #b8d8f4", bgcolor: "#eef7ff", flexWrap: "wrap", gap: 1}}>
                 {isPending ? (
                     <>
                         <Button variant="contained" onClick={onApprove} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
@@ -557,9 +637,16 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                             Từ chối
                         </Button>
                     </>
-                ) : (
-                    <Chip label="Đã xử lý" sx={{borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800}} />
-                )}
+                ) : isPaymentPending ? (
+                    <>
+                        <Button variant="contained" onClick={onConfirmPayment} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                            Xác nhận hoàn thành
+                        </Button>
+                        <Button variant="outlined" color="error" onClick={onRejectPayment} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                            Từ chối thanh toán
+                        </Button>
+                    </>
+                ) : null}
             </DialogActions>
         </Dialog>
     );
@@ -593,7 +680,8 @@ export default function SchoolCampusAdmissionReservations() {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [search, setSearch] = React.useState("");
-    const [statusFilter, setStatusFilter] = React.useState("RESERVATION_PENDING");
+    const [statusFilter, setStatusFilter] = React.useState("ALL");
+    const [pendingCount, setPendingCount] = React.useState(0);
     const [page, setPage] = React.useState(0);
     const [pageSize] = React.useState(12);
     const [totalItems, setTotalItems] = React.useState(0);
@@ -606,10 +694,12 @@ export default function SchoolCampusAdmissionReservations() {
 
     const [confirmState, setConfirmState] = React.useState({open: false, form: null});
     const [rejectState, setRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
+    const [paymentConfirmState, setPaymentConfirmState] = React.useState({open: false, form: null});
+    const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
 
     const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
-        if (!VALID_STATUSES.has(nextStatus)) return;
+        if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
         setDetailOpen(false);
         setSelectedReservation(null);
         setStatusFilter(nextStatus);
@@ -623,9 +713,11 @@ export default function SchoolCampusAdmissionReservations() {
             const res = await getCampusAdmissionReservationForms({
                 status: statusFilter,
             });
-            const allRows = Array.isArray(res?.items)
-                ? res.items.map(mapRow).filter((row) => VALID_STATUSES.has(row.status))
-                : [];
+            let allRows = Array.isArray(res?.items) ? res.items.map(mapRow) : [];
+            if (statusFilter !== "ALL") {
+                allRows = allRows.filter((row) => row.status === statusFilter);
+            }
+            setPendingCount(allRows.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
             allRows.sort((a, b) => {
                 const diff = new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
                 return sortBy === "OLDEST" ? -diff : diff;
@@ -671,7 +763,6 @@ export default function SchoolCampusAdmissionReservations() {
         setPage(0);
     }, [search, statusFilter]);
 
-    const pendingCount = React.useMemo(() => rows.filter((row) => row.status === "RESERVATION_PENDING").length, [rows]);
     const openDetail = (row) => {
         setSelectedReservation(row);
         setDetailOpen(true);
@@ -681,6 +772,13 @@ export default function SchoolCampusAdmissionReservations() {
         if (files.length === 0) return;
         setPreviewImages(files);
         setSelectedImageIndex(Math.max(0, Math.min(index, files.length - 1)));
+        setImagePreviewOpen(true);
+    };
+    const openPaymentProofPreview = (row) => {
+        const url = row?.paymentProofUrl;
+        if (!url) return;
+        setPreviewImages([{key: "Minh chứng thanh toán", url}]);
+        setSelectedImageIndex(0);
         setImagePreviewOpen(true);
     };
 
@@ -697,7 +795,7 @@ export default function SchoolCampusAdmissionReservations() {
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
             setConfirmState({open: false, form: null});
-            redirectToProcessedStatusView("RESERVATION_APPROVAL");
+            redirectToProcessedStatusView(RESERVATION_STATUS.APPROVAL);
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể phê duyệt hồ sơ."), {variant: "error"});
         } finally {
@@ -724,9 +822,53 @@ export default function SchoolCampusAdmissionReservations() {
             });
             enqueueSnackbar("Từ chối thành công", {variant: "success"});
             setRejectState({open: false, form: null, reason: "", touched: false});
-            redirectToProcessedStatusView("RESERVATION_REJECTED");
+            redirectToProcessedStatusView(RESERVATION_STATUS.REJECTED);
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối hồ sơ."), {variant: "error"});
+        } finally {
+            setSubmittingId(null);
+        }
+    };
+
+    const handlePaymentConfirm = async () => {
+        const form = paymentConfirmState.form;
+        if (!form) return;
+        setSubmittingId(form.id);
+        try {
+            await confirmAdmissionReservationPayment({
+                formId: form.id,
+                action: "CONFIRM",
+            });
+            enqueueSnackbar("Xác nhận hoàn thành thành công", {variant: "success"});
+            setPaymentConfirmState({open: false, form: null});
+            redirectToProcessedStatusView(RESERVATION_STATUS.DEPOSITED);
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể xác nhận thanh toán."), {variant: "error"});
+        } finally {
+            setSubmittingId(null);
+        }
+    };
+
+    const handlePaymentRejectSubmit = async () => {
+        const form = paymentRejectState.form;
+        const reason = String(paymentRejectState.reason || "").trim();
+        if (!form) return;
+        if (!reason) {
+            setPaymentRejectState((prev) => ({...prev, touched: true}));
+            return;
+        }
+        setSubmittingId(form.id);
+        try {
+            await confirmAdmissionReservationPayment({
+                formId: form.id,
+                action: "REJECT_PAYMENT",
+                rejectReason: reason,
+            });
+            enqueueSnackbar("Từ chối thanh toán thành công", {variant: "success"});
+            setPaymentRejectState({open: false, form: null, reason: "", touched: false});
+            redirectToProcessedStatusView(RESERVATION_STATUS.PAYMENT_REJECTED);
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối thanh toán."), {variant: "error"});
         } finally {
             setSubmittingId(null);
         }
@@ -798,7 +940,7 @@ export default function SchoolCampusAdmissionReservations() {
                             onChange={(e) => setStatusFilter(e.target.value)}
                             sx={{minWidth: 180, "& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "white"}}}
                         >
-                            {STATUS_OPTIONS.map((s) => (
+                            {RESERVATION_STATUS_FILTER_OPTIONS.map((s) => (
                                 <MenuItem key={s.value} value={s.value}>
                                     {s.label}
                                 </MenuItem>
@@ -856,7 +998,7 @@ export default function SchoolCampusAdmissionReservations() {
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Chương trình</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Ngày nộp</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Trạng thái</TableCell>
-                                        <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", py: 2, minWidth: 150}}>Thao tác</TableCell>
+                                        <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", py: 2, minWidth: 128}}>Thao tác</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -875,35 +1017,51 @@ export default function SchoolCampusAdmissionReservations() {
                                             <TableCell sx={{py: 2.25, whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
                                             <TableCell sx={{py: 2.25}}><StatusChip status={row.status} /></TableCell>
                                             <TableCell align="right" sx={{py: 2.25}}>
-                                                <Stack direction="row" spacing={0.25} justifyContent="flex-end">
-                                                    <IconButton
-                                                        size="small"
+                                                <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
+                                                    <RowActionButton
+                                                        variant="view"
+                                                        title="Xem chi tiết"
                                                         onClick={() => openDetail(row)}
-                                                        sx={{ color: "#64748b", "&:hover": { color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)" } }}
-                                                        aria-label="Xem chi tiết"
                                                     >
-                                                        <VisibilityRoundedIcon fontSize="small" />
-                                                    </IconButton>
-                                                    {row.status === "RESERVATION_PENDING" ? (
+                                                        <VisibilityRoundedIcon />
+                                                    </RowActionButton>
+                                                    {row.status === RESERVATION_STATUS.PENDING ? (
                                                         <>
-                                                            <IconButton
-                                                                size="small"
+                                                            <RowActionButton
+                                                                variant="success"
+                                                                title="Phê duyệt"
                                                                 disabled={submittingId === row.id}
                                                                 onClick={() => setConfirmState({open: true, form: row})}
-                                                                sx={{ color: "#64748b", "&:hover": { color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)" } }}
-                                                                aria-label="Phê duyệt"
                                                             >
-                                                                <CheckCircleRoundedIcon fontSize="small" />
-                                                            </IconButton>
-                                                            <IconButton
-                                                                size="small"
+                                                                <CheckCircleRoundedIcon />
+                                                            </RowActionButton>
+                                                            <RowActionButton
+                                                                variant="danger"
+                                                                title="Từ chối hồ sơ"
                                                                 disabled={submittingId === row.id}
                                                                 onClick={() => setRejectState({open: true, form: row, reason: "", touched: false})}
-                                                                sx={{ color: "#64748b", "&:hover": { color: "#dc2626", bgcolor: "rgba(220, 38, 38, 0.08)" } }}
-                                                                aria-label="Từ chối"
                                                             >
-                                                                <CancelRoundedIcon fontSize="small" />
-                                                            </IconButton>
+                                                                <CancelRoundedIcon />
+                                                            </RowActionButton>
+                                                        </>
+                                                    ) : row.status === RESERVATION_STATUS.PAYMENT_PENDING ? (
+                                                        <>
+                                                            <RowActionButton
+                                                                variant="success"
+                                                                title="Xác nhận hoàn thành"
+                                                                disabled={submittingId === row.id}
+                                                                onClick={() => setPaymentConfirmState({open: true, form: row})}
+                                                            >
+                                                                <CheckCircleRoundedIcon />
+                                                            </RowActionButton>
+                                                            <RowActionButton
+                                                                variant="danger"
+                                                                title="Từ chối thanh toán"
+                                                                disabled={submittingId === row.id}
+                                                                onClick={() => setPaymentRejectState({open: true, form: row, reason: "", touched: false})}
+                                                            >
+                                                                <CancelRoundedIcon />
+                                                            </RowActionButton>
                                                         </>
                                                     ) : null}
                                                 </Stack>
@@ -928,36 +1086,103 @@ export default function SchoolCampusAdmissionReservations() {
                 </>
             )}
 
-            <Dialog open={confirmState.open} onClose={() => setConfirmState({open: false, form: null})} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{fontWeight: 800}}>Xác nhận phê duyệt</DialogTitle>
-                <DialogContent><Typography>Bạn có chắc muốn duyệt đơn này?</Typography></DialogContent>
-                <DialogActions sx={{p: 2}}>
-                    <Button onClick={() => setConfirmState({open: false, form: null})} disabled={submittingId != null}>Hủy</Button>
-                    <Button variant="contained" onClick={handleApprove} disabled={submittingId != null}>Xác nhận</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={confirmState.open}
+                title="Xác nhận phê duyệt"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>phê duyệt</ConfirmHighlight> hồ sơ nhập học này?
+                    </>
+                }
+                extraDescription={
+                    <>
+                        Hồ sơ sẽ chuyển sang trạng thái <ConfirmHighlight>đã duyệt</ConfirmHighlight> và phụ huynh có thể tiếp tục thanh toán.
+                    </>
+                }
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Phê duyệt"}
+                loading={submittingId != null}
+                onCancel={() => setConfirmState({open: false, form: null})}
+                onConfirm={handleApprove}
+            />
 
-            <Dialog open={rejectState.open} onClose={() => setRejectState({open: false, form: null, reason: "", touched: false})} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{fontWeight: 800}}>Xác nhận từ chối</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={1.2} sx={{pt: 0.5}}>
-                        <Typography variant="body2" sx={{color: "#475569"}}>Nhập lý do từ chối hồ sơ.</Typography>
-                        <TextField
-                            multiline
-                            minRows={3}
-                            placeholder="Nhập lý do từ chối..."
-                            value={rejectState.reason}
-                            onChange={(e) => setRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
-                            error={rejectState.touched && !String(rejectState.reason || "").trim()}
-                            helperText={rejectState.touched && !String(rejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
-                        />
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{p: 2}}>
-                    <Button onClick={() => setRejectState({open: false, form: null, reason: "", touched: false})} disabled={submittingId != null}>Hủy</Button>
-                    <Button color="error" variant="contained" onClick={handleRejectSubmit} disabled={submittingId != null}>Xác nhận từ chối</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={rejectState.open}
+                title="Xác nhận từ chối hồ sơ"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>từ chối hồ sơ</ConfirmHighlight> nhập học này?
+                    </>
+                }
+                extraDescription="Vui lòng nhập lý do từ chối bên dưới."
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận từ chối"}
+                confirmColor="error"
+                loading={submittingId != null}
+                onCancel={() => setRejectState({open: false, form: null, reason: "", touched: false})}
+                onConfirm={handleRejectSubmit}
+            >
+                <TextField
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    placeholder="Nhập lý do từ chối..."
+                    value={rejectState.reason}
+                    onChange={(e) => setRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
+                    error={rejectState.touched && !String(rejectState.reason || "").trim()}
+                    helperText={rejectState.touched && !String(rejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
+                    sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff", fontSize: 15}}}
+                />
+            </ConfirmDialog>
+
+            <ConfirmDialog
+                open={paymentConfirmState.open}
+                title="Xác nhận hoàn thành"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>xác nhận minh chứng thanh toán</ConfirmHighlight> và hoàn tất đơn này?
+                    </>
+                }
+                extraDescription={
+                    <>
+                        Đơn sẽ chuyển sang trạng thái <ConfirmHighlight>đã đặt cọc</ConfirmHighlight> sau khi xác nhận.
+                    </>
+                }
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận hoàn thành"}
+                loading={submittingId != null}
+                onCancel={() => setPaymentConfirmState({open: false, form: null})}
+                onConfirm={handlePaymentConfirm}
+            />
+
+            <ConfirmDialog
+                open={paymentRejectState.open}
+                title="Từ chối thanh toán"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>từ chối minh chứng thanh toán</ConfirmHighlight> này?
+                    </>
+                }
+                extraDescription="Vui lòng nhập lý do từ chối bên dưới."
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận từ chối"}
+                confirmColor="error"
+                loading={submittingId != null}
+                onCancel={() => setPaymentRejectState({open: false, form: null, reason: "", touched: false})}
+                onConfirm={handlePaymentRejectSubmit}
+            >
+                <TextField
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    placeholder="Nhập lý do từ chối..."
+                    value={paymentRejectState.reason}
+                    onChange={(e) => setPaymentRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
+                    error={paymentRejectState.touched && !String(paymentRejectState.reason || "").trim()}
+                    helperText={paymentRejectState.touched && !String(paymentRejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
+                    sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff", fontSize: 15}}}
+                />
+            </ConfirmDialog>
 
             <AdmissionReservationDetailDrawer
                 open={detailOpen}
@@ -973,6 +1198,15 @@ export default function SchoolCampusAdmissionReservations() {
                     setRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
                     if (isMobile) setDetailOpen(false);
                 }}
+                onConfirmPayment={() => {
+                    setPaymentConfirmState({ open: true, form: selectedReservation });
+                    if (isMobile) setDetailOpen(false);
+                }}
+                onRejectPayment={() => {
+                    setPaymentRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
+                    if (isMobile) setDetailOpen(false);
+                }}
+                onPreviewPaymentProof={() => openPaymentProofPreview(selectedReservation)}
             />
 
             <ImagePreviewModal

@@ -1,3 +1,5 @@
+import {normalizeReservationStatus} from '../../../constants/reservationStatusConfig.js';
+
 export const HOC_BA_THCS_CODE = 'HOC_BA';
 export const HOC_BA_THCS_GRADE_LABELS = ['Lớp 6', 'Lớp 7', 'Lớp 8', 'Lớp 9'];
 
@@ -438,7 +440,7 @@ export function normalizeParentAdmissionReservationRow(item, index = 0) {
         admissionMethodCode: pickReservationField(item, 'admissionMethodCode', 'methodCode'),
         createdTime: item.createdTime ?? item.submittedAt ?? item.createdAt ?? item.createdDate ?? null,
         updatedTime: item.updatedTime ?? null,
-        status: sanitizeReservationDisplayValue(item.status ?? item.formStatus),
+        status: normalizeReservationStatus(item.status ?? item.formStatus) || null,
         rejectReason: pickReservationField(item, 'rejectReason'),
         cancelReason: pickReservationField(item, 'cancelReason'),
         transferCode: pickReservationField(item, 'transferCode'),
