@@ -236,15 +236,30 @@ export const postParentAdmissionReservationFormTemplate = async (payload) => {
     return response || null;
 };
 
+export const putParentAdmissionReservationFormTemplate = async (payload) => {
+    const sid = normalizeTemplateStudentProfileId(payload?.studentProfileId);
+    const templateId = Number(payload?.admissionReservationFormTemplateId);
+    if (!Number.isFinite(templateId) || templateId <= 0) {
+        throw new Error('admissionReservationFormTemplateId is required');
+    }
+    const body = {
+        admissionReservationFormTemplateId: Math.trunc(templateId),
+        studentProfileId: sid,
+        submissionDocuments: Array.isArray(payload?.submissionDocuments)
+            ? payload.submissionDocuments
+            : [],
+    };
+    const response = await axiosClient.put('/parent/admission/reservation/form/template', body, {
+        params: {studentProfileId: sid},
+    });
+    return response || null;
+};
+
 export const getParentAdmissionReservationForms = async () => {
     const response = await axiosClient.get('/parent/admission/reservation/form');
     return response || null;
 };
 
-/**
- * PUT /parent/admission/reservation/form — nộp minh chứng thanh toán giữ chỗ.
- * @param {{ admissionFormId: number, campusProgramOfferingId: number, paymentUrl: string }} payload
- */
 export const putParentAdmissionReservationFormPayment = async (payload) => {
     const admissionFormId = normalizeAdmissionFormId(payload?.admissionFormId);
     const offeringId = Number(payload?.campusProgramOfferingId);
@@ -255,13 +270,23 @@ export const putParentAdmissionReservationFormPayment = async (payload) => {
     if (!paymentUrl) {
         throw new Error('paymentUrl is required');
     }
+    const action = String(payload?.action ?? 'payment').trim() || 'payment';
     const body = {
         admissionFormId,
-        action: 'payment',
+        action,
         paymentUrl,
         campusProgramOfferingId: Math.trunc(offeringId),
     };
     const response = await axiosClient.put('/parent/admission/reservation/form', body);
+    return response || null;
+};
+
+export const putParentAdmissionReservationFormConfirmEnrollment = async (admissionFormId) => {
+    const id = normalizeAdmissionFormId(admissionFormId);
+    const response = await axiosClient.put('/parent/admission/reservation/form', {
+        admissionFormId: id,
+        action: 'confirm',
+    });
     return response || null;
 };
 
@@ -273,7 +298,6 @@ function normalizeAdmissionFormId(admissionFormId) {
     return Math.trunc(id);
 }
 
-/** GET /parent/programs/offering?admissionFormId= */
 export const getParentProgramsOffering = async (admissionFormId) => {
     const id = normalizeAdmissionFormId(admissionFormId);
     const response = await axiosClient.get('/parent/programs/offering', {
@@ -282,7 +306,6 @@ export const getParentProgramsOffering = async (admissionFormId) => {
     return response || null;
 };
 
-/** GET /parent/qrCodeInfo?admissionFormId= */
 export const getParentQrCodeInfo = async (admissionFormId) => {
     const id = normalizeAdmissionFormId(admissionFormId);
     const response = await axiosClient.get('/parent/qrCodeInfo', {
@@ -415,6 +438,34 @@ export function pickAdmissionSchoolsAvailabilityFromResponse(response) {
     const unavailable = Array.isArray(inner?.unavailable) ? inner.unavailable : [];
     const available = Array.isArray(inner?.available) ? inner.available : [];
     return {unavailable, available, message: topMessage || (typeof inner?.message === 'string' ? inner.message : '')};
+}
+
+export function pickSchoolAdmissionAvailability(availabilityResult, schoolId) {
+    const targetId = Number(schoolId);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+        return {eligible: false, reason: 'Không xác định được trường để kiểm tra điều kiện nộp hồ sơ.'};
+    }
+    const available = Array.isArray(availabilityResult?.available) ? availabilityResult.available : [];
+    if (
+        available.some((item) => {
+            const id = Number(item?.schoolId ?? item?.id);
+            return Number.isFinite(id) && id === targetId;
+        })
+    ) {
+        return {eligible: true, reason: ''};
+    }
+    for (const row of flattenAdmissionSchoolsUnavailable(availabilityResult?.unavailable)) {
+        if (Number(row.schoolId) === targetId) {
+            return {
+                eligible: false,
+                reason: row.reason || 'Học sinh không đủ điều kiện nộp hồ sơ tại trường này.',
+            };
+        }
+    }
+    return {
+        eligible: false,
+        reason: 'Học sinh không đủ điều kiện nộp hồ sơ tại trường này.',
+    };
 }
 
 export function pickAdmissionReservationFormsFromResponse(response) {

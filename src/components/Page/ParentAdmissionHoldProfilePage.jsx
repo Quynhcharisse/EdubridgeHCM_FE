@@ -8,6 +8,7 @@ import {
     Typography,
 } from '@mui/material';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import {Link as RouterLink} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
 import AdmissionSubmissionFormContent from './admission/AdmissionSubmissionFormContent.jsx';
@@ -19,6 +20,8 @@ import {
     cloneEmptyCatalogDocs,
     hasSavedReservationTemplateForStudent,
     mapStudentsForPicker,
+    pickAdmissionReservationFormTemplateIdFromBody,
+    pickAdmissionReservationFormTemplateIdFromResponse,
     pickReservationTemplateBodyFromResponse,
     pickStudentProfileIdForTemplateApi,
     pickStudentProfileIdFromTemplateBody,
@@ -30,12 +33,15 @@ import {
     getParentStudent,
     pickAdmissionDocumentsFromResponse,
     postParentAdmissionReservationFormTemplate,
+    putParentAdmissionReservationFormTemplate,
 } from '../../services/ParentService.jsx';
 import {APP_PRIMARY_DARK, BRAND_NAVY, BRAND_PASTEL_AURA} from '../../constants/homeLandingTheme';
 
 export default function ParentAdmissionHoldProfilePage() {
     const catalogRef = useRef([]);
     const templateLoadSeqRef = useRef(0);
+    const templateBodyRef = useRef(null);
+    const lastTemplateResRef = useRef(null);
 
     const [studentLoading, setStudentLoading] = useState(true);
     const [studentError, setStudentError] = useState('');
@@ -48,6 +54,8 @@ export default function ParentAdmissionHoldProfilePage() {
     const [docs, setDocs] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [templateAlreadySaved, setTemplateAlreadySaved] = useState(false);
+    const [savedTemplateId, setSavedTemplateId] = useState(null);
+    const [isEditingTemplate, setIsEditingTemplate] = useState(false);
 
     const {cloudinaryReady, uploadingSlots, anyUploading, handlePickFile, handleRemoveSlot} =
         useAdmissionDocumentUpload(setDocs);
@@ -93,28 +101,46 @@ export default function ParentAdmissionHoldProfilePage() {
         const seq = ++templateLoadSeqRef.current;
         setPrefillLoading(true);
         setTemplateAlreadySaved(false);
+        setSavedTemplateId(null);
+        setIsEditingTemplate(false);
+        templateBodyRef.current = null;
+        lastTemplateResRef.current = null;
         setDocs(cloneEmptyCatalogDocs(catalogRef.current));
 
         try {
             const templateRes = await getParentAdmissionReservationFormTemplate(sid);
             if (seq !== templateLoadSeqRef.current) return;
 
+            lastTemplateResRef.current = templateRes;
             const body = pickReservationTemplateBodyFromResponse(templateRes);
+            templateBodyRef.current = body;
             const bodySid = pickStudentProfileIdFromTemplateBody(body);
 
             if (bodySid != null && bodySid !== sid) {
                 setDocs(cloneEmptyCatalogDocs(catalogRef.current));
                 setTemplateAlreadySaved(false);
+                setSavedTemplateId(null);
+                templateBodyRef.current = null;
                 return;
             }
 
             setDocs(applyReservationTemplateToDocs(catalogRef.current, body, sid));
-            setTemplateAlreadySaved(hasSavedReservationTemplateForStudent(body, sid));
+            const saved = hasSavedReservationTemplateForStudent(body, sid);
+            setTemplateAlreadySaved(saved);
+            setSavedTemplateId(
+                saved
+                    ? pickAdmissionReservationFormTemplateIdFromResponse(templateRes, sid) ??
+                      pickAdmissionReservationFormTemplateIdFromBody(body, sid)
+                    : null,
+            );
         } catch (err) {
             if (seq !== templateLoadSeqRef.current) return;
             const status = err?.response?.status;
             setDocs(cloneEmptyCatalogDocs(catalogRef.current));
             setTemplateAlreadySaved(false);
+            setSavedTemplateId(null);
+            templateBodyRef.current = null;
+            lastTemplateResRef.current = null;
             if (status !== 404) {
                 console.warn('[ParentAdmissionHoldProfilePage] load template:', err);
             }
@@ -176,10 +202,61 @@ export default function ParentAdmissionHoldProfilePage() {
         templateLoadSeqRef.current += 1;
         setSelectedStudentId(id);
         setTemplateAlreadySaved(false);
+        setSavedTemplateId(null);
+        setIsEditingTemplate(false);
+        templateBodyRef.current = null;
+        lastTemplateResRef.current = null;
         if (catalogRef.current.length) {
             setDocs(cloneEmptyCatalogDocs(catalogRef.current));
         }
     }, []);
+
+    const resolveTemplateId = useCallback((sid) => {
+        const fromState = Number(savedTemplateId);
+        if (Number.isFinite(fromState) && fromState > 0) return Math.trunc(fromState);
+        return (
+            pickAdmissionReservationFormTemplateIdFromResponse(lastTemplateResRef.current, sid) ??
+            pickAdmissionReservationFormTemplateIdFromBody(templateBodyRef.current, sid)
+        );
+    }, [savedTemplateId]);
+
+    const applyTemplateResponse = useCallback((templateRes, sid) => {
+        lastTemplateResRef.current = templateRes;
+        const body = pickReservationTemplateBodyFromResponse(templateRes);
+        templateBodyRef.current = body;
+        const bodySid = pickStudentProfileIdFromTemplateBody(body);
+        if (bodySid == null || bodySid === sid) {
+            setDocs(applyReservationTemplateToDocs(catalogRef.current, body, sid));
+            const saved = hasSavedReservationTemplateForStudent(body, sid);
+            setTemplateAlreadySaved(saved);
+            setSavedTemplateId(
+                saved
+                    ? pickAdmissionReservationFormTemplateIdFromResponse(templateRes, sid) ??
+                      pickAdmissionReservationFormTemplateIdFromBody(body, sid)
+                    : null,
+            );
+        } else {
+            setDocs(cloneEmptyCatalogDocs(catalogRef.current));
+            setTemplateAlreadySaved(false);
+            setSavedTemplateId(null);
+            templateBodyRef.current = null;
+            lastTemplateResRef.current = null;
+        }
+    }, []);
+
+    const handleStartEdit = useCallback(() => {
+        const sid = Number(selectedStudentId);
+        const templateId = Number.isFinite(sid) && sid > 0 ? resolveTemplateId(sid) : null;
+        if (templateId) setSavedTemplateId(templateId);
+        setIsEditingTemplate(true);
+    }, [selectedStudentId, resolveTemplateId]);
+
+    const handleCancelEdit = useCallback(() => {
+        setIsEditingTemplate(false);
+        if (selectedStudentId) {
+            void loadTemplateForStudent(selectedStudentId);
+        }
+    }, [selectedStudentId, loadTemplateForStudent]);
 
     const validation = useMemo(
         () => validateDocsForSubmit(docs, {selectedStudentId}),
@@ -208,49 +285,54 @@ export default function ParentAdmissionHoldProfilePage() {
             return;
         }
 
+        const shouldUpdate = templateAlreadySaved || isEditingTemplate;
+        const templateId = shouldUpdate ? resolveTemplateId(sid) : null;
+        if (shouldUpdate && !templateId) {
+            enqueueSnackbar(
+                'Không xác định được mã hồ sơ giữ chỗ để cập nhật. Vui lòng tải lại trang.',
+                {variant: 'warning'},
+            );
+            return;
+        }
+
         setSubmitting(true);
         try {
-            await postParentAdmissionReservationFormTemplate({
-                studentProfileId: sid,
-                submissionDocuments,
-            });
-            const templateRes = await getParentAdmissionReservationFormTemplate(sid);
-            const body = pickReservationTemplateBodyFromResponse(templateRes);
-            const bodySid = pickStudentProfileIdFromTemplateBody(body);
-            if (bodySid == null || bodySid === sid) {
-                setDocs(applyReservationTemplateToDocs(catalogRef.current, body, sid));
-                setTemplateAlreadySaved(hasSavedReservationTemplateForStudent(body, sid));
+            if (shouldUpdate) {
+                await putParentAdmissionReservationFormTemplate({
+                    admissionReservationFormTemplateId: templateId,
+                    studentProfileId: sid,
+                    submissionDocuments,
+                });
             } else {
-                setDocs(cloneEmptyCatalogDocs(catalogRef.current));
-                setTemplateAlreadySaved(false);
+                await postParentAdmissionReservationFormTemplate({
+                    studentProfileId: sid,
+                    submissionDocuments,
+                });
             }
-            enqueueSnackbar(
-                templateRes?.data?.message || 'Đã lưu hồ sơ giữ chỗ thành công.',
-                {variant: 'success'},
-            );
+            const templateRes = await getParentAdmissionReservationFormTemplate(sid);
+            applyTemplateResponse(templateRes, sid);
+            setIsEditingTemplate(false);
+            enqueueSnackbar('Lưu mẫu hồ sơ giữ chỗ thành công', {variant: 'success'});
         } catch (err) {
             console.error('[ParentAdmissionHoldProfilePage] submit:', err);
             const serverMsg = err?.response?.data?.message || err?.message || 'Lưu hồ sơ thất bại.';
-            const alreadyExists = String(serverMsg).toLowerCase().includes('đã có mẫu');
-            enqueueSnackbar(
-                alreadyExists
-                    ? `${serverMsg} (đang lưu cho học sinh mã ${sid} — kiểm tra request POST có studentProfileId=${sid} trong body và query).`
-                    : serverMsg,
-                {variant: 'error', autoHideDuration: alreadyExists ? 9000 : 5000},
-            );
+            enqueueSnackbar(serverMsg, {variant: 'error'});
         } finally {
             setSubmitting(false);
         }
     };
 
-    const studentPickerDisabled = submitting || anyUploading || studentLoading;
+    const studentPickerDisabled =
+        submitting || anyUploading || studentLoading || isEditingTemplate;
+    const documentsLocked = templateAlreadySaved && !isEditingTemplate;
     const documentsDisabled =
         submitting ||
         anyUploading ||
         !selectedStudentId ||
         catalogLoading ||
         prefillLoading ||
-        templateAlreadySaved;
+        documentsLocked;
+    const showSaveFooter = !templateAlreadySaved || isEditingTemplate;
 
     return (
         <Box
@@ -288,11 +370,38 @@ export default function ParentAdmissionHoldProfilePage() {
                             borderBottom: '1px solid rgba(147, 197, 253, 0.4)',
                         }}
                     >
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                            <AssignmentTurnedInRoundedIcon sx={{color: '#1e3a8a', fontSize: 22}} />
-                            <Typography sx={{fontSize: '1.08rem', fontWeight: 800, color: '#1e3a8a'}}>
-                                Nộp hồ sơ giữ chỗ
-                            </Typography>
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            flexWrap="wrap"
+                            gap={1}
+                        >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <AssignmentTurnedInRoundedIcon sx={{color: '#1e3a8a', fontSize: 22}} />
+                                <Typography sx={{fontSize: '1.08rem', fontWeight: 800, color: '#1e3a8a'}}>
+                                    Nộp hồ sơ giữ chỗ
+                                </Typography>
+                            </Stack>
+                            {templateAlreadySaved && !isEditingTemplate ? (
+                                <Button
+                                    variant="contained"
+                                    size="medium"
+                                    startIcon={<EditOutlinedIcon />}
+                                    disabled={submitting || anyUploading || docsLoading || studentLoading}
+                                    onClick={handleStartEdit}
+                                    sx={{
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        borderRadius: 2,
+                                        px: 2,
+                                        bgcolor: APP_PRIMARY_DARK,
+                                        boxShadow: '0 6px 16px rgba(37, 99, 235, 0.22)',
+                                    }}
+                                >
+                                    Chỉnh sửa hồ sơ
+                                </Button>
+                            ) : null}
                         </Stack>
                     </Box>
 
@@ -332,7 +441,7 @@ export default function ParentAdmissionHoldProfilePage() {
                         ) : null}
                     </Box>
 
-                    {!templateAlreadySaved ? (
+                    {showSaveFooter ? (
                         <Box
                             sx={{
                                 px: {xs: 2, md: 2.5},
@@ -341,8 +450,28 @@ export default function ParentAdmissionHoldProfilePage() {
                                 bgcolor: '#fafbff',
                                 display: 'flex',
                                 justifyContent: 'flex-end',
+                                gap: 1.25,
+                                flexWrap: 'wrap',
                             }}
                         >
+                            {isEditingTemplate ? (
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    disabled={submitting || anyUploading}
+                                    onClick={handleCancelEdit}
+                                    sx={{
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        borderRadius: 2,
+                                        px: 3,
+                                        py: 1.1,
+                                        width: {xs: '100%', sm: 'auto'},
+                                    }}
+                                >
+                                    Hủy
+                                </Button>
+                            ) : null}
                             <Button
                                 variant="contained"
                                 size="large"
@@ -365,7 +494,11 @@ export default function ParentAdmissionHoldProfilePage() {
                                     width: {xs: '100%', sm: 'auto'},
                                 }}
                             >
-                                {submitting ? 'Đang lưu...' : 'Lưu hồ sơ'}
+                                {submitting
+                                    ? 'Đang lưu...'
+                                    : isEditingTemplate
+                                      ? 'Lưu thay đổi'
+                                      : 'Lưu hồ sơ'}
                             </Button>
                         </Box>
                     ) : null}

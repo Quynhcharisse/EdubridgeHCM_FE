@@ -3584,8 +3584,6 @@ export default function SchoolSearchDetailView({
                   ? "school-detail-campus"
                   : section === "campaign"
                     ? "school-detail-campaign"
-                    : section === "curriculum"
-                    ? "school-detail-curriculum"
                     : section === "facility"
                       ? "school-detail-facility"
                       : section === "policy"
@@ -3621,20 +3619,18 @@ export default function SchoolSearchDetailView({
 
     const detailTabIndex =
         detailActiveSection === "location"
-            ? 7
+            ? 6
             : detailActiveSection === "consult"
-              ? 6
+              ? 5
               : detailActiveSection === "policy"
-                ? 5
+                ? 4
                 : detailActiveSection === "facility"
-                  ? 4
-                  : detailActiveSection === "curriculum"
-                    ? 3
-                    : detailActiveSection === "campaign"
-                      ? 2
-                      : detailActiveSection === "campus"
-                        ? 1
-                        : 0;
+                  ? 3
+                  : detailActiveSection === "campaign" || detailActiveSection === "curriculum"
+                    ? 2
+                    : detailActiveSection === "campus"
+                      ? 1
+                      : 0;
 
     React.useEffect(() => {
         const root = detailScrollRef.current;
@@ -3648,12 +3644,11 @@ export default function SchoolSearchDetailView({
                 const intro = detailIntroRef.current;
                 const campus = detailCampusRef.current;
                 const campaign = detailCampaignRef.current;
-                const curriculum = detailCurriculumRef.current;
                 const facility = detailFacilityRef.current;
                 const policy = detailPolicyRef.current;
                 const loc = detailLocationRef.current;
                 const consult = detailConsultRef.current;
-                if (!intro || !campus || !campaign || !curriculum || !facility || !policy || !loc || !consult) return;
+                if (!intro || !campus || !campaign || !facility || !policy || !loc || !consult) return;
                 const rootRect = root.getBoundingClientRect();
                 const anchor = rootRect.top + DETAIL_SCROLL_HEADROOM;
                 const activationLine = anchor + 24;
@@ -3661,7 +3656,6 @@ export default function SchoolSearchDetailView({
                     ["intro", intro],
                     ["campus", campus],
                     ["campaign", campaign],
-                    ["curriculum", curriculum],
                     ["facility", facility],
                     ["policy", policy],
                     ["consult", consult],
@@ -4116,12 +4110,22 @@ export default function SchoolSearchDetailView({
                     top: `calc(${DETAIL_WITH_HEADER_OFFSET}px + 8px + env(safe-area-inset-top, 0px))`,
                     left: 12,
                     zIndex: 1400,
-                    color: "#fff",
-                    bgcolor: "transparent",
-                    border: "none",
-                    boxShadow: "none",
+                    width: 40,
+                    height: 40,
+                    color: showScrollTopButton ? "#0f172a" : "#fff",
+                    bgcolor: showScrollTopButton ? "rgba(255,255,255,0.96)" : "rgba(15,23,42,0.38)",
+                    border: showScrollTopButton
+                        ? "1px solid rgba(226,232,240,0.95)"
+                        : "1px solid rgba(255,255,255,0.22)",
+                    borderRadius: "50%",
+                    boxShadow: showScrollTopButton
+                        ? "0 2px 10px rgba(15,23,42,0.12)"
+                        : "0 2px 8px rgba(15,23,42,0.2)",
                     p: 0.5,
-                    "&:hover": {bgcolor: "transparent", opacity: 0.85}
+                    transition: "color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+                    "&:hover": {
+                        bgcolor: showScrollTopButton ? "#fff" : "rgba(15,23,42,0.52)",
+                    },
                 }}
             >
                 <ArrowBackIcon/>
@@ -4528,15 +4532,16 @@ export default function SchoolSearchDetailView({
                             position: "sticky",
                             top: 0,
                             zIndex: 20,
-                            bgcolor: "rgba(255,255,255,0.97)",
-                            backdropFilter: "blur(8px)",
-                            WebkitBackdropFilter: "blur(8px)",
-                            pt: 0.35,
-                            pb: 0,
-                            mb: 1.5,
-                            borderBottom: "1px solid rgba(147,197,253,0.4)",
+                            bgcolor: "rgba(255,255,255,0.98)",
+                            backdropFilter: "blur(10px)",
+                            WebkitBackdropFilter: "blur(10px)",
+                            pt: 1,
+                            pb: 1.25,
+                            mb: 2,
+                            borderBottom: "1px solid rgba(226,232,240,0.95)",
                             pl: {xs: 6.5, sm: 7},
-                            boxShadow: "0 4px 12px rgba(15,23,42,0.04)"
+                            pr: {xs: 1.5, sm: 2},
+                            boxShadow: "0 1px 3px rgba(15,23,42,0.06)"
                         }}
                     >
                         <Tabs
@@ -4550,62 +4555,66 @@ export default function SchoolSearchDetailView({
                                           : v === 2
                                             ? "campaign"
                                             : v === 3
-                                              ? "curriculum"
+                                              ? "facility"
                                               : v === 4
-                                                ? "facility"
+                                                ? "policy"
                                                 : v === 5
-                                                  ? "policy"
-                                                  : v === 6
-                                                    ? "consult"
-                                                    : "location"
+                                                  ? "consult"
+                                                  : "location"
                                 )
                             }
                             variant="scrollable"
                             scrollButtons="auto"
                             allowScrollButtonsMobile
-                            TabIndicatorProps={{
-                                sx: {
-                                    height: 3,
-                                    borderRadius: "2px 2px 0 0",
-                                    bgcolor: "#2563eb",
-                                    transition:
-                                        "left 0.4s cubic-bezier(0.2, 0, 0, 1), width 0.4s cubic-bezier(0.2, 0, 0, 1)"
-                                }
-                            }}
+                            TabIndicatorProps={{sx: {display: "none"}}}
                             sx={{
-                                minHeight: 42,
+                                minHeight: 44,
                                 "& .MuiTabs-scrollButtons": {
-                                    width: 28,
-                                    "&.Mui-disabled": {opacity: 0.35}
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "50%",
+                                    border: "1px solid rgba(148,163,184,0.35)",
+                                    bgcolor: "#fff",
+                                    "&.Mui-disabled": {opacity: 0.32}
                                 },
+                                "& .MuiTabs-indicator": {display: "none"},
+                                "& .MuiTabs-flexContainer": {gap: 0.75, py: 0.25},
                                 "& .MuiTab-root": {
                                     textTransform: "none",
                                     fontWeight: 600,
-                                    fontSize: "0.8125rem",
-                                    letterSpacing: "0.01em",
-                                    minHeight: 42,
+                                    fontSize: "0.875rem",
+                                    letterSpacing: "normal",
+                                    minHeight: 36,
                                     minWidth: "auto",
-                                    px: 1.85,
-                                    py: 0.85,
-                                    color: "#60a5fa",
-                                    transition: "color 0.4s ease, background-color 0.4s ease",
+                                    px: 1.75,
+                                    py: 0.75,
+                                    color: "#64748b",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(226,232,240,0.95)",
+                                    bgcolor: "rgba(248,250,252,0.85)",
+                                    transition: "all 0.2s ease",
                                     "&:hover": {
-                                        color: "#38bdf8",
-                                        bgcolor: "rgba(56,189,248,0.12)"
+                                        color: "#334155",
+                                        bgcolor: "#fff",
+                                        borderColor: "rgba(148,163,184,0.45)"
                                     }
                                 },
                                 "& .Mui-selected": {
-                                    color: "#0ea5e9 !important",
-                                    fontWeight: 800,
-                                    bgcolor: "rgba(56,189,248,0.16)"
-                                },
-                                "& .MuiTabs-flexContainer": {gap: 0.25}
+                                    color: "#fff !important",
+                                    fontWeight: 700,
+                                    bgcolor: "#2563eb !important",
+                                    borderColor: "rgba(37,99,235,0.95) !important",
+                                    boxShadow: "0 2px 10px rgba(37,99,235,0.28)",
+                                    "&:hover": {
+                                        bgcolor: "#1d4ed8 !important",
+                                        borderColor: "rgba(29,78,216,0.95) !important"
+                                    }
+                                }
                             }}
                         >
                             <Tab label="Giới thiệu" disableRipple/>
                             <Tab label="Thông tin cơ sở" disableRipple/>
                             <Tab label="Chiến dịch tuyển sinh" disableRipple/>
-                            <Tab label="Chương trình đào tạo" disableRipple/>
                             <Tab label="Cơ sở vật chất" disableRipple/>
                             <Tab label="Chính sách" disableRipple/>
                             <Tab label="Đặt lịch tư vấn" disableRipple/>

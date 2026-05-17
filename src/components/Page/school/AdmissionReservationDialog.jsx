@@ -1,5 +1,7 @@
 import React from "react";
+import {useNavigate} from "react-router-dom";
 import {
+    Alert,
     Box,
     Button,
     Dialog,
@@ -8,6 +10,7 @@ import {
     DialogTitle,
     Divider,
     IconButton,
+    LinearProgress,
     Stack,
     Typography,
 } from "@mui/material";
@@ -20,10 +23,12 @@ import {
     getParentAdmissionReservationFormTemplate,
     getParentStudent,
     pickAdmissionDocumentsFromResponse,
+    pickAdmissionSchoolsAvailabilityFromResponse,
+    pickSchoolAdmissionAvailability,
     postParentAdmissionReservationForm,
+    putParentAdmissionSchoolsAvailability,
 } from "../../../services/ParentService.jsx";
 import {showErrorSnackbar, showSuccessSnackbar, showWarningSnackbar} from "../../ui/AppSnackbar.jsx";
-import {isCloudinaryConfigured, uploadFileToCloudinary} from "../../../utils/cloudinaryUpload.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
 import StudentProfilePicker from "../admission/StudentProfilePicker.jsx";
 import {
@@ -31,17 +36,15 @@ import {
     buildInitialDocsState,
     buildSubmissionDocumentsPayload,
     cloneEmptyCatalogDocs,
-    formatBytes,
     hasSavedReservationTemplateForStudent,
-    isAllowedImage,
     mapStudentsForPicker,
-    MAX_IMAGE_BYTES,
     pickOfferingProgramName,
     pickReservationTemplateBodyFromResponse,
     pickStudentProfileIdFromTemplateBody,
     SECTION_LABEL_SX,
-    validateDocsForSubmit,
 } from "../admission/admissionSubmissionUtils.js";
+
+const PARENT_ADMISSION_RESERVATIONS_PATH = "/parent/admission-reservations";
 
 export default function AdmissionReservationDialog({
     open,
@@ -51,6 +54,8 @@ export default function AdmissionReservationDialog({
     school,
     onSubmitted,
 }) {
+    const navigate = useNavigate();
+
     const offeringId = React.useMemo(() => {
         const raw = offering?.id;
         if (raw == null) return null;
@@ -58,57 +63,167 @@ export default function AdmissionReservationDialog({
         return Number.isFinite(num) && num > 0 ? num : null;
     }, [offering?.id]);
 
-    const templateCatalogRef = React.useRef([]);
-    const offeringCatalogRef = React.useRef([]);
-    const templateLoadSeqRef = React.useRef(0);
+    const schoolId = React.useMemo(() => {
+        const raw = school?.id ?? school?.schoolId;
+        if (raw == null) return null;
+        const num = Number(raw);
+        return Number.isFinite(num) && num > 0 ? num : null;
+    }, [school?.id, school?.schoolId]);
 
-    const [templateCatalogLoading, setTemplateCatalogLoading] = React.useState(false);
+    const templateCatalogRef = React.useRef([]);
+    const studentDataSeqRef = React.useRef(0);
+
+    const [bootstrapLoading, setBootstrapLoading] = React.useState(false);
     const [templateCatalogError, setTemplateCatalogError] = React.useState("");
-    const [templatePrefillLoading, setTemplatePrefillLoading] = React.useState(false);
+    const [studentDataLoading, setStudentDataLoading] = React.useState(false);
     const [templateDocs, setTemplateDocs] = React.useState([]);
     const [templateAlreadySaved, setTemplateAlreadySaved] = React.useState(false);
-
-    const [offeringDocsLoading, setOfferingDocsLoading] = React.useState(false);
-    const [offeringDocsError, setOfferingDocsError] = React.useState("");
-    const [offeringDocs, setOfferingDocs] = React.useState([]);
+    const [templateLoadError, setTemplateLoadError] = React.useState("");
 
     const [studentLoading, setStudentLoading] = React.useState(false);
     const [studentError, setStudentError] = React.useState("");
     const [students, setStudents] = React.useState([]);
     const [selectedStudentId, setSelectedStudentId] = React.useState(null);
 
-    const [uploadingSlots, setUploadingSlots] = React.useState(() => new Set());
-    const [submitting, setSubmitting] = React.useState(false);
+    const [availabilityError, setAvailabilityError] = React.useState("");
+    const [schoolEligibility, setSchoolEligibility] = React.useState({eligible: null, reason: ""});
 
-    const cloudinaryReady = isCloudinaryConfigured();
+    const [submitting, setSubmitting] = React.useState(false);
 
     const resetState = React.useCallback(() => {
         templateCatalogRef.current = [];
-        offeringCatalogRef.current = [];
-        templateLoadSeqRef.current = 0;
+        studentDataSeqRef.current = 0;
         setTemplateDocs([]);
         setTemplateCatalogError("");
         setTemplateAlreadySaved(false);
-        setOfferingDocs([]);
-        setOfferingDocsError("");
+        setTemplateLoadError("");
         setStudentError("");
-        setUploadingSlots(new Set());
+        setAvailabilityError("");
+        setSchoolEligibility({eligible: null, reason: ""});
         setSubmitting(false);
+        setBootstrapLoading(false);
+        setStudentDataLoading(false);
     }, []);
+
+    const loadStudentAdmissionData = React.useCallback(
+        async (studentProfileId) => {
+            const sid = Number(studentProfileId);
+            if (!Number.isFinite(sid) || sid <= 0 || !templateCatalogRef.current.length) return;
+
+            const seq = ++studentDataSeqRef.current;
+            setStudentDataLoading(true);
+            setTemplateLoadError("");
+            setAvailabilityError("");
+            setSchoolEligibility({eligible: null, reason: ""});
+            setTemplateAlreadySaved(false);
+            setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
+
+            try {
+                const availabilityPromise =
+                    schoolId != null
+                        ? putParentAdmissionSchoolsAvailability(sid, [schoolId])
+                        : Promise.resolve(null);
+
+                const [templateSettled, availabilitySettled] = await Promise.allSettled([
+                    getParentAdmissionReservationFormTemplate(sid),
+                    availabilityPromise,
+                ]);
+                if (seq !== studentDataSeqRef.current) return;
+
+                if (schoolId == null) {
+                    setSchoolEligibility({
+                        eligible: false,
+                        reason: "Không xác định được trường để kiểm tra điều kiện nộp hồ sơ.",
+                    });
+                } else if (availabilitySettled.status === "fulfilled") {
+                    const availabilityResult = pickAdmissionSchoolsAvailabilityFromResponse(
+                        availabilitySettled.value,
+                    );
+                    setSchoolEligibility(pickSchoolAdmissionAvailability(availabilityResult, schoolId));
+                } else {
+                    const availErr = availabilitySettled.reason;
+                    setAvailabilityError(
+                        availErr?.response?.data?.message ||
+                            availErr?.message ||
+                            "Không kiểm tra được điều kiện nộp hồ sơ tại trường này.",
+                    );
+                    setSchoolEligibility({eligible: false, reason: ""});
+                }
+
+                if (templateSettled.status === "fulfilled") {
+                    const body = pickReservationTemplateBodyFromResponse(templateSettled.value);
+                    const bodySid = pickStudentProfileIdFromTemplateBody(body);
+
+                    if (bodySid != null && bodySid !== sid) {
+                        setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
+                        setTemplateAlreadySaved(false);
+                        setTemplateLoadError(
+                            "Không tải được hồ sơ giữ chỗ của học sinh này. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+                        );
+                    } else {
+                        setTemplateDocs(
+                            applyReservationTemplateToDocs(templateCatalogRef.current, body, sid),
+                        );
+                        const saved = hasSavedReservationTemplateForStudent(body, sid);
+                        setTemplateAlreadySaved(saved);
+                        if (!saved) {
+                            setTemplateLoadError(
+                                "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                            );
+                        }
+                    }
+                } else {
+                    const templateErr = templateSettled.reason;
+                    setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
+                    setTemplateAlreadySaved(false);
+                    if (templateErr?.response?.status === 404) {
+                        setTemplateLoadError(
+                            "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                        );
+                    } else {
+                        setTemplateLoadError(
+                            templateErr?.response?.data?.message ||
+                                templateErr?.message ||
+                                "Không tải được hồ sơ giữ chỗ.",
+                        );
+                    }
+                }
+            } catch (err) {
+                if (seq !== studentDataSeqRef.current) return;
+                console.error("[AdmissionReservationDialog] load student data:", err);
+                setTemplateLoadError(
+                    err?.response?.data?.message || err?.message || "Không tải được dữ liệu hồ sơ.",
+                );
+            } finally {
+                if (seq === studentDataSeqRef.current) {
+                    setStudentDataLoading(false);
+                }
+            }
+        },
+        [schoolId],
+    );
 
     React.useEffect(() => {
         if (!open) {
             resetState();
             return undefined;
         }
+
         let cancelled = false;
-        setTemplateCatalogLoading(true);
+        setBootstrapLoading(true);
+        setStudentLoading(true);
         setTemplateCatalogError("");
+        setStudentError("");
+
         (async () => {
             try {
-                const res = await getParentAdmissionDocuments();
+                const [docsRes, studentsRes] = await Promise.all([
+                    getParentAdmissionDocuments(),
+                    getParentStudent(),
+                ]);
                 if (cancelled) return;
-                const {required, optional} = pickAdmissionDocumentsFromResponse(res);
+
+                const {required, optional} = pickAdmissionDocumentsFromResponse(docsRes);
                 const initial = buildInitialDocsState(required, optional);
                 templateCatalogRef.current = cloneEmptyCatalogDocs(initial);
                 setTemplateDocs(templateCatalogRef.current);
@@ -117,259 +232,132 @@ export default function AdmissionReservationDialog({
                         "Hệ thống chưa cấu hình danh mục hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ.",
                     );
                 }
-            } catch (err) {
-                if (cancelled) return;
-                console.error("[AdmissionReservationDialog] load template catalog:", err);
-                templateCatalogRef.current = [];
-                setTemplateDocs([]);
-                setTemplateCatalogError(
-                    err?.response?.data?.message || err?.message || "Không tải được danh mục hồ sơ giữ chỗ.",
-                );
-            } finally {
-                if (!cancelled) setTemplateCatalogLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [open, resetState]);
 
-    React.useEffect(() => {
-        if (!open) return undefined;
-        if (offeringId == null) {
-            offeringCatalogRef.current = [];
-            setOfferingDocs([]);
-            setOfferingDocsError("Không xác định được gói tuyển sinh để tải danh sách hồ sơ.");
-            return undefined;
-        }
-        let cancelled = false;
-        setOfferingDocsLoading(true);
-        setOfferingDocsError("");
-        (async () => {
-            try {
-                const res = await getParentAdmissionDocuments(offeringId);
-                if (cancelled) return;
-                const {required, optional} = pickAdmissionDocumentsFromResponse(res);
-                const initial = buildInitialDocsState(required, optional);
-                offeringCatalogRef.current = cloneEmptyCatalogDocs(initial);
-                setOfferingDocs(offeringCatalogRef.current);
-                if (initial.length === 0) {
-                    setOfferingDocsError(
-                        "Nhà trường chưa cấu hình danh sách hồ sơ cần nộp cho gói này.",
-                    );
-                }
-            } catch (err) {
-                if (cancelled) return;
-                console.error("[AdmissionReservationDialog] load offering docs:", err);
-                offeringCatalogRef.current = [];
-                setOfferingDocs([]);
-                setOfferingDocsError(
-                    err?.response?.data?.message || err?.message || "Không tải được danh sách hồ sơ theo chương trình.",
-                );
-            } finally {
-                if (!cancelled) setOfferingDocsLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [open, offeringId]);
-
-    React.useEffect(() => {
-        if (!open) return undefined;
-        let cancelled = false;
-        setStudentLoading(true);
-        setStudentError("");
-        (async () => {
-            try {
-                const res = await getParentStudent();
-                if (cancelled) return;
-                const list = mapStudentsForPicker(res);
+                const list = mapStudentsForPicker(studentsRes);
                 setStudents(list);
                 if (list.length === 0) {
-                    setStudentError("Bạn chưa có hồ sơ học sinh nào. Vui lòng thêm hồ sơ trước khi nộp đơn.");
+                    setStudentError(
+                        "Bạn chưa có hồ sơ học sinh nào. Vui lòng thêm hồ sơ trước khi nộp đơn.",
+                    );
                     setSelectedStudentId(null);
                 } else {
-                    setSelectedStudentId((prev) => {
-                        if (prev != null && list.some((s) => s.id === prev)) return prev;
-                        return list[0].id;
-                    });
+                    const firstId = list[0].id;
+                    setSelectedStudentId(firstId);
+                    if (initial.length > 0) {
+                        await loadStudentAdmissionData(firstId);
+                    }
                 }
             } catch (err) {
                 if (cancelled) return;
-                console.error("[AdmissionReservationDialog] load students:", err);
+                console.error("[AdmissionReservationDialog] bootstrap:", err);
+                templateCatalogRef.current = [];
+                setTemplateDocs([]);
                 setStudents([]);
                 setSelectedStudentId(null);
-                setStudentError(
-                    err?.response?.data?.message || err?.message || "Không tải được danh sách hồ sơ học sinh.",
+                setTemplateCatalogError(
+                    err?.response?.data?.message || err?.message || "Không tải được dữ liệu nộp hồ sơ.",
                 );
             } finally {
-                if (!cancelled) setStudentLoading(false);
+                if (!cancelled) {
+                    setBootstrapLoading(false);
+                    setStudentLoading(false);
+                }
             }
         })();
+
         return () => {
             cancelled = true;
+            studentDataSeqRef.current += 1;
         };
-    }, [open]);
+    }, [open, loadStudentAdmissionData, resetState]);
 
-    const loadTemplateForStudent = React.useCallback(async (studentProfileId) => {
-        const sid = Number(studentProfileId);
-        if (!Number.isFinite(sid) || sid <= 0 || !templateCatalogRef.current.length) return;
-
-        const seq = ++templateLoadSeqRef.current;
-        setTemplatePrefillLoading(true);
-        setTemplateAlreadySaved(false);
-        setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
-
-        try {
-            const templateRes = await getParentAdmissionReservationFormTemplate(sid);
-            if (seq !== templateLoadSeqRef.current) return;
-
-            const body = pickReservationTemplateBodyFromResponse(templateRes);
-            const bodySid = pickStudentProfileIdFromTemplateBody(body);
-
-            if (bodySid != null && bodySid !== sid) {
-                setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
-                setTemplateAlreadySaved(false);
-                return;
-            }
-
-            setTemplateDocs(applyReservationTemplateToDocs(templateCatalogRef.current, body, sid));
-            setTemplateAlreadySaved(hasSavedReservationTemplateForStudent(body, sid));
-        } catch (err) {
-            if (seq !== templateLoadSeqRef.current) return;
-            setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
-            setTemplateAlreadySaved(false);
-            const status = err?.response?.status;
-            if (status !== 404) {
-                console.warn("[AdmissionReservationDialog] load template:", err);
-            }
-        } finally {
-            if (seq === templateLoadSeqRef.current) {
-                setTemplatePrefillLoading(false);
-            }
-        }
-    }, []);
-
-    React.useEffect(() => {
-        if (!open || !selectedStudentId || templateCatalogLoading) return undefined;
-        loadTemplateForStudent(selectedStudentId);
-        return () => {
-            templateLoadSeqRef.current += 1;
-        };
-    }, [open, selectedStudentId, templateCatalogLoading, loadTemplateForStudent]);
-
-    const handleSelectStudent = React.useCallback((id) => {
-        templateLoadSeqRef.current += 1;
-        setSelectedStudentId(id);
-        setTemplateAlreadySaved(false);
-        if (templateCatalogRef.current.length) {
-            setTemplateDocs(cloneEmptyCatalogDocs(templateCatalogRef.current));
-        }
-    }, []);
-
-    const setSlotUploading = React.useCallback((slotKey, isUploading) => {
-        setUploadingSlots((prev) => {
-            const next = new Set(prev);
-            if (isUploading) next.add(slotKey);
-            else next.delete(slotKey);
-            return next;
-        });
-    }, []);
-
-    const handlePickFile = React.useCallback(
-        async (docIndex, slotIndex, file) => {
-            if (!file) return;
-            if (!cloudinaryReady) {
-                showErrorSnackbar("Chưa cấu hình Cloudinary, không thể tải ảnh lên.");
-                return;
-            }
-            if (!isAllowedImage(file)) {
-                showWarningSnackbar("Chỉ hỗ trợ định dạng ảnh JPG, JPEG, PNG, WEBP.");
-                return;
-            }
-            if (file.size > MAX_IMAGE_BYTES) {
-                showWarningSnackbar(`Ảnh vượt quá ${formatBytes(MAX_IMAGE_BYTES)}, vui lòng chọn ảnh nhỏ hơn.`);
-                return;
-            }
-            const slotKey = `offering-${docIndex}-${slotIndex}`;
-            setSlotUploading(slotKey, true);
-            try {
-                const result = await uploadFileToCloudinary(file);
-                setOfferingDocs((prev) => {
-                    const next = prev.slice();
-                    const target = next[docIndex];
-                    if (!target) return prev;
-                    const slots = target.slots.slice();
-                    slots[slotIndex] = result.url;
-                    next[docIndex] = {...target, slots};
-                    return next;
-                });
-            } catch (err) {
-                console.error("[AdmissionReservationDialog] upload error:", err);
-                showErrorSnackbar(err?.message || "Tải ảnh lên thất bại, vui lòng thử lại.");
-            } finally {
-                setSlotUploading(slotKey, false);
-            }
+    const handleSelectStudent = React.useCallback(
+        (id) => {
+            if (id === selectedStudentId) return;
+            studentDataSeqRef.current += 1;
+            setSelectedStudentId(id);
+            loadStudentAdmissionData(id);
         },
-        [cloudinaryReady, setSlotUploading]
+        [loadStudentAdmissionData, selectedStudentId],
     );
 
-    const handleRemoveSlot = React.useCallback((docIndex, slotIndex) => {
-        setOfferingDocs((prev) => {
-            const next = prev.slice();
-            const target = next[docIndex];
-            if (!target) return prev;
-            const slots = target.slots.slice();
-            slots[slotIndex] = null;
-            next[docIndex] = {...target, slots};
-            return next;
-        });
-    }, []);
-
-    const anyUploading = uploadingSlots.size > 0;
-    const templateDocsLoading = templateCatalogLoading || templatePrefillLoading;
+    const templateDocsLoading = bootstrapLoading || studentDataLoading;
 
     const validation = React.useMemo(() => {
         if (offeringId == null) {
             return {ok: false, message: "Thiếu mã gói tuyển sinh."};
         }
-        if (!templateAlreadySaved) {
+        if (!Number.isFinite(Number(selectedStudentId)) || Number(selectedStudentId) <= 0) {
+            return {ok: false, message: "Vui lòng chọn hồ sơ học sinh."};
+        }
+        if (templateDocsLoading) {
+            return {ok: false, message: ""};
+        }
+        if (availabilityError) {
+            return {ok: false, message: availabilityError};
+        }
+        if (schoolEligibility.eligible === false) {
             return {
                 ok: false,
                 message:
-                    "Vui lòng lưu hồ sơ giữ chỗ tại trang Hồ sơ giữ chỗ trước khi nộp đơn theo chương trình.",
+                    schoolEligibility.reason ||
+                    "Học sinh không đủ điều kiện nộp hồ sơ tại trường này.",
             };
         }
-        return validateDocsForSubmit(offeringDocs, {selectedStudentId});
-    }, [offeringDocs, offeringId, selectedStudentId, templateAlreadySaved]);
+        if (schoolEligibility.eligible !== true) {
+            return {ok: false, message: ""};
+        }
+        if (templateLoadError) {
+            return {ok: false, message: templateLoadError};
+        }
+        if (!templateAlreadySaved) {
+            return {
+                ok: false,
+                message: "Vui lòng lưu hồ sơ giữ chỗ tại trang Hồ sơ giữ chỗ trước khi nộp đơn.",
+            };
+        }
+        const submissionDocuments = buildSubmissionDocumentsPayload(templateDocs);
+        if (submissionDocuments.length === 0) {
+            return {
+                ok: false,
+                message: "Hồ sơ giữ chỗ chưa có minh chứng. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+            };
+        }
+        return {ok: true, message: ""};
+    }, [
+        availabilityError,
+        offeringId,
+        schoolEligibility.eligible,
+        schoolEligibility.reason,
+        selectedStudentId,
+        templateAlreadySaved,
+        templateDocs,
+        templateDocsLoading,
+        templateLoadError,
+    ]);
 
     const handleSubmit = React.useCallback(async () => {
         if (!validation.ok) {
             if (validation.message) showWarningSnackbar(validation.message);
             return;
         }
-        if (anyUploading) {
-            showWarningSnackbar("Vui lòng đợi quá trình tải ảnh hoàn tất.");
-            return;
-        }
-        const submissionDocuments = buildSubmissionDocumentsPayload(offeringDocs);
-        if (submissionDocuments.length === 0) {
-            showWarningSnackbar("Vui lòng tải lên ít nhất 1 hồ sơ theo chương trình trước khi nộp.");
-            return;
-        }
+        const submissionDocuments = buildSubmissionDocumentsPayload(templateDocs);
 
         setSubmitting(true);
         try {
             const payload = {
                 submissionDocuments,
-                campusProgramOfferingId: Number(offeringId),
                 studentProfileId: Number(selectedStudentId),
+                schoolIds: schoolId != null ? [schoolId] : [],
             };
+            if (offeringId != null) {
+                payload.campusProgramOfferingId = Number(offeringId);
+            }
             await postParentAdmissionReservationForm(payload);
             showSuccessSnackbar("Nộp đơn xin giữ chỗ thành công.");
-            if (typeof onSubmitted === "function") onSubmitted();
             if (typeof onClose === "function") onClose();
+            if (typeof onSubmitted === "function") onSubmitted();
+            navigate(PARENT_ADMISSION_RESERVATIONS_PATH);
         } catch (err) {
             console.error("[AdmissionReservationDialog] submit error:", err);
             const msg = err?.response?.data?.message || err?.message || "Nộp đơn thất bại, vui lòng thử lại.";
@@ -377,25 +365,30 @@ export default function AdmissionReservationDialog({
         } finally {
             setSubmitting(false);
         }
-    }, [anyUploading, offeringDocs, offeringId, onClose, onSubmitted, selectedStudentId, validation]);
+    }, [navigate, offeringId, onClose, onSubmitted, schoolId, selectedStudentId, templateDocs, validation]);
 
     const handleClose = React.useCallback(() => {
-        if (submitting || anyUploading) return;
+        if (submitting) return;
         if (typeof onClose === "function") onClose();
-    }, [anyUploading, onClose, submitting]);
+    }, [onClose, submitting]);
 
     const programName = pickOfferingProgramName(offering) || "—";
     const campaignName = String(campaign?.name || "").trim() || "—";
-    const schoolName = String(school?.name || "").trim() || "—";
 
     const activeStudent = React.useMemo(
         () => students.find((s) => s.id === selectedStudentId) ?? null,
-        [students, selectedStudentId]
+        [students, selectedStudentId],
     );
 
     const templateSectionTitle = activeStudent
         ? `Hồ sơ giữ chỗ — ${activeStudent.name}${activeStudent.subLabel ? ` (${activeStudent.subLabel})` : ""}`
         : "Hồ sơ giữ chỗ";
+
+    const showTemplateWarning =
+        !templateDocsLoading &&
+        selectedStudentId &&
+        templateAlreadySaved === false &&
+        !templateLoadError;
 
     return (
         <Dialog
@@ -433,7 +426,7 @@ export default function AdmissionReservationDialog({
                 <IconButton
                     aria-label="Đóng"
                     onClick={handleClose}
-                    disabled={submitting || anyUploading}
+                    disabled={submitting}
                     sx={{position: "absolute", top: 8, right: 8, color: "#475569"}}
                 >
                     <CloseIcon />
@@ -450,7 +443,6 @@ export default function AdmissionReservationDialog({
                             border: "1px solid rgba(226,232,240,0.9)",
                         }}
                     >
-                        <InfoRow label="Trường" value={schoolName} />
                         <InfoRow label="Chiến dịch" value={campaignName} />
                         <InfoRow label="Chương trình" value={programName} />
                     </Box>
@@ -461,19 +453,50 @@ export default function AdmissionReservationDialog({
                         <Typography sx={SECTION_LABEL_SX}>Học sinh nộp đơn</Typography>
                         <StudentProfilePicker
                             students={students}
-                            loading={studentLoading}
+                            loading={studentLoading || bootstrapLoading}
                             error={studentError}
                             selectedStudentId={selectedStudentId}
                             onSelect={handleSelectStudent}
-                            disabled={submitting}
+                            disabled={submitting || templateDocsLoading}
                         />
                     </Box>
+
+                    {templateDocsLoading ? (
+                        <LinearProgress
+                            sx={{
+                                borderRadius: 1,
+                                height: 4,
+                                bgcolor: "rgba(85,179,217,0.15)",
+                                "& .MuiLinearProgress-bar": {bgcolor: "#1e3a8a"},
+                            }}
+                        />
+                    ) : null}
+
+                    {availabilityError ? (
+                        <Alert severity="error" sx={{borderRadius: 2}}>
+                            {availabilityError}
+                        </Alert>
+                    ) : null}
+
+                    {!templateDocsLoading &&
+                    !availabilityError &&
+                    schoolEligibility.eligible === false &&
+                    schoolEligibility.reason ? (
+                        <Alert severity="warning" sx={{borderRadius: 2}}>
+                            {schoolEligibility.reason}
+                        </Alert>
+                    ) : null}
 
                     <Divider sx={{borderColor: "rgba(148,163,184,0.25)"}} />
 
                     <Box>
                         <Typography sx={SECTION_LABEL_SX}>{templateSectionTitle}</Typography>
-                        {!templateAlreadySaved && !templateDocsLoading && selectedStudentId ? (
+                        {templateLoadError ? (
+                            <Alert severity="warning" sx={{mb: 1.25, borderRadius: 2}}>
+                                {templateLoadError}
+                            </Alert>
+                        ) : null}
+                        {showTemplateWarning ? (
                             <Typography
                                 sx={{
                                     fontSize: "0.85rem",
@@ -484,37 +507,20 @@ export default function AdmissionReservationDialog({
                                 }}
                             >
                                 Chưa có hồ sơ giữ chỗ đã lưu. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước
-                                khi nộp đơn theo chương trình.
+                                khi nộp đơn.
                             </Typography>
                         ) : null}
                         <AdmissionDocumentsSection
                             docs={templateDocs}
                             docsLoading={templateDocsLoading}
                             docsError={templateCatalogError}
-                            cloudinaryReady={cloudinaryReady}
-                            uploadingSlots={uploadingSlots}
+                            cloudinaryReady={false}
+                            uploadingSlots={new Set()}
                             disabled
                             readOnly
                             onPickFile={() => {}}
                             onRemoveSlot={() => {}}
                             emptyMessage="Chưa có hồ sơ giữ chỗ cho học sinh này."
-                        />
-                    </Box>
-
-                    <Divider sx={{borderColor: "rgba(148,163,184,0.25)"}} />
-
-                    <Box>
-                        <Typography sx={SECTION_LABEL_SX}>Hồ sơ theo chương trình tuyển sinh</Typography>
-                        <AdmissionDocumentsSection
-                            docs={offeringDocs}
-                            docsLoading={offeringDocsLoading}
-                            docsError={offeringDocsError}
-                            cloudinaryReady={cloudinaryReady}
-                            uploadingSlots={uploadingSlots}
-                            disabled={submitting || !templateAlreadySaved}
-                            onPickFile={handlePickFile}
-                            onRemoveSlot={handleRemoveSlot}
-                            emptyMessage="Không có hồ sơ nào cần nộp theo gói tuyển sinh này."
                         />
                     </Box>
                 </Stack>
@@ -531,20 +537,14 @@ export default function AdmissionReservationDialog({
             >
                 <Button
                     onClick={handleClose}
-                    disabled={submitting || anyUploading}
+                    disabled={submitting}
                     sx={{textTransform: "none", fontWeight: 700, px: 2, color: "#475569"}}
                 >
                     Hủy
                 </Button>
                 <Button
                     onClick={handleSubmit}
-                    disabled={
-                        submitting ||
-                        anyUploading ||
-                        offeringDocsLoading ||
-                        templateDocsLoading ||
-                        !validation.ok
-                    }
+                    disabled={submitting || templateDocsLoading || !validation.ok}
                     variant="contained"
                     sx={{
                         textTransform: "none",

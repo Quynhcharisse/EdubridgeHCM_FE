@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from "react";
 import {
+    Alert,
     Box,
     Button,
     Chip,
@@ -26,9 +27,17 @@ import {
     putParentAdmissionReservationFormPayment,
 } from "../../../services/ParentService.jsx";
 import ImageUpload from "../../ui/ImageUpload.jsx";
+import ConfirmDialog from "../../ui/ConfirmDialog.jsx";
+import {RESERVATION_STATUS} from "../../../constants/reservationStatusConfig.js";
 import {isCloudinaryConfigured} from "../../../utils/cloudinaryUpload.js";
 import {buildVietQrImageUrl} from "../../../utils/vietQr.js";
 import {BRAND_NAVY} from "../../../constants/homeLandingTheme";
+import {
+    MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS,
+    canParentRetryReservationPayment,
+    isParentReservationPaymentAgain,
+    pickReservationPaymentAgainCount,
+} from "../../../constants/reservationStatusConfig.js";
 
 const ADMISSION_METHOD_LABELS = {
     HOC_BA: "Xét học bạ",
@@ -143,11 +152,52 @@ function OfferingOptionCard({offering, selected, onSelect}) {
     );
 }
 
+function LockedProgramDisplay({reservation}) {
+    const programName = String(reservation?.programName ?? "").trim() || "Chương trình đã chọn";
+    const method = admissionMethodLabel(reservation?.admissionMethodCode ?? reservation?.methodName);
+    const offeringId = Number(reservation?.campusProgramOfferingId);
+
+    return (
+        <Paper
+            elevation={0}
+            sx={{
+                p: 1.75,
+                borderRadius: 2,
+                border: "2px solid #2563eb",
+                bgcolor: "rgba(239,246,255,0.85)",
+                boxShadow: "0 8px 20px rgba(37,99,235,0.12)",
+            }}
+        >
+            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, fontSize: 15, lineHeight: 1.35}}>
+                {programName}
+            </Typography>
+            {method ? (
+                <Typography sx={{fontSize: 13, color: "#64748b", mt: 0.5}}>
+                    Phương thức: {method}
+                </Typography>
+            ) : null}
+            {Number.isFinite(offeringId) && offeringId > 0 ? (
+                <Typography sx={{fontSize: 12.5, color: "#475569", mt: 0.35}}>
+                    Mã gói tuyển sinh: {offeringId}
+                </Typography>
+            ) : null}
+            <Typography sx={{fontSize: 12.5, color: "#64748b", mt: 1, lineHeight: 1.5}}>
+                Chương trình học đã chọn khi thanh toán lần đầu — không thể thay đổi khi thanh toán lại.
+            </Typography>
+        </Paper>
+    );
+}
+
 export default function ReservationPaymentDialog({reservation, onClose, onSubmitted}) {
     const open = Boolean(reservation);
     const admissionFormId = pickAdmissionFormId(reservation);
     const schoolName = String(reservation?.schoolName ?? "").trim() || "Trường";
     const cloudinaryReady = isCloudinaryConfigured();
+    const isPaymentAgain = isParentReservationPaymentAgain(reservation);
+    const paymentAgainCount = pickReservationPaymentAgainCount(reservation);
+    const paymentAgainRemaining = Math.max(0, MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS - paymentAgainCount);
+    const canRetryPayment = canParentRetryReservationPayment(reservation);
+    const paymentRejectReason = String(reservation?.rejectReason ?? "").trim();
 
     const [offeringsLoading, setOfferingsLoading] = useState(false);
     const [qrLoading, setQrLoading] = useState(false);
@@ -157,6 +207,7 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
     const [reservationFee, setReservationFee] = useState(null);
     const [selectedOfferingId, setSelectedOfferingId] = useState(null);
     const [paymentUrl, setPaymentUrl] = useState(null);
+    const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (!open) {
@@ -166,11 +217,11 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
             setSelectedOfferingId(null);
             setPaymentUrl(null);
             setSubmitting(false);
+            setPaymentConfirmOpen(false);
             return undefined;
         }
 
-        const existingProof = String(reservation?.paymentProofUrl ?? "").trim();
-        setPaymentUrl(existingProof || null);
+        setPaymentUrl(isPaymentAgain ? null : String(reservation?.paymentProofUrl ?? "").trim() || null);
 
         const presetId = Number(reservation?.campusProgramOfferingId);
         if (Number.isFinite(presetId) && presetId > 0) {
@@ -186,35 +237,40 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
 
         let cancelled = false;
 
-        setOfferingsLoading(true);
-        setQrLoading(true);
-
-        (async () => {
-            try {
-                const res = await getParentProgramsOffering(admissionFormId);
-                if (cancelled) return;
-                const list = pickParentProgramsOfferingFromResponse(res);
-                setOfferings(list);
-                if (list.length === 0) {
-                    enqueueSnackbar("Chưa có chương trình được phép giữ chỗ.", {variant: "info"});
-                } else if (!Number.isFinite(presetId) || presetId <= 0) {
-                    const firstSelectable = list.find((o) => o.canSubmit);
-                    if (firstSelectable) {
-                        setSelectedOfferingId(firstSelectable.campusProgramOfferingId);
+        if (!isPaymentAgain) {
+            setOfferingsLoading(true);
+            (async () => {
+                try {
+                    const res = await getParentProgramsOffering(admissionFormId);
+                    if (cancelled) return;
+                    const list = pickParentProgramsOfferingFromResponse(res);
+                    setOfferings(list);
+                    if (list.length === 0) {
+                        enqueueSnackbar("Chưa có chương trình được phép giữ chỗ.", {variant: "info"});
+                    } else if (!Number.isFinite(presetId) || presetId <= 0) {
+                        const firstSelectable = list.find((o) => o.canSubmit);
+                        if (firstSelectable) {
+                            setSelectedOfferingId(firstSelectable.campusProgramOfferingId);
+                        }
                     }
+                } catch (error) {
+                    if (cancelled) return;
+                    console.error("[ReservationPaymentDialog] load offerings:", error);
+                    setOfferings([]);
+                    enqueueSnackbar(
+                        error?.response?.data?.message || "Không tải được danh sách chương trình.",
+                        {variant: "error"},
+                    );
+                } finally {
+                    if (!cancelled) setOfferingsLoading(false);
                 }
-            } catch (error) {
-                if (cancelled) return;
-                console.error("[ReservationPaymentDialog] load offerings:", error);
-                setOfferings([]);
-                enqueueSnackbar(
-                    error?.response?.data?.message || "Không tải được danh sách chương trình.",
-                    {variant: "error"},
-                );
-            } finally {
-                if (!cancelled) setOfferingsLoading(false);
-            }
-        })();
+            })();
+        } else {
+            setOfferings([]);
+            setOfferingsLoading(false);
+        }
+
+        setQrLoading(true);
 
         (async () => {
             try {
@@ -240,7 +296,7 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
         return () => {
             cancelled = true;
         };
-    }, [open, admissionFormId, reservation?.campusProgramOfferingId]);
+    }, [open, admissionFormId, isPaymentAgain, reservation?.campusProgramOfferingId, reservation?.paymentProofUrl]);
 
     const vietQrUrl = useMemo(
         () => buildVietQrImageUrl(bankInfo, {amount: reservationFee}),
@@ -255,34 +311,70 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
 
     const titleSuffix = reservation?.studentName ? ` — ${reservation.studentName}` : "";
 
-    const handleSubmitPayment = useCallback(async () => {
+    const validateBeforePaymentSubmit = useCallback(() => {
         if (!admissionFormId) {
             enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
-            return;
+            return false;
         }
         if (!selectedOfferingId) {
-            enqueueSnackbar("Vui lòng chọn chương trình học.", {variant: "warning"});
-            return;
+            enqueueSnackbar(
+                isPaymentAgain
+                    ? "Không xác định được chương trình học của đơn."
+                    : "Vui lòng chọn chương trình học.",
+                {variant: "warning"},
+            );
+            return false;
+        }
+        if (isPaymentAgain && !canRetryPayment) {
+            enqueueSnackbar(
+                `Đã vượt quá ${MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS} lần thanh toán lại. Vui lòng liên hệ nhà trường.`,
+                {variant: "warning"},
+            );
+            return false;
         }
         const url = String(paymentUrl ?? "").trim();
         if (!url) {
             enqueueSnackbar("Vui lòng tải ảnh minh chứng thanh toán.", {variant: "warning"});
-            return;
+            return false;
         }
         if (!cloudinaryReady && !/^https?:\/\//i.test(url)) {
             enqueueSnackbar("Chưa cấu hình Cloudinary, không thể tải ảnh lên.", {variant: "error"});
-            return;
+            return false;
         }
+        return true;
+    }, [
+        admissionFormId,
+        canRetryPayment,
+        cloudinaryReady,
+        isPaymentAgain,
+        paymentUrl,
+        selectedOfferingId,
+    ]);
 
+    const handleSubmitPayment = useCallback(async () => {
+        if (!validateBeforePaymentSubmit()) return;
+
+        const url = String(paymentUrl ?? "").trim();
         setSubmitting(true);
         try {
-            await putParentAdmissionReservationFormPayment({
+            const res = await putParentAdmissionReservationFormPayment({
                 admissionFormId,
                 campusProgramOfferingId: selectedOfferingId,
                 paymentUrl: url,
+                action: isPaymentAgain ? "payment-again" : "payment",
             });
-            enqueueSnackbar("Nộp minh chứng thanh toán thành công.", {variant: "success"});
-            if (typeof onSubmitted === "function") onSubmitted();
+            enqueueSnackbar(
+                isPaymentAgain
+                    ? "Nộp minh chứng thanh toán lại thành công."
+                    : "Nộp minh chứng thanh toán thành công.",
+                {variant: "success"},
+            );
+            setPaymentConfirmOpen(false);
+            const nextStatus =
+                res?.data?.body?.status ??
+                res?.data?.status ??
+                RESERVATION_STATUS.PAYMENT_PENDING;
+            if (typeof onSubmitted === "function") onSubmitted({status: nextStatus});
             else if (typeof onClose === "function") onClose();
         } catch (error) {
             console.error("[ReservationPaymentDialog] submit payment:", error);
@@ -295,17 +387,27 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
         }
     }, [
         admissionFormId,
-        cloudinaryReady,
+        isPaymentAgain,
         onClose,
         onSubmitted,
         paymentUrl,
         selectedOfferingId,
+        validateBeforePaymentSubmit,
     ]);
+
+    const handleRequestPaymentSubmit = useCallback(() => {
+        if (!validateBeforePaymentSubmit()) return;
+        setPaymentConfirmOpen(true);
+    }, [validateBeforePaymentSubmit]);
 
     const handleDialogClose = useCallback(() => {
         if (submitting) return;
+        if (paymentConfirmOpen) {
+            setPaymentConfirmOpen(false);
+            return;
+        }
         if (typeof onClose === "function") onClose();
-    }, [onClose, submitting]);
+    }, [onClose, paymentConfirmOpen, submitting]);
 
     return (
         <Dialog
@@ -337,7 +439,8 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                     <PaymentsRoundedIcon sx={{color: BRAND_NAVY}} />
                     <Box>
                         <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
-                            Thanh toán giữ chỗ{titleSuffix}
+                            {isPaymentAgain ? "Thanh toán lại" : "Thanh toán giữ chỗ"}
+                            {titleSuffix}
                         </Typography>
                         <Typography sx={{fontSize: 13.5, color: "#475569", mt: 0.25}}>
                             {schoolName}
@@ -349,6 +452,14 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: {xs: 2, md: 3}}}>
+                {isPaymentAgain && paymentRejectReason ? (
+                    <Alert severity="error" sx={{borderRadius: 2, mb: 2}}>
+                        <Typography sx={{fontWeight: 700, fontSize: 14, mb: 0.35}}>
+                            Lý do từ chối thanh toán
+                        </Typography>
+                        <Typography sx={{fontSize: 14, lineHeight: 1.5}}>{paymentRejectReason}</Typography>
+                    </Alert>
+                ) : null}
                 <Stack
                     direction={{xs: "column", md: "row"}}
                     spacing={2.5}
@@ -367,9 +478,11 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                         }}
                     >
                         <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
-                            Chọn chương trình học
+                            {isPaymentAgain ? "Chương trình học" : "Chọn chương trình học"}
                         </Typography>
-                        {offeringsLoading ? (
+                        {isPaymentAgain ? (
+                            <LockedProgramDisplay reservation={reservation} />
+                        ) : offeringsLoading ? (
                             <Box sx={{py: 5, textAlign: "center"}}>
                                 <CircularProgress size={28} />
                                 <Typography sx={{mt: 1.5, color: "#64748b", fontSize: 14}}>
@@ -407,7 +520,7 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                                 ))}
                             </Stack>
                         )}
-                        {selectedOffering ? (
+                        {!isPaymentAgain && selectedOffering ? (
                             <Box sx={{mt: 2, pt: 1.5, borderTop: "1px dashed #c7d8ea"}}>
                                 <Typography sx={{fontSize: 13, color: "#64748b"}}>
                                     Đã chọn:{" "}
@@ -557,31 +670,63 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                     <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 0.75}}>
                         Nộp minh chứng thanh toán
                     </Typography>
-                    <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 2}}>
+                    <Typography sx={{fontSize: 13.5, color: "#64748b", mb: isPaymentAgain ? 1.5 : 2}}>
                         Tải ảnh biên lai / screenshot chuyển khoản sau khi đã thanh toán phí giữ chỗ.
                     </Typography>
+                    {isPaymentAgain ? (
+                        <Stack spacing={1.25} sx={{mb: 2}}>
+                            <Alert severity="warning" sx={{borderRadius: 2}}>
+                                <Typography sx={{fontSize: 14, lineHeight: 1.55}}>
+                                    Lưu ý: Thanh toán lại tối đa {MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS} lần đối với các
+                                    đơn bị từ chối thanh toán.
+                                    {paymentAgainCount > 0
+                                        ? ` (Đã thanh toán lại ${paymentAgainCount}/${MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS} lần${
+                                              paymentAgainRemaining > 0
+                                                  ? `, còn ${paymentAgainRemaining} lần`
+                                                  : ", đã hết lượt"
+                                          })`
+                                        : ""}
+                                </Typography>
+                            </Alert>
+                            {!canRetryPayment ? (
+                                <Alert severity="error" sx={{borderRadius: 2}}>
+                                    Bạn đã hết lượt thanh toán lại. Vui lòng liên hệ nhà trường để được hỗ trợ.
+                                </Alert>
+                            ) : null}
+                        </Stack>
+                    ) : null}
                     {!cloudinaryReady ? (
                         <Typography sx={{fontSize: 13, color: "#b45309", mb: 1.5}}>
                             Chưa cấu hình Cloudinary — không thể tải ảnh mới lên.
                         </Typography>
                     ) : null}
-                    <ImageUpload
-                        value={paymentUrl}
-                        onChange={setPaymentUrl}
-                        onError={(msg) => enqueueSnackbar(msg, {variant: "warning"})}
-                        disabled={submitting || !cloudinaryReady}
-                        receiptPreview
-                        previewFit="contain"
-                    />
+                    <Box
+                        sx={{
+                            width: "100%",
+                            maxWidth: 360,
+                            mx: "auto",
+                        }}
+                    >
+                        <ImageUpload
+                            value={paymentUrl}
+                            onChange={setPaymentUrl}
+                            onError={(msg) => enqueueSnackbar(msg, {variant: "warning"})}
+                            disabled={submitting || !cloudinaryReady}
+                            receiptPreview
+                            receiptPreviewHeight={400}
+                            previewFit="contain"
+                        />
+                    </Box>
                     <Box sx={{mt: 2, display: "flex", justifyContent: "flex-end"}}>
                         <Button
                             variant="contained"
-                            onClick={() => void handleSubmitPayment()}
+                            onClick={handleRequestPaymentSubmit}
                             disabled={
                                 submitting ||
-                                offeringsLoading ||
+                                (!isPaymentAgain && offeringsLoading) ||
                                 !selectedOfferingId ||
-                                !String(paymentUrl ?? "").trim()
+                                !String(paymentUrl ?? "").trim() ||
+                                (isPaymentAgain && !canRetryPayment)
                             }
                             sx={{
                                 borderRadius: 999,
@@ -591,11 +736,32 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                                 "&:hover": {bgcolor: "#047857"},
                             }}
                         >
-                            {submitting ? "Đang gửi..." : "Gửi"}
+                            {submitting
+                                ? "Đang gửi..."
+                                : isPaymentAgain
+                                  ? "Thanh toán lại"
+                                  : "Thanh toán"}
                         </Button>
                     </Box>
                 </Paper>
             </DialogContent>
+            <ConfirmDialog
+                open={paymentConfirmOpen}
+                title={isPaymentAgain ? "Xác nhận thanh toán lại" : "Xác nhận thanh toán"}
+                description={
+                    isPaymentAgain
+                        ? "Bạn có chắc muốn gửi minh chứng thanh toán lại cho đơn này?"
+                        : "Bạn có chắc muốn gửi minh chứng thanh toán phí giữ chỗ?"
+                }
+                confirmText={isPaymentAgain ? "Thanh toán lại" : "Thanh toán"}
+                cancelText="Hủy"
+                loading={submitting}
+                onCancel={() => {
+                    if (submitting) return;
+                    setPaymentConfirmOpen(false);
+                }}
+                onConfirm={() => void handleSubmitPayment()}
+            />
         </Dialog>
     );
 }
