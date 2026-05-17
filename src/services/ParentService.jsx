@@ -236,6 +236,25 @@ export const postParentAdmissionReservationFormTemplate = async (payload) => {
     return response || null;
 };
 
+export const putParentAdmissionReservationFormTemplate = async (payload) => {
+    const sid = normalizeTemplateStudentProfileId(payload?.studentProfileId);
+    const templateId = Number(payload?.admissionReservationFormTemplateId);
+    if (!Number.isFinite(templateId) || templateId <= 0) {
+        throw new Error('admissionReservationFormTemplateId is required');
+    }
+    const body = {
+        admissionReservationFormTemplateId: Math.trunc(templateId),
+        studentProfileId: sid,
+        submissionDocuments: Array.isArray(payload?.submissionDocuments)
+            ? payload.submissionDocuments
+            : [],
+    };
+    const response = await axiosClient.put('/parent/admission/reservation/form/template', body, {
+        params: {studentProfileId: sid},
+    });
+    return response || null;
+};
+
 export const getParentAdmissionReservationForms = async () => {
     const response = await axiosClient.get('/parent/admission/reservation/form');
     return response || null;

@@ -308,6 +308,43 @@ export function pickStudentProfileIdFromTemplateBody(body) {
     return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+export function pickAdmissionReservationFormTemplateIdFromBody(body, studentProfileId = null) {
+    if (!body || typeof body !== 'object') return null;
+    const sid = Number(
+        studentProfileId ?? body.studentProfileId ?? body.studentId ?? body.student?.id,
+    );
+    const explicit =
+        body.admissionReservationFormTemplateId ??
+        body.admission_reservation_form_template_id ??
+        body.reservationFormTemplateId ??
+        body.reservationTemplateId ??
+        body.formTemplateId ??
+        body.templateId ??
+        body.admissionReservationFormTemplate?.id;
+    const fromExplicit = Number(explicit);
+    if (Number.isFinite(fromExplicit) && fromExplicit > 0) {
+        return Math.trunc(fromExplicit);
+    }
+    const bodyId = Number(body.id);
+    if (Number.isFinite(bodyId) && bodyId > 0 && (!Number.isFinite(sid) || sid <= 0 || bodyId !== sid)) {
+        return Math.trunc(bodyId);
+    }
+    return null;
+}
+
+export function pickAdmissionReservationFormTemplateIdFromResponse(response, studentProfileId = null) {
+    const fromBody = pickAdmissionReservationFormTemplateIdFromBody(
+        pickReservationTemplateBodyFromResponse(response),
+        studentProfileId,
+    );
+    if (fromBody) return fromBody;
+    const data = response?.data;
+    if (!data || typeof data !== 'object') return null;
+    const top = Number(data.admissionReservationFormTemplateId);
+    if (Number.isFinite(top) && top > 0) return Math.trunc(top);
+    return null;
+}
+
 export function templateBodyBelongsToStudent(body, studentProfileId) {
     const expected = Number(studentProfileId);
     if (!Number.isFinite(expected) || expected <= 0) return false;
