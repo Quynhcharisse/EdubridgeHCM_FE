@@ -32,21 +32,6 @@ function formatBytes(n) {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Dropzone upload ảnh (Cloudinary), không ô nhập URL — preview, trạng thái loading / thành công / lỗi.
- *
- * @param {object} props
- * @param {string | null} props.value — URL ảnh hiện tại
- * @param {(url: string | null) => void} props.onChange
- * @param {(message: string) => void} [props.onError]
- * @param {number} [props.maxBytes=5242880] — chỉ dùng khi không truyền mediaImageRules
- * @param {{ extensions: string[], maxBytes: number, maxImgSizeMb?: number } | null} [props.mediaImageRules]
- * @param {boolean} [props.mediaImageRulesLoading]
- * @param {boolean} [props.disabled]
- * @param {string} [props.inputId]
- * @param {"cover" | "contain"} [props.previewFit="cover"] — contain: xem đủ chiều dài ảnh (biên lai)
- * @param {boolean} [props.receiptPreview] — khung preview cao theo ảnh, không crop 1:1
- */
 export default function ImageUpload({
     value,
     onChange,
@@ -58,6 +43,7 @@ export default function ImageUpload({
     inputId: inputIdProp,
     previewFit = "cover",
     receiptPreview = false,
+    receiptPreviewHeight = 400,
 }) {
     const genId = useId();
     const inputId = inputIdProp ?? `image-upload-${genId.replace(/:/g, "")}`;
@@ -333,7 +319,14 @@ export default function ImageUpload({
                                 bgcolor: "#e2e8f0",
                                 boxShadow: "0 8px 24px rgba(15, 23, 42, 0.1)",
                                 ...(receiptPreview
-                                    ? {maxHeight: "min(72vh, 640px)", overflowY: "auto"}
+                                    ? {
+                                          height: receiptPreviewHeight,
+                                          maxHeight: receiptPreviewHeight,
+                                          overflow: "hidden",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                      }
                                     : {aspectRatio: "1"}),
                             }}
                         >
@@ -343,8 +336,8 @@ export default function ImageUpload({
                                 alt="Xem trước ảnh"
                                 sx={{
                                     width: "100%",
-                                    height: receiptPreview ? "auto" : "100%",
-                                    maxHeight: receiptPreview ? "none" : "100%",
+                                    height: receiptPreview ? "100%" : "100%",
+                                    maxHeight: receiptPreview ? "100%" : "100%",
                                     objectFit: previewFit,
                                     display: "block",
                                 }}

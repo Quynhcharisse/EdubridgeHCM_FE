@@ -27,11 +27,14 @@ import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import {enqueueSnackbar} from "notistack";
 import {
     getParentAdmissionReservationForms,
-    pickAdmissionReservationFormsFromResponse
+    pickAdmissionReservationFormsFromResponse,
+    putParentAdmissionReservationFormConfirmEnrollment,
 } from "../../services/ParentService.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
 import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
+import RejectReasonAlert from "./admission/RejectReasonAlert.jsx";
 import {
     isReservationConfirmed,
     normalizeParentAdmissionReservationRow,
@@ -40,12 +43,19 @@ import {
 } from "./admission/admissionSubmissionUtils.js";
 import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
 import {
+    MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS,
     PARENT_RESERVATION_FILTERS,
     RESERVATION_STATUS,
+    canParentConfirmEnrollment,
+    canParentOpenReservationPayment,
+    canParentRetryReservationPayment,
+    getParentReservationFilterValueForStatus,
     getReservationStatusLabel,
     getReservationStatusStyle,
+    isParentReservationPaymentAgain,
     normalizeReservationStatus,
     reservationStatusMatchesFilter,
+    shouldShowReservationPaymentRejectReason,
 } from "../../constants/reservationStatusConfig.js";
 
 const FILTERS = PARENT_RESERVATION_FILTERS;
@@ -135,6 +145,19 @@ function DetailSection({title, chip, children}) {
     );
 }
 
+function getDetailRejectReasonAlertProps(reservation) {
+    const reason = String(reservation?.rejectReason ?? "").trim();
+    if (!reason) return null;
+    const status = normalizeReservationStatus(reservation?.status);
+    if (status === RESERVATION_STATUS.REJECTED) {
+        return {title: "Lý do từ chối hồ sơ", reason, variant: "profile"};
+    }
+    if (shouldShowReservationPaymentRejectReason(reservation)) {
+        return {title: "Lý do từ chối thanh toán", reason, variant: "payment"};
+    }
+    return null;
+}
+
 function DetailLineRow({label, value}) {
     if (!isDisplayableValue(value)) return null;
     return (
@@ -156,20 +179,53 @@ function DetailLineRow({label, value}) {
     );
 }
 
-function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
+function ReservationCard({
+    reservation,
+    onOpenDetail,
+    onOpenPayment,
+    onOpenConfirmEnrollment,
+    confirmEnrollmentLoadingId,
+}) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
-    const showPayment =
-        normalizedStatus === RESERVATION_STATUS.APPROVAL ||
-        normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED;
+    const isPaymentAgain = isParentReservationPaymentAgain(reservation);
+    const showPayment = canParentOpenReservationPayment(reservation);
+    const canRetryPayment = canParentRetryReservationPayment(reservation);
+    const paymentRejectReason = String(reservation?.rejectReason ?? "").trim();
+    const showPaymentRejectReason =
+        shouldShowReservationPaymentRejectReason(reservation) && paymentRejectReason;
     const statusHint =
-        normalizedStatus === RESERVATION_STATUS.APPROVAL
-            ? "Vui lòng thanh toán phí giữ chỗ theo hướng dẫn của trường."
-            : normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING
-              ? "Trường đang xác nhận minh chứng thanh toán của bạn."
-              : normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED
-                ? "Minh chứng thanh toán bị từ chối — vui lòng nộp lại."
-                : null;
+        normalizedStatus === RESERVATION_STATUS.PENDING
+            ? "Hồ sơ đang chờ trường duyệt."
+            : normalizedStatus === RESERVATION_STATUS.APPROVAL
+              ? "Vui lòng thanh toán phí giữ chỗ theo hướng dẫn của trường."
+              : normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING
+                ? showPaymentRejectReason
+                    ? `Trường đang xác nhận thanh toán. Lý do từ chối lần trước: ${paymentRejectReason}`
+                    : "Trường đang xác nhận minh chứng thanh toán của bạn."
+                : normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED
+                  ? showPaymentRejectReason
+                      ? `Lý do từ chối thanh toán: ${paymentRejectReason}`
+                      : "Minh chứng thanh toán bị từ chối — vui lòng thanh toán lại."
+                  : normalizedStatus === RESERVATION_STATUS.DEPOSITED
+                    ? "Đã đặt cọc thành công — vui lòng xác nhận nhập học nếu chọn trường này."
+                    : normalizedStatus === RESERVATION_STATUS.DEPOSIT_EXPIRED
+                      ? "Đơn đã hết hạn đặt cọc."
+                      : normalizedStatus === RESERVATION_STATUS.CONFIRMED
+                        ? "Bạn đã xác nhận nhập học cho đơn này."
+                        : normalizedStatus === RESERVATION_STATUS.GHOST
+                          ? "Bạn đã chốt trường khác — hồ sơ này không còn hiệu lực."
+                          : normalizedStatus === RESERVATION_STATUS.CANCELLED
+                            ? "Đơn đã được hủy."
+                            : normalizedStatus === RESERVATION_STATUS.REJECTED
+                              ? isDisplayableValue(reservation?.rejectReason)
+                                  ? `Lý do từ chối hồ sơ: ${reservation.rejectReason}`
+                                  : "Hồ sơ bị trường từ chối."
+                              : null;
+    const showConfirmEnrollment = canParentConfirmEnrollment(reservation);
+    const confirmEnrollmentLoading =
+        confirmEnrollmentLoadingId != null &&
+        Number(confirmEnrollmentLoadingId) === Number(reservation?.admissionFormId ?? reservation?.id);
     const cardTitle = isDisplayableValue(reservation?.schoolName)
         ? reservation.schoolName
         : isDisplayableValue(reservation?.studentName)
@@ -266,7 +322,17 @@ function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
                         <Button
                             variant="contained"
                             startIcon={<PaymentsRoundedIcon />}
-                            onClick={() => onOpenPayment(reservation)}
+                            disabled={isPaymentAgain && !canRetryPayment}
+                            onClick={() => {
+                                if (isPaymentAgain && !canRetryPayment) {
+                                    enqueueSnackbar(
+                                        `Đã vượt quá ${MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS} lần thanh toán lại. Vui lòng liên hệ nhà trường.`,
+                                        {variant: "warning"},
+                                    );
+                                    return;
+                                }
+                                onOpenPayment(reservation);
+                            }}
                             sx={{
                                 borderRadius: 999,
                                 px: 2.4,
@@ -277,7 +343,25 @@ function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
                                 flex: {xs: "1 1 auto", sm: "0 0 auto"},
                             }}
                         >
-                            Thanh toán
+                            {isPaymentAgain ? "Thanh toán lại" : "Thanh toán"}
+                        </Button>
+                    ) : null}
+                    {showConfirmEnrollment ? (
+                        <Button
+                            variant="contained"
+                            disabled={confirmEnrollmentLoading}
+                            onClick={() => onOpenConfirmEnrollment(reservation)}
+                            sx={{
+                                borderRadius: 999,
+                                px: 2.4,
+                                fontWeight: 600,
+                                bgcolor: BRAND_NAVY,
+                                boxShadow: "0 8px 18px rgba(45, 95, 115, 0.22)",
+                                "&:hover": {bgcolor: APP_PRIMARY_DARK},
+                                flex: {xs: "1 1 auto", sm: "0 0 auto"},
+                            }}
+                        >
+                            {confirmEnrollmentLoading ? "Đang xử lý..." : "Xác nhận nhập học"}
                         </Button>
                     ) : null}
                     <Button
@@ -337,6 +421,7 @@ function DetailDialog({reservation, onClose}) {
         : isDisplayableValue(reservation?.schoolName)
           ? ` — ${reservation.schoolName}`
           : "";
+    const rejectReasonAlertProps = getDetailRejectReasonAlertProps(reservation);
 
     return (
         <>
@@ -387,6 +472,9 @@ function DetailDialog({reservation, onClose}) {
                 </DialogTitle>
                 <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
                     <Stack spacing={2.5}>
+                        {rejectReasonAlertProps ? (
+                            <RejectReasonAlert {...rejectReasonAlertProps} />
+                        ) : null}
                         <DetailSection title="Thông tin học sinh">
                             <DetailLineRow label="Học sinh" value={reservation?.studentName} />
                             <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
@@ -419,12 +507,6 @@ function DetailDialog({reservation, onClose}) {
                             />
                             <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime) ?? undefined} />
                             <DetailLineRow label="Mã chuyển" value={reservation?.transferCode} />
-                            {normalizedStatus === RESERVATION_STATUS.REJECTED ? (
-                                <DetailLineRow label="Lý do từ chối hồ sơ" value={reservation?.rejectReason} />
-                            ) : null}
-                            {normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED ? (
-                                <DetailLineRow label="Lý do từ chối thanh toán" value={reservation?.rejectReason} />
-                            ) : null}
                         </DetailSection>
 
                         {normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING ||
@@ -485,6 +567,8 @@ export default function ParentAdmissionReservationsPage() {
     const [filter, setFilter] = useState("ALL");
     const [selectedReservation, setSelectedReservation] = useState(null);
     const [paymentReservation, setPaymentReservation] = useState(null);
+    const [confirmEnrollmentTarget, setConfirmEnrollmentTarget] = useState(null);
+    const [confirmEnrollmentLoadingId, setConfirmEnrollmentLoadingId] = useState(null);
     const mountedRef = useRef(true);
 
     const loadReservations = useCallback(async ({silent = false} = {}) => {
@@ -506,6 +590,35 @@ export default function ParentAdmissionReservationsPage() {
             if (mountedRef.current && !silent) setLoading(false);
         }
     }, []);
+
+    const handleConfirmEnrollment = useCallback(async () => {
+        const formId = Number(
+            confirmEnrollmentTarget?.admissionFormId ?? confirmEnrollmentTarget?.id,
+        );
+        if (!Number.isFinite(formId) || formId <= 0) {
+            enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
+            return;
+        }
+        setConfirmEnrollmentLoadingId(formId);
+        try {
+            const res = await putParentAdmissionReservationFormConfirmEnrollment(formId);
+            enqueueSnackbar(
+                res?.data?.message || "Xác nhận nhập học thành công.",
+                {variant: "success"},
+            );
+            setConfirmEnrollmentTarget(null);
+            setFilter(getParentReservationFilterValueForStatus(RESERVATION_STATUS.CONFIRMED));
+            await loadReservations({silent: true});
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] confirm enrollment:", error);
+            enqueueSnackbar(
+                error?.response?.data?.message || error?.message || "Xác nhận nhập học thất bại.",
+                {variant: "error"},
+            );
+        } finally {
+            setConfirmEnrollmentLoadingId(null);
+        }
+    }, [confirmEnrollmentTarget, loadReservations]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -654,6 +767,8 @@ export default function ParentAdmissionReservationsPage() {
                                         reservation={reservation}
                                         onOpenDetail={setSelectedReservation}
                                         onOpenPayment={setPaymentReservation}
+                                        onOpenConfirmEnrollment={setConfirmEnrollmentTarget}
+                                        confirmEnrollmentLoadingId={confirmEnrollmentLoadingId}
                                     />
                                 ))}
                             </Stack>
@@ -665,10 +780,28 @@ export default function ParentAdmissionReservationsPage() {
             <ReservationPaymentDialog
                 reservation={paymentReservation}
                 onClose={() => setPaymentReservation(null)}
-                onSubmitted={() => {
+                onSubmitted={({status} = {}) => {
                     setPaymentReservation(null);
+                    setFilter(
+                        getParentReservationFilterValueForStatus(
+                            status ?? RESERVATION_STATUS.PAYMENT_PENDING,
+                        ),
+                    );
                     void loadReservations({silent: true});
                 }}
+            />
+            <ConfirmDialog
+                open={Boolean(confirmEnrollmentTarget)}
+                title="Xác nhận nhập học"
+                description="Bạn có chắc muốn xác nhận nhập học?"
+                confirmText="Xác nhận nhập học"
+                cancelText="Hủy"
+                loading={confirmEnrollmentLoadingId != null}
+                onCancel={() => {
+                    if (confirmEnrollmentLoadingId != null) return;
+                    setConfirmEnrollmentTarget(null);
+                }}
+                onConfirm={() => void handleConfirmEnrollment()}
             />
         </Box>
     );

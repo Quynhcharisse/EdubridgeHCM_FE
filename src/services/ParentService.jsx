@@ -241,10 +241,6 @@ export const getParentAdmissionReservationForms = async () => {
     return response || null;
 };
 
-/**
- * PUT /parent/admission/reservation/form — nộp minh chứng thanh toán giữ chỗ.
- * @param {{ admissionFormId: number, campusProgramOfferingId: number, paymentUrl: string }} payload
- */
 export const putParentAdmissionReservationFormPayment = async (payload) => {
     const admissionFormId = normalizeAdmissionFormId(payload?.admissionFormId);
     const offeringId = Number(payload?.campusProgramOfferingId);
@@ -255,13 +251,23 @@ export const putParentAdmissionReservationFormPayment = async (payload) => {
     if (!paymentUrl) {
         throw new Error('paymentUrl is required');
     }
+    const action = String(payload?.action ?? 'payment').trim() || 'payment';
     const body = {
         admissionFormId,
-        action: 'payment',
+        action,
         paymentUrl,
         campusProgramOfferingId: Math.trunc(offeringId),
     };
     const response = await axiosClient.put('/parent/admission/reservation/form', body);
+    return response || null;
+};
+
+export const putParentAdmissionReservationFormConfirmEnrollment = async (admissionFormId) => {
+    const id = normalizeAdmissionFormId(admissionFormId);
+    const response = await axiosClient.put('/parent/admission/reservation/form', {
+        admissionFormId: id,
+        action: 'confirm',
+    });
     return response || null;
 };
 
@@ -273,7 +279,6 @@ function normalizeAdmissionFormId(admissionFormId) {
     return Math.trunc(id);
 }
 
-/** GET /parent/programs/offering?admissionFormId= */
 export const getParentProgramsOffering = async (admissionFormId) => {
     const id = normalizeAdmissionFormId(admissionFormId);
     const response = await axiosClient.get('/parent/programs/offering', {
@@ -282,7 +287,6 @@ export const getParentProgramsOffering = async (admissionFormId) => {
     return response || null;
 };
 
-/** GET /parent/qrCodeInfo?admissionFormId= */
 export const getParentQrCodeInfo = async (admissionFormId) => {
     const id = normalizeAdmissionFormId(admissionFormId);
     const response = await axiosClient.get('/parent/qrCodeInfo', {

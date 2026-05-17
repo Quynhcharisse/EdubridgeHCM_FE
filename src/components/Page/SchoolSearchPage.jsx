@@ -8,7 +8,6 @@ import {
     CardMedia,
     Checkbox,
     Chip,
-    Collapse,
     Container,
     Dialog,
     DialogActions,
@@ -17,6 +16,7 @@ import {
     Divider,
     Modal,
     FormControl,
+    FormControlLabel,
     IconButton,
     InputAdornment,
     Link,
@@ -42,8 +42,6 @@ import {
     LocationOn as LocationOnIcon,
     PersonOutline as PersonOutlineIcon,
     Phone as PhoneIcon,
-    ExpandLess as ExpandLessIcon,
-    ExpandMore as ExpandMoreIcon,
     Search as SearchIcon,
     Tune as TuneIcon
 } from "@mui/icons-material";
@@ -65,6 +63,7 @@ import {
     setCompareSchools
 } from "../../utils/compareSchoolsStorage";
 import {showErrorSnackbar, showSuccessSnackbar, showWarningSnackbar} from "../ui/AppSnackbar.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import {
     getSchoolStorageKey,
     getUserIdentity
@@ -180,21 +179,11 @@ function filterAvailabilitySchoolRows(rows, query) {
 function AvailabilitySelectableSchoolRow({row, selected, disabled, onToggle}) {
     return (
         <Box
-            component="label"
             sx={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: 0.75,
-                px: 1.25,
-                py: 1.15,
-                m: 0,
-                cursor: disabled ? "default" : "pointer",
+                gap: 0.5,
                 borderBottom: "1px solid rgba(226,232,240,0.85)",
-                bgcolor: selected ? "rgba(240,253,244,0.95)" : "transparent",
-                transition: "background-color 160ms ease",
-                "&:hover": disabled
-                    ? {}
-                    : {bgcolor: selected ? "rgba(240,253,244,1)" : "rgba(248,250,252,0.95)"},
                 "&:last-of-type": {borderBottom: "none"},
             }}
         >
@@ -203,25 +192,48 @@ function AvailabilitySelectableSchoolRow({row, selected, disabled, onToggle}) {
                 checked={selected}
                 disabled={disabled}
                 onChange={onToggle}
-                sx={{mt: -0.2, p: 0.45, color: "#94a3b8", "&.Mui-checked": {color: "#16a34a"}}}
+                sx={{
+                    flexShrink: 0,
+                    mt: 0.65,
+                    ml: 0.35,
+                    p: 0.45,
+                    color: "#94a3b8",
+                    "&.Mui-checked": {color: "#16a34a"},
+                }}
             />
-            <Typography
-                title={row.schoolName}
+            <Box
+                component="label"
                 sx={{
                     flex: 1,
                     minWidth: 0,
-                    fontSize: "0.9rem",
-                    fontWeight: selected ? 700 : 600,
-                    color: "#0f172a",
-                    lineHeight: 1.45,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
+                    display: "block",
+                    px: 1.25,
+                    py: 1.15,
+                    m: 0,
+                    cursor: disabled ? "default" : "pointer",
+                    bgcolor: selected ? "rgba(240,253,244,0.95)" : "transparent",
+                    transition: "background-color 160ms ease",
+                    "&:hover": disabled
+                        ? {}
+                        : {bgcolor: selected ? "rgba(240,253,244,1)" : "rgba(248,250,252,0.95)"},
                 }}
             >
-                {row.schoolName}
-            </Typography>
+                <Typography
+                    title={row.schoolName}
+                    sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: selected ? 700 : 600,
+                        color: "#0f172a",
+                        lineHeight: 1.45,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                    }}
+                >
+                    {row.schoolName}
+                </Typography>
+            </Box>
         </Box>
     );
 }
@@ -990,10 +1002,53 @@ export default function SchoolSearchPage() {
 
     const compareCount = compareSchoolKeys.size;
 
+    const [batchAdmissionSelectedIds, setBatchAdmissionSelectedIds] = React.useState([]);
+
     const batchPageSchoolIds = React.useMemo(
         () => shownSchools.map((s) => getBatchRowSchoolId(s)).filter((id) => id != null),
         [shownSchools]
     );
+
+    const allBatchPageSelected =
+        batchPageSchoolIds.length > 0 &&
+        batchPageSchoolIds.every((id) => batchAdmissionSelectedIds.includes(id));
+    const someBatchPageSelected =
+        batchPageSchoolIds.some((id) => batchAdmissionSelectedIds.includes(id)) && !allBatchPageSelected;
+
+    React.useEffect(() => {
+        setBatchAdmissionSelectedIds([]);
+    }, [
+        normalizedKeyword,
+        selectedProvince,
+        selectedDistrict,
+        selectedBoardingType,
+        selectedCurriculumType,
+        isTuitionFilterActive,
+        tuitionRange[0],
+        tuitionRange[1],
+        listLoading,
+    ]);
+
+    const toggleBatchSelectRow = React.useCallback((school) => {
+        const id = getBatchRowSchoolId(school);
+        if (id == null) return;
+        setBatchAdmissionSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    }, []);
+
+    const toggleBatchSelectAllShown = React.useCallback(() => {
+        setBatchAdmissionSelectedIds((prev) => {
+            if (batchPageSchoolIds.length === 0) return prev;
+            if (batchPageSchoolIds.every((id) => prev.includes(id))) {
+                const pageSet = new Set(batchPageSchoolIds);
+                return prev.filter((id) => !pageSet.has(id));
+            }
+            const next = new Set(prev);
+            batchPageSchoolIds.forEach((id) => next.add(id));
+            return [...next];
+        });
+    }, [batchPageSchoolIds]);
 
     const [batchAdmissionPickerOpen, setBatchAdmissionPickerOpen] = React.useState(false);
     const [batchAdmissionPickerLoading, setBatchAdmissionPickerLoading] = React.useState(false);
@@ -1022,7 +1077,7 @@ export default function SchoolSearchPage() {
     const [availabilityImagePreview, setAvailabilityImagePreview] = React.useState(null);
     const [availabilitySelectedSchoolIds, setAvailabilitySelectedSchoolIds] = React.useState([]);
     const [availabilitySchoolSearch, setAvailabilitySchoolSearch] = React.useState("");
-    const [availabilityBlockedExpanded, setAvailabilityBlockedExpanded] = React.useState(false);
+    const [availabilitySubmitConfirmOpen, setAvailabilitySubmitConfirmOpen] = React.useState(false);
 
     const closeStudentPickerForAdmission = React.useCallback(() => {
         setBatchAdmissionPickerOpen(false);
@@ -1048,7 +1103,7 @@ export default function SchoolSearchPage() {
         setAvailabilityImagePreview(null);
         setAvailabilitySelectedSchoolIds([]);
         setAvailabilitySchoolSearch("");
-        setAvailabilityBlockedExpanded(false);
+        setAvailabilitySubmitConfirmOpen(false);
     }, []);
 
     const handleBatchSubmitFromSearchList = React.useCallback(() => {
@@ -1056,15 +1111,15 @@ export default function SchoolSearchPage() {
             showWarningSnackbar("Bạn cần đăng nhập với vai trò Phụ huynh.");
             return;
         }
-        if (batchPageSchoolIds.length === 0) {
-            showWarningSnackbar("Trang này không có trường nào để nộp hồ sơ.");
+        if (batchAdmissionSelectedIds.length === 0) {
+            showWarningSnackbar("Vui lòng chọn ít nhất một trường.");
             return;
         }
         setBatchAdmissionPickerProfileId(null);
         setBatchAdmissionPickerOptions([]);
         setBatchAdmissionPickerError("");
         setBatchAdmissionPickerOpen(true);
-    }, [batchPageSchoolIds, isParent]);
+    }, [batchAdmissionSelectedIds.length, isParent]);
 
     const confirmStudentPickerForAdmission = React.useCallback(() => {
         if (batchAdmissionPickerProfileId == null) {
@@ -1075,17 +1130,17 @@ export default function SchoolSearchPage() {
         setAvailabilityStudentProfileId(batchAdmissionPickerProfileId);
         setAvailabilityStudentDisplayName(String(opt?.name || "").trim() || "Học sinh");
         setAvailabilityStudentSummary(mapStudentProfileForAvailabilitySummary(opt?.raw));
-        setAvailabilityPendingSchoolIds([...batchPageSchoolIds]);
+        setAvailabilityPendingSchoolIds([...batchAdmissionSelectedIds]);
         setAvailabilityResult({unavailable: [], available: [], message: ""});
         setAvailabilityError("");
         setAvailabilityTemplateError("");
         setAvailabilityTemplateDocs([]);
         setAvailabilitySelectedSchoolIds([]);
         setAvailabilitySchoolSearch("");
-        setAvailabilityBlockedExpanded(false);
+        setAvailabilitySubmitConfirmOpen(false);
         setBatchAdmissionPickerOpen(false);
         setAvailabilityDialogOpen(true);
-    }, [batchAdmissionPickerOptions, batchAdmissionPickerProfileId, batchPageSchoolIds]);
+    }, [batchAdmissionPickerOptions, batchAdmissionPickerProfileId, batchAdmissionSelectedIds]);
 
     React.useEffect(() => {
         if (!batchAdmissionPickerOpen) return undefined;
@@ -1384,11 +1439,6 @@ export default function SchoolSearchPage() {
         [availabilitySchoolGroups.blocked, availabilitySchoolSearch],
     );
 
-    React.useEffect(() => {
-        if (!availabilityDialogOpen || availabilityCheckLoading) return;
-        setAvailabilityBlockedExpanded(availabilitySchoolGroups.blocked.length <= 3);
-    }, [availabilityDialogOpen, availabilityCheckLoading, availabilitySchoolGroups.blocked.length]);
-
     const allFilteredAvailableSelected = React.useMemo(() => {
         if (filteredAvailableSchoolRows.length === 0) return false;
         const selected = new Set(
@@ -1412,31 +1462,50 @@ export default function SchoolSearchPage() {
         });
     }, [allFilteredAvailableSelected, filteredAvailableSchoolRows, orderedAvailableAdmissionIds]);
 
-    const handleConfirmAdmissionAfterAvailability = React.useCallback(async () => {
+    const validateBeforeAvailabilitySubmit = React.useCallback(() => {
         const sid = Number(availabilityStudentProfileId);
         if (!Number.isFinite(sid) || sid <= 0) {
             showWarningSnackbar("Vui lòng chọn hồ sơ học sinh.");
-            return;
+            return false;
         }
         if (orderedAvailableAdmissionIds.length === 0) {
             showWarningSnackbar("Không có trường nào đủ điều kiện để nộp hồ sơ.");
-            return;
+            return false;
         }
         if (selectedAvailableAdmissionIds.length === 0) {
             showWarningSnackbar("Vui lòng chọn ít nhất một trường hợp lệ để nộp hồ sơ.");
-            return;
+            return false;
         }
         if (availabilityTemplateError) {
             showWarningSnackbar(availabilityTemplateError);
-            return;
+            return false;
         }
         const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
         if (submissionDocuments.length === 0) {
             showWarningSnackbar(
                 "Hồ sơ giữ chỗ chưa có minh chứng. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
             );
-            return;
+            return false;
         }
+        return true;
+    }, [
+        availabilityStudentProfileId,
+        availabilityTemplateDocs,
+        availabilityTemplateError,
+        orderedAvailableAdmissionIds.length,
+        selectedAvailableAdmissionIds.length,
+    ]);
+
+    const handleRequestSubmitAdmissionAfterAvailability = React.useCallback(() => {
+        if (!validateBeforeAvailabilitySubmit()) return;
+        setAvailabilitySubmitConfirmOpen(true);
+    }, [validateBeforeAvailabilitySubmit]);
+
+    const handleConfirmAdmissionAfterAvailability = React.useCallback(async () => {
+        if (!validateBeforeAvailabilitySubmit()) return;
+
+        const sid = Number(availabilityStudentProfileId);
+        const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
 
         setAvailabilitySubmitting(true);
         try {
@@ -1448,6 +1517,7 @@ export default function SchoolSearchPage() {
             showSuccessSnackbar(
                 res?.data?.message || "Nộp hồ sơ vào trường thành công.",
             );
+            setAvailabilitySubmitConfirmOpen(false);
             closeAdmissionAvailabilityDialog();
             navigate(PARENT_ADMISSION_RESERVATIONS_PATH);
         } catch (e) {
@@ -1461,10 +1531,10 @@ export default function SchoolSearchPage() {
     }, [
         availabilityStudentProfileId,
         availabilityTemplateDocs,
-        availabilityTemplateError,
         closeAdmissionAvailabilityDialog,
         navigate,
         selectedAvailableAdmissionIds,
+        validateBeforeAvailabilitySubmit,
     ]);
 
     const detailKeyForActions = detailSchool ? getSchoolStorageKey(detailSchool) : "";
@@ -1508,7 +1578,14 @@ export default function SchoolSearchPage() {
             <Container maxWidth={false} sx={{maxWidth: '1400px', px: {xs: 2, md: 4}, pt: 1, pb: 6, position: 'relative', zIndex: 1}}>
     
 
-                <Box sx={{display: 'grid', gridTemplateColumns: {xs: '1fr', md: 'minmax(0, 3fr) minmax(0, 7fr)'}, gap: 3}}>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {xs: '1fr', md: 'minmax(0, 3fr) minmax(0, 7fr)'},
+                        gap: 3,
+                        alignItems: {xs: 'start', md: 'stretch'},
+                    }}
+                >
                     <Card
                         sx={{
                             p: 0,
@@ -1517,9 +1594,12 @@ export default function SchoolSearchPage() {
                             border: '1px solid rgba(203,213,225,0.95)',
                             bgcolor: '#fff',
                             boxShadow: '0 10px 40px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)',
-                            height: 'fit-content',
+                            height: {xs: 'fit-content', md: '100%'},
+                            display: 'flex',
+                            flexDirection: 'column',
                             position: {md: 'sticky'},
-                            top: {md: 96}
+                            top: {md: 96},
+                            alignSelf: {md: 'stretch'},
                         }}
                     >
                         <Box
@@ -1544,7 +1624,7 @@ export default function SchoolSearchPage() {
                                 Bộ lọc tìm trường
                             </Typography>
                         </Box>
-                        <Stack spacing={2} sx={{p: 2, pt: 2}}>
+                        <Stack spacing={2} sx={{p: 2, pt: 2, flex: 1}}>
                             <Box>
                                 <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Tỉnh, Thành phố</Typography>
                                 <Box sx={{display: 'flex', gap: 1, flexWrap: 'wrap'}}>
@@ -1743,7 +1823,7 @@ export default function SchoolSearchPage() {
                         </Stack>
                     </Card>
 
-                    <Box>
+                    <Box sx={{display: 'flex', flexDirection: 'column', minHeight: {md: '100%'}}}>
                         <Card
                             sx={{
                                 mb: 2,
@@ -1875,14 +1955,31 @@ export default function SchoolSearchPage() {
                                     display: "flex",
                                     flexDirection: {xs: "column", sm: "row"},
                                     alignItems: {xs: "stretch", sm: "center"},
-                                    justifyContent: "flex-end",
+                                    justifyContent: "space-between",
                                     gap: 1.5,
                                     mb: 2
                                 }}
                             >
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={allBatchPageSelected}
+                                            indeterminate={someBatchPageSelected}
+                                            onChange={toggleBatchSelectAllShown}
+                                            disabled={batchPageSchoolIds.length === 0}
+                                            sx={{py: 0}}
+                                        />
+                                    }
+                                    label={
+                                        <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
+                                            Chọn tất cả trên trang này
+                                        </Typography>
+                                    }
+                                    sx={{mr: 0, ml: 0}}
+                                />
                                 <Button
                                     variant="contained"
-                                    disabled={batchPageSchoolIds.length === 0}
+                                    disabled={batchAdmissionSelectedIds.length === 0}
                                     onClick={handleBatchSubmitFromSearchList}
                                     sx={{
                                         textTransform: "none",
@@ -1896,7 +1993,9 @@ export default function SchoolSearchPage() {
                                     }}
                                 >
                                     Nộp hồ sơ
-                                    {batchPageSchoolIds.length > 0 ? ` (${batchPageSchoolIds.length})` : ""}
+                                    {batchAdmissionSelectedIds.length > 0
+                                        ? ` (${batchAdmissionSelectedIds.length})`
+                                        : ""}
                                 </Button>
                             </Box>
                         ) : null}
@@ -1917,12 +2016,43 @@ export default function SchoolSearchPage() {
                                 const schoolKey = getSchoolStorageKey(school);
                                 const isSaved = Boolean(school?.isFavourite);
                                 const inCompare = compareSchoolKeys.has(schoolKey);
+                                const batchRowId = getBatchRowSchoolId(school);
+                                const rowBatchChecked =
+                                    batchRowId != null && batchAdmissionSelectedIds.includes(batchRowId);
+                                const rowKey =
+                                    school.id != null
+                                        ? `school-${school.id}`
+                                        : `${school.province}-${school.ward}-${school.school}`;
 
                                 return (
+                                    <Box
+                                        key={rowKey}
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: {xs: 0.75, sm: 1},
+                                        }}
+                                    >
+                                    {isParent ? (
+                                        <Checkbox
+                                            checked={rowBatchChecked}
+                                            onChange={() => toggleBatchSelectRow(school)}
+                                            disabled={batchRowId == null}
+                                            sx={{
+                                                flexShrink: 0,
+                                                mt: {xs: 1.25, sm: 1.5},
+                                                p: 0.5,
+                                            }}
+                                            inputProps={{
+                                                "aria-label": `Chọn ${school?.school || "trường"} để nộp hồ sơ theo lô`,
+                                            }}
+                                        />
+                                    ) : null}
                                     <Card
-                                        key={school.id != null ? `school-${school.id}` : `${school.province}-${school.ward}-${school.school}`}
                                         sx={{
                                             position: "relative",
+                                            flex: 1,
+                                            minWidth: 0,
                                             display: 'grid',
                                             gridTemplateColumns: {xs: '1fr', sm: 'minmax(0, 2.6fr) minmax(0, 7.4fr)'},
                                             gap: {xs: 1.25, sm: 2},
@@ -2221,6 +2351,7 @@ export default function SchoolSearchPage() {
                                         </Box>
                                     </Box>
                                     </Card>
+                                    </Box>
                                 );
                             })}
                         </Stack>
@@ -2791,35 +2922,36 @@ export default function SchoolSearchPage() {
                                         >
                                             <Stack
                                                 direction="row"
-                                                flexWrap="wrap"
-                                                gap={0.75}
                                                 alignItems="center"
+                                                justifyContent="space-between"
+                                                spacing={1}
                                                 sx={{mb: 1}}
                                             >
-                                                <Chip
-                                                    size="small"
-                                                    label={`Chọn nộp ${selectedAvailableAdmissionIds.length}/${availabilitySchoolGroups.available.length}`}
-                                                    sx={{
-                                                        height: 24,
-                                                        fontWeight: 700,
-                                                        fontSize: "0.75rem",
-                                                        bgcolor: "#dcfce7",
-                                                        color: "#166534",
-                                                    }}
-                                                />
-                                                {availabilitySchoolGroups.blocked.length > 0 ? (
-                                                    <Chip
-                                                        size="small"
-                                                        label={`Không nộp ${availabilitySchoolGroups.blocked.length}`}
+                                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                                    <Typography
                                                         sx={{
-                                                            height: 24,
+                                                            fontSize: "0.8125rem",
                                                             fontWeight: 700,
-                                                            fontSize: "0.75rem",
-                                                            bgcolor: "#f1f5f9",
-                                                            color: "#475569",
+                                                            color: "#166534",
                                                         }}
-                                                    />
-                                                ) : null}
+                                                    >
+                                                        Chọn nộp{" "}
+                                                        {selectedAvailableAdmissionIds.length}/
+                                                        {availabilitySchoolGroups.available.length}
+                                                    </Typography>
+                                                    {availabilitySchoolGroups.blocked.length > 0 ? (
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: "0.8125rem",
+                                                                fontWeight: 700,
+                                                                color: "#64748b",
+                                                            }}
+                                                        >
+                                                            · Không nộp{" "}
+                                                            {availabilitySchoolGroups.blocked.length}
+                                                        </Typography>
+                                                    ) : null}
+                                                </Stack>
                                                 {filteredAvailableSchoolRows.length > 0 ? (
                                                     <Button
                                                         size="small"
@@ -2827,7 +2959,7 @@ export default function SchoolSearchPage() {
                                                         disabled={availabilitySubmitting}
                                                         onClick={toggleSelectAllFilteredAvailable}
                                                         sx={{
-                                                            ml: "auto",
+                                                            flexShrink: 0,
                                                             textTransform: "none",
                                                             fontWeight: 700,
                                                             fontSize: "0.8125rem",
@@ -2837,8 +2969,8 @@ export default function SchoolSearchPage() {
                                                         }}
                                                     >
                                                         {allFilteredAvailableSelected
-                                                            ? "Bỏ chọn danh sách đang hiện"
-                                                            : "Chọn tất cả đang hiện"}
+                                                            ? "Bỏ chọn"
+                                                            : "Chọn tất cả"}
                                                     </Button>
                                                 ) : null}
                                             </Stack>
@@ -2874,13 +3006,15 @@ export default function SchoolSearchPage() {
                                                 maxHeight: {xs: 420, md: "min(58vh, 620px)"},
                                             }}
                                         >
-                                            {filteredAvailableSchoolRows.length > 0 ? (
-                                                <Box sx={{borderBottom: "1px solid rgba(226,232,240,0.95)"}}>
+                                            {filteredAvailableSchoolRows.length > 0 ||
+                                            filteredBlockedSchoolRows.length > 0 ? (
+                                                <Box>
                                                     {filteredAvailableSchoolRows.map((row) => {
                                                         const isSelected =
                                                             availabilitySelectedSchoolIds.some(
                                                                 (id) =>
-                                                                    Number(id) === Number(row.schoolId),
+                                                                    Number(id) ===
+                                                                    Number(row.schoolId),
                                                             );
                                                         return (
                                                             <AvailabilitySelectableSchoolRow
@@ -2896,8 +3030,48 @@ export default function SchoolSearchPage() {
                                                             />
                                                         );
                                                     })}
+                                                    {filteredBlockedSchoolRows.length > 0 ? (
+                                                        <>
+                                                            {filteredAvailableSchoolRows.length >
+                                                            0 ? (
+                                                                <Box
+                                                                    sx={{
+                                                                        px: 1.5,
+                                                                        py: 1,
+                                                                        bgcolor:
+                                                                            "rgba(248,250,252,0.95)",
+                                                                        borderTop:
+                                                                            "1px solid rgba(226,232,240,0.95)",
+                                                                        borderBottom:
+                                                                            "1px solid rgba(226,232,240,0.95)",
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontSize: "0.72rem",
+                                                                            fontWeight: 700,
+                                                                            letterSpacing:
+                                                                                "0.06em",
+                                                                            textTransform:
+                                                                                "uppercase",
+                                                                            color: "#64748b",
+                                                                        }}
+                                                                    >
+                                                                        Không thể nộp
+                                                                    </Typography>
+                                                                </Box>
+                                                            ) : null}
+                                                            {filteredBlockedSchoolRows.map((row) => (
+                                                                <AvailabilityBlockedSchoolRow
+                                                                    key={row.key}
+                                                                    row={row}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    ) : null}
                                                 </Box>
-                                            ) : availabilitySchoolGroups.available.length > 0 ? (
+                                            ) : availabilitySchoolGroups.available.length > 0 ||
+                                              availabilitySchoolGroups.blocked.length > 0 ? (
                                                 <Typography
                                                     sx={{
                                                         px: 1.5,
@@ -2907,69 +3081,8 @@ export default function SchoolSearchPage() {
                                                         fontStyle: "italic",
                                                     }}
                                                 >
-                                                    Không có trường hợp lệ khớp từ khóa tìm kiếm.
+                                                    Không có trường khớp từ khóa tìm kiếm.
                                                 </Typography>
-                                            ) : null}
-
-                                            {availabilitySchoolGroups.blocked.length > 0 ? (
-                                                <Box>
-                                                    <Button
-                                                        fullWidth
-                                                        size="small"
-                                                        onClick={() =>
-                                                            setAvailabilityBlockedExpanded((v) => !v)
-                                                        }
-                                                        endIcon={
-                                                            availabilityBlockedExpanded ? (
-                                                                <ExpandLessIcon />
-                                                            ) : (
-                                                                <ExpandMoreIcon />
-                                                            )
-                                                        }
-                                                        sx={{
-                                                            justifyContent: "space-between",
-                                                            px: 1.5,
-                                                            py: 1,
-                                                            borderRadius: 0,
-                                                            textTransform: "none",
-                                                            fontWeight: 700,
-                                                            fontSize: "0.8125rem",
-                                                            color: "#475569",
-                                                            bgcolor: "#f8fafc",
-                                                            borderTop: "1px solid rgba(226,232,240,0.95)",
-                                                            "&:hover": {bgcolor: "#f1f5f9"},
-                                                        }}
-                                                    >
-                                                        Không thể nộp (
-                                                        {filteredBlockedSchoolRows.length}
-                                                        {availabilitySchoolSearch.trim()
-                                                            ? ` / ${availabilitySchoolGroups.blocked.length}`
-                                                            : ""}
-                                                        )
-                                                    </Button>
-                                                    <Collapse in={availabilityBlockedExpanded} timeout="auto">
-                                                        {filteredBlockedSchoolRows.length > 0 ? (
-                                                            filteredBlockedSchoolRows.map((row) => (
-                                                                <AvailabilityBlockedSchoolRow
-                                                                    key={row.key}
-                                                                    row={row}
-                                                                />
-                                                            ))
-                                                        ) : (
-                                                            <Typography
-                                                                sx={{
-                                                                    px: 1.5,
-                                                                    py: 1.5,
-                                                                    fontSize: "0.875rem",
-                                                                    color: "#64748b",
-                                                                    fontStyle: "italic",
-                                                                }}
-                                                            >
-                                                                Không có trường khớp từ khóa tìm kiếm.
-                                                            </Typography>
-                                                        )}
-                                                    </Collapse>
-                                                </Box>
                                             ) : null}
                                         </Box>
                                     </Box>
@@ -3008,7 +3121,7 @@ export default function SchoolSearchPage() {
                     </Button>
                     <Button
                         variant="contained"
-                        onClick={handleConfirmAdmissionAfterAvailability}
+                        onClick={handleRequestSubmitAdmissionAfterAvailability}
                         disabled={
                             availabilityCheckLoading ||
                             availabilitySubmitting ||
@@ -3037,6 +3150,20 @@ export default function SchoolSearchPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <ConfirmDialog
+                open={availabilitySubmitConfirmOpen}
+                title="Xác nhận nộp hồ sơ"
+                description={`Bạn có chắc muốn nộp hồ sơ giữ chỗ cho ${availabilityStudentDisplayName || "học sinh này"} vào ${selectedAvailableAdmissionIds.length} trường đã chọn?`}
+                confirmText="Nộp hồ sơ"
+                cancelText="Hủy"
+                loading={availabilitySubmitting}
+                onCancel={() => {
+                    if (availabilitySubmitting) return;
+                    setAvailabilitySubmitConfirmOpen(false);
+                }}
+                onConfirm={() => void handleConfirmAdmissionAfterAvailability()}
+            />
 
             <Modal
                 open={Boolean(availabilityImagePreview?.url)}

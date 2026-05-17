@@ -61,6 +61,7 @@ import {
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "../admission/PaymentProofPreview.jsx";
+import RejectReasonAlert from "../admission/RejectReasonAlert.jsx";
 import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
 import {
     HOC_BA_THCS_CODE,
@@ -83,9 +84,13 @@ const STATUS_ICONS = {
     [RESERVATION_STATUS.PENDING]: AccessTimeRoundedIcon,
     [RESERVATION_STATUS.APPROVAL]: CheckCircleRoundedIcon,
     [RESERVATION_STATUS.PAYMENT_PENDING]: AccessTimeRoundedIcon,
-    [RESERVATION_STATUS.DEPOSITED]: CheckCircleRoundedIcon,
-    [RESERVATION_STATUS.REJECTED]: CancelRoundedIcon,
     [RESERVATION_STATUS.PAYMENT_REJECTED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.DEPOSITED]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.DEPOSIT_EXPIRED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.CONFIRMED]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.GHOST]: CancelRoundedIcon,
+    [RESERVATION_STATUS.CANCELLED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.REJECTED]: CancelRoundedIcon,
 };
 
 const statusMeta = (status) => {
@@ -524,6 +529,20 @@ function AdmissionReservationDetailDrawer({
             </DialogTitle>
             <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
                 <Stack spacing={2.5}>
+                    {row?.status === RESERVATION_STATUS.REJECTED && row?.rejectReason ? (
+                        <RejectReasonAlert
+                            title="Lý do từ chối hồ sơ"
+                            reason={row.rejectReason}
+                            variant="profile"
+                        />
+                    ) : null}
+                    {row?.status === RESERVATION_STATUS.PAYMENT_REJECTED && row?.rejectReason ? (
+                        <RejectReasonAlert
+                            title="Lý do từ chối thanh toán"
+                            reason={row.rejectReason}
+                            variant="payment"
+                        />
+                    ) : null}
                     <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
                         <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
                             Thông tin học sinh
@@ -590,28 +609,6 @@ function AdmissionReservationDetailDrawer({
                                 url={row?.paymentProofUrl}
                                 onPreview={row?.paymentProofUrl ? onPreviewPaymentProof : undefined}
                             />
-                        </Paper>
-                    ) : null}
-
-                    {row?.status === RESERVATION_STATUS.REJECTED && row?.rejectReason ? (
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fecaca", bgcolor: "#fef2f2"}}>
-                            <Typography sx={{fontWeight: 800, color: "#b91c1c", mb: 0.8}}>
-                                Lý do từ chối hồ sơ
-                            </Typography>
-                            <Typography variant="body2" sx={{color: "#7f1d1d"}}>
-                                {row.rejectReason}
-                            </Typography>
-                        </Paper>
-                    ) : null}
-
-                    {row?.status === RESERVATION_STATUS.PAYMENT_REJECTED && row?.rejectReason ? (
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fda4af", bgcolor: "#fff1f2"}}>
-                            <Typography sx={{fontWeight: 800, color: "#9f1239", mb: 0.8}}>
-                                Lý do từ chối thanh toán
-                            </Typography>
-                            <Typography variant="body2" sx={{color: "#881337"}}>
-                                {row.rejectReason}
-                            </Typography>
                         </Paper>
                     ) : null}
 
