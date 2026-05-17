@@ -440,6 +440,34 @@ export function pickAdmissionSchoolsAvailabilityFromResponse(response) {
     return {unavailable, available, message: topMessage || (typeof inner?.message === 'string' ? inner.message : '')};
 }
 
+export function pickSchoolAdmissionAvailability(availabilityResult, schoolId) {
+    const targetId = Number(schoolId);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+        return {eligible: false, reason: 'Không xác định được trường để kiểm tra điều kiện nộp hồ sơ.'};
+    }
+    const available = Array.isArray(availabilityResult?.available) ? availabilityResult.available : [];
+    if (
+        available.some((item) => {
+            const id = Number(item?.schoolId ?? item?.id);
+            return Number.isFinite(id) && id === targetId;
+        })
+    ) {
+        return {eligible: true, reason: ''};
+    }
+    for (const row of flattenAdmissionSchoolsUnavailable(availabilityResult?.unavailable)) {
+        if (Number(row.schoolId) === targetId) {
+            return {
+                eligible: false,
+                reason: row.reason || 'Học sinh không đủ điều kiện nộp hồ sơ tại trường này.',
+            };
+        }
+    }
+    return {
+        eligible: false,
+        reason: 'Học sinh không đủ điều kiện nộp hồ sơ tại trường này.',
+    };
+}
+
 export function pickAdmissionReservationFormsFromResponse(response) {
     const data = response?.data;
     if (data == null) return [];
