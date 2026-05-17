@@ -31,6 +31,7 @@ import {
 } from "../../services/ParentService.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
+import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
 import {
     isReservationConfirmed,
     normalizeParentAdmissionReservationRow,
@@ -155,9 +156,12 @@ function DetailLineRow({label, value}) {
     );
 }
 
-function ReservationCard({reservation, onOpenDetail}) {
+function ReservationCard({reservation, onOpenDetail, onOpenPayment}) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
+    const showPayment =
+        normalizedStatus === RESERVATION_STATUS.APPROVAL ||
+        normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED;
     const statusHint =
         normalizedStatus === RESERVATION_STATUS.APPROVAL
             ? "Vui lòng thanh toán phí giữ chỗ theo hướng dẫn của trường."
