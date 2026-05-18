@@ -417,14 +417,69 @@ function normalizeDocItem(d) {
   };
 }
 
-/** Hồ sơ bắt buộc chung (hệ thống): thêm ocrCriteria, luôn required. */
+/** Hồ sơ bắt buộc chung (hệ thống): ocrCriteria + templateFileUrl, luôn required. */
 function normalizeMandatoryDocItem(d) {
-  if (!d || typeof d !== "object") return {code: "", name: "", required: true, ocrCriteria: []};
+  if (!d || typeof d !== "object") {
+    return {code: "", name: "", required: true, ocrCriteria: [], templateFileUrl: null};
+  }
+  const templateRaw =
+    d.templateFileUrl != null
+      ? String(d.templateFileUrl).trim()
+      : d.fileUrl != null
+        ? String(d.fileUrl).trim()
+        : d.templateUrl != null
+          ? String(d.templateUrl).trim()
+          : "";
   return {
-    ...normalizeDocItem(d),
+    code: d.code != null ? String(d.code) : "",
+    name: d.name != null ? String(d.name) : "",
     required: true,
     ocrCriteria: normalizeOcrCriteriaList(d.ocrCriteria),
+    templateFileUrl: templateRaw || null,
   };
+}
+
+/** Giữ danh sách/OCR từ hệ thống, gộp templateFileUrl (GET trường) theo mã hồ sơ. */
+function mergeMandatoryAllWithSchoolOverrides(systemList, schoolList) {
+  const system = Array.isArray(systemList) ? systemList.map(normalizeMandatoryDocItem) : [];
+  const school = Array.isArray(schoolList) ? schoolList.map(normalizeMandatoryDocItem) : [];
+  if (school.length === 0) return system;
+  if (system.length === 0) return school;
+
+  const schoolByCode = new Map();
+  for (const row of school) {
+    const code = row.code.trim();
+    if (code) schoolByCode.set(code, row);
+  }
+
+  return system.map((base) => {
+    const override = schoolByCode.get(base.code.trim());
+    if (!override?.templateFileUrl) return base;
+    return {...base, templateFileUrl: override.templateFileUrl};
+  });
+}
+
+function sanitizeMandatoryDocOcrForApi(criteria) {
+  const normalized = normalizeOcrCriteriaList(criteria)
+    .map((item) => ({
+      label: String(item.label ?? "").trim(),
+      validations: item.validations.map((v) => String(v).trim()).filter(Boolean),
+    }))
+    .filter((item) => item.label);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function sanitizeMandatoryDocItemForApi(d) {
+  const x = normalizeMandatoryDocItem(d);
+  const base = {
+    code: x.code.trim(),
+    name: x.name.trim(),
+    required: x.required,
+    templateFileUrl: x.templateFileUrl,
+  };
+  const ocrCriteria = sanitizeMandatoryDocOcrForApi(x.ocrCriteria);
+  if (ocrCriteria) base.ocrCriteria = ocrCriteria;
+  return base;
 }
 
 function parseSystemMandatoryAllFromApiBody(body) {
@@ -761,9 +816,9 @@ function parseMethodAdmissionProcessFromOperation(op) {
   return [];
 }
 
-/** Gửi PUT /school/config — chỉ byMethod (mandatoryAll do hệ thống quản lý). */
+/** Gửi PUT /school/config — byMethod (templateUrl) + mandatoryAll (templateFileUrl). */
 function sanitizeDocumentRequirementsForApi(data) {
-  if (!data || typeof data !== "object") return {byMethod: []};
+  if (!data || typeof data !== "object") return {byMethod: [], mandatoryAll: []};
   const byMethod = Array.isArray(data.byMethod)
     ? data.byMethod.map((g) => {
         const ng = normalizeByMethodGroup(g);
@@ -782,7 +837,10 @@ function sanitizeDocumentRequirementsForApi(data) {
         };
       })
     : [];
-  return {byMethod};
+  const mandatoryAll = Array.isArray(data.mandatoryAll)
+    ? data.mandatoryAll.map(sanitizeMandatoryDocItemForApi).filter((d) => d.code || d.name)
+    : [];
+  return {byMethod, mandatoryAll};
 }
 
 function documentRequirementsDirty(current, initial) {
@@ -1884,6 +1942,8 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const initialPolicyFullTextRef = useRef("");
   const [config, setConfig] = useState(() => defaultConfig());
   const initialRef = useRef(null);
+  /** Sau PUT thành công: BE có thể chưa trả templateFileUrl trên GET — gộp lại từ payload vừa gửi. */
+  const pendingMandatoryAllFromPutRef = useRef(null);
   const facilityFormRef = useRef(null);
   const methodAdmissionProcessGroupRefs = useRef({});
   const [pendingScrollToProcessIdx, setPendingScrollToProcessIdx] = useState(null);
@@ -1903,6 +1963,9 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   /** `${groupIdx}-${docIdx}` đang upload mẫu hồ sơ theo phương thức */
   const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
   const methodDocFileInputRefs = useRef({});
+  /** index mandatoryAll đang upload mẫu */
+  const [mandatoryDocUploadingKeys, setMandatoryDocUploadingKeys] = useState(() => new Set());
+  const mandatoryDocFileInputRefs = useRef({});
   const [vietQrBanks, setVietQrBanks] = useState([]);
   const [loadingVietQrBanks, setLoadingVietQrBanks] = useState(false);
   const [vietQrBanksLoaded, setVietQrBanksLoaded] = useState(false);
@@ -2132,18 +2195,34 @@ export default function SchoolConfig({variant = "platform"} = {}) {
       }
 
       try {
+        const schoolMandatoryAll = next.documentRequirementsData?.mandatoryAll || [];
         const systemMandatoryAll = await fetchSystemMandatoryAllDocuments();
         if (systemMandatoryAll.length > 0) {
           next = {
             ...next,
             documentRequirementsData: {
               ...next.documentRequirementsData,
-              mandatoryAll: systemMandatoryAll,
+              mandatoryAll: mergeMandatoryAllWithSchoolOverrides(systemMandatoryAll, schoolMandatoryAll),
             },
           };
         }
       } catch {
         // Giữ mandatoryAll từ GET school/config nếu không tải được mẫu hệ thống.
+      }
+
+      const putMandatoryOverride = pendingMandatoryAllFromPutRef.current;
+      if (Array.isArray(putMandatoryOverride) && putMandatoryOverride.length > 0) {
+        next = {
+          ...next,
+          documentRequirementsData: {
+            ...next.documentRequirementsData,
+            mandatoryAll: mergeMandatoryAllWithSchoolOverrides(
+              next.documentRequirementsData?.mandatoryAll,
+              putMandatoryOverride,
+            ),
+          },
+        };
+        pendingMandatoryAllFromPutRef.current = null;
       }
 
       setConfig(next);
@@ -2477,6 +2556,10 @@ export default function SchoolConfig({variant = "platform"} = {}) {
         });
       }
       setEditing(false);
+      const putMandatory = schoolPayload.documentRequirementsData?.mandatoryAll;
+      if (Array.isArray(putMandatory) && putMandatory.length > 0) {
+        pendingMandatoryAllFromPutRef.current = putMandatory;
+      }
       await load({silent: true});
     } catch (e) {
       console.error(e);
@@ -2811,6 +2894,44 @@ export default function SchoolConfig({variant = "platform"} = {}) {
       by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
       return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
     });
+  }, []);
+
+  const handleMandatoryDocumentTemplateUpload = useCallback(async (idx, file) => {
+    if (!file) return;
+    setMandatoryDocUploadingKeys((prev) => new Set([...prev, idx]));
+    try {
+      const fileType = file.type.startsWith("image/") ? "image" : "doc";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
+        headers: {"Content-Type": "multipart/form-data"},
+      });
+      const body = res.data?.body ?? res.data;
+      const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
+      if (!fileUrl) {
+        enqueueSnackbar("Không nhận được URL file sau khi tải lên.", {variant: "error"});
+        return;
+      }
+      setConfig((c) => {
+        const list = [...(c.documentRequirementsData.mandatoryAll || [])];
+        if (!list[idx]) return c;
+        list[idx] = normalizeMandatoryDocItem({...list[idx], templateFileUrl: fileUrl});
+        return {
+          ...c,
+          documentRequirementsData: {...c.documentRequirementsData, mandatoryAll: list},
+        };
+      });
+      enqueueSnackbar(res.data?.message || "Đã tải mẫu hồ sơ lên.", {variant: "success"});
+    } catch (e) {
+      console.error(e);
+      enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {variant: "error"});
+    } finally {
+      setMandatoryDocUploadingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+    }
   }, []);
 
   const handleMethodDocumentTemplateUpload = useCallback(async (gIdx, dIdx, file) => {
@@ -4307,6 +4428,8 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                         (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
                       ).length;
                       const ocrExpanded = mandatoryOcrExpandedIdxs.includes(idx);
+                      const isUploadingMandatoryTemplate = mandatoryDocUploadingKeys.has(idx);
+                      const templateFileUrl = doc.templateFileUrl ? String(doc.templateFileUrl).trim() : "";
                       return (
                         <Box
                           key={`mandatory-${doc.code || idx}`}
@@ -4357,20 +4480,71 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                     Mã: {doc.code}
                                   </Typography>
                                 ) : null}
+                                {templateFileUrl ? (
+                                  <Button
+                                    component="a"
+                                    href={templateFileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    size="small"
+                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
+                                    sx={{mt: 0.5, textTransform: "none", fontWeight: 600, px: 0}}
+                                  >
+                                    Xem mẫu đã tải
+                                  </Button>
+                                ) : null}
                               </Box>
                             </Stack>
-                            <Chip
-                              size="small"
-                              label="Bắt buộc"
-                              sx={{
-                                height: 24,
-                                fontWeight: 700,
-                                fontSize: 11,
-                                color: "#b91c1c",
-                                bgcolor: "#fee2e2",
-                                alignSelf: {xs: "flex-start", sm: "center"},
-                              }}
-                            />
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={0.5}
+                              sx={{flexShrink: 0, alignSelf: {xs: "flex-start", sm: "center"}}}
+                            >
+                              <input
+                                type="file"
+                                hidden
+                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                ref={(el) => {
+                                  if (el) mandatoryDocFileInputRefs.current[idx] = el;
+                                  else delete mandatoryDocFileInputRefs.current[idx];
+                                }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = "";
+                                  if (file) void handleMandatoryDocumentTemplateUpload(idx, file);
+                                }}
+                              />
+                              <Tooltip title="Tải mẫu" slotProps={{tooltip: {sx: {fontSize: "0.75rem"}}}}>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    disabled={fieldDisabled || isUploadingMandatoryTemplate}
+                                    onClick={() => mandatoryDocFileInputRefs.current[idx]?.click()}
+                                    aria-label="Tải mẫu"
+                                    sx={blockPointerSx}
+                                  >
+                                    {isUploadingMandatoryTemplate ? (
+                                      <CircularProgress size={18} color="inherit"/>
+                                    ) : (
+                                      <FileUploadOutlinedIcon fontSize="small"/>
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <Chip
+                                size="small"
+                                label="Bắt buộc"
+                                sx={{
+                                  height: 24,
+                                  fontWeight: 700,
+                                  fontSize: 11,
+                                  color: "#b91c1c",
+                                  bgcolor: "#fee2e2",
+                                }}
+                              />
+                            </Stack>
                           </Box>
                           <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
                             <Box sx={{px: 1.5, pb: 1.5, pt: 1.25, bgcolor: "#f8fbff", borderTop: "1px dashed #bfdbfe"}}>
