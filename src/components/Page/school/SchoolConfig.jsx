@@ -58,10 +58,13 @@ import NumbersOutlinedIcon from "@mui/icons-material/NumbersOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import {useNavigate, useSearchParams} from "react-router-dom";
 import {closeSnackbar, enqueueSnackbar} from "notistack";
 import {motion} from "framer-motion";
 
+import axiosClient from "../../../configs/APIConfig.jsx";
 import {extractCampusListBody, listCampuses} from "../../../services/CampusService.jsx";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {
@@ -402,13 +405,15 @@ function pickSection(body, camelKey, snakeKey) {
   return c || s || {};
 }
 
-/** Một dòng hồ sơ: { code, name, required } */
+/** Một dòng hồ sơ: { code, name, required, templateUrl } */
 function normalizeDocItem(d) {
-  if (!d || typeof d !== "object") return {code: "", name: "", required: false};
+  if (!d || typeof d !== "object") return {code: "", name: "", required: false, templateUrl: null};
+  const templateRaw = d.templateUrl != null ? String(d.templateUrl).trim() : "";
   return {
     code: d.code != null ? String(d.code) : "",
     name: d.name != null ? String(d.name) : "",
     required: Boolean(d.required),
+    templateUrl: templateRaw || null,
   };
 }
 
@@ -764,7 +769,12 @@ function sanitizeDocumentRequirementsForApi(data) {
         const ng = normalizeByMethodGroup(g);
         const documents = ng.documents.map((d) => {
           const x = normalizeDocItem(d);
-          return {code: x.code.trim(), name: x.name.trim(), required: x.required};
+          return {
+            code: x.code.trim(),
+            name: x.name.trim(),
+            required: x.required,
+            templateUrl: x.templateUrl,
+          };
         });
         return {
           documents,
@@ -1890,6 +1900,9 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const [resourceSummaryReport, setResourceSummaryReport] = useState(null);
   const [resourceSummaryLoading, setResourceSummaryLoading] = useState(false);
   const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
+  /** `${groupIdx}-${docIdx}` đang upload mẫu hồ sơ theo phương thức */
+  const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
+  const methodDocFileInputRefs = useRef({});
   const [vietQrBanks, setVietQrBanks] = useState([]);
   const [loadingVietQrBanks, setLoadingVietQrBanks] = useState(false);
   const [vietQrBanksLoaded, setVietQrBanksLoaded] = useState(false);
@@ -2794,10 +2807,48 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     setConfig((c) => {
       const by = [...(c.documentRequirementsData.byMethod || [])];
       if (!by[gIdx]) return c;
-      const docs = [...(by[gIdx].documents || []), {code: "", name: "", required: true}];
+      const docs = [...(by[gIdx].documents || []), {code: "", name: "", required: true, templateUrl: null}];
       by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
       return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
     });
+  }, []);
+
+  const handleMethodDocumentTemplateUpload = useCallback(async (gIdx, dIdx, file) => {
+    if (!file) return;
+    const key = `${gIdx}-${dIdx}`;
+    setMethodDocUploadingKeys((prev) => new Set([...prev, key]));
+    try {
+      const fileType = file.type.startsWith("image/") ? "image" : "doc";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
+        headers: {"Content-Type": "multipart/form-data"},
+      });
+      const body = res.data?.body ?? res.data;
+      const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
+      if (!fileUrl) {
+        enqueueSnackbar("Không nhận được URL file sau khi tải lên.", {variant: "error"});
+        return;
+      }
+      setConfig((c) => {
+        const by = [...(c.documentRequirementsData.byMethod || [])];
+        const docs = [...(by[gIdx]?.documents || [])];
+        if (!docs[dIdx]) return c;
+        docs[dIdx] = normalizeDocItem({...docs[dIdx], templateUrl: fileUrl});
+        by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
+        return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
+      });
+      enqueueSnackbar(res.data?.message || "Đã tải mẫu hồ sơ lên.", {variant: "success"});
+    } catch (e) {
+      console.error(e);
+      enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {variant: "error"});
+    } finally {
+      setMethodDocUploadingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   }, []);
 
   const removeDocumentInMethod = useCallback((gIdx, dIdx) => {
@@ -4432,7 +4483,11 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                             </MenuItem>
                           ))}
                         </TextField>
-                        {(group.documents || []).map((doc, dIdx) => (
+                        {(group.documents || []).map((doc, dIdx) => {
+                          const uploadKey = `${gIdx}-${dIdx}`;
+                          const isUploadingTemplate = methodDocUploadingKeys.has(uploadKey);
+                          const templateUrl = doc.templateUrl ? String(doc.templateUrl).trim() : "";
+                          return (
                           <Box
                             key={`by-method-${gIdx}-${dIdx}`}
                             sx={{
@@ -4447,41 +4502,71 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                             }}
                           >
                             {fieldDisabled ? (
-                              <Typography>{doc.name || doc.code || "—"}</Typography>
+                              <Stack spacing={0.5} sx={{flex: 1, minWidth: 0}}>
+                                <Typography>{doc.name || doc.code || "—"}</Typography>
+                                {templateUrl ? (
+                                  <Button
+                                    component="a"
+                                    href={templateUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    size="small"
+                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
+                                    sx={{alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0}}
+                                  >
+                                    Xem mẫu đã tải
+                                  </Button>
+                                ) : null}
+                              </Stack>
                             ) : (
-                              <Stack direction={{xs: "column", sm: "row"}} spacing={1} sx={{flex: 1, minWidth: 0}}>
-                                <TextField
-                                  size="small"
-                                  label="Mã"
-                                  value={doc.code ?? ""}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setConfig((c) => {
-                                      const by = [...(c.documentRequirementsData.byMethod || [])];
-                                      const docs = [...(by[gIdx].documents || [])];
-                                      docs[dIdx] = normalizeDocItem({...docs[dIdx], code: v});
-                                      by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
-                                      return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
-                                    });
-                                  }}
-                                  sx={{minWidth: {sm: 140}}}
-                                />
-                                <TextField
-                                  size="small"
-                                  label="Tên"
-                                  value={doc.name ?? ""}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setConfig((c) => {
-                                      const by = [...(c.documentRequirementsData.byMethod || [])];
-                                      const docs = [...(by[gIdx].documents || [])];
-                                      docs[dIdx] = normalizeDocItem({...docs[dIdx], name: v});
-                                      by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
-                                      return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
-                                    });
-                                  }}
-                                  fullWidth
-                                />
+                              <Stack spacing={1} sx={{flex: 1, minWidth: 0}}>
+                                <Stack direction={{xs: "column", sm: "row"}} spacing={1}>
+                                  <TextField
+                                    size="small"
+                                    label="Mã"
+                                    value={doc.code ?? ""}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setConfig((c) => {
+                                        const by = [...(c.documentRequirementsData.byMethod || [])];
+                                        const docs = [...(by[gIdx].documents || [])];
+                                        docs[dIdx] = normalizeDocItem({...docs[dIdx], code: v});
+                                        by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
+                                        return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
+                                      });
+                                    }}
+                                    sx={{minWidth: {sm: 140}}}
+                                  />
+                                  <TextField
+                                    size="small"
+                                    label="Tên"
+                                    value={doc.name ?? ""}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setConfig((c) => {
+                                        const by = [...(c.documentRequirementsData.byMethod || [])];
+                                        const docs = [...(by[gIdx].documents || [])];
+                                        docs[dIdx] = normalizeDocItem({...docs[dIdx], name: v});
+                                        by[gIdx] = normalizeByMethodGroup({...by[gIdx], documents: docs});
+                                        return {...c, documentRequirementsData: {...c.documentRequirementsData, byMethod: by}};
+                                      });
+                                    }}
+                                    fullWidth
+                                  />
+                                </Stack>
+                                {templateUrl ? (
+                                  <Button
+                                    component="a"
+                                    href={templateUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    size="small"
+                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
+                                    sx={{alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0}}
+                                  >
+                                    Xem mẫu đã tải
+                                  </Button>
+                                ) : null}
                               </Stack>
                             )}
                             <Stack direction="row" alignItems="center" spacing={1} sx={{flexShrink: 0, alignSelf: {xs: "flex-end", sm: "center"}}}>
@@ -4501,6 +4586,38 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                 }}
                                 sx={blockPointerSx}
                               />
+                              <input
+                                type="file"
+                                hidden
+                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                                ref={(el) => {
+                                  if (el) methodDocFileInputRefs.current[uploadKey] = el;
+                                  else delete methodDocFileInputRefs.current[uploadKey];
+                                }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = "";
+                                  if (file) void handleMethodDocumentTemplateUpload(gIdx, dIdx, file);
+                                }}
+                              />
+                              <Tooltip title="Tải mẫu" slotProps={{tooltip: {sx: {fontSize: "0.75rem"}}}}>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="primary"
+                                    disabled={fieldDisabled || isUploadingTemplate}
+                                    onClick={() => methodDocFileInputRefs.current[uploadKey]?.click()}
+                                    aria-label="Tải mẫu"
+                                    sx={blockPointerSx}
+                                  >
+                                    {isUploadingTemplate ? (
+                                      <CircularProgress size={18} color="inherit"/>
+                                    ) : (
+                                      <FileUploadOutlinedIcon fontSize="small"/>
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
                               <IconButton
                                 size="small"
                                 color="error"
@@ -4513,7 +4630,8 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                               </IconButton>
                             </Stack>
                               </Box>
-                        ))}
+                          );
+                        })}
                       </Stack>
                     </AccordionDetails>
                   </Accordion>
