@@ -535,7 +535,29 @@ export default function BatchAdmissionFlowDialogs({
 
                                 {availabilityTemplateError ? (
                                     <Alert severity="warning" sx={{mb: 1.5, borderRadius: 2}}>
-                                        {availabilityTemplateError}
+                                        {availabilityTemplateError === "__TEMPLATE_NULL__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError === "__TEMPLATE_OUTDATED__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại.{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    Cấu hình lại tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError}
                                     </Alert>
                                 ) : null}
 

@@ -278,18 +278,14 @@ export function useBatchAdmissionFromSchoolList({
                     const applied = applyReservationTemplateToDocs(catalog, body, sid);
                     setAvailabilityTemplateDocs(applied);
                     if (!hasSavedReservationTemplateForStudent(body, sid)) {
-                        setAvailabilityTemplateError(
-                            "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
-                        );
+                        setAvailabilityTemplateError("__TEMPLATE_OUTDATED__");
                     }
                 }
             } else {
                 const templateErr = templateSettled.reason;
                 setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
                 if (templateErr?.response?.status === 404) {
-                    setAvailabilityTemplateError(
-                        "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
-                    );
+                    setAvailabilityTemplateError("__TEMPLATE_NULL__");
                 } else {
                     setAvailabilityTemplateError(
                         templateErr?.response?.data?.message ||

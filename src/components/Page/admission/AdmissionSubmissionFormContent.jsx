@@ -49,6 +49,7 @@ export default function AdmissionSubmissionFormContent({
     programName,
     showParentInfo = false,
     parentInfo,
+    studentDetailContent,
 }) {
     const studentTitle = studentSectionTitle ?? 'Học sinh';
 
@@ -97,6 +98,8 @@ export default function AdmissionSubmissionFormContent({
                     disabled={studentPickerDisabled ?? disabled}
                 />
             </Box>
+
+            {studentDetailContent ?? null}
 
             <Divider sx={{borderColor: 'rgba(148,163,184,0.25)'}} />
 

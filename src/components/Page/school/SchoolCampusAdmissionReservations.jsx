@@ -30,6 +30,9 @@ import {
     Tooltip,
     Typography,
     useMediaQuery,
+    CircularProgress,
+    Tabs,
+    Tab,
 } from "@mui/material";
 import Pagination from "@mui/material/Pagination";
 import SearchIcon from "@mui/icons-material/Search";
@@ -50,6 +53,8 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
+import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
@@ -57,6 +62,8 @@ import {
     confirmAdmissionReservationPayment,
     getCampusAdmissionReservationForms,
     processAdmissionReservationForm,
+    getAdmissionCampaigns,
+    autoApproveAdmissionReservations,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
@@ -669,6 +676,387 @@ function ImagePreviewModal({ open, images, selectedIndex, onChangeIndex, onClose
     );
 }
 
+const AUTO_APPROVE_STATUS_CONFIG = {
+    valid: {label: "Hợp lệ", color: "#166534", bg: "#f0fdf4", border: "#bbf7d0"},
+    invalid: {label: "Không hợp lệ", color: "#92400e", bg: "#fffbeb", border: "#fde68a"},
+    error: {label: "Hồ sơ lỗi", color: "#991b1b", bg: "#fef2f2", border: "#fecaca"},
+};
+
+function SummaryStatCard({label, value, color, bg, border, icon}) {
+    return (
+        <Paper elevation={0} sx={{flex: "1 1 0", minWidth: 110, borderRadius: 2.5, overflow: "hidden", border: `1px solid ${border}`}}>
+            <Box sx={{height: 3, bgcolor: color}} />
+            <Stack spacing={0.5} alignItems="center" sx={{p: 2, bgcolor: bg}}>
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                    {icon && <Box sx={{color, display: "flex"}}>{React.cloneElement(icon, {sx: {fontSize: 20}})}</Box>}
+                    <Typography sx={{fontSize: 30, fontWeight: 800, color, lineHeight: 1}}>{value}</Typography>
+                </Stack>
+                <Typography sx={{fontSize: 12, color, opacity: 0.72, fontWeight: 600}}>{label}</Typography>
+            </Stack>
+        </Paper>
+    );
+}
+
+function DocumentResultCard({doc}) {
+    const [open, setOpen] = React.useState(false);
+    const [imgPreview, setImgPreview] = React.useState(false);
+    const isValid = doc.status === "valid";
+    const details = Array.isArray(doc.details) ? doc.details : [];
+    const accentColor = isValid ? "#16a34a" : "#d97706";
+    return (
+        <Box sx={{borderRadius: 2, border: "1px solid #e2e8f0", overflow: "hidden", bgcolor: "#fff"}}>
+            <Box
+                onClick={() => details.length > 0 && setOpen((v) => !v)}
+                sx={{
+                    display: "flex", alignItems: "stretch",
+                    cursor: details.length > 0 ? "pointer" : "default",
+                    userSelect: "none",
+                    "&:hover": details.length > 0 ? {bgcolor: "#f8fafc"} : {},
+                    transition: "background-color 0.15s",
+                }}
+            >
+                <Box sx={{width: 3, flexShrink: 0, bgcolor: accentColor}} />
+                <Box sx={{flex: 1, minWidth: 0, px: 2, py: 1.25}}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{mb: doc.reason ? 0.4 : 0}}>
+                        <Typography sx={{fontWeight: 700, fontSize: 13, color: "#1e293b"}}>{doc.label || doc.key}</Typography>
+                        <Chip
+                            label={isValid ? "Hợp lệ" : "Không hợp lệ"}
+                            size="small"
+                            sx={{bgcolor: isValid ? "#dcfce7" : "#fef3c7", color: isValid ? "#166534" : "#92400e", fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}}
+                        />
+                    </Stack>
+                    {doc.reason && (
+                        <Typography sx={{color: "#b45309", fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
+                    )}
+                </Box>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{pr: 1.5, flexShrink: 0}} onClick={(e) => e.stopPropagation()}>
+                    {doc.submissionImage && (
+                        <Tooltip title="Xem ảnh minh chứng" arrow placement="top">
+                            <Box
+                                component="img"
+                                src={doc.submissionImage}
+                                alt={doc.label || doc.key}
+                                onClick={() => setImgPreview(true)}
+                                sx={{width: 36, height: 36, objectFit: "cover", borderRadius: 1, border: "1px solid #e2e8f0", cursor: "pointer", "&:hover": {opacity: 0.82, borderColor: "#93c5fd"}}}
+                            />
+                        </Tooltip>
+                    )}
+                    {details.length > 0 && (
+                        <Box
+                            onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+                            sx={{color: "#94a3b8", cursor: "pointer", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "flex"}}
+                        >
+                            <ExpandMoreRoundedIcon sx={{fontSize: 20}} />
+                        </Box>
+                    )}
+                </Stack>
+            </Box>
+            {open && details.length > 0 && (
+                <Box sx={{px: 2, py: 1.5, bgcolor: "#f8fafc", borderTop: "1px solid #f1f5f9"}}>
+                    <Stack spacing={0.8}>
+                        {details.map((d, i) => (
+                            <Stack key={i} direction="row" spacing={1} alignItems="flex-start"
+                                sx={{p: 1, borderRadius: 1.5, bgcolor: d.passed ? "rgba(220,252,231,0.5)" : "rgba(254,226,226,0.45)"}}
+                            >
+                                <Box sx={{mt: 0.1, flexShrink: 0}}>
+                                    {d.passed
+                                        ? <CheckCircleRoundedIcon sx={{fontSize: 15, color: "#16a34a"}} />
+                                        : <CancelRoundedIcon sx={{fontSize: 15, color: "#dc2626"}} />
+                                    }
+                                </Box>
+                                <Box sx={{minWidth: 0}}>
+                                    <Typography sx={{fontSize: 12.5, color: "#1e293b", fontWeight: 600, lineHeight: 1.4}}>{d.criteria}</Typography>
+                                    {d.note && <Typography sx={{fontSize: 12, color: "#64748b", mt: 0.2, lineHeight: 1.4}}>{d.note}</Typography>}
+                                </Box>
+                            </Stack>
+                        ))}
+                    </Stack>
+                </Box>
+            )}
+            {doc.submissionImage && (
+                <Backdrop open={imgPreview} onClick={() => setImgPreview(false)} sx={{zIndex: 1500, bgcolor: "rgba(15,23,42,0.7)", backdropFilter: "blur(6px)"}}>
+                    <Fade in={imgPreview}>
+                        <Box onClick={(e) => e.stopPropagation()} sx={{position: "relative", display: "inline-flex"}}>
+                            <Box component="img" src={doc.submissionImage} alt={doc.label || doc.key} sx={{maxWidth: "88vw", maxHeight: "80vh", objectFit: "contain", borderRadius: 2, display: "block"}} />
+                            <IconButton onClick={() => setImgPreview(false)} size="small" sx={{position: "absolute", top: -12, right: -12, bgcolor: "white", "&:hover": {bgcolor: "#f1f5f9"}, boxShadow: 2}}>
+                                <CloseRoundedIcon sx={{fontSize: 18}} />
+                            </IconButton>
+                        </Box>
+                    </Fade>
+                </Backdrop>
+            )}
+        </Box>
+    );
+}
+
+function FormResultCard({form}) {
+    const [open, setOpen] = React.useState(false);
+    const s = AUTO_APPROVE_STATUS_CONFIG[form.overallStatus] ?? AUTO_APPROVE_STATUS_CONFIG.error;
+    const docs = Array.isArray(form.documents) ? form.documents : [];
+    return (
+        <Paper
+            elevation={0}
+            sx={{
+                borderRadius: 2, border: `1px solid ${s.border}`, overflow: "hidden",
+                transition: "box-shadow 0.18s",
+                "&:hover": docs.length > 0 ? {boxShadow: `0 2px 10px -2px ${s.border}`} : {},
+            }}
+        >
+            <Box
+                onClick={() => docs.length > 0 && setOpen((v) => !v)}
+                sx={{display: "flex", alignItems: "stretch", cursor: docs.length > 0 ? "pointer" : "default", userSelect: "none"}}
+            >
+                <Box sx={{width: 4, flexShrink: 0, bgcolor: s.color}} />
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{flex: 1, px: 2, py: 1.5, bgcolor: s.bg}}>
+                    <Stack direction="row" spacing={1.25} alignItems="center">
+                        <Typography sx={{fontWeight: 700, color: "#1e293b", fontSize: 14}}>
+                            Hồ sơ #{form.formId}
+                        </Typography>
+                        <Chip
+                            label={s.label}
+                            size="small"
+                            sx={{bgcolor: "rgba(255,255,255,0.85)", color: s.color, border: `1px solid ${s.border}`, fontWeight: 700, borderRadius: 999, height: 22, "& .MuiChip-label": {px: 1.25}, fontSize: 12}}
+                        />
+                    </Stack>
+                    {docs.length > 0 && (
+                        <Box sx={{color: "#94a3b8", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.22s", display: "flex"}}>
+                            <ExpandMoreRoundedIcon sx={{fontSize: 20}} />
+                        </Box>
+                    )}
+                </Stack>
+            </Box>
+            {open && docs.length > 0 && (
+                <Box sx={{p: 2, bgcolor: "#fafafa", borderTop: `1px solid ${s.border}`}}>
+                    <Stack spacing={1}>
+                        {docs.map((doc, i) => (
+                            <DocumentResultCard key={`${form.formId}-${doc.key ?? i}`} doc={doc} />
+                        ))}
+                    </Stack>
+                </Box>
+            )}
+        </Paper>
+    );
+}
+
+function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
+    const [step, setStep] = React.useState("select");
+    const [campaigns, setCampaigns] = React.useState([]);
+    const [campaignsLoading, setCampaignsLoading] = React.useState(false);
+    const [selectedCampaignId, setSelectedCampaignId] = React.useState("");
+    const [selectedCampaignName, setSelectedCampaignName] = React.useState("");
+    const [processing, setProcessing] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [activeTab, setActiveTab] = React.useState("valid");
+
+    // Fetch campaigns khi dialog mở
+    React.useEffect(() => {
+        if (!open) return;
+        setStep("select");
+        setResult(null);
+        setSelectedCampaignId("");
+        setSelectedCampaignName("");
+        setActiveTab("valid");
+        setCampaignsLoading(true);
+        getAdmissionCampaigns()
+            .then((data) => {
+                setCampaigns(data);
+                if (data.length === 1) {
+                    setSelectedCampaignId(String(data[0].id));
+                    setSelectedCampaignName(data[0].name ?? "");
+                }
+            })
+            .catch(() => enqueueSnackbar("Không thể lấy danh sách chiến dịch tuyển sinh.", {variant: "error"}))
+            .finally(() => setCampaignsLoading(false));
+    }, [open]);
+
+    const handleRun = async () => {
+        if (!selectedCampaignId) return;
+        setProcessing(true);
+        try {
+            const data = await autoApproveAdmissionReservations(selectedCampaignId);
+            setResult(data);
+            setStep("result");
+            onDone();
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể tự động duyệt hồ sơ."), {variant: "error"});
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const totalForms = result?.totalForms ?? 0;
+    const summary = result?.summary ?? {valid: 0, invalid: 0, error: 0};
+    const forms = Array.isArray(result?.forms) ? result.forms : [];
+    const validForms = forms.filter((f) => f.overallStatus === "valid");
+    const invalidForms = forms.filter((f) => f.overallStatus === "invalid");
+    const errorForms = forms.filter((f) => f.overallStatus === "error");
+
+    const TAB_CONFIG = [
+        {key: "valid",   label: "Hợp lệ",       count: validForms.length,   activeColor: "#166534"},
+        {key: "invalid", label: "Không hợp lệ", count: invalidForms.length, activeColor: "#d97706"},
+        {key: "error",   label: "Lỗi",           count: errorForms.length,   activeColor: "#dc2626"},
+    ];
+
+    return (
+        <Dialog
+            open={open}
+            onClose={processing ? undefined : onClose}
+            fullWidth
+            maxWidth={step === "result" ? "md" : "sm"}
+            PaperProps={{sx: {borderRadius: 3, overflow: "hidden"}}}
+        >
+            <DialogTitle sx={{display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2.25, bgcolor: "#d9ecff", borderBottom: "1px solid #b8d8f4"}}>
+                <Box>
+                    <Typography sx={{fontSize: 18, fontWeight: 700, color: "#0f172a"}}>
+                        {step === "result" ? "Kết quả xét duyệt tự động" : "Duyệt hồ sơ tự động"}
+                    </Typography>
+                    {step === "result" && selectedCampaignName && (
+                        <Typography sx={{fontSize: 13, color: "#475569", mt: 0.3}}>{selectedCampaignName}</Typography>
+                    )}
+                </Box>
+                <IconButton onClick={onClose} disabled={processing} size="small">
+                    <CloseRoundedIcon />
+                </IconButton>
+            </DialogTitle>
+
+            <DialogContent sx={{p: 0, bgcolor: "#f8fafc"}}>
+                {step === "select" ? (
+                    <Stack spacing={2.5} sx={{p: 3}}>
+                        <Typography variant="body2" sx={{color: "#475569"}}>
+                            Chọn chiến dịch tuyển sinh để hệ thống tự động xét duyệt tất cả hồ sơ đang chờ xét.
+                        </Typography>
+                        {campaignsLoading ? (
+                            <Box sx={{display: "flex", justifyContent: "center", py: 3}}>
+                                <CircularProgress size={28} />
+                            </Box>
+                        ) : (
+                            <TextField
+                                select
+                                fullWidth
+                                value={selectedCampaignId}
+                                onChange={(e) => {
+                                    const id = e.target.value;
+                                    setSelectedCampaignId(id);
+                                    setSelectedCampaignName(campaigns.find((c) => String(c.id) === id)?.name ?? "");
+                                }}
+                                size="small"
+                                sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff"}}}
+                            >
+                                {campaigns.length === 0 ? (
+                                    <MenuItem value="" disabled>Không có chiến dịch đang hoạt động</MenuItem>
+                                ) : campaigns.map((c) => (
+                                    <MenuItem key={c.id} value={String(c.id)}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <span>{c.name}</span>
+                                            {c.isActive && (
+                                                <Chip label="Đang hoạt động" size="small" sx={{bgcolor: "#dcfce7", color: "#166534", fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}} />
+                                            )}
+                                        </Stack>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        )}
+                    </Stack>
+                ) : (
+                    <Box>
+                        {/* Summary strip */}
+                        <Box sx={{px: 3, pt: 2.5, pb: 2, bgcolor: "#fff", borderBottom: "1px solid #e2e8f0"}}>
+                            <Stack direction="row" spacing={1.5}>
+                                <SummaryStatCard label="Tổng hồ sơ" value={totalForms} color="#1e3a8a" bg="#eff6ff" border="#bfdbfe" />
+                                <SummaryStatCard label="Hợp lệ" value={summary.valid} color="#166534" bg="#f0fdf4" border="#bbf7d0" icon={<CheckCircleRoundedIcon />} />
+                                <SummaryStatCard label="Không hợp lệ" value={summary.invalid} color="#92400e" bg="#fffbeb" border="#fde68a" icon={<WarningAmberRoundedIcon />} />
+                                <SummaryStatCard label="Lỗi" value={summary.error} color="#991b1b" bg="#fef2f2" border="#fecaca" icon={<CancelRoundedIcon />} />
+                            </Stack>
+                        </Box>
+
+                        {/* Tabs */}
+                        {forms.length === 0 ? (
+                            <Stack alignItems="center" spacing={1} sx={{py: 4}}>
+                                <CheckCircleRoundedIcon sx={{fontSize: 36, color: "#86efac"}} />
+                                <Typography sx={{color: "#64748b", fontWeight: 500}}>Không có hồ sơ nào được xử lý.</Typography>
+                            </Stack>
+                        ) : (
+                            <Box>
+                                <Box sx={{borderBottom: "1px solid #e2e8f0", bgcolor: "#fff", px: 3}}>
+                                    <Tabs
+                                        value={activeTab}
+                                        onChange={(_, v) => setActiveTab(v)}
+                                        sx={{
+                                            "& .MuiTab-root": {textTransform: "none", fontWeight: 700, fontSize: 13.5, minHeight: 44, px: 2},
+                                            "& .MuiTabs-indicator": {height: 3, borderRadius: "3px 3px 0 0"},
+                                        }}
+                                    >
+                                        {TAB_CONFIG.map(({key, label, count, activeColor}) => (
+                                            <Tab
+                                                key={key}
+                                                value={key}
+                                                label={
+                                                    <Stack direction="row" spacing={0.75} alignItems="center">
+                                                        <span>{label}</span>
+                                                        <Box sx={{
+                                                            minWidth: 20, height: 20, borderRadius: 999, px: 0.75,
+                                                            bgcolor: activeTab === key ? activeColor : "#e2e8f0",
+                                                            color: activeTab === key ? "#fff" : "#64748b",
+                                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                                            fontSize: 11, fontWeight: 800, lineHeight: 1, transition: "background-color 0.2s",
+                                                        }}>
+                                                            {count}
+                                                        </Box>
+                                                    </Stack>
+                                                }
+                                            />
+                                        ))}
+                                    </Tabs>
+                                </Box>
+                                <Box sx={{px: 3, py: 2.5}}>
+                                    {activeTab === "valid" && (
+                                        validForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ hợp lệ.</Typography>
+                                            : <Stack spacing={1}>{validForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                    {activeTab === "invalid" && (
+                                        invalidForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ không hợp lệ.</Typography>
+                                            : <Stack spacing={1}>{invalidForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                    {activeTab === "error" && (
+                                        errorForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ lỗi.</Typography>
+                                            : <Stack spacing={1}>{errorForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                </Box>
+                            </Box>
+                        )}
+                    </Box>
+                )}
+            </DialogContent>
+
+            <DialogActions sx={{px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "#fff", gap: 1}}>
+                {step === "select" ? (
+                    <>
+                        <Button onClick={onClose} disabled={processing} variant="outlined" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}>
+                            Hủy
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleRun}
+                            disabled={!selectedCampaignId || processing || campaignsLoading}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <DoneAllRoundedIcon />}
+                            sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}
+                        >
+                            {processing ? "Đang xử lý..." : "Duyệt tất cả"}
+                        </Button>
+                    </>
+                ) : (
+                    <Button onClick={onClose} variant="contained" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, px: 3}}>
+                        Đóng
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 export default function SchoolCampusAdmissionReservations() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -694,6 +1082,7 @@ export default function SchoolCampusAdmissionReservations() {
     const [paymentConfirmState, setPaymentConfirmState] = React.useState({open: false, form: null});
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
+    const [autoApproveOpen, setAutoApproveOpen] = React.useState(false);
 
     const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
         if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
@@ -896,7 +1285,31 @@ export default function SchoolCampusAdmissionReservations() {
                             </Typography>
                         </Box>
                     </Stack>
-                    <Chip label={`Còn lại: ${pendingCount} hồ sơ`} sx={{ alignSelf: {xs: "flex-start", sm: "flex-end"}, borderRadius: 999, bgcolor: "rgba(255,255,255,0.95)", color: "#0D64DE", fontWeight: 800 }} />
+                    <Stack direction={{xs: "column", sm: "row"}} spacing={1} alignItems={{xs: "flex-start", sm: "center"}}>
+                        <Chip label={`Còn lại: ${pendingCount} hồ sơ`} sx={{ borderRadius: 999, bgcolor: "rgba(255,255,255,0.95)", color: "#0D64DE", fontWeight: 800 }} />
+                        {pendingCount > 0 && (
+                            <Button
+                                variant="contained"
+                                startIcon={<DoneAllRoundedIcon />}
+                                onClick={() => setAutoApproveOpen(true)}
+                                sx={{
+                                    textTransform: "none",
+                                    borderRadius: 999,
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(255,255,255,0.18)",
+                                    color: "white",
+                                    border: "1px solid rgba(255,255,255,0.5)",
+                                    backdropFilter: "blur(4px)",
+                                    "&:hover": {bgcolor: "rgba(255,255,255,0.3)", borderColor: "white"},
+                                    "&.Mui-disabled": {opacity: 0.55, color: "white"},
+                                    boxShadow: "none",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                Duyệt hồ sơ (tự động)
+                            </Button>
+                        )}
+                    </Stack>
                 </Box>
             </Box>
 
@@ -1212,6 +1625,13 @@ export default function SchoolCampusAdmissionReservations() {
                 selectedIndex={selectedImageIndex}
                 onChangeIndex={setSelectedImageIndex}
                 onClose={() => setImagePreviewOpen(false)}
+            />
+
+            <AutoApproveDialog
+                open={autoApproveOpen}
+                onClose={() => setAutoApproveOpen(false)}
+                onDone={loadData}
+                pendingCount={pendingCount}
             />
         </Box>
     );

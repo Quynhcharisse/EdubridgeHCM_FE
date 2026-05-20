@@ -177,9 +177,14 @@ export function useChildrenInfoPage() {
                     const records = extractStudentRecords(body);
                     setStudentRecords(records);
                     if (records.length > 0) {
-                        setActiveStudentTab(0);
+                        const targetId = location.state?.studentProfileId;
+                        const idx = targetId != null
+                            ? records.findIndex((r) => String(r.id ?? r.studentId) === String(targetId))
+                            : -1;
+                        const selectedIdx = idx >= 0 ? idx : 0;
+                        setActiveStudentTab(selectedIdx);
                         setCreatingNewStudent(false);
-                        applyStudentRecordToEditor(records[0]);
+                        applyStudentRecordToEditor(records[selectedIdx]);
                     } else {
                         setActiveStudentTab(0);
                         setCreatingNewStudent(true);

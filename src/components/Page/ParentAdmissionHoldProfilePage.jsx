@@ -4,9 +4,12 @@ import {
     Button,
     Container,
     Paper,
+    Skeleton,
     Stack,
+    TextField,
     Typography,
 } from '@mui/material';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import {Link as RouterLink} from 'react-router-dom';
@@ -31,11 +34,27 @@ import {
     getParentAdmissionDocuments,
     getParentAdmissionReservationFormTemplate,
     getParentStudent,
+    getParentStudentById,
     pickAdmissionDocumentsFromResponse,
+    pickStudentDetailBodyFromResponse,
     postParentAdmissionReservationFormTemplate,
     putParentAdmissionReservationFormTemplate,
 } from '../../services/ParentService.jsx';
 import {APP_PRIMARY_DARK, BRAND_NAVY, BRAND_PASTEL_AURA} from '../../constants/homeLandingTheme';
+import {SECTION_LABEL_SX} from './admission/admissionSubmissionUtils.js';
+
+const GENDER_LABEL = {MALE: 'Nam', FEMALE: 'Nữ'};
+const GRADE_LABEL = {
+    GRADE_06: 'Lớp 6', GRADE_07: 'Lớp 7', GRADE_08: 'Lớp 8', GRADE_09: 'Lớp 9',
+    GRADE_10: 'Lớp 10', GRADE_11: 'Lớp 11', GRADE_12: 'Lớp 12',
+};
+
+function formatDob(raw) {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('vi-VN');
+}
 
 export default function ParentAdmissionHoldProfilePage() {
     const catalogRef = useRef([]);
@@ -54,6 +73,9 @@ export default function ParentAdmissionHoldProfilePage() {
     const [docs, setDocs] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [templateAlreadySaved, setTemplateAlreadySaved] = useState(false);
+
+    const [studentDetail, setStudentDetail] = useState(null);
+    const [studentDetailLoading, setStudentDetailLoading] = useState(false);
     const [savedTemplateId, setSavedTemplateId] = useState(null);
     const [isEditingTemplate, setIsEditingTemplate] = useState(false);
 
@@ -198,6 +220,18 @@ export default function ParentAdmissionHoldProfilePage() {
         };
     }, [selectedStudentId, catalogLoading, loadTemplateForStudent]);
 
+    useEffect(() => {
+        if (!selectedStudentId) { setStudentDetail(null); return undefined; }
+        let cancelled = false;
+        setStudentDetailLoading(true);
+        setStudentDetail(null);
+        getParentStudentById(selectedStudentId)
+            .then((res) => { if (!cancelled) setStudentDetail(pickStudentDetailBodyFromResponse(res)); })
+            .catch(() => {})
+            .finally(() => { if (!cancelled) setStudentDetailLoading(false); });
+        return () => { cancelled = true; };
+    }, [selectedStudentId]);
+
     const handleSelectStudent = useCallback((id) => {
         templateLoadSeqRef.current += 1;
         setSelectedStudentId(id);
@@ -322,6 +356,123 @@ export default function ParentAdmissionHoldProfilePage() {
         }
     };
 
+    const transcriptImages = Array.isArray(studentDetail?.transcriptImages) ? studentDetail.transcriptImages : [];
+    const studentDetailContent = selectedStudentId ? (
+        <Box
+            sx={{
+                p: 2,
+                borderRadius: 2,
+                bgcolor: 'rgba(248,250,252,0.85)',
+                border: '1px solid rgba(226,232,240,0.9)',
+            }}
+        >
+            {studentDetailLoading ? (
+                <Stack spacing={1.5}>
+                    <Stack direction="row" flexWrap="wrap" gap={2}>
+                        <Skeleton variant="rounded" height={56} sx={{flex: '1 1 200px'}} />
+                        <Skeleton variant="rounded" height={56} sx={{flex: '1 1 200px'}} />
+                        <Skeleton variant="rounded" height={56} sx={{flex: '1 1 160px'}} />
+                        <Skeleton variant="rounded" height={56} sx={{flex: '1 1 180px'}} />
+                    </Stack>
+                </Stack>
+            ) : studentDetail ? (
+                <>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{mb: 1.5}}>
+                        <Typography sx={{fontSize: '0.85rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5}}>
+                            Thông tin học sinh
+                        </Typography>
+                        <Button
+                            component={RouterLink}
+                            to="/children-info"
+                            state={{studentProfileId: selectedStudentId}}
+                            startIcon={<EditOutlinedIcon sx={{fontSize: '16px !important'}} />}
+                            size="small"
+                            variant="outlined"
+                            sx={{textTransform: 'none', fontWeight: 700, borderRadius: 1.5, fontSize: '0.82rem'}}
+                        >
+                            Chỉnh sửa
+                        </Button>
+                    </Stack>
+                    <Stack direction="row" flexWrap="wrap" gap={2}>
+                        <TextField
+                            label="Họ và tên"
+                            value={studentDetail.studentName ?? ''}
+                            InputProps={{readOnly: true}}
+                            size="small"
+                            variant="outlined"
+                            sx={{flex: '1 1 200px'}}
+                        />
+                        <TextField
+                            label="Căn cước công dân học sinh"
+                            value={studentDetail.studentCode ?? ''}
+                            InputProps={{readOnly: true}}
+                            size="small"
+                            variant="outlined"
+                            sx={{flex: '1 1 200px'}}
+                        />
+                        <TextField
+                            label="Giới tính"
+                            value={GENDER_LABEL[studentDetail.gender] ?? studentDetail.gender ?? ''}
+                            InputProps={{readOnly: true}}
+                            size="small"
+                            variant="outlined"
+                            sx={{flex: '1 1 160px'}}
+                        />
+                        <TextField
+                            label="Ngày tháng năm sinh"
+                            value={formatDob(studentDetail.dateOfBirth)}
+                            InputProps={{readOnly: true}}
+                            size="small"
+                            variant="outlined"
+                            sx={{flex: '1 1 180px'}}
+                        />
+                    </Stack>
+                    <Box sx={{mt: 2}}>
+                        <Typography sx={{...SECTION_LABEL_SX, mb: 1}}>Học bạ học sinh</Typography>
+                        {transcriptImages.length > 0 ? (
+                            <Stack direction="row" flexWrap="wrap" gap={2}>
+                                {transcriptImages.map((img) => (
+                                    <Box
+                                        key={img.grade}
+                                        sx={{
+                                            width: 120,
+                                            borderRadius: 1.5,
+                                            overflow: 'hidden',
+                                            border: '1px solid rgba(226,232,240,0.9)',
+                                            bgcolor: '#fff',
+                                        }}
+                                    >
+                                        <Box
+                                            component="img"
+                                            src={img.imageUrl}
+                                            alt={GRADE_LABEL[img.grade] ?? img.grade}
+                                            sx={{width: '100%', display: 'block', aspectRatio: '3/4', objectFit: 'cover'}}
+                                        />
+                                        <Typography
+                                            sx={{
+                                                fontSize: '0.78rem',
+                                                fontWeight: 700,
+                                                textAlign: 'center',
+                                                py: 0.75,
+                                                color: '#475569',
+                                            }}
+                                        >
+                                            {GRADE_LABEL[img.grade] ?? img.grade}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Stack>
+                        ) : (
+                            <Typography sx={{fontSize: '0.88rem', color: '#94a3b8', fontStyle: 'italic'}}>
+                                Chưa có hình ảnh học bạ học sinh.
+                            </Typography>
+                        )}
+                    </Box>
+                </>
+            ) : null}
+        </Box>
+    ) : null;
+
     const studentPickerDisabled =
         submitting || anyUploading || studentLoading || isEditingTemplate;
     const documentsLocked = templateAlreadySaved && !isEditingTemplate;
@@ -345,6 +496,15 @@ export default function ParentAdmissionHoldProfilePage() {
             }}
         >
             <Container maxWidth="md">
+                <Button
+                    component={RouterLink}
+                    to="/parent/search-schools"
+                    startIcon={<ArrowBackRoundedIcon />}
+                    variant="text"
+                    sx={{textTransform: 'none', fontWeight: 600, color: BRAND_NAVY, mb: 1, pl: 0, opacity: 0.8, '&:hover': {opacity: 1, bgcolor: 'transparent'}}}
+                >
+                    Quay lại kiểm tra nộp hồ sơ
+                </Button>
                 <Typography
                     variant="h5"
                     sx={{fontWeight: 700, color: BRAND_NAVY, mb: 2, letterSpacing: -0.2}}
@@ -427,6 +587,7 @@ export default function ParentAdmissionHoldProfilePage() {
                                     ? `Hồ sơ cần nộp — ${activeStudent.name}${activeStudent.subLabel ? ` (${activeStudent.subLabel})` : ''}`
                                     : 'Hồ sơ cần nộp'
                             }
+                            studentDetailContent={studentDetailContent}
                         />
 
                         {!studentLoading && students.length === 0 ? (
