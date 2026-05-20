@@ -14,6 +14,7 @@ import {
     applyStudentBodyToState,
     buildStudentPayload,
     emptyGrades,
+    validateStudentCode,
     GRADE_LEVELS,
     findPersonalityByCode,
     findPersonalityById,
@@ -72,7 +73,7 @@ export function useChildrenInfoPage() {
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({name: '', gender: ''});
+    const [form, setForm] = useState({name: '', gender: '', studentCode: '', dateOfBirth: ''});
 
     const [personalityGroups, setPersonalityGroups] = useState(null);
     const [personalityLoading, setPersonalityLoading] = useState(true);
@@ -176,9 +177,14 @@ export function useChildrenInfoPage() {
                     const records = extractStudentRecords(body);
                     setStudentRecords(records);
                     if (records.length > 0) {
-                        setActiveStudentTab(0);
+                        const targetId = location.state?.studentProfileId;
+                        const idx = targetId != null
+                            ? records.findIndex((r) => String(r.id ?? r.studentId) === String(targetId))
+                            : -1;
+                        const selectedIdx = idx >= 0 ? idx : 0;
+                        setActiveStudentTab(selectedIdx);
                         setCreatingNewStudent(false);
-                        applyStudentRecordToEditor(records[0]);
+                        applyStudentRecordToEditor(records[selectedIdx]);
                     } else {
                         setActiveStudentTab(0);
                         setCreatingNewStudent(true);
@@ -373,6 +379,11 @@ export function useChildrenInfoPage() {
 
     const handleChange = (e) => {
         const {name, value} = e.target;
+        if (name === 'studentCode') {
+            const digits = String(value).replace(/\D/g, '').slice(0, 12);
+            setForm((prev) => ({...prev, studentCode: digits}));
+            return;
+        }
         setForm((prev) => ({...prev, [name]: value}));
     };
 
@@ -620,6 +631,12 @@ export function useChildrenInfoPage() {
     };
 
     const handleSave = async () => {
+        const studentCodeError = validateStudentCode(form.studentCode);
+        if (studentCodeError) {
+            enqueueSnackbar(studentCodeError, {variant: 'error'});
+            return;
+        }
+
         setSaving(true);
         try {
             const transcriptImages = await uploadTranscriptImages();

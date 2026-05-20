@@ -61,15 +61,41 @@ import ParentStudentInfoPanel, {
 const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
 const isImageFile = (f) => IMAGE_EXT_RE.test(String(f?.fileName || f?.fileUrl || ""));
 const UUID_PREFIX_RE = /^[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}_/i;
-const formatAttachmentName = (fileName, maxBase = 8) => {
+
+const displayChatAttachmentFileName = (fileName) => {
   let name = String(fileName || "").trim();
   let prev;
-  do { prev = name; name = name.replace(UUID_PREFIX_RE, ""); } while (name !== prev);
-  const dotIdx = name.lastIndexOf(".");
-  const base = dotIdx >= 0 ? name.slice(0, dotIdx) : name;
-  const ext = dotIdx >= 0 ? name.slice(dotIdx) : "";
-  if (base.length <= maxBase) return name;
-  return `${base.slice(0, maxBase)}...${ext}`;
+  do {
+    prev = name;
+    name = name.replace(UUID_PREFIX_RE, "");
+  } while (name !== prev);
+  return name || "Tệp đính kèm";
+};
+
+const formatChatAttachmentSize = (f) => {
+  if (!f || typeof f !== "object") return "";
+  const raw = f.fileSize ?? f.size ?? f.fileSizeBytes ?? f.bytes ?? f.contentLength ?? f.length;
+  const n = typeof raw === "number" && Number.isFinite(raw) ? raw : Number(String(raw ?? "").replace(/,/g, "").trim());
+  if (!Number.isFinite(n) || n <= 0) return "";
+  if (n < 1024) return `${Math.round(n)} B`;
+  const kb = n / 1024;
+  if (n < 1024 * 1024) {
+    return `${kb.toLocaleString("vi-VN", { maximumFractionDigits: 2, minimumFractionDigits: 0 })} KB`;
+  }
+  const mb = n / (1024 * 1024);
+  return `${mb.toLocaleString("vi-VN", { maximumFractionDigits: 2, minimumFractionDigits: 0 })} MB`;
+};
+
+/** Viền + đổ bóng để hàng file nổi rõ trên nền vùng chat */
+const chatDocRowElevatedSx = {
+  border: "1px solid rgba(15, 23, 42, 0.12)",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.07), 0 8px 24px -6px rgba(15, 23, 42, 0.18)",
+  transition: "box-shadow 0.18s ease, transform 0.18s ease",
+  "&:hover": {
+    boxShadow: "0 2px 6px rgba(15, 23, 42, 0.1), 0 12px 32px -8px rgba(15, 23, 42, 0.26)",
+    transform: "translateY(-1px)",
+  },
+  "&:hover .chat-doc-name": { textDecoration: "underline" },
 };
 
 const mergeCounsellorConversationWithHistoryMeta = (conversation, historyMeta) => {
@@ -128,6 +154,24 @@ const formatMessageTime = (value) => {
     return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   } catch {
     return String(value);
+  }
+};
+
+const formatMessageTooltipTime = (value) => {
+  if (!value) return "";
+  try {
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString("vi-VN", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
   }
 };
 
@@ -299,6 +343,67 @@ const extractSenderIdentifiers = (payload) => {
   ].filter(Boolean);
 };
 
+/** Actor đánh dấu đã đọc trên payload CONVERSATION_READ (đồng bộ với Header phụ huynh). */
+const flattenReadActorValue = (v) => {
+  if (v == null) return [];
+  if (typeof v === "object" && !Array.isArray(v)) {
+    return [v.email, v.username, v.userName, v.name, v.sub]
+      .map((x) => normalizeWsPrincipal(x))
+      .filter(Boolean);
+  }
+  const s = normalizeWsPrincipal(v);
+  return s ? [s] : [];
+};
+
+const collectConversationReadActors = (obj, rawPayload) => {
+  const actorFields = (o) => {
+    if (!o || typeof o !== "object") return [];
+    return [
+      o.readBy,
+      o.readerEmail,
+      o.readByEmail,
+      o.readerUsername,
+      o.username,
+      o.userEmail,
+      o.userName,
+      o.email,
+      o.actor,
+      o.markedBy,
+      o.readByUser,
+      o.reader,
+      o.user,
+      o.lastReadBy,
+      o.readInitiator,
+      o?.data?.readBy,
+      o?.payload?.readBy,
+    ];
+  };
+  const actors = new Set();
+  for (const v of [...actorFields(obj), ...actorFields(rawPayload)]) {
+    for (const a of flattenReadActorValue(v)) {
+      actors.add(a);
+    }
+  }
+  return actors;
+};
+
+/** true = chính TVV là người mark-read (đồng bộ máy), không dùng làm “phụ huynh đã xem tin bạn”. */
+const conversationReadByCounsellor = (root, rawPayload, counsellorIdentitySet) => {
+  if (!counsellorIdentitySet?.size) return false;
+  const actors = collectConversationReadActors(root, rawPayload);
+  for (const a of actors) {
+    if (counsellorIdentitySet.has(a)) return true;
+  }
+  return false;
+};
+
+const conversationReadByParent = (root, rawPayload, parentEmailPrincipal) => {
+  const pe = normalizeWsPrincipal(parentEmailPrincipal);
+  if (!pe) return false;
+  const actors = collectConversationReadActors(root, rawPayload);
+  return actors.has(pe);
+};
+
 const pickStudentProfileIdFromMerged = (merged) => {
   if (!merged || typeof merged !== "object") return null;
   const raw =
@@ -409,7 +514,7 @@ export default function CounsellorParentConsultation() {
   const [pendingConversations, setPendingConversations] = useState([]);
   const [activeHasMore, setActiveHasMore] = useState(false);
   const [pendingHasMore, setPendingHasMore] = useState(false);
-  const [listTab, setListTab] = useState("pending");
+  const [listTab, setListTab] = useState("active");
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [conversationsError, setConversationsError] = useState("");
   const [selectedConversationId, setSelectedConversationId] = useState(null);
@@ -604,7 +709,7 @@ export default function CounsellorParentConsultation() {
     messageNextCursorIdRef.current = messageNextCursorId;
   }, [messageNextCursorId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = messageListRef.current;
     if (!node) return;
     if (loadingMoreRef.current) return;
@@ -912,6 +1017,48 @@ export default function CounsellorParentConsultation() {
     return false;
   };
 
+  const [parentReadReceiptAt, setParentReadReceiptAt] = useState(null);
+
+  useEffect(() => {
+    setParentReadReceiptAt(null);
+  }, [selectedConversationId]);
+
+  const counsellorReadReceiptAnchorId = useMemo(() => {
+    if (!parentReadReceiptAt || !messageItems.length) return null;
+    const readMs = new Date(parentReadReceiptAt).getTime();
+    if (Number.isNaN(readMs)) return null;
+    let lastMineId = null;
+    let anchorId = null;
+    for (const m of messageItems) {
+      if (!isCounsellorOutgoingMessage(m, selectedConversation)) continue;
+      lastMineId = String(m.id);
+      const t = m.sentAt ? new Date(m.sentAt).getTime() : 0;
+      if (!Number.isNaN(t) && t <= readMs) anchorId = String(m.id);
+    }
+    return anchorId ?? lastMineId;
+  }, [messageItems, parentReadReceiptAt, selectedConversation, isCounsellorOutgoingMessage]);
+
+  const lastCounsellorOutgoingMessageId = useMemo(() => {
+    if (!messageItems.length || !selectedConversation) return null;
+    for (let i = messageItems.length - 1; i >= 0; i--) {
+      const m = messageItems[i];
+      if (isCounsellorOutgoingMessage(m, selectedConversation)) {
+        return String(m.id);
+      }
+    }
+    return null;
+  }, [messageItems, selectedConversation, isCounsellorOutgoingMessage]);
+
+  const peerMessagedAfterLastCounsellorOutgoing = useMemo(() => {
+    if (!lastCounsellorOutgoingMessageId || !messageItems.length || !selectedConversation) return false;
+    const idx = messageItems.findIndex((m) => String(m.id) === lastCounsellorOutgoingMessageId);
+    if (idx < 0) return false;
+    for (let j = idx + 1; j < messageItems.length; j++) {
+      if (!isCounsellorOutgoingMessage(messageItems[j], selectedConversation)) return true;
+    }
+    return false;
+  }, [messageItems, selectedConversation, lastCounsellorOutgoingMessageId, isCounsellorOutgoingMessage]);
+
   useEffect(() => {
     setStudentProfileDetailForPanel(null);
     setStudentProfileDetailLoading(false);
@@ -938,16 +1085,23 @@ export default function CounsellorParentConsultation() {
     // Fallback sớm; effect phía dưới sẽ scroll chắc chắn sau khi render xong.
     scrollMessageListToBottom();
     setTimeout(scrollMessageListToBottom, 30);
+    setTimeout(scrollMessageListToBottom, 90);
     await handleMarkRead({ conversation });
     return loadResult;
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pendingInitialBottomScrollRef.current) return;
     if (messageLoading) return;
     if (!selectedConversationId) return;
+    if (messageItems.length === 0) return;
     scrollMessageListToBottom();
-    pendingInitialBottomScrollRef.current = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollMessageListToBottom();
+        pendingInitialBottomScrollRef.current = false;
+      });
+    });
   }, [selectedConversationId, messageLoading, messageItems.length]);
 
   const handleAcceptPendingConversation = async (event, conversation) => {
@@ -1232,13 +1386,29 @@ export default function CounsellorParentConsultation() {
     const onCounsellorPrivateMessage = (payload) => {
         const root = mergeCounsellorWsPayload(payload);
         if (pickWsControlEventType(root) === "CONVERSATION_READ") {
-          const cid = pickIncomingConversationId(payload);
+          const cid = pickIncomingConversationId(payload) ?? pickIncomingConversationId(root);
+          const readTime =
+            coerceWsTimestamp(root?.timestamp ?? root?.sentAt ?? root?.time) ?? new Date().toISOString();
           if (cid != null && String(cid).trim() !== "") {
             updateConversationInLists(cid, (item) => ({
               ...item,
               unreadCount: 0,
               unreadMessages: 0,
             }));
+            const actors = collectConversationReadActors(root, payload);
+            const { parentEmail } = getConversationEmails(selectedConversationRef.current || {});
+            const readByParent = conversationReadByParent(root, payload, parentEmail);
+            const readByCounsellorSelf = conversationReadByCounsellor(
+              root,
+              payload,
+              identityLowerSet
+            );
+            const shouldShowParentSeen =
+              isSameConversationId(selectedConversationIdRef.current, cid) &&
+              (readByParent || (actors.size > 0 && !readByCounsellorSelf));
+            if (shouldShowParentSeen) {
+              setParentReadReceiptAt(readTime);
+            }
           }
           return;
         }
@@ -1572,32 +1742,6 @@ export default function CounsellorParentConsultation() {
                   <Paper
                     component="button"
                     type="button"
-                    onClick={() => setListTab("pending")}
-                    elevation={0}
-                    sx={{
-                      flex: 1,
-                      minWidth: 120,
-                      py: 1,
-                      px: 1.25,
-                      cursor: "pointer",
-                      borderRadius: 2,
-                      border:
-                        listTab === "pending"
-                          ? "1px solid rgba(245,158,11,0.45)"
-                          : "1px solid rgba(148,163,184,0.45)",
-                      bgcolor: listTab === "pending" ? "rgba(245,158,11,0.12)" : "rgba(248,250,252,0.9)",
-                      textAlign: "left",
-                      font: "inherit",
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#f59e0b" }}>
-                      Đang chờ (
-                      {formatConversationCountLabel(pendingConversations.length, pendingHasMore)})
-                    </Typography>
-                  </Paper>
-                  <Paper
-                    component="button"
-                    type="button"
                     onClick={() => setListTab("active")}
                     elevation={0}
                     sx={{
@@ -1619,6 +1763,32 @@ export default function CounsellorParentConsultation() {
                     <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#2563eb" }}>
                       Đang hoạt động (
                       {formatConversationCountLabel(activeConversations.length, activeHasMore)})
+                    </Typography>
+                  </Paper>
+                  <Paper
+                    component="button"
+                    type="button"
+                    onClick={() => setListTab("pending")}
+                    elevation={0}
+                    sx={{
+                      flex: 1,
+                      minWidth: 120,
+                      py: 1,
+                      px: 1.25,
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      border:
+                        listTab === "pending"
+                          ? "1px solid rgba(245,158,11,0.45)"
+                          : "1px solid rgba(148,163,184,0.45)",
+                      bgcolor: listTab === "pending" ? "rgba(245,158,11,0.12)" : "rgba(248,250,252,0.9)",
+                      textAlign: "left",
+                      font: "inherit",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#f59e0b" }}>
+                      Đang chờ (
+                      {formatConversationCountLabel(pendingConversations.length, pendingHasMore)})
                     </Typography>
                   </Paper>
                 </Box>
@@ -1955,9 +2125,9 @@ export default function CounsellorParentConsultation() {
               sx={{
                 flex: "1 1 0%",
                 minHeight: 0,
-                px: 3,
+                px: { xs: 2, sm: 2.5 },
                 pt: 2,
-                pb: 6,
+                pb: 1.25,
                 overflowX: "hidden",
                 overflowY: "auto",
                 WebkitOverflowScrolling: "touch",
@@ -2015,24 +2185,104 @@ export default function CounsellorParentConsultation() {
                     >
                       {group.label}
                     </Typography>
-                    {group.items.map((m) => {
+                    {group.items.map((m, idx) => {
                       const isMine = isCounsellorOutgoingMessage(m, selectedConversation);
+                      const next = idx < group.items.length - 1 ? group.items[idx + 1] : null;
+                      const nextIsMine =
+                        next != null ? isCounsellorOutgoingMessage(next, selectedConversation) : null;
+                      const showPeerAvatar = !isMine && (next == null || nextIsMine === true);
+                      const isLastOutgoingMine =
+                        isMine &&
+                        lastCounsellorOutgoingMessageId != null &&
+                        String(m.id) === lastCounsellorOutgoingMessageId;
+                      const showOutgoingStatusFooter =
+                        isLastOutgoingMine && !peerMessagedAfterLastCounsellorOutgoing;
+                      const showReadReceipt =
+                        showOutgoingStatusFooter &&
+                        parentReadReceiptAt &&
+                        counsellorReadReceiptAnchorId != null &&
+                        String(counsellorReadReceiptAnchorId) === String(m.id);
+                      const files = m.files || [];
+                      const imageFiles = files.filter(isImageFile);
+                      const docFiles = files.filter((f) => !isImageFile(f));
+                      const hasText = !!(m.text && String(m.text).trim());
 
                       return (
                         <Box
                           key={m.id}
                           sx={{
                             display: "flex",
+                            width: "100%",
+                            alignItems: "flex-end",
                             justifyContent: isMine ? "flex-end" : "flex-start",
+                            gap: !isMine ? 0.75 : 0,
                             mb: 0.5,
                             ".msg-actions": { display: "none" },
                           }}
                         >
-                          <Box sx={{ maxWidth: "78%", ...(m.files?.length > 0 && { width: "min(240px, 78%)" }) }}>
+                          {!isMine && (
                             <Box
                               sx={{
-                                bgcolor: (m.files && m.files.length > 0) ? "#e5e5ea" : isMine ? "#0084ff" : "#e5e5ea",
-                                color: (isMine && !(m.files && m.files.length > 0)) ? "#ffffff" : "#1e293b",
+                                width: 32,
+                                flexShrink: 0,
+                                display: "flex",
+                                justifyContent: "center",
+                              }}
+                            >
+                              {showPeerAvatar ? (
+                                <Avatar
+                                  src={selectedConversation.avatarUrl || undefined}
+                                  sx={{
+                                    width: 32,
+                                    height: 32,
+                                    fontSize: 13,
+                                    bgcolor: selectedConversation.avatarColor,
+                                  }}
+                                >
+                                  {getInitials(selectedConversation.name)}
+                                </Avatar>
+                              ) : (
+                                <Box sx={{ width: 32 }} />
+                              )}
+                            </Box>
+                          )}
+                          <Box
+                            sx={{
+                              maxWidth:
+                                docFiles.length > 0
+                                  ? "min(92%, 920px)"
+                                  : isMine
+                                    ? "min(360px, 96%)"
+                                    : "calc(78% - 40px)",
+                              minWidth: 0,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: isMine ? "flex-end" : "flex-start",
+                            }}
+                          >
+                            <Tooltip
+                              title={m.sentAt ? formatMessageTooltipTime(m.sentAt) : ""}
+                              enterDelay={380}
+                              placement={isMine ? "left" : "right"}
+                              describeChild
+                              disableHoverListener={!m.sentAt}
+                              disableFocusListener={!m.sentAt}
+                              disableTouchListener={!m.sentAt}
+                              slotProps={{ tooltip: { sx: { fontSize: 12 } } }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: isMine ? "flex-end" : "flex-start",
+                                  width: "100%",
+                                }}
+                              >
+                            {hasText ? (
+                            <Box
+                              sx={{
+                                bgcolor: isMine ? "#0084ff" : "#e5e5ea",
+                                color: (isMine && (!files.length || hasText)) ? "#ffffff" : "#1e293b",
                                 px: 1.75,
                                 py: 1.05,
                                 borderRadius: "18px",
@@ -2041,47 +2291,24 @@ export default function CounsellorParentConsultation() {
                                 boxShadow: isMine ? "0 1px 1px rgba(0,0,0,0.08)" : "none",
                               }}
                             >
-                              {m.text ? (
-                                <Typography sx={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                                  {m.text}
-                                </Typography>
-                              ) : null}
-                              {m.files && m.files.length > 0 && (
+                              <Typography sx={{ fontSize: 13, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                                {m.text}
+                              </Typography>
+                              {docFiles.length > 0 ? (
                                 <Box
                                   sx={{
-                                    bgcolor: "#ffffff",
-                                    border: "1px solid #e2e8f0",
-                                    borderRadius: 1.5,
-                                    p: 0.75,
-                                    mt: m.text ? 0.75 : 0,
-                                    width: "100%",
+                                    mt: 0.75,
+                                    alignSelf: isMine ? "flex-end" : "flex-start",
+                                    width: "max-content",
+                                    maxWidth: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: 0.75,
+                                    gap: 0.65,
                                   }}
                                 >
-                                  {m.files.map((f, idx) =>
-                                    isImageFile(f) ? (
-                                      <Box
-                                        key={idx}
-                                        onClick={() => setLightboxUrl(f.fileUrl)}
-                                        sx={{ display: "block", cursor: "pointer" }}
-                                      >
-                                        <Box
-                                          component="img"
-                                          src={f.fileUrl}
-                                          alt=""
-                                          sx={{
-                                            display: "block",
-                                            width: "100%",
-                                            height: "auto",
-                                            maxHeight: 220,
-                                            borderRadius: 1,
-                                            objectFit: "contain",
-                                          }}
-                                        />
-                                      </Box>
-                                    ) : (
+                                  {docFiles.map((f, idx) => {
+                                    const sizeLabel = formatChatAttachmentSize(f);
+                                    return (
                                       <Box
                                         key={idx}
                                         component="a"
@@ -2090,44 +2317,223 @@ export default function CounsellorParentConsultation() {
                                         rel="noopener noreferrer"
                                         sx={{
                                           display: "flex",
+                                          flexDirection: "row",
                                           alignItems: "center",
-                                          gap: 1,
+                                          gap: 0.85,
                                           textDecoration: "none",
-                                          width: "100%",
-                                          borderRadius: 1,
-                                          "&:hover": { opacity: 0.85 },
+                                          width: "max-content",
+                                          maxWidth: "100%",
+                                          py: 0.65,
+                                          px: 1.1,
+                                          borderRadius: 2,
+                                          bgcolor: "#ffffff",
+                                          color: "#0f172a",
+                                          ...chatDocRowElevatedSx,
                                         }}
                                       >
-                                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: APP_PRIMARY_MAIN, flexShrink: 0 }} />
-                                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#1e293b", lineHeight: 1.3, wordBreak: "break-all" }}>
-                                            {formatAttachmentName(f.fileName)}
+                                        <InsertDriveFileOutlinedIcon
+                                          sx={{
+                                            fontSize: 22,
+                                            flexShrink: 0,
+                                            color: "#475569",
+                                          }}
+                                        />
+                                        <Box sx={{ minWidth: 0 }}>
+                                          <Typography
+                                            className="chat-doc-name"
+                                            sx={{
+                                              fontSize: 13,
+                                              fontWeight: 700,
+                                              lineHeight: 1.35,
+                                              whiteSpace: "nowrap",
+                                              color: "#0f172a",
+                                            }}
+                                          >
+                                            {displayChatAttachmentFileName(f.fileName)}
                                           </Typography>
-                                          <Typography sx={{ fontSize: 10, color: "#94a3b8", mt: 0.15 }}>
-                                            Nhấn để xem
+                                          <Typography
+                                            sx={{
+                                              fontSize: 11.5,
+                                              mt: 0.15,
+                                              lineHeight: 1.25,
+                                              whiteSpace: "nowrap",
+                                              color: "#64748b",
+                                            }}
+                                          >
+                                            {sizeLabel || "Nhấn để xem"}
                                           </Typography>
                                         </Box>
                                       </Box>
-                                    )
-                                  )}
+                                    );
+                                  })}
                                 </Box>
-                              )}
+                              ) : null}
                             </Box>
-
-                            <Box
-                              sx={{
-                                mt: 0.25,
-                                display: "flex",
-                                justifyContent: isMine ? "flex-end" : "flex-start",
-                                alignItems: "center",
-                                gap: 0.75,
-                              }}
-                            >
-                              <Typography sx={{ fontSize: 10.5, color: "#64748b", lineHeight: 1.2 }}>
-                                {formatMessageTime(m.sentAt)}
-                              </Typography>
-                            </Box>
-
+                            ) : null}
+                            {!hasText && docFiles.length > 0 ? (
+                              <Box
+                                sx={{
+                                  alignSelf: isMine ? "flex-end" : "flex-start",
+                                  width: "max-content",
+                                  maxWidth: "100%",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.65,
+                                }}
+                              >
+                                {docFiles.map((f, idx) => {
+                                  const sizeLabel = formatChatAttachmentSize(f);
+                                  return (
+                                    <Box
+                                      key={idx}
+                                      component="a"
+                                      href={f.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      sx={{
+                                        display: "flex",
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        gap: 0.85,
+                                        textDecoration: "none",
+                                        width: "max-content",
+                                        maxWidth: "100%",
+                                        py: 0.65,
+                                        px: 1.1,
+                                        borderRadius: 2,
+                                        bgcolor: "#ffffff",
+                                        color: "#0f172a",
+                                        ...chatDocRowElevatedSx,
+                                      }}
+                                    >
+                                      <InsertDriveFileOutlinedIcon
+                                        sx={{
+                                          fontSize: 22,
+                                          flexShrink: 0,
+                                          color: "#475569",
+                                        }}
+                                      />
+                                      <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                          className="chat-doc-name"
+                                          sx={{
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            lineHeight: 1.35,
+                                            whiteSpace: "nowrap",
+                                            color: "#0f172a",
+                                          }}
+                                        >
+                                          {displayChatAttachmentFileName(f.fileName)}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            fontSize: 11.5,
+                                            mt: 0.15,
+                                            lineHeight: 1.25,
+                                            whiteSpace: "nowrap",
+                                            color: "#64748b",
+                                          }}
+                                        >
+                                          {sizeLabel || "Nhấn để xem"}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            ) : null}
+                            {imageFiles.length > 0 ? (
+                              <Box
+                                sx={{
+                                  mt: hasText || docFiles.length > 0 ? 0.6 : 0,
+                                  width: "100%",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.75,
+                                }}
+                              >
+                                {imageFiles.map((f, idx) => (
+                                    <Box
+                                      key={idx}
+                                      onClick={() => setLightboxUrl(f.fileUrl)}
+                                      sx={{ display: "block", cursor: "pointer", lineHeight: 0 }}
+                                    >
+                                      <Box
+                                        component="img"
+                                        src={f.fileUrl}
+                                        alt=""
+                                        sx={{
+                                          display: "block",
+                                          width: "100%",
+                                          height: "auto",
+                                          maxHeight: 220,
+                                          borderRadius: 0,
+                                          objectFit: "contain",
+                                        }}
+                                      />
+                                    </Box>
+                                ))}
+                              </Box>
+                            ) : null}
+                              </Box>
+                            </Tooltip>
+                            {showOutgoingStatusFooter ? (
+                              showReadReceipt ? (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    alignSelf: "flex-end",
+                                    flexShrink: 0,
+                                    mt: 0.25,
+                                  }}
+                                >
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      fontSize: 11,
+                                      color: "#64748b",
+                                      fontWeight: 600,
+                                      lineHeight: 1.2,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    Đã xem
+                                  </Typography>
+                                  <Tooltip title="Phụ huynh đã xem">
+                                    <Avatar
+                                      src={selectedConversation.avatarUrl || undefined}
+                                      sx={{
+                                        width: 18,
+                                        height: 18,
+                                        fontSize: 8,
+                                        bgcolor: selectedConversation.avatarColor,
+                                        boxShadow: "0 0 0 1px rgba(255,255,255,0.9)",
+                                      }}
+                                    >
+                                      {getInitials(selectedConversation.name)}
+                                    </Avatar>
+                                  </Tooltip>
+                                </Box>
+                              ) : (
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    alignSelf: "flex-end",
+                                    mt: 0.25,
+                                    fontSize: 11,
+                                    color: "#64748b",
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  Đã gửi
+                                </Typography>
+                              )
+                            ) : null}
                           </Box>
                         </Box>
                       );
@@ -2261,16 +2667,6 @@ export default function CounsellorParentConsultation() {
                 <SendIcon fontSize="small" />
               </IconButton>
             </Paper>
-            {selectedConversation && (
-              <Typography sx={{ fontSize: 10.5, color: "#94a3b8", mt: 1.5, px: 0.5, userSelect: "none" }}>
-                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
-                {" "}gửi tin nhắn{"  ·  "}
-                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Alt</Box>
-                {" + "}
-                <Box component="kbd" sx={{ fontFamily: "inherit", bgcolor: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 0.5, px: 0.5, py: 0.1, fontSize: 10 }}>Enter</Box>
-                {" "}xuống hàng
-              </Typography>
-            )}
           </Box>
           )}
         </Box>

@@ -32,19 +32,6 @@ function formatBytes(n) {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Dropzone upload ảnh (Cloudinary), không ô nhập URL — preview, trạng thái loading / thành công / lỗi.
- *
- * @param {object} props
- * @param {string | null} props.value — URL ảnh hiện tại
- * @param {(url: string | null) => void} props.onChange
- * @param {(message: string) => void} [props.onError]
- * @param {number} [props.maxBytes=5242880] — chỉ dùng khi không truyền mediaImageRules
- * @param {{ extensions: string[], maxBytes: number, maxImgSizeMb?: number } | null} [props.mediaImageRules]
- * @param {boolean} [props.mediaImageRulesLoading]
- * @param {boolean} [props.disabled]
- * @param {string} [props.inputId]
- */
 export default function ImageUpload({
     value,
     onChange,
@@ -54,6 +41,9 @@ export default function ImageUpload({
     mediaImageRulesLoading = false,
     disabled = false,
     inputId: inputIdProp,
+    previewFit = "cover",
+    receiptPreview = false,
+    receiptPreviewHeight = 400,
 }) {
     const genId = useId();
     const inputId = inputIdProp ?? `image-upload-${genId.replace(/:/g, "")}`;
@@ -323,22 +313,32 @@ export default function ImageUpload({
                             sx={{
                                 position: "relative",
                                 width: "100%",
-                                maxWidth: 280,
+                                maxWidth: receiptPreview ? 420 : 280,
                                 borderRadius: 3,
                                 overflow: "hidden",
                                 bgcolor: "#e2e8f0",
                                 boxShadow: "0 8px 24px rgba(15, 23, 42, 0.1)",
-                                aspectRatio: "1",
+                                ...(receiptPreview
+                                    ? {
+                                          height: receiptPreviewHeight,
+                                          maxHeight: receiptPreviewHeight,
+                                          overflow: "hidden",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                      }
+                                    : {aspectRatio: "1"}),
                             }}
                         >
                             <Box
                                 component="img"
                                 src={previewSrc}
-                                alt="Xem trước ảnh đại diện"
+                                alt="Xem trước ảnh"
                                 sx={{
                                     width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
+                                    height: receiptPreview ? "100%" : "100%",
+                                    maxHeight: receiptPreview ? "100%" : "100%",
+                                    objectFit: previewFit,
                                     display: "block",
                                 }}
                             />

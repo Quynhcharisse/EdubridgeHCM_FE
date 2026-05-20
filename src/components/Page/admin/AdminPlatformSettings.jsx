@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     alpha,
@@ -9,10 +9,12 @@ import {
     CardContent,
     Chip,
     CircularProgress,
+    Collapse,
     LinearProgress,
     IconButton,
     InputAdornment,
     Link,
+    Menu,
     MenuItem,
     Dialog,
     DialogActions,
@@ -21,6 +23,7 @@ import {
     Paper,
     Popover,
     Stack,
+    Switch,
     Tab,
     Table,
     TableBody,
@@ -39,7 +42,13 @@ import AddIcon from "@mui/icons-material/Add";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
+import axiosClient from "../../../configs/APIConfig.jsx";
 import {
     confirmSystemConfigImport,
     getSystemConfig,
@@ -52,7 +61,77 @@ import { autoFillAdminSchoolQuotas } from "../../../services/AdminService.jsx";
 import { getPublicSchoolList } from "../../../services/SchoolPublicService.jsx";
 import { enqueueSnackbar } from "notistack";
 import { adminSttChipSx } from "../../../constants/adminTableStyles.js";
-import { sanitizeAdmissionSettingsForApi } from "../../../utils/admissionSettingsShared.js";
+import {
+    isLockedCriterionLabel,
+    mergeMandatoryDocFromImport,
+    normalizeOcrCriteriaList,
+    sanitizeAdmissionSettingsForApi,
+} from "../../../utils/admissionSettingsShared.js";
+
+function mapMandatoryDocFromApi(doc) {
+    return {
+        code: doc?.code != null ? String(doc.code) : "",
+        name: doc?.name != null ? String(doc.name) : "",
+        required: doc?.required === true,
+        ocrCriteria: normalizeOcrCriteriaList(
+            (doc?.validateCriterion ?? doc?.ocrCriteria ?? []).filter(
+                (item) => !isLockedCriterionLabel(typeof item === "string" ? item : item?.label),
+            ),
+        ),
+        templateFileUrl: doc?.templateFileUrl != null ? String(doc.templateFileUrl) : "",
+    };
+}
+
+function mapMethodDocFromApi(doc) {
+    return {
+        code: doc?.code != null ? String(doc.code) : "",
+        name: doc?.name != null ? String(doc.name) : "",
+        required: doc?.required === true,
+        templateUrl: doc?.templateUrl != null ? String(doc.templateUrl) : "",
+    };
+}
+
+function isImageUrl(url) {
+    if (!url) return false;
+    if (url.includes("/image/upload/")) return true;
+    return /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+}
+
+function updateMandatoryDocScalars(setAdmissionTemplateForm, docIdx, patch) {
+    setAdmissionTemplateForm((prev) => {
+        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+            ? [...prev.mandatoryAllDocumentRequirements]
+            : [];
+        if (!nextDocs[docIdx]) return prev;
+        const current = nextDocs[docIdx];
+        nextDocs[docIdx] = {
+            code: patch.code !== undefined ? String(patch.code) : String(current?.code ?? ""),
+            name: patch.name !== undefined ? String(patch.name) : String(current?.name ?? ""),
+            required: patch.required !== undefined ? patch.required === true : current?.required === true,
+            ocrCriteria: normalizeOcrCriteriaList(current?.ocrCriteria),
+            templateFileUrl: patch.templateFileUrl !== undefined ? String(patch.templateFileUrl) : String(current?.templateFileUrl ?? ""),
+        };
+        return {...prev, mandatoryAllDocumentRequirements: nextDocs};
+    });
+}
+
+function updateMandatoryDocOcrAt(setAdmissionTemplateForm, docIdx, patcher) {
+    setAdmissionTemplateForm((prev) => {
+        const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
+            ? [...prev.mandatoryAllDocumentRequirements]
+            : [];
+        if (!nextDocs[docIdx]) return prev;
+        const current = nextDocs[docIdx];
+        nextDocs[docIdx] = {
+            code: String(current?.code ?? ""),
+            name: String(current?.name ?? ""),
+            required: current?.required === true,
+            ocrCriteria: normalizeOcrCriteriaList(patcher(normalizeOcrCriteriaList(current?.ocrCriteria))),
+            templateFileUrl: String(current?.templateFileUrl ?? ""),
+        };
+        return {...prev, mandatoryAllDocumentRequirements: nextDocs};
+    });
+}
 function getAdmissionQuotaMap(cfg) {
     if (!cfg || typeof cfg !== "object") return {};
     const raw = cfg.admissionQuota;
@@ -428,10 +507,32 @@ export default function AdminPlatformSettings() {
     const [confirmingAdmissionImport, setConfirmingAdmissionImport] = useState(false);
     const [admissionImportConfirmOpen, setAdmissionImportConfirmOpen] = useState(false);
     const [admissionImportPreviewOpen, setAdmissionImportPreviewOpen] = useState(false);
-    const [admissionTemplateEditing, setAdmissionTemplateEditing] = useState(false);
+    const [admissionMethodsEditing, setAdmissionMethodsEditing] = useState(false);
+    const [admissionMandatoryEditing, setAdmissionMandatoryEditing] = useState(false);
+    const [admissionDocumentsEditing, setAdmissionDocumentsEditing] = useState(false);
     const [admissionImportPreview, setAdmissionImportPreview] = useState(null);
     const [importingAdmissionTemplate, setImportingAdmissionTemplate] = useState(false);
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
+    const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
+    const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
+    const methodDocFileInputRefs = useRef({});
+    const [studentFieldMenuAnchor, setStudentFieldMenuAnchor] = useState(null);
+    const [studentFieldMenuDocIdx, setStudentFieldMenuDocIdx] = useState(null);
+    const [admissionImagePreview, setAdmissionImagePreview] = useState({
+        open: false,
+        url: "",
+        title: "Xem hình mẫu",
+    });
+
+    const STUDENT_FIELD_OPTIONS = [
+        { value: "studentName", label: "Họ Và Tên" },
+        { value: "gender", label: "Giới tính" },
+        { value: "studentCode", label: "Số Căn cước công dân học sinh" },
+        { value: "dateOfBirth", label: "Ngày, tháng, năm sinh" },
+    ];
+
+    const CHILD_FIELD_REGEX = /^\{child\.([a-zA-Z]*)\}/;
+    const parseChildField = (label) => { const m = String(label || "").match(CHILD_FIELD_REGEX); return m ? m[1] : null; };
     const admissionImportInputRef = useRef(null);
     const rowValidationVersionRef = useRef({});
     const validateRowDebouncedRef = useRef(null);
@@ -571,6 +672,15 @@ export default function AdminPlatformSettings() {
         setFormatDialogError("");
         setFormatDialogOpen(true);
     };
+    const openAdmissionImagePreview = useCallback((url, title = "Xem hình mẫu") => {
+        const safeUrl = String(url ?? "").trim();
+        if (!safeUrl) return;
+        setAdmissionImagePreview({ open: true, url: safeUrl, title });
+    }, []);
+
+    const closeAdmissionImagePreview = useCallback(() => {
+        setAdmissionImagePreview((prev) => ({ ...prev, open: false }));
+    }, []);
 
     const validateBusiness = (form) => {
         const errors = {};
@@ -714,20 +824,22 @@ export default function AdminPlatformSettings() {
               : [];
         const methodDocsSource = Array.isArray(adm.methodDocumentRequirements)
             ? adm.methodDocumentRequirements
-            : Array.isArray(adm?.documentRequirements?.byMethod)
-              ? adm.documentRequirements.byMethod
             : Array.isArray(adm?.documentRequirementsData?.byMethod)
               ? adm.documentRequirementsData.byMethod
-              : Array.isArray(adm.byMethod)
-                ? adm.byMethod
-                : [];
-        const mandatoryDocsSource = Array.isArray(adm?.documentRequirements?.mandatoryAll)
-            ? adm.documentRequirements.mandatoryAll
+              : Array.isArray(adm?.documentRequirements?.byMethod)
+                ? adm.documentRequirements.byMethod
+                : Array.isArray(adm.byMethod)
+                  ? adm.byMethod
+                  : [];
+        const mandatoryDocsSource = Array.isArray(adm.mandatoryAllDocumentRequirements)
+            ? adm.mandatoryAllDocumentRequirements
             : Array.isArray(adm?.documentRequirementsData?.mandatoryAll)
               ? adm.documentRequirementsData.mandatoryAll
-              : Array.isArray(adm?.mandatoryAll)
-                ? adm.mandatoryAll
-                : [];
+              : Array.isArray(adm?.documentRequirements?.mandatoryAll)
+                ? adm.documentRequirements.mandatoryAll
+                : Array.isArray(adm?.mandatoryAll)
+                  ? adm.mandatoryAll
+                  : [];
         const normalizedProcessSource = processSource.some((group) => Array.isArray(group?.steps))
             ? processSource
             : (() => {
@@ -758,11 +870,7 @@ export default function AdminPlatformSettings() {
                       const methodCode = String(row?.methodCode ?? "").trim();
                       if (!methodCode) return;
                       if (!Array.isArray(grouped[methodCode])) grouped[methodCode] = [];
-                      grouped[methodCode].push({
-                          code: row?.code != null ? String(row.code) : "",
-                          name: row?.name != null ? String(row.name) : "",
-                          required: row?.required === true,
-                      });
+                      grouped[methodCode].push(mapMethodDocFromApi(row));
                   });
                   return Object.entries(grouped).map(([methodCode, documents]) => ({
                       methodCode,
@@ -793,18 +901,10 @@ export default function AdminPlatformSettings() {
             methodDocumentRequirements: normalizedMethodDocsSource.map((group) => ({
                       methodCode: group?.methodCode != null ? String(group.methodCode) : "",
                       documents: Array.isArray(group?.documents)
-                          ? group.documents.map((doc) => ({
-                                code: doc?.code != null ? String(doc.code) : "",
-                                name: doc?.name != null ? String(doc.name) : "",
-                                required: doc?.required === true,
-                            }))
+                          ? group.documents.map((doc) => mapMethodDocFromApi(doc))
                           : [],
                   })),
-            mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => ({
-                code: doc?.code != null ? String(doc.code) : "",
-                name: doc?.name != null ? String(doc.name) : "",
-                required: doc?.required === true,
-            })),
+            mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => mapMandatoryDocFromApi(doc)),
         };
     };
 
@@ -914,14 +1014,21 @@ export default function AdminPlatformSettings() {
         });
         setAdmissionImportRows([]);
         rowValidationVersionRef.current = {};
-        setAdmissionTemplateEditing(false);
+        setAdmissionMethodsEditing(false);
+        setAdmissionMandatoryEditing(false);
+        setAdmissionDocumentsEditing(false);
+        setMandatoryOcrExpandedIdxs([]);
     }, [configBody]);
 
     useEffect(() => {
         if (activeTabKey !== "business") setBusinessEditing(false);
         if (activeTabKey !== "media") setMediaEditing(false);
         if (activeTabKey !== "limits") setQuotaEditing(false);
-        if (activeTabKey !== "admission") setAdmissionTemplateEditing(false);
+        if (activeTabKey !== "admission") {
+            setAdmissionMethodsEditing(false);
+            setAdmissionMandatoryEditing(false);
+            setAdmissionDocumentsEditing(false);
+        }
     }, [activeTabKey]);
 
     useEffect(() => {
@@ -1447,36 +1554,150 @@ export default function AdminPlatformSettings() {
         return ok;
     };
 
-    const cancelAdmissionTemplate = () => {
+    const ADMISSION_EDIT_SECTION = {
+        METHODS: "methods",
+        MANDATORY: "mandatory",
+        DOCUMENTS: "documents",
+    };
+
+    const isAdmissionImportEditingDraft = (type) => {
+        switch (String(type || "").trim()) {
+            case "ALLOWED_METHODS":
+                return admissionMethodsEditing;
+            case "MANDATORY_ALL":
+                return admissionMandatoryEditing;
+            case "METHOD_DOCUMENTS":
+            case "ADMISSION_PROCESSES":
+                return admissionDocumentsEditing;
+            default:
+                return false;
+        }
+    };
+
+    const cancelAdmissionSection = (section) => {
         if (!configBody) return;
-        setAdmissionTemplateForm(getAdmissionInitialForm(configBody));
+        const base = getAdmissionInitialForm(configBody);
+        setAdmissionTemplateForm((prev) => {
+            switch (section) {
+                case ADMISSION_EDIT_SECTION.METHODS:
+                    return { ...prev, allowedMethods: base.allowedMethods };
+                case ADMISSION_EDIT_SECTION.MANDATORY:
+                    return { ...prev, mandatoryAllDocumentRequirements: base.mandatoryAllDocumentRequirements };
+                case ADMISSION_EDIT_SECTION.DOCUMENTS:
+                    return {
+                        ...prev,
+                        methodDocumentRequirements: base.methodDocumentRequirements,
+                        methodAdmissionProcess: base.methodAdmissionProcess,
+                    };
+                default:
+                    return prev;
+            }
+        });
+        if (section === ADMISSION_EDIT_SECTION.MANDATORY) {
+            setMandatoryOcrExpandedIdxs([]);
+        }
         setStatus({ type: "", message: "" });
     };
 
-    const saveAdmissionTemplate = async () => {
-        if (!configBody) return;
+    const buildAdmissionPayloadForSection = (section) => {
+        const base = getAdmissionInitialForm(configBody);
+        const form = admissionTemplateForm;
+        switch (section) {
+            case ADMISSION_EDIT_SECTION.METHODS:
+                return sanitizeAdmissionSettingsForApi({ ...base, allowedMethods: form.allowedMethods });
+            case ADMISSION_EDIT_SECTION.MANDATORY:
+                return sanitizeAdmissionSettingsForApi({
+                    ...base,
+                    mandatoryAllDocumentRequirements: form.mandatoryAllDocumentRequirements,
+                });
+            case ADMISSION_EDIT_SECTION.DOCUMENTS:
+                return sanitizeAdmissionSettingsForApi({
+                    ...base,
+                    methodDocumentRequirements: form.methodDocumentRequirements,
+                    methodAdmissionProcess: form.methodAdmissionProcess,
+                });
+            default:
+                return sanitizeAdmissionSettingsForApi(base);
+        }
+    };
+
+    const saveAdmissionSection = async (section) => {
+        if (!configBody) return false;
+        const successMessages = {
+            [ADMISSION_EDIT_SECTION.METHODS]: "Đã cập nhật phương thức tuyển sinh.",
+            [ADMISSION_EDIT_SECTION.MANDATORY]: "Đã cập nhật hồ sơ bắt buộc chung.",
+            [ADMISSION_EDIT_SECTION.DOCUMENTS]: "Đã cập nhật hồ sơ và quy trình tuyển sinh.",
+        };
         setSaving(true);
         setStatus({ type: "", message: "" });
         try {
-            const sanitized = sanitizeAdmissionSettingsForApi(admissionTemplateForm);
+            const sanitized = buildAdmissionPayloadForSection(section);
             const updateRes = await updateSystemConfig({ admissionSettingsData: sanitized });
             assertSystemConfigUpdateSuccess(updateRes);
-            enqueueSnackbar(
-                "Đã cập nhật mẫu phương thức. Các trường đang dùng bản riêng không tự đổi.",
-                { variant: "success" }
-            );
-            setStatus({ type: "success", message: "Mẫu hệ thống đã lưu." });
+            const msg = successMessages[section] || "Đã lưu cấu hình tuyển sinh.";
+            enqueueSnackbar(msg, { variant: "success" });
+            setStatus({ type: "success", message: msg });
             await fetchConfig();
-            setAdmissionTemplateEditing(false);
+            return true;
         } catch (e) {
-            console.error("saveAdmissionTemplate failed", e);
+            console.error("saveAdmissionSection failed", e);
             const msg = apiErrorMessage(e, "Cập nhật thất bại. Vui lòng thử lại.");
             enqueueSnackbar(msg, { variant: "error" });
             setStatus({ type: "error", message: msg });
+            return false;
         } finally {
             setSaving(false);
         }
     };
+
+    const handleMethodCatalogTemplateUpload = useCallback(async (methodCode, docIdx, file) => {
+        if (!file) return;
+        const normalizedMethodCode = String(methodCode ?? "").trim();
+        if (!normalizedMethodCode) return;
+        const uploadKey = `${normalizedMethodCode}-${docIdx}`;
+        setMethodDocUploadingKeys((prev) => new Set([...prev, uploadKey]));
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await axiosClient.post("/auth/upload/file?fileType=image", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const body = res.data?.body ?? res.data;
+            const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
+            if (!fileUrl) {
+                enqueueSnackbar("Không nhận được URL file sau khi tải lên.", { variant: "error" });
+                return;
+            }
+            setAdmissionTemplateForm((prev) => {
+                const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                const gIdx = nextGroups.findIndex(
+                    (g) => String(g?.methodCode ?? "").trim() === normalizedMethodCode,
+                );
+                if (gIdx < 0) return prev;
+                const currentGroup = { ...nextGroups[gIdx] };
+                currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                if (!currentGroup.documents[docIdx]) return prev;
+                currentGroup.documents[docIdx] = {
+                    ...currentGroup.documents[docIdx],
+                    templateUrl: fileUrl,
+                };
+                nextGroups[gIdx] = currentGroup;
+                return { ...prev, methodDocumentRequirements: nextGroups };
+            });
+            enqueueSnackbar(res.data?.message || "Đã tải hình mẫu lên.", { variant: "success" });
+        } catch (e) {
+            console.error("[AdminPlatformSettings] method catalog template upload:", e);
+            enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {
+                variant: "error",
+            });
+        } finally {
+            setMethodDocUploadingKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(uploadKey);
+                return next;
+            });
+        }
+    }, []);
 
     const handleSelectAdmissionTemplateFile = () => {
         if (saving || importingAdmissionTemplate || confirmingAdmissionImport) return;
@@ -1567,12 +1788,20 @@ export default function AdminPlatformSettings() {
 
         switch (String(type || "").trim()) {
             case "MANDATORY_ALL": {
+                const existingMandatory = Array.isArray(prevForm.mandatoryAllDocumentRequirements)
+                    ? prevForm.mandatoryAllDocumentRequirements
+                    : [];
                 const mandatoryAllDocumentRequirements = rowDataList
-                    .map((row) => ({
-                        code: String(row?.documentCode ?? row?.code ?? "").trim(),
-                        name: String(row?.documentName ?? row?.name ?? "").trim(),
-                        required: parseRequiredValue(row?.required),
-                    }))
+                    .map((row) =>
+                        mergeMandatoryDocFromImport(
+                            {
+                                code: String(row?.documentCode ?? row?.code ?? "").trim(),
+                                name: String(row?.documentName ?? row?.name ?? "").trim(),
+                                required: parseRequiredValue(row?.required),
+                            },
+                            existingMandatory,
+                        ),
+                    )
                     .filter((doc) => doc.code || doc.name);
                 return { ...prevForm, mandatoryAllDocumentRequirements };
             }
@@ -1646,7 +1875,7 @@ export default function AdminPlatformSettings() {
                 enqueueSnackbar("File không có dữ liệu để nhập.", { variant: "warning" });
             } else if (errorCount === 0) {
                 enqueueSnackbar(
-                    admissionTemplateEditing
+                    isAdmissionImportEditingDraft(importType)
                         ? "Dữ liệu hợp lệ. Kiểm tra trong bảng, sau đó nhấn Xác nhận nhập để áp dụng vào bản nháp."
                         : "Dữ liệu hợp lệ, bạn có thể xác nhận nhập ngay.",
                     { variant: "success" }
@@ -1737,9 +1966,9 @@ export default function AdminPlatformSettings() {
                     isError: Boolean(item?.isError),
                 }))
                 : payloadRows;
-            if (admissionTemplateEditing) {
+            if (isAdmissionImportEditingDraft(importType)) {
                 setAdmissionTemplateForm((prev) => applyImportedRowsToAdmissionDraft(prev, importType, rowsForConfirm));
-                enqueueSnackbar("Đã áp dụng dữ liệu vào bản nháp. Nhấn Lưu để cập nhật hệ thống.", { variant: "success" });
+                enqueueSnackbar("Đã áp dụng dữ liệu vào bản nháp. Nhấn Lưu ở mục tương ứng để cập nhật hệ thống.", { variant: "success" });
                 setStatus({ type: "success", message: "Đã áp dụng vào bản nháp." });
             } else {
                 const res = await confirmSystemConfigImport({ type: importType, rows: rowsForConfirm });
@@ -1770,10 +1999,11 @@ export default function AdminPlatformSettings() {
     };
 
     const renderAdmissionTab = () => {
-        const rowDisabled = !admissionTemplateEditing || saving;
+        const methodsRowDisabled = !admissionMethodsEditing || saving;
+        const mandatoryRowDisabled = !admissionMandatoryEditing || saving;
         const methods = admissionTemplateForm.allowedMethods || [];
         const preview = admissionImportPreview;
-        const mandatoryDocsSource = admissionTemplateEditing
+        const mandatoryDocsSource = admissionMandatoryEditing
             ? Array.isArray(admissionTemplateForm.mandatoryAllDocumentRequirements)
                 ? admissionTemplateForm.mandatoryAllDocumentRequirements
                 : []
@@ -1782,14 +2012,14 @@ export default function AdminPlatformSettings() {
                 : Array.isArray(preview?.documentRequirementsData?.mandatoryAll)
                     ? preview.documentRequirementsData.mandatoryAll
                     : [];
-        const docsSource = admissionTemplateEditing
+        const docsSource = admissionDocumentsEditing
             ? Array.isArray(admissionTemplateForm.methodDocumentRequirements)
                 ? admissionTemplateForm.methodDocumentRequirements
                 : []
             : Array.isArray(preview?.documentRequirementsData?.byMethod)
                 ? preview.documentRequirementsData.byMethod
                 : [];
-        const processSource = admissionTemplateEditing
+        const processSource = admissionDocumentsEditing
             ? Array.isArray(admissionTemplateForm.methodAdmissionProcess)
                 ? admissionTemplateForm.methodAdmissionProcess
                 : []
@@ -1840,6 +2070,247 @@ export default function AdminPlatformSettings() {
                 WebkitTextFillColor: "#374151",
                 color: "#374151",
             },
+        };
+        const isMandatoryOcrExpanded = (idx) => mandatoryOcrExpandedIdxs.includes(idx);
+        const toggleMandatoryOcrExpanded = (idx) => {
+            setMandatoryOcrExpandedIdxs((prev) =>
+                prev.includes(idx) ? prev.filter((item) => item !== idx) : [...prev, idx],
+            );
+        };
+        const countMandatoryOcrCriteria = (doc) =>
+            normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+                (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
+            ).length;
+        const renderSectionEditActions = (section, editing, setEditing) => (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {!editing ? (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={saving}
+                        onClick={() => setEditing(true)}
+                        sx={admissionToolbarSmallOutlinedSx}
+                    >
+                        Chỉnh sửa
+                    </Button>
+                ) : (
+                    <>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={saving}
+                            onClick={() => {
+                                cancelAdmissionSection(section);
+                                setEditing(false);
+                            }}
+                            sx={admissionToolbarSmallOutlinedSx}
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            disabled={saving}
+                            onClick={() => {
+                                void saveAdmissionSection(section).then((ok) => {
+                                    if (ok) setEditing(false);
+                                });
+                            }}
+                            sx={admissionToolbarSmallPrimarySx}
+                        >
+                            Lưu
+                        </Button>
+                    </>
+                )}
+            </Stack>
+        );
+        const renderMandatoryOcrBlock = (doc, dIdx, alwaysShow = false) => {
+            const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria);
+            const filledCount = countMandatoryOcrCriteria(doc);
+            const hasTemplateImage = Boolean(doc?.templateFileUrl && isImageUrl(doc.templateFileUrl));
+            const lockedLabel = hasTemplateImage
+                ? `Hình ảnh ${doc?.name ? `"${doc.name}"` : "hồ sơ"} phải có cấu trúc giống với hình ảnh mẫu của tài liệu`
+                : null;
+            if (!admissionMandatoryEditing && filledCount === 0 && !alwaysShow && !lockedLabel) return null;
+
+            return (
+                <Box sx={{ px: 1.5, py: 1.25, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", display: "block", mb: 1 }}>
+                        Tiêu chí kiểm tra
+                    </Typography>
+                    {admissionMandatoryEditing ? (
+                        <Stack spacing={1}>
+                            {/* Tiêu chí cố định — không xóa được, chỉ hiện khi có ảnh mẫu */}
+                            {lockedLabel ? (
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        value={lockedLabel}
+                                        disabled
+                                        sx={{ ...admissionInputSx, flex: 1, minWidth: 0, "& .MuiInputBase-input.Mui-disabled": { color: "#374151", WebkitTextFillColor: "#374151" } }}
+                                    />
+                                    <Tooltip title="Tiêu chí này được tự động tạo khi có hình ảnh mẫu, không thể xóa">
+                                        <InfoOutlinedIcon fontSize="small" sx={{ color: "#94a3b8", flexShrink: 0 }} />
+                                    </Tooltip>
+                                </Stack>
+                            ) : null}
+                            {criteria.length === 0 && !lockedLabel ? (
+                                <Typography variant="body2" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
+                                    Chưa có tiêu chí — thêm nếu cần kiểm tra OCR.
+                                </Typography>
+                            ) : (
+                                criteria.map((item, cIdx) => {
+                                    const childField = parseChildField(item.label);
+                                    const isChildField = childField !== null;
+                                    const hasSelectedField = isChildField && childField !== "";
+                                    const prevIsChildField = cIdx > 0 && parseChildField(criteria[cIdx - 1]?.label) !== null;
+                                    const showChildHeader = isChildField && !prevIsChildField;
+                                    return (
+                                    <Stack
+                                        key={`mandatory-ocr-${dIdx}-${cIdx}`}
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                    >
+                                        {isChildField ? (
+                                            <Stack direction="column" spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+                                                {showChildHeader && (
+                                                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", display: "block" }}>
+                                                        Thông tin học sinh
+                                                    </Typography>
+                                                )}
+                                                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap" }}>
+                                                <TextField
+                                                    select
+                                                    size="small"
+                                                    disabled={mandatoryRowDisabled}
+                                                    value={childField}
+                                                    displayEmpty
+                                                    SelectProps={{ displayEmpty: true }}
+                                                    onChange={(e) => {
+                                                        const opt = STUDENT_FIELD_OPTIONS.find((o) => o.value === e.target.value);
+                                                        if (!opt) return;
+                                                        const newLabel = `{child.${opt.value}} khớp với ${opt.label} trong hình ảnh`;
+                                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                            const next = [...list];
+                                                            next[cIdx] = { ...next[cIdx], label: newLabel };
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    sx={{ ...admissionInputSx, minWidth: 220 }}
+                                                >
+                                                    <MenuItem value=""><em>Chọn ...</em></MenuItem>
+                                                    {STUDENT_FIELD_OPTIONS.filter((o) => {
+                                                        const usedByOther = criteria.some((it, idx) => {
+                                                            if (idx === cIdx) return false;
+                                                            const f = parseChildField(it.label);
+                                                            return f === o.value;
+                                                        });
+                                                        return !usedByOther;
+                                                    }).map((o) => (
+                                                        <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                                                    ))}
+                                                </TextField>
+                                                {hasSelectedField ? (
+                                                    <Typography variant="body2" sx={{ color: "#374151", whiteSpace: "nowrap" }}>
+                                                        khớp với {STUDENT_FIELD_OPTIONS.find((o) => o.value === childField)?.label ?? childField} trong hình ảnh
+                                                    </Typography>
+                                                ) : null}
+                                                </Stack>
+                                            </Stack>
+                                        ) : (
+                                            <TextField
+                                                size="small"
+                                                label="Tiêu chí"
+                                                fullWidth
+                                                value={item.label}
+                                                placeholder="VD: Họ và tên"
+                                                disabled={mandatoryRowDisabled}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                        const next = [...list];
+                                                        next[cIdx] = { ...next[cIdx], label: value };
+                                                        return next;
+                                                    });
+                                                }}
+                                                sx={{ ...admissionInputSx, flex: 1, minWidth: 0 }}
+                                            />
+                                        )}
+                                        <IconButton
+                                            size="small"
+                                            color="error"
+                                            disabled={mandatoryRowDisabled}
+                                            aria-label="Xóa tiêu chí"
+                                            onClick={() => {
+                                                updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => {
+                                                    const next = [...list];
+                                                    next.splice(cIdx, 1);
+                                                    return next;
+                                                });
+                                            }}
+                                        >
+                                            <DeleteOutlineIcon fontSize="small" />
+                                        </IconButton>
+                                    </Stack>
+                                    );
+                                })
+                            )}
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+<Button
+                                    size="small"
+                                    variant="text"
+                                    startIcon={<AddIcon fontSize="small" />}
+                                    disabled={mandatoryRowDisabled}
+                                    onClick={() => {
+                                        updateMandatoryDocOcrAt(setAdmissionTemplateForm, dIdx, (list) => [
+                                            ...list,
+                                            { label: "{child.}", validations: [] },
+                                        ]);
+                                    }}
+                                    sx={{ textTransform: "none", fontWeight: 700, color: "#7c3aed" }}
+                                >
+                                    Thêm tiêu chí về thông tin học sinh
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    ) : (
+                        <Stack spacing={0.75}>
+                            {lockedLabel ? (
+                                <Typography variant="body2" sx={{ color: "#475569", lineHeight: 1.5 }}>
+                                    {lockedLabel}
+                                </Typography>
+                            ) : null}
+                            {criteria
+                                .filter(
+                                    (item) =>
+                                        String(item.label || "").trim() ||
+                                        item.validations.some((rule) => String(rule).trim()),
+                                )
+                                .map((item, cIdx) => (
+                                    <Typography key={`mandatory-ocr-view-${dIdx}-${cIdx}`} variant="body2" sx={{ color: "#475569", lineHeight: 1.5 }}>
+                                        {(() => {
+                                            const raw = String(item.label || "");
+                                            const m = raw.match(CHILD_FIELD_REGEX);
+                                            if (m) {
+                                                const opt = STUDENT_FIELD_OPTIONS.find((o) => o.value === m[1]);
+                                                const fieldLabel = opt ? opt.label : m[1];
+                                                return raw.replace(CHILD_FIELD_REGEX, `${fieldLabel} học sinh`);
+                                            }
+                                            return raw || "—";
+                                        })()}
+                                    </Typography>
+                                ))}
+                            {!lockedLabel && filledCount === 0 ? (
+                                <Typography variant="body2" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
+                                    Chưa có tiêu chí kiểm tra.
+                                </Typography>
+                            ) : null}
+                        </Stack>
+                    )}
+                </Box>
+            );
         };
         const previewHeaderRowSx = {
             display: "grid",
@@ -1902,19 +2373,6 @@ export default function AdminPlatformSettings() {
 
         return (
             <Stack spacing={2.5} sx={{ width: "100%" }}>
-                {!admissionTemplateEditing ? (
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={saving}
-                            onClick={() => setAdmissionTemplateEditing(true)}
-                            sx={admissionToolbarSmallOutlinedSx}
-                        >
-                            Chỉnh sửa
-                        </Button>
-                    </Box>
-                ) : null}
                 <Box>
                     <input
                         ref={admissionImportInputRef}
@@ -2092,40 +2550,38 @@ export default function AdminPlatformSettings() {
                             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1d4ed8" }}>
                                 Phương thức tuyển sinh
                             </Typography>
-                            {admissionTemplateEditing ? (
-                                <Stack direction="row" spacing={1}>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                    >
-                                        Tài liệu mẫu
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                        disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
-                                        onClick={() => {
-                                            setImportType("ALLOWED_METHODS");
-                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                        }}
-                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                    >
-                                        Tải lên
-                                    </Button>
-                                </Stack>
-                            ) : (
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tài liệu mẫu
-                                </Button>
-                            )}
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                                {admissionMethodsEditing ? (
+                                    <>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => exportAdmissionTemplateFile("phương_thức_tuyển_sinh.xlsx")}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Tài liệu mẫu
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                            disabled={saving || importingAdmissionTemplate || confirmingAdmissionImport}
+                                            onClick={() => {
+                                                setImportType("ALLOWED_METHODS");
+                                                setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                            }}
+                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                        >
+                                            Tải lên
+                                        </Button>
+                                    </>
+                                ) : null}
+                                {renderSectionEditActions(
+                                    ADMISSION_EDIT_SECTION.METHODS,
+                                    admissionMethodsEditing,
+                                    setAdmissionMethodsEditing,
+                                )}
+                            </Stack>
                         </Box>
                         {methods.length === 0 ? (
                             <Box
@@ -2150,7 +2606,7 @@ export default function AdminPlatformSettings() {
                                             <TableCell sx={{ width: 170, fontWeight: 700, color: "#374151" }}>Mã phương thức</TableCell>
                                             <TableCell sx={{ width: 220, fontWeight: 700, color: "#374151" }}>Tên hiển thị</TableCell>
                                             <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Mô tả</TableCell>
-                                            {admissionTemplateEditing ? (
+                                            {admissionMethodsEditing ? (
                                                 <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
                                                     Xóa
                                                 </TableCell>
@@ -2161,13 +2617,13 @@ export default function AdminPlatformSettings() {
                                         {methods.map((row, idx) => (
                                             <TableRow key={`adm-${idx}-${row.code ?? "row"}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
                                                             placeholder="VD: HOC_BA"
                                                             value={row.code}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2212,13 +2668,13 @@ export default function AdminPlatformSettings() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
                                                             placeholder="Tên trên giao diện"
                                                             value={row.displayName}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2236,7 +2692,7 @@ export default function AdminPlatformSettings() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell sx={{ py: 1.35 }}>
-                                                    {admissionTemplateEditing ? (
+                                                    {admissionMethodsEditing ? (
                                                         <TextField
                                                             size="small"
                                                             fullWidth
@@ -2245,7 +2701,7 @@ export default function AdminPlatformSettings() {
                                                             maxRows={4}
                                                             placeholder="Mô tả ngắn cho tư vấn / trường"
                                                             value={row.description}
-                                                            disabled={rowDisabled}
+                                                            disabled={methodsRowDisabled}
                                                             onChange={(e) => {
                                                                 const v = e.target.value;
                                                                 setAdmissionTemplateForm((p) => {
@@ -2262,14 +2718,14 @@ export default function AdminPlatformSettings() {
                                                         </Typography>
                                                     )}
                                                 </TableCell>
-                                                {admissionTemplateEditing ? (
+                                                {admissionMethodsEditing ? (
                                                     <TableCell align="center" sx={{ py: 1.35 }}>
                                                         <Tooltip title="Xóa dòng" placement="left">
                                                             <span>
                                                                 <IconButton
                                                                     size="small"
                                                                     color="error"
-                                                                    disabled={rowDisabled}
+                                                                    disabled={methodsRowDisabled}
                                                                     aria-label="Xóa dòng"
                                                                     onClick={() =>
                                                                         setAdmissionTemplateForm((p) => {
@@ -2291,6 +2747,28 @@ export default function AdminPlatformSettings() {
                                 </Table>
                             </TableContainer>
                         )}
+                        {admissionMethodsEditing ? (
+                            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<AddIcon fontSize="small" />}
+                                    disabled={methodsRowDisabled}
+                                    onClick={() =>
+                                        setAdmissionTemplateForm((prev) => ({
+                                            ...prev,
+                                            allowedMethods: [
+                                                ...(Array.isArray(prev.allowedMethods) ? prev.allowedMethods : []),
+                                                { code: "", displayName: "", description: "" },
+                                            ],
+                                        }))
+                                    }
+                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                >
+                                    Thêm phương thức
+                                </Button>
+                            </Box>
+                        ) : null}
                     </Box>
                 </Box>
 
@@ -2312,171 +2790,328 @@ export default function AdminPlatformSettings() {
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1d4ed8" }}>
                             Hồ sơ bắt buộc chung
                         </Typography>
-                        {admissionTemplateEditing ? (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                            {admissionMandatoryEditing ? (
+                                <>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<FileUploadOutlinedIcon fontSize="small" />}
+                                        disabled={mandatoryRowDisabled}
+                                        onClick={() => {
+                                            setImportType("MANDATORY_ALL");
+                                            setTimeout(() => admissionImportInputRef.current?.click(), 0);
+                                        }}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tải hồ sơ chung
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
+                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                    >
+                                        Tài liệu mẫu
+                                    </Button>
+                                </>
+                            ) : null}
+                            {admissionMandatoryEditing ? (
                                 <Button
                                     size="small"
                                     variant="outlined"
-                                    startIcon={<FileUploadOutlinedIcon fontSize="small" />}
-                                    onClick={() => {
-                                        setImportType("MANDATORY_ALL");
-                                        setTimeout(() => admissionImportInputRef.current?.click(), 0);
-                                    }}
+                                    startIcon={<AddIcon fontSize="small" />}
+                                    disabled={mandatoryRowDisabled}
+                                    onClick={() =>
+                                        setAdmissionTemplateForm((prev) => ({
+                                            ...prev,
+                                            mandatoryAllDocumentRequirements: [
+                                                ...(Array.isArray(prev.mandatoryAllDocumentRequirements)
+                                                    ? prev.mandatoryAllDocumentRequirements
+                                                    : []),
+                                                { code: "", name: "", required: false, ocrCriteria: [], templateFileUrl: "" },
+                                            ],
+                                        }))
+                                    }
                                     sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
                                 >
-                                    Tải hồ sơ chung
+                                    Thêm hồ sơ
                                 </Button>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
-                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                >
-                                    Tài liệu mẫu
-                                </Button>
-                            </Stack>
-                        ) : (
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => exportAdmissionTemplateFile("hồ_sơ_bắt_buộc_chung.xlsx")}
-                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                            >
-                                Tài liệu mẫu
-                            </Button>
-                        )}
+                            ) : null}
+                            {renderSectionEditActions(
+                                ADMISSION_EDIT_SECTION.MANDATORY,
+                                admissionMandatoryEditing,
+                                setAdmissionMandatoryEditing,
+                            )}
+                        </Stack>
                     </Box>
-                    <TableContainer component={Paper} variant="outlined" sx={{ borderColor: "#dbeafe", borderRadius: 1.5, bgcolor: "#ffffff" }}>
-                        <Table size="small">
-                            <TableHead>
-                                <TableRow sx={{ bgcolor: "#eef4ff" }}>
-                                    <TableCell sx={{ width: 64, fontWeight: 700, color: "#374151" }}>STT</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
-                                    <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
-                                    {admissionTemplateEditing ? (
-                                        <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>
-                                            Thao tác
-                                        </TableCell>
-                                    ) : null}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {mandatoryDocsSource.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={admissionTemplateEditing ? 4 : 3} sx={{ py: 4, textAlign: "center", color: "#64748b" }}>
-                                            <InfoOutlinedIcon sx={{ fontSize: 22, color: "#94a3b8", mb: 0.5 }} />
-                                            <Typography variant="body2">Chưa có hồ sơ bắt buộc chung.</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : mandatoryDocsSource.map((doc, dIdx) => (
-                                    <TableRow key={`mandatory-doc-${dIdx}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
-                                        <TableCell>{dIdx + 1}</TableCell>
-                                        <TableCell>
-                                            {admissionTemplateEditing ? (
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    value={doc?.name ?? ""}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], name: value };
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
-                                                    placeholder="Nhập tên hồ sơ"
-                                                    sx={admissionInputSx}
-                                                />
-                                            ) : (
-                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {admissionTemplateEditing ? (
-                                                <TextField
-                                                    size="small"
-                                                    select
-                                                    fullWidth
-                                                    value={doc?.required === true ? "true" : "false"}
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs[dIdx] = { ...nextDocs[dIdx], required: value === "true" };
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
-                                                    sx={admissionInputSx}
-                                                >
-                                                    <MenuItem value="true">Bắt buộc</MenuItem>
-                                                    <MenuItem value="false">Tùy chọn</MenuItem>
-                                                </TextField>
-                                            ) : (
-                                                <Chip
-                                                    size="small"
-                                                    label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
-                                                    sx={{
-                                                        height: 24,
-                                                        fontWeight: 700,
-                                                        fontSize: 11,
-                                                        color: doc?.required ? "#b91c1c" : "#166534",
-                                                        bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
-                                                    }}
-                                                />
-                                            )}
-                                        </TableCell>
-                                        {admissionTemplateEditing ? (
-                                            <TableCell align="center">
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => {
-                                                        setAdmissionTemplateForm((prev) => {
-                                                            const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                                ? [...prev.mandatoryAllDocumentRequirements]
-                                                                : [];
-                                                            nextDocs.splice(dIdx, 1);
-                                                            return { ...prev, mandatoryAllDocumentRequirements: nextDocs };
-                                                        });
-                                                    }}
-                                                >
-                                                    <DeleteOutlineIcon fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
-                                        ) : null}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    {admissionTemplateEditing ? (
-                        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<AddIcon fontSize="small" />}
-                                onClick={() =>
-                                    setAdmissionTemplateForm((prev) => ({
-                                        ...prev,
-                                        mandatoryAllDocumentRequirements: [
-                                            ...(Array.isArray(prev.mandatoryAllDocumentRequirements)
-                                                ? prev.mandatoryAllDocumentRequirements
-                                                : []),
-                                            { code: "", name: "", required: false },
-                                        ],
-                                    }))
-                                }
-                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                            >
-                                Thêm hồ sơ chung
-                            </Button>
+                    {mandatoryDocsSource.length === 0 ? (
+                        <Box
+                            sx={{
+                                py: 4,
+                                px: 2,
+                                borderRadius: 2,
+                                border: "1px dashed #cbd5e1",
+                                bgcolor: "#ffffff",
+                                textAlign: "center",
+                            }}
+                        >
+                            <InfoOutlinedIcon sx={{ fontSize: 22, color: "#94a3b8", mb: 0.5 }} />
+                            <Typography variant="body2" sx={{ color: "#64748b" }}>
+                                Chưa có hồ sơ bắt buộc chung.
+                            </Typography>
                         </Box>
-                    ) : null}
+                    ) : (
+                        <Stack spacing={1.25}>
+                            {mandatoryDocsSource.map((doc, dIdx) => {
+                                const ocrCriteriaCount = countMandatoryOcrCriteria(doc);
+                                const showOcrBlock =
+                                    admissionMandatoryEditing || ocrCriteriaCount > 0 || (doc?.templateFileUrl && isImageUrl(doc.templateFileUrl));
+
+                                return (
+                                    <Box
+                                        key={`mandatory-doc-${dIdx}`}
+                                        sx={{
+                                            border: "1px solid #dbeafe",
+                                            borderRadius: 2,
+                                            overflow: "hidden",
+                                            bgcolor: "#ffffff",
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                alignItems: { xs: "stretch", sm: "center" },
+                                                gap: 1.25,
+                                                p: 1.5,
+                                            }}
+                                        >
+                                            {admissionMandatoryEditing ? (
+                                                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        label="Tên hồ sơ"
+                                                        value={doc?.name ?? ""}
+                                                        disabled={mandatoryRowDisabled}
+                                                        onChange={(e) => {
+                                                            updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                name: e.target.value,
+                                                            });
+                                                        }}
+                                                        placeholder="VD: Bản sao Giấy khai sinh"
+                                                        sx={{ ...admissionInputSx }}
+                                                    />
+                                                </Box>
+                                            ) : (
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Typography sx={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.4 }}>
+                                                        {doc?.name || "—"}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                            <Stack
+                                                direction="row"
+                                                spacing={1}
+                                                alignItems="center"
+                                                justifyContent={{ xs: "space-between", sm: "flex-end" }}
+                                                flexShrink={0}
+                                            >
+                                                {admissionMandatoryEditing ? (
+                                                    <>
+                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"}>
+                                                            <Stack direction="row" spacing={0.75} alignItems="center">
+                                                                <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                                                                    Bắt buộc
+                                                                </Typography>
+                                                                <Switch
+                                                                    size="small"
+                                                                    checked={doc?.required === true}
+                                                                    disabled={mandatoryRowDisabled}
+                                                                    onChange={(_, checked) => {
+                                                                        updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                            required: checked,
+                                                                        });
+                                                                    }}
+                                                                    color="primary"
+                                                                />
+                                                            </Stack>
+                                                        </Tooltip>
+                                                        <Tooltip title="Xóa hồ sơ">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="error"
+                                                                    disabled={mandatoryRowDisabled}
+                                                                    onClick={() => {
+                                                                        setAdmissionTemplateForm((prev) => {
+                                                                            const nextDocs = Array.isArray(
+                                                                                prev.mandatoryAllDocumentRequirements,
+                                                                            )
+                                                                                ? [...prev.mandatoryAllDocumentRequirements]
+                                                                                : [];
+                                                                            nextDocs.splice(dIdx, 1);
+                                                                            return {
+                                                                                ...prev,
+                                                                                mandatoryAllDocumentRequirements: nextDocs,
+                                                                            };
+                                                                        });
+                                                                        setMandatoryOcrExpandedIdxs((prev) =>
+                                                                            prev
+                                                                                .filter((item) => item !== dIdx)
+                                                                                .map((item) => (item > dIdx ? item - 1 : item)),
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <DeleteOutlineIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    </>
+                                                ) : (
+                                                    <Chip
+                                                        size="small"
+                                                        label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                        sx={{
+                                                            height: 24,
+                                                            fontWeight: 700,
+                                                            fontSize: 11,
+                                                            color: doc?.required ? "#b91c1c" : "#166534",
+                                                            bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                        }}
+                                                    />
+                                                )}
+                                            </Stack>
+                                        </Box>
+                                        {(admissionMandatoryEditing || (doc?.templateFileUrl && isImageUrl(doc.templateFileUrl)) || ocrCriteriaCount > 0) ? (
+                                            <Stack
+                                                direction="row"
+                                                sx={{ borderTop: "1px solid #dbeafe", bgcolor: "#f8fafc" }}
+                                                divider={<Box sx={{ width: "1px", bgcolor: "#dbeafe", flexShrink: 0 }} />}
+                                            >
+                                                {/* Hình ảnh mẫu — 1/3 */}
+                                                <Box sx={{ flex: "0 0 33.333%", minWidth: 0, px: 1.5, py: 1.25 }}>
+                                                    {doc?.templateFileUrl && isImageUrl(doc.templateFileUrl) ? (
+                                                        <Stack spacing={0.75} alignItems="flex-start">
+                                                            <Typography variant="caption" sx={{ fontWeight: 700, color: "#475569" }}>
+                                                                Hình ảnh mẫu
+                                                            </Typography>
+                                                            <Box sx={{ position: "relative", display: "inline-block" }}>
+                                                                <Box
+                                                                    component="button"
+                                                                    type="button"
+                                                                    onClick={() => openAdmissionImagePreview(doc.templateFileUrl, "Hình ảnh mẫu")}
+                                                                    sx={{
+                                                                        display: "inline-block",
+                                                                        borderRadius: 1.5,
+                                                                        overflow: "hidden",
+                                                                        border: "1px solid #cbd5e1",
+                                                                        lineHeight: 0,
+                                                                        p: 0,
+                                                                        cursor: "pointer",
+                                                                        background: "transparent",
+                                                                    }}
+                                                                >
+                                                                    <Box
+                                                                        component="img"
+                                                                        src={doc.templateFileUrl}
+                                                                        alt="Hình ảnh mẫu"
+                                                                        sx={{ display: "block", width: "auto", maxWidth: "100%", maxHeight: 220, objectFit: "contain" }}
+                                                                    />
+                                                                </Box>
+                                                                {admissionMandatoryEditing ? (
+                                                                    <Stack direction="row" spacing={0.5} sx={{ position: "absolute", top: 6, right: 6 }}>
+                                                                        <CloudinaryUpload
+                                                                            accept="image/*"
+                                                                            multiple={false}
+                                                                            disabled={mandatoryRowDisabled}
+                                                                            onSuccess={(results) => {
+                                                                                const url = results?.[0]?.url ?? "";
+                                                                                updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: url });
+                                                                            }}
+                                                                            onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
+                                                                        >
+                                                                            {({ inputId, loading }) => (
+                                                                                <label htmlFor={inputId}>
+                                                                                    <Tooltip title="Tải ảnh mới">
+                                                                                        <span>
+                                                                                            <IconButton
+                                                                                                size="small"
+                                                                                                component="span"
+                                                                                                disabled={mandatoryRowDisabled || loading}
+                                                                                                sx={{ bgcolor: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e1", "&:hover": { bgcolor: "#fff" } }}
+                                                                                            >
+                                                                                                <FileUploadOutlinedIcon fontSize="small" />
+                                                                                            </IconButton>
+                                                                                        </span>
+                                                                                    </Tooltip>
+                                                                                </label>
+                                                                            )}
+                                                                        </CloudinaryUpload>
+                                                                        <Tooltip title="Xóa hình ảnh">
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                disabled={mandatoryRowDisabled}
+                                                                                onClick={() => updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: "" })}
+                                                                                sx={{ bgcolor: "rgba(255,255,255,0.9)", border: "1px solid #fca5a5", color: "#dc2626", "&:hover": { bgcolor: "#fff1f2" } }}
+                                                                            >
+                                                                                <DeleteOutlineIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Tooltip>
+                                                                    </Stack>
+                                                                ) : null}
+                                                            </Box>
+                                                        </Stack>
+                                                    ) : admissionMandatoryEditing ? (
+                                                        <Stack spacing={0.75}>
+                                                            <Typography variant="caption" sx={{ fontWeight: 700, color: "#475569" }}>
+                                                                Hình ảnh mẫu
+                                                            </Typography>
+                                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                                <CloudinaryUpload
+                                                                    accept="image/*"
+                                                                    multiple={false}
+                                                                    disabled={mandatoryRowDisabled}
+                                                                    onSuccess={(results) => {
+                                                                        const url = results?.[0]?.url ?? "";
+                                                                        updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: url });
+                                                                    }}
+                                                                    onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
+                                                                >
+                                                                    {({ inputId, loading }) => (
+                                                                        <label htmlFor={inputId}>
+                                                                            <Button
+                                                                                size="small"
+                                                                                variant="outlined"
+                                                                                component="span"
+                                                                                disabled={mandatoryRowDisabled || loading}
+                                                                                startIcon={<InsertDriveFileOutlinedIcon fontSize="small" />}
+                                                                                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, whiteSpace: "nowrap" }}
+                                                                            >
+                                                                                {loading ? "Đang tải..." : "Tải hình ảnh mẫu"}
+                                                                            </Button>
+                                                                        </label>
+                                                                    )}
+                                                                </CloudinaryUpload>
+                                                                <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                                                                    Chưa có hình ảnh mẫu
+                                                                </Typography>
+                                                            </Stack>
+                                                        </Stack>
+                                                    ) : null}
+                                                </Box>
+                                                {/* Tiêu chí kiểm tra — 2/3 */}
+                                                <Box sx={{ flex: "0 0 66.667%", minWidth: 0 }}>
+                                                    {renderMandatoryOcrBlock(doc, dIdx, true)}
+                                                </Box>
+                                            </Stack>
+                                        ) : null}
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    )}
                 </Box>
 
                 {preview ? (() => {
@@ -2488,12 +3123,13 @@ export default function AdminPlatformSettings() {
                         ? docsSource[selectedDocGroupIndex].documents
                         : [];
                     const selectedSteps = selectedMethodCode ? (processByMethodMap[selectedMethodCode] || []) : [];
-                    const canEdit = admissionTemplateEditing;
+                    const canEdit = admissionDocumentsEditing;
 
                     return (
                         <Box sx={previewSectionCardSx}>
                             <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between" alignItems={{ md: "center" }} sx={{ mb: 1.5 }}>
                                 <Typography sx={previewSectionTitleSx}>Hồ sơ tuyển sinh</Typography>
+                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" justifyContent={{ xs: "flex-start", md: "flex-end" }}>
                                 {canEdit ? (
                                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                         <Tooltip title={methods.length === 0 ? "Phải upload danh sách phương thức tuyển sinh đầu tiên" : ""} arrow>
@@ -2547,26 +3183,13 @@ export default function AdminPlatformSettings() {
                                             Tài liệu mẫu quy trình
                                         </Button>
                                     </Stack>
-                                ) : (
-                                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() => exportAdmissionTemplateFile("hồ_sơ_tuyển_sinh.xlsx")}
-                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                        >
-                                            Tài liệu mẫu hồ sơ
-                                        </Button>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() => exportAdmissionTemplateFile("quy_trình_tuyển_sinh.xlsx")}
-                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                                        >
-                                            Tài liệu mẫu quy trình
-                                        </Button>
-                                    </Stack>
+                                ) : null}
+                                {renderSectionEditActions(
+                                    ADMISSION_EDIT_SECTION.DOCUMENTS,
+                                    admissionDocumentsEditing,
+                                    setAdmissionDocumentsEditing,
                                 )}
+                                </Stack>
                             </Stack>
 
                             {methods.length === 0 ? (
@@ -2630,10 +3253,10 @@ export default function AdminPlatformSettings() {
                                                             setAdmissionTemplateForm((prev) => {
                                                                 const nextGroups = [...(prev.methodDocumentRequirements || [])];
                                                                 const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                if (gIdx < 0) nextGroups.push({ methodCode: selectedMethodCode, documents: [{ code: "", name: "", required: false }] });
+                                                                if (gIdx < 0) nextGroups.push({ methodCode: selectedMethodCode, documents: [{ code: "", name: "", required: false, templateUrl: "" }] });
                                                                 else {
                                                                     const currentGroup = { ...nextGroups[gIdx] };
-                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : []), { code: "", name: "", required: false }];
+                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : []), { code: "", name: "", required: false, templateUrl: "" }];
                                                                     nextGroups[gIdx] = currentGroup;
                                                                 }
                                                                 return { ...prev, methodDocumentRequirements: nextGroups };
@@ -2651,8 +3274,8 @@ export default function AdminPlatformSettings() {
                                                         <TableRow sx={{ bgcolor: "#eef4ff" }}>
                                                             <TableCell sx={{ width: 64, fontWeight: 700, color: "#374151" }}>STT</TableCell>
                                                             <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
-                                                            <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
-                                                            {canEdit ? <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
+                                                            <TableCell align="center" sx={{ width: 190, fontWeight: 700, color: "#374151", textAlign: "center" }}>Loại</TableCell>
+                                                            {canEdit ? <TableCell align="center" sx={{ width: 108, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
                                                         </TableRow>
                                                     </TableHead>
                                                     <TableBody>
@@ -2663,7 +3286,11 @@ export default function AdminPlatformSettings() {
                                                                     <Typography variant="body2">Chưa có hồ sơ cho phương thức này.</Typography>
                                                                 </TableCell>
                                                             </TableRow>
-                                                        ) : selectedDocs.map((doc, dIdx) => (
+                                                        ) : selectedDocs.map((doc, dIdx) => {
+                                                            const methodDocUploadKey = `${selectedMethodCode}-${dIdx}`;
+                                                            const isUploadingMethodTemplate = methodDocUploadingKeys.has(methodDocUploadKey);
+                                                            const templateUrl = doc?.templateUrl ? String(doc.templateUrl).trim() : "";
+                                                            return (
                                                             <TableRow key={`method-doc-${selectedMethodIdx}-${dIdx}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
                                                                 <TableCell>{dIdx + 1}</TableCell>
                                                                 <TableCell>
@@ -2692,69 +3319,140 @@ export default function AdminPlatformSettings() {
                                                                         <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell>
-                                                                    {canEdit ? (
-                                                                        <TextField
-                                                                            size="small"
-                                                                            select
-                                                                            fullWidth
-                                                                            value={doc?.required === true ? "true" : "false"}
-                                                                            onChange={(e) => {
-                                                                                const value = e.target.value;
-                                                                                setAdmissionTemplateForm((prev) => {
-                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                    if (gIdx < 0) return prev;
-                                                                                    const currentGroup = { ...nextGroups[gIdx] };
-                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                    currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: value === "true" };
-                                                                                    nextGroups[gIdx] = currentGroup;
-                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                });
-                                                                            }}
-                                                                            sx={admissionInputSx}
-                                                                        >
-                                                                            <MenuItem value="true">Bắt buộc</MenuItem>
-                                                                            <MenuItem value="false">Tùy chọn</MenuItem>
-                                                                        </TextField>
-                                                                    ) : (
-                                                                        <Chip
-                                                                            size="small"
-                                                                            label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
-                                                                            sx={{
-                                                                                height: 24,
-                                                                                fontWeight: 700,
-                                                                                fontSize: 11,
-                                                                                color: doc?.required ? "#b91c1c" : "#166534",
-                                                                                bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
-                                                                            }}
-                                                                        />
-                                                                    )}
+                                                                <TableCell align="center" sx={{ textAlign: "center", px: 1 }}>
+                                                                    <Box
+                                                                        sx={{
+                                                                            display: "grid",
+                                                                            gridTemplateColumns: "88px 32px",
+                                                                            columnGap: 2,
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            width: "max-content",
+                                                                            mx: "auto",
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: "flex", justifyContent: "center" }}>
+                                                                            {canEdit ? (
+                                                                                <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
+                                                                                    <Switch
+                                                                                        size="small"
+                                                                                        checked={doc?.required === true}
+                                                                                        onChange={(_, checked) => {
+                                                                                            setAdmissionTemplateForm((prev) => {
+                                                                                                const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                                const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                                if (gIdx < 0) return prev;
+                                                                                                const currentGroup = { ...nextGroups[gIdx] };
+                                                                                                currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                                currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: checked };
+                                                                                                nextGroups[gIdx] = currentGroup;
+                                                                                                return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                            });
+                                                                                        }}
+                                                                                        color="primary"
+                                                                                        inputProps={{
+                                                                                            "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
+                                                                                        }}
+                                                                                    />
+                                                                                </Tooltip>
+                                                                            ) : (
+                                                                                <Chip
+                                                                                    size="small"
+                                                                                    label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                                                    sx={{
+                                                                                        height: 24,
+                                                                                        fontWeight: 700,
+                                                                                        fontSize: 11,
+                                                                                        color: doc?.required ? "#b91c1c" : "#166534",
+                                                                                        bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                        <Box sx={{ display: "flex", justifyContent: "center" }}>
+                                                                            {templateUrl ? (
+                                                                                <Tooltip title="Xem hình mẫu" placement="top">
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        onClick={() => openAdmissionImagePreview(templateUrl, "Hình mẫu hồ sơ")}
+                                                                                        aria-label="Xem hình mẫu"
+                                                                                        sx={{ color: "#2563eb", p: 0.25, "&:hover": { bgcolor: "#eff6ff" } }}
+                                                                                    >
+                                                                                        <OpenInNewOutlinedIcon sx={{ fontSize: 18 }} />
+                                                                                    </IconButton>
+                                                                                </Tooltip>
+                                                                            ) : null}
+                                                                        </Box>
+                                                                    </Box>
                                                                 </TableCell>
                                                                 {canEdit ? (
                                                                     <TableCell align="center">
-                                                                        <IconButton
-                                                                            size="small"
-                                                                            color="error"
-                                                                            onClick={() => {
-                                                                                setAdmissionTemplateForm((prev) => {
-                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                    if (gIdx < 0) return prev;
-                                                                                    const currentGroup = { ...nextGroups[gIdx] };
-                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                    currentGroup.documents.splice(dIdx, 1);
-                                                                                    nextGroups[gIdx] = currentGroup;
-                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                });
-                                                                            }}
-                                                                        >
-                                                                            <DeleteOutlineIcon fontSize="small" />
-                                                                        </IconButton>
+                                                                        <Stack direction="row" spacing={0.25} justifyContent="center" alignItems="center">
+                                                                            <input
+                                                                                type="file"
+                                                                                hidden
+                                                                                accept="image/*"
+                                                                                ref={(el) => {
+                                                                                    if (el) methodDocFileInputRefs.current[methodDocUploadKey] = el;
+                                                                                    else delete methodDocFileInputRefs.current[methodDocUploadKey];
+                                                                                }}
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files?.[0];
+                                                                                    e.target.value = "";
+                                                                                    if (file) {
+                                                                                        void handleMethodCatalogTemplateUpload(
+                                                                                            selectedMethodCode,
+                                                                                            dIdx,
+                                                                                            file,
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <Tooltip title="Tải hình mẫu">
+                                                                                <span>
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        color="primary"
+                                                                                        disabled={saving || isUploadingMethodTemplate}
+                                                                                        onClick={() =>
+                                                                                            methodDocFileInputRefs.current[methodDocUploadKey]?.click()
+                                                                                        }
+                                                                                        aria-label="Tải hình mẫu"
+                                                                                    >
+                                                                                        {isUploadingMethodTemplate ? (
+                                                                                            <CircularProgress size={18} color="inherit" />
+                                                                                        ) : (
+                                                                                            <FileUploadOutlinedIcon fontSize="small" />
+                                                                                        )}
+                                                                                    </IconButton>
+                                                                                </span>
+                                                                            </Tooltip>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                color="error"
+                                                                                disabled={saving || isUploadingMethodTemplate}
+                                                                                onClick={() => {
+                                                                                    setAdmissionTemplateForm((prev) => {
+                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                        if (gIdx < 0) return prev;
+                                                                                        const currentGroup = { ...nextGroups[gIdx] };
+                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                        currentGroup.documents.splice(dIdx, 1);
+                                                                                        nextGroups[gIdx] = currentGroup;
+                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                    });
+                                                                                }}
+                                                                                aria-label="Xóa hồ sơ"
+                                                                            >
+                                                                                <DeleteOutlineIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Stack>
                                                                     </TableCell>
                                                                 ) : null}
                                                             </TableRow>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </TableBody>
                                                 </Table>
                                             </TableContainer>
@@ -2948,41 +3646,6 @@ export default function AdminPlatformSettings() {
                         </Box>
                     );
                 })() : null}
-
-                {admissionTemplateEditing ? (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            gap: 1,
-                            flexWrap: "wrap",
-                            pt: 0.5,
-                            pb: 0.25,
-                        }}
-                    >
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            disabled={saving}
-                            onClick={() => {
-                                cancelAdmissionTemplate();
-                                setAdmissionTemplateEditing(false);
-                            }}
-                            sx={admissionToolbarSmallOutlinedSx}
-                        >
-                            Hủy
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="contained"
-                            disabled={saving}
-                            onClick={() => void saveAdmissionTemplate()}
-                            sx={admissionToolbarSmallPrimarySx}
-                        >
-                            Lưu
-                        </Button>
-                    </Box>
-                ) : null}
             </Stack>
         );
     };
@@ -4459,6 +5122,44 @@ export default function AdminPlatformSettings() {
                         sx={saveButtonSx}
                     >
                         {confirmingAdmissionImport ? "Đang xử lý..." : "Có, xác nhận nhập"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={admissionImagePreview.open}
+                onClose={closeAdmissionImagePreview}
+                fullWidth
+                maxWidth="md"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        overflow: "hidden",
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>
+                    {admissionImagePreview.title}
+                </DialogTitle>
+                <DialogContent sx={{ bgcolor: "#f8fafc", display: "flex", justifyContent: "center", p: 2.5 }}>
+                    {admissionImagePreview.url ? (
+                        <Box
+                            component="img"
+                            src={admissionImagePreview.url}
+                            alt={admissionImagePreview.title}
+                            sx={{
+                                maxWidth: "100%",
+                                maxHeight: "70vh",
+                                objectFit: "contain",
+                                borderRadius: 1.5,
+                                border: "1px solid #dbeafe",
+                                bgcolor: "#ffffff",
+                            }}
+                        />
+                    ) : null}
+                </DialogContent>
+                <DialogActions sx={{ px: 2.5, pb: 2 }}>
+                    <Button variant="outlined" onClick={closeAdmissionImagePreview} sx={cancelButtonSx}>
+                        Đóng
                     </Button>
                 </DialogActions>
             </Dialog>

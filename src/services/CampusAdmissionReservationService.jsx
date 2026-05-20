@@ -22,19 +22,46 @@ export const getCampusAdmissionReservationForms = async ({
     };
 };
 
-export const processAdmissionReservationForm = async ({formId, campusId, action, rejectReason}) => {
+export const confirmAdmissionReservationPayment = async ({formId, action, rejectReason}) => {
+    const payload = {
+        formId: Number(formId),
+        action: String(action || "").trim().toUpperCase(),
+    };
+    if (payload.action === "REJECT_PAYMENT") {
+        payload.rejectReason = String(rejectReason || "").trim();
+    }
+    return axiosClient.put("/campus/confirm/admission/reservation/payment", payload, {
+        headers: {"X-Device-Type": "web"},
+    });
+};
+
+export const processAdmissionReservationForm = async ({formId, action, rejectReason, checkedDocuments}) => {
     const payload = {
         formId: Number(formId),
         action: String(action || "").toUpperCase(),
+        checkedDocuments: Array.isArray(checkedDocuments)
+            ? checkedDocuments.map((key) => String(key || "").trim()).filter(Boolean)
+            : [],
     };
-    const normalizedCampusId = Number(campusId);
-    if (Number.isFinite(normalizedCampusId) && normalizedCampusId > 0) {
-        payload.campusId = normalizedCampusId;
-    }
     if (payload.action === "REJECT") {
         payload.rejectReason = String(rejectReason || "").trim();
     }
     return axiosClient.put("/campus/process/admission/reservation/form", payload, {
         headers: {"X-Device-Type": "web"},
     });
+};
+
+export const getAdmissionCampaigns = async () => {
+    const response = await axiosClient.get("/campus/admission/campaign");
+    const body = pickBody(response);
+    return Array.isArray(body) ? body : [];
+};
+
+export const autoApproveAdmissionReservations = async (admissionCampaignId) => {
+    const response = await axiosClient.put(
+        "/campus/approve/auto/admission/reservation/form",
+        null,
+        {params: {admissionCampaignId}, headers: {"X-Device-Type": "web"}},
+    );
+    return pickBody(response);
 };

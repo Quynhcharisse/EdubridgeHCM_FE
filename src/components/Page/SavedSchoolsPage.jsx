@@ -45,19 +45,15 @@ import {
     setCompareSchools
 } from "../../utils/compareSchoolsStorage";
 import {getSchoolStorageKey, getUserIdentity} from "../../utils/savedSchoolsStorage";
+import BatchAdmissionFlowDialogs from "./admission/BatchAdmissionFlowDialogs.jsx";
+import {getBatchRowSchoolId} from "./admission/batchAdmissionUi.jsx";
+import {useBatchAdmissionFromSchoolList} from "./admission/useBatchAdmissionFromSchoolList.js";
 
 const DEFAULT_SCHOOL_IMAGE =
     "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=900&q=80";
 const LOCATION_FALLBACK_PROVINCE = "Đang cập nhật";
 const LOCATION_FALLBACK_WARD = "Đang cập nhật";
 const FAVOURITE_PAGE_SIZE = 10;
-const BATCH_ADMISSION_SCHOOL_IDS_KEY = "edubridge_batch_admission_school_ids";
-
-function getRowSchoolId(row) {
-    const raw = row?.schoolId ?? row?.id ?? null;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 function mapFavouriteSchoolRow(item) {
     if (!item || typeof item !== "object") return null;
@@ -157,8 +153,6 @@ export default function SavedSchoolsPage() {
     const [detailLoading, setDetailLoading] = React.useState(false);
     const [detailError, setDetailError] = React.useState("");
     const [detailSchool, setDetailSchool] = React.useState(null);
-    /** Thứ tự chọn — nộp hồ sơ lô theo thứ tự này. */
-    const [selectedSchoolIds, setSelectedSchoolIds] = React.useState([]);
 
     React.useEffect(() => {
         if (!isParent) {
@@ -215,62 +209,6 @@ export default function SavedSchoolsPage() {
             cancelled = true;
         };
     }, [isParent, userInfo, page, loadFavouritePage]);
-
-    React.useEffect(() => {
-        setSelectedSchoolIds([]);
-    }, [page]);
-
-    const pageSchoolIds = React.useMemo(
-        () => savedSchools.map((row) => getRowSchoolId(row)).filter((id) => id != null),
-        [savedSchools]
-    );
-
-    const allPageSelected =
-        pageSchoolIds.length > 0 && pageSchoolIds.every((id) => selectedSchoolIds.includes(id));
-    const somePageSelected =
-        pageSchoolIds.some((id) => selectedSchoolIds.includes(id)) && !allPageSelected;
-
-    const toggleSelectRow = React.useCallback((row) => {
-        const id = getRowSchoolId(row);
-        if (id == null) return;
-        setSelectedSchoolIds((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-        );
-    }, []);
-
-    const toggleSelectAllPage = React.useCallback(() => {
-        setSelectedSchoolIds((prev) => {
-            if (pageSchoolIds.length === 0) return prev;
-            if (pageSchoolIds.every((id) => prev.includes(id))) {
-                const pageSet = new Set(pageSchoolIds);
-                return prev.filter((id) => !pageSet.has(id));
-            }
-            const next = new Set(prev);
-            pageSchoolIds.forEach((id) => next.add(id));
-            return Array.from(next);
-        });
-    }, [pageSchoolIds]);
-
-    const handleBatchSubmitApplications = React.useCallback(() => {
-        if (!isParent) {
-            showWarningSnackbar("Bạn cần đăng nhập với vai trò Phụ huynh.");
-            return;
-        }
-        if (selectedSchoolIds.length === 0) {
-            showWarningSnackbar("Vui lòng chọn ít nhất một trường.");
-            return;
-        }
-        try {
-            sessionStorage.setItem(BATCH_ADMISSION_SCHOOL_IDS_KEY, JSON.stringify(selectedSchoolIds));
-        } catch {
-            showWarningSnackbar("Trình duyệt không cho lưu hàng đợi nộp hồ sơ. Vui lòng thử lại.");
-            return;
-        }
-        const first = selectedSchoolIds[0];
-        navigate(
-            `/search-schools/detail?detail=${encodeURIComponent(`id:${first}`)}&batchAdmission=1`
-        );
-    }, [isParent, navigate, selectedSchoolIds]);
 
     const toggleFavourite = async (schoolRecord) => {
         if (!isParent) {
@@ -412,6 +350,18 @@ export default function SavedSchoolsPage() {
     const detailIsSaved = Boolean(detailSchool?.isFavourite);
     const detailInCompare = Boolean(detailSchool && compareSchoolKeys.has(detailKeyForActions));
 
+    const resolveSchoolName = React.useCallback(
+        (school) => String(school?.schoolName || school?.school || "").trim(),
+        [],
+    );
+
+    const batchAdmission = useBatchAdmissionFromSchoolList({
+        isParent,
+        pageSchools: savedSchools,
+        resolveSchoolName,
+        clearSelectionDeps: [page],
+    });
+
     const cardSurface = {
         bgcolor: "#fff",
         borderRadius: 3,
@@ -465,54 +415,6 @@ export default function SavedSchoolsPage() {
                     )}
                 </Box>
 
-                {isParent && !loading && !error && savedSchools.length > 0 ? (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            flexDirection: {xs: "column", sm: "row"},
-                            alignItems: {xs: "stretch", sm: "center"},
-                            justifyContent: "space-between",
-                            gap: 1.5,
-                            mb: 2,
-                        }}
-                    >
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={allPageSelected}
-                                    indeterminate={somePageSelected}
-                                    onChange={toggleSelectAllPage}
-                                    disabled={pageSchoolIds.length === 0}
-                                    sx={{py: 0}}
-                                />
-                            }
-                            label={
-                                <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
-                                    Chọn tất cả trên trang này
-                                </Typography>
-                            }
-                            sx={{mr: 0, ml: 0}}
-                        />
-                        <Button
-                            variant="contained"
-                            disabled={selectedSchoolIds.length === 0}
-                            onClick={handleBatchSubmitApplications}
-                            sx={{
-                                textTransform: "none",
-                                fontWeight: 700,
-                                borderRadius: 999,
-                                px: 2.5,
-                                py: 1,
-                                bgcolor: BRAND_NAVY,
-                                alignSelf: {xs: "stretch", sm: "center"},
-                                "&:hover": {bgcolor: APP_PRIMARY_DARK},
-                            }}
-                        >
-                            Nộp hồ sơ{selectedSchoolIds.length > 0 ? ` (${selectedSchoolIds.length})` : ""}
-                        </Button>
-                    </Box>
-                ) : null}
-
                 {!isParent ? (
                     <Card sx={{p: 3, ...cardSurface}}>
                         <Typography sx={{color: "#64748b", fontWeight: 600}}>
@@ -540,20 +442,86 @@ export default function SavedSchoolsPage() {
                             </Card>
                         ) : (
                             <>
+                            {!loading && savedSchools.length > 0 ? (
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: {xs: 0.75, sm: 1},
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Checkbox
+                                        checked={batchAdmission.allBatchPageSelected}
+                                        indeterminate={batchAdmission.someBatchPageSelected}
+                                        onChange={batchAdmission.toggleBatchSelectAllShown}
+                                        disabled={batchAdmission.batchPageSchoolIds.length === 0}
+                                        sx={{ flexShrink: 0, p: 0.5 }}
+                                    />
+                                    <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
+                                        <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
+                                            Chọn tất cả trên trang này
+                                        </Typography>
+                                        <Button
+                                            variant="contained"
+                                            disabled={batchAdmission.batchAdmissionSelectedIds.length === 0}
+                                            onClick={batchAdmission.handleBatchSubmitFromList}
+                                            sx={{
+                                                textTransform: "none",
+                                                fontWeight: 700,
+                                                borderRadius: 999,
+                                                px: 2.5,
+                                                py: 1,
+                                                bgcolor: BRAND_NAVY,
+                                                "&:hover": {bgcolor: APP_PRIMARY_DARK},
+                                            }}
+                                        >
+                                            Nộp hồ sơ
+                                            {batchAdmission.batchAdmissionSelectedIds.length > 0
+                                                ? ` (${batchAdmission.batchAdmissionSelectedIds.length})`
+                                                : ""}
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            ) : null}
                             <Stack spacing={2}>
                                 {savedSchools.map((item) => {
                                     const schoolKey = getSchoolStorageKey(item);
                                     const inCompare = compareSchoolKeys.has(schoolKey);
                                     const isSaved = Boolean(item?.isFavourite);
-                                    const rowId = getRowSchoolId(item);
-                                    const rowChecked = rowId != null && selectedSchoolIds.includes(rowId);
+                                    const batchRowId = getBatchRowSchoolId(item);
+                                    const rowBatchChecked =
+                                        batchRowId != null &&
+                                        batchAdmission.batchAdmissionSelectedIds.includes(batchRowId);
                                     return (
-                                    <Card
+                                    <Box
                                         key={item?.schoolKey}
                                         sx={{
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: {xs: 0.75, sm: 1},
+                                        }}
+                                    >
+                                    <Checkbox
+                                        checked={rowBatchChecked}
+                                        onChange={() => batchAdmission.toggleBatchSelectRow(item)}
+                                        disabled={batchRowId == null}
+                                        sx={{
+                                            flexShrink: 0,
+                                            mt: {xs: 1.25, sm: 1.5},
+                                            p: 0.5,
+                                        }}
+                                        inputProps={{
+                                            "aria-label": `Chọn ${item?.schoolName || "trường"} để nộp hồ sơ theo lô`,
+                                        }}
+                                    />
+                                    <Card
+                                        sx={{
                                             position: "relative",
+                                            flex: 1,
+                                            minWidth: 0,
                                             display: "grid",
-                                            gridTemplateColumns: {xs: "40px 1fr", sm: "40px 220px 1fr"},
+                                            gridTemplateColumns: {xs: "1fr", sm: "220px 1fr"},
                                             gridTemplateRows: {xs: "auto auto", sm: "1fr"},
                                             gap: 1.5,
                                             p: 1.5,
@@ -572,20 +540,6 @@ export default function SavedSchoolsPage() {
                                             }
                                         }}
                                     >
-                                        <Checkbox
-                                            checked={rowChecked}
-                                            onChange={() => toggleSelectRow(item)}
-                                            disabled={rowId == null}
-                                            sx={{
-                                                gridColumn: 1,
-                                                gridRow: {xs: "1 / -1", sm: "1"},
-                                                alignSelf: "start",
-                                                justifySelf: "center",
-                                                mt: {xs: 0.5, sm: 1},
-                                                p: 0.5,
-                                            }}
-                                            inputProps={{"aria-label": `Chọn ${item?.schoolName || "trường"}`}}
-                                        />
                                         <Box
                                             sx={{
                                                 display: "flex",
@@ -595,7 +549,7 @@ export default function SavedSchoolsPage() {
                                                 alignSelf: "center",
                                                 minHeight: {xs: 132, sm: 120},
                                                 py: {xs: 0.5, sm: 0.5},
-                                                gridColumn: {xs: 2, sm: 2},
+                                                gridColumn: {xs: 1, sm: 1},
                                                 gridRow: {xs: 1, sm: 1},
                                             }}
                                         >
@@ -621,7 +575,7 @@ export default function SavedSchoolsPage() {
                                                 display: "flex",
                                                 flexDirection: "column",
                                                 minHeight: 132,
-                                                gridColumn: {xs: 2, sm: 3},
+                                                gridColumn: {xs: 1, sm: 2},
                                                 gridRow: {xs: 2, sm: 1},
                                             }}
                                         >
@@ -865,6 +819,7 @@ export default function SavedSchoolsPage() {
                                             </Box>
                                         </Box>
                                     </Card>
+                                    </Box>
                                     );
                                 })}
                             </Stack>
@@ -886,6 +841,8 @@ export default function SavedSchoolsPage() {
                     </>
                 )}
             </Box>
+            <BatchAdmissionFlowDialogs {...batchAdmission} />
+
             {detailSchool && (
                 <SchoolSearchDetailView
                     school={detailSchool}

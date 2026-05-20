@@ -6,6 +6,7 @@ import {
     CardMedia,
     Chip,
     CircularProgress,
+    Collapse,
     Divider,
     Dialog,
     DialogActions,
@@ -32,6 +33,8 @@ import {
     ChevronLeft as ChevronLeftIcon,
     ChevronRight as ChevronRightIcon,
     Email as EmailIcon,
+    ExpandLess as ExpandLessIcon,
+    ExpandMore as ExpandMoreIcon,
     Hotel as HotelIcon,
     Language as LanguageIcon,
     LocationOn as LocationOnIcon,
@@ -406,9 +409,9 @@ function curriculumStatusChipSx(status) {
     if (s === "CUR_ACTIVE") {
         return {
             ...base,
-            bgcolor: "rgba(34, 197, 94, 0.12)",
-            color: "#16a34a",
-            border: "1px solid rgba(34, 197, 94, 0.35)"
+            bgcolor: "rgba(59,130,246,0.12)",
+            color: "#2563eb",
+            border: "1px solid rgba(147,197,253,0.55)"
         };
     }
     if (s === "CUR_DRAFT") {
@@ -422,9 +425,9 @@ function curriculumStatusChipSx(status) {
     if (s === "CUR_ARCHIVED") {
         return {
             ...base,
-            bgcolor: "rgba(234, 88, 12, 0.12)",
-            color: "#c2410c",
-            border: "1px solid rgba(234, 88, 12, 0.3)"
+            bgcolor: "rgba(71,85,105,0.1)",
+            color: "#475569",
+            border: "1px solid rgba(148,163,184,0.4)"
         };
     }
     return {
@@ -450,9 +453,9 @@ function curriculumClassificationChipSx(kind) {
             height: 22,
             fontSize: "0.625rem",
             fontWeight: 600,
-            bgcolor: "#f3edff",
-            color: "#7c6aa6",
-            border: "1px solid rgba(167, 139, 250, 0.28)",
+            bgcolor: "rgba(239,246,255,0.95)",
+            color: "#2563eb",
+            border: "1px solid rgba(147,197,253,0.55)",
             borderRadius: 999,
             "& .MuiChip-label": labelPad
         };
@@ -462,9 +465,9 @@ function curriculumClassificationChipSx(kind) {
             height: 22,
             fontSize: "0.625rem",
             fontWeight: 600,
-            bgcolor: "#fff7ed",
-            color: "#b45309",
-            border: "1px solid rgba(253, 186, 116, 0.45)",
+            bgcolor: "rgba(239,246,255,0.85)",
+            color: "#1d4ed8",
+            border: "1px solid rgba(147,197,253,0.52)",
             borderRadius: 999,
             "& .MuiChip-label": labelPad
         };
@@ -553,17 +556,17 @@ function programStatusChipSx(status) {
     if (s === "PRO_ACTIVE") {
         return {
             ...base,
-            bgcolor: "rgba(34, 197, 94, 0.12)",
-            color: "#16a34a",
-            border: "1px solid rgba(34, 197, 94, 0.35)"
+            bgcolor: "rgba(59,130,246,0.12)",
+            color: "#2563eb",
+            border: "1px solid rgba(147,197,253,0.55)"
         };
     }
     if (s === "PRO_DRAFT") {
         return {
             ...base,
-            bgcolor: "rgba(234, 179, 8, 0.14)",
-            color: "#b45309",
-            border: "1px solid rgba(234, 179, 8, 0.4)"
+            bgcolor: "rgba(191,219,254,0.45)",
+            color: "#1d4ed8",
+            border: "1px solid rgba(147,197,253,0.62)"
         };
     }
     if (s === "PRO_INACTIVE") {
@@ -577,9 +580,9 @@ function programStatusChipSx(status) {
     if (s === "PRO_ARCHIVED") {
         return {
             ...base,
-            bgcolor: "rgba(234, 88, 12, 0.12)",
-            color: "#c2410c",
-            border: "1px solid rgba(234, 88, 12, 0.3)"
+            bgcolor: "rgba(71,85,105,0.1)",
+            color: "#475569",
+            border: "1px solid rgba(148,163,184,0.4)"
         };
     }
     return {
@@ -617,9 +620,23 @@ function formatFoundingDate(value) {
 }
 
 function formatIsoDate(value) {
-    if (!value) return "—";
+    if (value == null || value === "") return "—";
+    if (Array.isArray(value) && value.length >= 3) {
+        const y = Number(value[0]);
+        const m = Number(value[1]);
+        const d = Number(value[2]);
+        if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+            const dt = new Date(y, m - 1, d);
+            if (!Number.isNaN(dt.getTime())) {
+                const day = String(dt.getDate()).padStart(2, "0");
+                const month = String(dt.getMonth() + 1).padStart(2, "0");
+                const year = dt.getFullYear();
+                return `${day}/${month}/${year}`;
+            }
+        }
+    }
     const dt = new Date(value);
-    if (Number.isNaN(dt.getTime())) return String(value);
+    if (Number.isNaN(dt.getTime())) return typeof value === "string" ? value : "—";
     const day = String(dt.getDate()).padStart(2, "0");
     const month = String(dt.getMonth() + 1).padStart(2, "0");
     const year = dt.getFullYear();
@@ -630,6 +647,7 @@ function admissionMethodLabel(value, fallback = "—") {
     const key = String(value || "").trim().toUpperCase();
     if (!key) return fallback;
     if (key === "HOC_BA") return "Xét học bạ";
+    if (key === "THI_TUYEN") return "Thi vào lớp 10";
     if (key === "THPT") return "Xét điểm thi THPT";
     if (key === "DGNL") return "Đánh giá năng lực";
     return String(value);
@@ -681,6 +699,30 @@ function formatVnd(value) {
     const amount = Number(value);
     if (!Number.isFinite(amount)) return "—";
     return `${new Intl.NumberFormat("vi-VN", {maximumFractionDigits: 0}).format(amount)} VND`;
+}
+
+function admissionDocumentDedupeKey(doc) {
+    const code = String(doc?.code ?? "").trim().toUpperCase();
+    if (code) return `c:${code}`;
+    const name = String(doc?.name ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+    if (name) return `n:${name}`;
+    return "";
+}
+
+/** Bỏ các hồ sơ phương thức đã nằm trong danh sách bắt buộc chung. */
+function filterMethodDocsExcludingMandatory(methodDocs, mandatoryAllDocs) {
+    const keys = new Set(
+        (Array.isArray(mandatoryAllDocs) ? mandatoryAllDocs : [])
+            .map(admissionDocumentDedupeKey)
+            .filter(Boolean)
+    );
+    return (Array.isArray(methodDocs) ? methodDocs : []).filter((d) => {
+        const k = admissionDocumentDedupeKey(d);
+        return Boolean(k) && !keys.has(k);
+    });
 }
 
 function classifyMandatoryDocument(name) {
@@ -836,12 +878,12 @@ const verticalCardTitleSx = {
 };
 
 const mainDetailSectionTitleSx = {
-    fontWeight: 900,
-    fontSize: {xs: "1.55rem", sm: "1.95rem"},
-    lineHeight: 1.2,
-    mb: {xs: 2.25, sm: 2.75},
-    pb: 1.1,
-    letterSpacing: "-0.024em",
+    fontWeight: 800,
+    fontSize: {xs: "1.38rem", sm: "1.68rem"},
+    lineHeight: 1.22,
+    mb: {xs: 2, sm: 2.5},
+    pb: 1,
+    letterSpacing: "-0.02em",
     color: "#2563eb",
     position: "relative",
     "&::after": {
@@ -871,41 +913,40 @@ const detailMainColumnCardSx = {
 
 const tableSubsectionTitleSx = {
     fontWeight: 800,
-    fontSize: {xs: "1.05rem", sm: "1.15rem"},
+    fontSize: {xs: "1.12rem", sm: "1.22rem"},
     letterSpacing: "-0.01em",
-    pl: 1.35,
-    borderLeft: "4px solid #3b82f6",
+    pl: 0,
     color: "#1e3a8a"
 };
 
 const sparseTableWrapperSx = {
-    border: "1px solid rgba(226,232,240,0.98)",
+    border: "1px solid rgba(226,232,240,0.95)",
     borderRadius: 1.5,
     overflow: "hidden",
     bgcolor: "#ffffff",
-    boxShadow: "0 4px 18px rgba(15,23,42,0.045)"
+    boxShadow: "none"
 };
 
 const detailPackageSectionSx = {
     mb: 2,
-    p: {xs: 1.35, sm: 1.65},
-    borderRadius: 2.75,
+    mt: 0.5,
+    p: 0,
+    pt: 2,
+    pl: {xs: 0.25, sm: 0.35},
     position: "relative",
-    overflow: "hidden",
-    border: "1px solid rgba(147,197,253,0.45)",
-    bgcolor: "#f8fbff",
-    boxShadow: "0 6px 18px rgba(59,130,246,0.06)",
-    transition: "box-shadow 0.4s ease",
-    "&:hover": {
-        boxShadow: "0 10px 24px rgba(59,130,246,0.1)"
-    }
+    overflow: "visible",
+    border: "none",
+    borderTop: "1px solid rgba(226,232,240,0.95)",
+    bgcolor: "rgba(239,246,255,0.45)",
+    borderRadius: 2,
+    boxShadow: "none"
 };
 
 const detailPackageTitleSx = {
-    fontSize: {xs: "1.14rem", sm: "1.22rem"},
-    fontWeight: 800,
-    mb: 1.25,
-    letterSpacing: "-0.02em",
+    fontSize: {xs: "1.12rem", sm: "1.22rem"},
+    fontWeight: 700,
+    mb: 1.15,
+    letterSpacing: "-0.015em",
     color: "#2563eb"
 };
 
@@ -923,35 +964,19 @@ const detailOfferingCardSx = {
     position: "relative",
     overflow: "visible",
     bgcolor: "transparent",
-    p: {xs: 0, sm: 0},
+    p: 0,
     border: "none",
     boxShadow: "none",
     transition: "none",
     "&:not(:last-of-type)": {
-        pb: 1.6,
-        mb: 1.6,
-        borderBottom: "1px dashed #bfdbfe"
+        pb: 2,
+        mb: 2,
+        borderBottom: "1px solid rgba(226,232,240,0.9)"
     },
     "&::before": {display: "none"}
 };
 
-const detailSchoolMethodGridSx = {
-    mb: 2.4,
-    p: {xs: 1.4, sm: 1.8},
-    borderRadius: 3,
-    border: "1px solid #bfdbfe",
-    bgcolor: "rgba(255,255,255,0.32)",
-    boxShadow: "none"
-};
 
-const detailSchoolMethodTileSx = {
-    borderBottom: "1px dashed #bfdbfe",
-    px: 0,
-    py: 1.15,
-    borderRadius: 0,
-    bgcolor: "transparent",
-    boxShadow: "none"
-};
 
 function buildPublicOfferingGroupKey(offering) {
     const program = offering?.program || {};
@@ -978,6 +1003,149 @@ function groupCampusProgramOfferingsForPublicDetail(offerings) {
                 sensitivity: "base"
             })
         )
+    );
+}
+
+/** Gói mặc định để mở form nộp hồ sơ theo chiến dịch (API vẫn gắn với campusProgramOffering). */
+function pickPrimaryOfferingForCampaign(campaign) {
+    const list = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
+    const withValidId = list.filter((o) => {
+        const n = Number(o?.id);
+        return Number.isFinite(n) && n > 0;
+    });
+    if (withValidId.length === 0) return null;
+    const openFirst = withValidId.find((o) => String(o?.applicationStatus || "").toUpperCase() === "OPEN");
+    return openFirst || withValidId[0];
+}
+
+const COLLAPSIBLE_DETAIL_ACCENTS = {
+    neutral: {
+        barPx: 0,
+        bar: "transparent",
+        wash: "transparent",
+        washHover: "rgba(248,250,252,0.6)",
+        title: "#475569",
+        summary: "#64748b",
+        focusRing: "rgba(59,130,246,0.28)",
+        contentWash: "transparent",
+        chevronMuted: "#64748b"
+    },
+    blue: {
+        barPx: 0,
+        bar: "transparent",
+        wash: "rgba(239,246,255,0.62)",
+        washHover: "rgba(219,234,254,0.85)",
+        title: "#1e40af",
+        summary: "#475569",
+        focusRing: "rgba(59,130,246,0.38)",
+        contentWash: "rgba(255,255,255,0.52)",
+        chevronMuted: "#2563eb"
+    }
+};
+
+function CollapsibleDetailSection({
+    title,
+    summaryCollapsed,
+    defaultExpanded = false,
+    dense = false,
+    accent = "neutral",
+    children
+}) {
+    const [open, setOpen] = React.useState(defaultExpanded);
+    const palette =
+        accent && accent !== "neutral" ? COLLAPSIBLE_DETAIL_ACCENTS.blue : COLLAPSIBLE_DETAIL_ACCENTS.neutral;
+    const hasAccent = accent && accent !== "neutral";
+    return (
+        <Box
+            sx={{
+                mb: dense ? 0.6 : 0.95,
+                border: "none",
+                ...(hasAccent
+                    ? {
+                          pl: dense ? 0.65 : 0.85,
+                          pr: dense ? 0.65 : 0.85,
+                          py: dense ? 0.4 : 0.5,
+                          bgcolor: palette.wash,
+                          borderRadius: 1.5
+                      }
+                    : {
+                          bgcolor: "transparent",
+                          borderRadius: 0
+                      }),
+                overflow: "visible"
+            }}
+        >
+            <Box
+                role="button"
+                tabIndex={0}
+                aria-expanded={open}
+                onClick={() => setOpen((v) => !v)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpen((v) => !v);
+                    }
+                }}
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1,
+                    px: 0,
+                    py: dense ? 0.5 : 0.65,
+                    cursor: "pointer",
+                    userSelect: "none",
+                    outline: "none",
+                    borderBottom: `1px solid ${hasAccent ? "rgba(148,163,184,0.38)" : "rgba(226,232,240,0.75)"}`,
+                    "&:hover": {bgcolor: hasAccent ? palette.washHover : "rgba(248,250,252,0.6)"},
+                    "&:focus-visible": {boxShadow: `0 0 0 2px ${palette.focusRing}`}
+                }}
+            >
+                <Box sx={{minWidth: 0}}>
+                    <Typography
+                        sx={{
+                            fontSize: dense ? "0.92rem" : "0.97rem",
+                            fontWeight: 700,
+                            color: palette.title,
+                            letterSpacing: "normal"
+                        }}
+                    >
+                        {title}
+                    </Typography>
+                    {!open && summaryCollapsed ? (
+                        <Typography sx={{fontSize: "0.92rem", color: palette.summary, mt: 0.25, lineHeight: 1.5}}>
+                            {summaryCollapsed}
+                        </Typography>
+                    ) : null}
+                </Box>
+                <IconButton
+                    size="small"
+                    aria-label={open ? "Thu gọn" : "Mở rộng"}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setOpen((v) => !v);
+                    }}
+                    sx={{flexShrink: 0, color: palette.chevronMuted}}
+                >
+                    {open ? <ExpandLessIcon fontSize="small"/> : <ExpandMoreIcon fontSize="small"/>}
+                </IconButton>
+            </Box>
+            <Collapse in={open} timeout="auto" unmountOnExit={false}>
+                <Box
+                    sx={{
+                        px: 0,
+                        pl: hasAccent ? {xs: 0.15, sm: 0.25} : {xs: 0, sm: 0.25},
+                        pb: dense ? 0.75 : 1,
+                        pt: 1,
+                        bgcolor: open && hasAccent ? palette.contentWash : "transparent",
+                        borderBottomRightRadius: hasAccent ? 1.5 : 0,
+                        borderBottomLeftRadius: hasAccent ? 1.5 : 0
+                    }}
+                >
+                    {children}
+                </Box>
+            </Collapse>
+        </Box>
     );
 }
 
@@ -1880,7 +2048,7 @@ function SchoolCampaignEnrollmentCard({
                 </Typography>
             ) : null}
             {!campaignLoading && campaignError ? (
-                <Typography sx={{fontSize: "1.06rem", color: "#b45309", lineHeight: 1.65}}>
+                <Typography sx={{fontSize: "1.06rem", color: "#2563eb", lineHeight: 1.65}}>
                     {campaignError}
                 </Typography>
             ) : null}
@@ -1890,7 +2058,7 @@ function SchoolCampaignEnrollmentCard({
                 </Typography>
             ) : null}
             {!campaignLoading && !campaignError && list.length > 0 && visibleCampaigns.length === 0 ? (
-                <Typography sx={{fontSize: "1.02rem", color: "#64748b", lineHeight: 1.65}}>
+                <Typography sx={{fontSize: "1.06rem", color: "#64748b", lineHeight: 1.65}}>
                     Hiện chưa có chiến dịch đang mở đăng ký.
                 </Typography>
             ) : null}
@@ -1922,62 +2090,214 @@ function SchoolCampaignEnrollmentCard({
                     const campusProgramOfferings = Array.isArray(campaign?.campusProgramOfferings)
                         ? campaign.campusProgramOfferings
                         : [];
+                    const mandatoryAllDocs = Array.isArray(campaign?.mandatoryAll) ? campaign.mandatoryAll : [];
+                    const campaignTotalQuota = Number(campaign?.campaignTotalQuota);
+                    const campaignRemainingQuota = Number(campaign?.campaignRemainingQuota);
+                    const hasCampaignQuota = Number.isFinite(campaignTotalQuota) && campaignTotalQuota > 0;
+                    const hasCampaignRemaining = Number.isFinite(campaignRemainingQuota);
+                    const campaignFilledRatio =
+                        hasCampaignQuota && hasCampaignRemaining
+                            ? Math.max(0, Math.min(1, (campaignTotalQuota - campaignRemainingQuota) / campaignTotalQuota))
+                            : 0;
+                    const campaignFilledPercent = Math.round(campaignFilledRatio * 100);
+                    const campaignQuotaLow = hasCampaignRemaining && campaignRemainingQuota < 50;
+                    const campaignQuotaTone = campaignQuotaLow
+                        ? {main: "#1e3a8a", soft: "#1e40af"}
+                        : {main: "#1d4ed8", soft: "#2563eb"};
+                    const primaryOffering = pickPrimaryOfferingForCampaign(campaign);
+                    const primaryOfferingId = Number(primaryOffering?.id);
 
                     return (
                         <Box key={`${campaign?.id ?? idx}-${campaignName}`} sx={{mt: idx === 0 ? 0 : 3}}>
                             {idx > 0 ? <Divider sx={{...contactDividerSx, mb: 2.5}}/> : null}
 
-                            <Stack
-                                direction={{xs: "column", md: "row"}}
-                                alignItems={{xs: "flex-start", md: "center"}}
-                                justifyContent="space-between"
-                                spacing={1.5}
-                                sx={{mb: 1.35}}
+                            <Box
+                                sx={{
+                                    mb: 1.35,
+                                    py: {xs: 1, sm: 1.1},
+                                    px: {xs: 1.15, sm: 1.35},
+                                    bgcolor: "rgba(239,246,255,0.72)",
+                                    borderRadius: 2,
+                                    border: "1px solid rgba(147,197,253,0.45)"
+                                }}
                             >
-                                <Typography
+                                <Stack
+                                    direction={{xs: "column", md: "row"}}
+                                    alignItems={{xs: "flex-start", md: "center"}}
+                                    justifyContent="space-between"
+                                    spacing={1.5}
+                                >
+                                    <Typography
+                                        sx={{
+                                            fontWeight: 700,
+                                            fontSize: {xs: "1.22rem", sm: "1.38rem"},
+                                            letterSpacing: "-0.02em",
+                                            lineHeight: 1.3,
+                                            color: "#172554"
+                                        }}
+                                    >
+                                        {campaignName}
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+                                        <Chip
+                                            size="medium"
+                                            label={`Năm ${campaign?.year ?? "—"}`}
+                                            sx={{
+                                                borderRadius: 999,
+                                                bgcolor: "rgba(255,255,255,0.92)",
+                                                color: "#2563eb",
+                                                border: "1px solid rgba(147,197,253,0.85)",
+                                                fontWeight: 700
+                                            }}
+                                        />
+                                        <Chip
+                                            size="medium"
+                                            label={campaignStatusLabel(campaign?.status)}
+                                            sx={{
+                                                borderRadius: 999,
+                                                bgcolor: "rgba(255,255,255,0.92)",
+                                                color: "#1e40af",
+                                                border: "1px solid rgba(147,197,253,0.88)",
+                                                fontWeight: 700
+                                            }}
+                                        />
+                                    </Stack>
+                                </Stack>
+                            </Box>
+                            {campaignDesc ? (
+                                <CollapsibleDetailSection
+                                    title="Giới thiệu chiến dịch"
+                                    accent="blue"
+                                    summaryCollapsed={(() => {
+                                        const plain = campaignDesc.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+                                        if (!plain) return "Nhấn để xem";
+                                        return plain.length > 100 ? `${plain.slice(0, 100)}…` : plain;
+                                    })()}
+                                    defaultExpanded={false}
+                                >
+                                    <Typography sx={{fontSize: "1.04rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.72}}>
+                                        {campaignDesc.replace(/<[^>]+>/g, "")}
+                                    </Typography>
+                                </CollapsibleDetailSection>
+                            ) : null}
+                            {mandatoryAllDocs.length > 0 ? (
+                                <CollapsibleDetailSection
+                                    title="Hồ sơ bắt buộc chung"
+                                    accent="blue"
+                                    summaryCollapsed={`${mandatoryAllDocs.length} loại giấy tờ cần có`}
+                                    defaultExpanded={false}
+                                >
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: {xs: "1fr", sm: "repeat(2, minmax(0, 1fr))"},
+                                            gap: 0.65
+                                        }}
+                                    >
+                                        {mandatoryAllDocs.map((doc, docIdx) => (
+                                            <Stack
+                                                key={`${doc?.code || docIdx}-${docIdx}`}
+                                                direction="row"
+                                                alignItems="center"
+                                                spacing={0.55}
+                                                sx={{minWidth: 0}}
+                                            >
+                                                <CheckCircleIcon sx={{fontSize: 15, color: "#2563eb", flexShrink: 0}}/>
+                                                <Typography sx={{fontSize: "0.98rem", color: "#334155", lineHeight: 1.55}}>
+                                                    {doc?.name || doc?.code || `Hồ sơ ${docIdx + 1}`}
+                                                    {doc?.required ? (
+                                                        <Box
+                                                            component="span"
+                                                            sx={{color: "#dc2626", fontWeight: 800, fontSize: "0.72rem", ml: 0.28}}
+                                                        >
+                                                            *
+                                                        </Box>
+                                                    ) : null}
+                                                </Typography>
+                                            </Stack>
+                                        ))}
+                                    </Box>
+                                </CollapsibleDetailSection>
+                            ) : null}
+                            <Box
+                                sx={{
+                                    mb: 1.2,
+                                    px: 1.1,
+                                    py: 0.65,
+                                    bgcolor: "rgba(239,246,255,0.72)",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(191,219,254,0.9)"
+                                }}
+                            >
+                                <Typography sx={{fontSize: "1.06rem", color: "#1e3a8a", fontWeight: 700}}>
+                                    Khung chiến dịch: {formatIsoDate(campaign?.startDate)} — {formatIsoDate(campaign?.endDate)}
+                                </Typography>
+                            </Box>
+                            {hasCampaignQuota ? (
+                                <CollapsibleDetailSection
+                                    title="Chỉ tiêu chiến dịch"
+                                    accent="blue"
+                                    summaryCollapsed={`Còn ${hasCampaignRemaining ? campaignRemainingQuota : "—"}/${campaignTotalQuota} suất · đã tuyển ${campaignFilledPercent}%`}
+                                    defaultExpanded={false}
+                                >
+                                    <Typography sx={{fontSize: "0.97rem", color: campaignQuotaTone.main, fontWeight: 700, mb: 0.45}}>
+                                        Chỉ tiêu chiến dịch: còn {hasCampaignRemaining ? campaignRemainingQuota : "—"}/{campaignTotalQuota} suất
+                                    </Typography>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={
+                                            hasCampaignQuota && hasCampaignRemaining
+                                                ? Math.max(
+                                                      0,
+                                                      Math.min(100, ((campaignTotalQuota - campaignRemainingQuota) / campaignTotalQuota) * 100)
+                                                  )
+                                                : 0
+                                        }
+                                        sx={{
+                                            height: 9,
+                                            borderRadius: 999,
+                                            bgcolor: "rgba(148,163,184,0.22)",
+                                            mb: 0.5,
+                                            "& .MuiLinearProgress-bar": {borderRadius: 999, bgcolor: "#2563eb"}
+                                        }}
+                                    />
+                                    <Typography sx={{fontSize: "0.9rem", color: campaignQuotaTone.soft, fontWeight: 600}}>
+                                        Đã tuyển {campaignFilledPercent}% tổng chỉ tiêu chiến dịch
+                                    </Typography>
+                                </CollapsibleDetailSection>
+                            ) : null}
+                            <Box sx={{mb: campusProgramOfferings.length > 0 ? 2 : 1.25}}>
+                                <Button
+                                    variant="contained"
+                                    fullWidth
+                                    disableElevation
+                                    disabled={
+                                        admissionSubmissionLocked ||
+                                        !Number.isFinite(primaryOfferingId) ||
+                                        primaryOfferingId <= 0
+                                    }
+                                    onClick={() =>
+                                        handleSubmitApplication({
+                                            campaign,
+                                            offering: primaryOffering
+                                        })
+                                    }
                                     sx={{
-                                        fontWeight: 800,
-                                        fontSize: {xs: "1.28rem", sm: "1.5rem"},
-                                        letterSpacing: "-0.02em",
-                                        lineHeight: 1.25,
-                                        color: "#1e293b"
+                                        borderRadius: 1.6,
+                                        py: 1.05,
+                                        textTransform: "none",
+                                        fontWeight: 700,
+                                        letterSpacing: "normal",
+                                        fontSize: "1rem",
+                                        bgcolor: "#2563eb",
+                                        color: "#fff",
+                                        "&:hover": {bgcolor: "#1d4ed8"},
+                                        "&.Mui-disabled": {bgcolor: "#cbd5f5", color: "#475569"}
                                     }}
                                 >
-                                    {campaignName}
-                                </Typography>
-                                <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
-                                    <Chip
-                                        size="small"
-                                        label={`Năm ${campaign?.year ?? "—"}`}
-                                        sx={{
-                                            borderRadius: 999,
-                                            bgcolor: "rgba(59,130,246,0.1)",
-                                            color: "#2563eb",
-                                            border: "1px solid rgba(147,197,253,0.75)",
-                                            fontWeight: 700
-                                        }}
-                                    />
-                                    <Chip
-                                        size="small"
-                                        label={campaignStatusLabel(campaign?.status)}
-                                        sx={{
-                                            borderRadius: 999,
-                                            bgcolor: "rgba(16,185,129,0.12)",
-                                            color: "#047857",
-                                            border: "1px solid rgba(110,231,183,0.72)",
-                                            fontWeight: 700
-                                        }}
-                                    />
-                                </Stack>
-                            </Stack>
-                            {campaignDesc ? (
-                                <Typography sx={{fontSize: "0.96rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.75, mb: 1.25}}>
-                                    {campaignDesc.replace(/<[^>]+>/g, "")}
-                                </Typography>
-                            ) : null}
-                            <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 600, mb: 1.8}}>
-                                {formatIsoDate(campaign?.startDate)} - {formatIsoDate(campaign?.endDate)}
-                            </Typography>
+                                    {admissionSubmissionLocked ? "Đã nộp hồ sơ" : "Nộp hồ sơ"}
+                                </Button>
+                            </Box>
                             {campusProgramOfferings.length > 0 ? (
                                 <Box sx={detailPackageSectionSx}>
                                     <Typography sx={detailPackageTitleSx}>Gói tuyển sinh</Typography>
@@ -2045,6 +2365,10 @@ function SchoolCampaignEnrollmentCard({
                                                     : tuitionUniq.length === 1
                                                       ? `${formatVnd(tuitionUniq[0])}${feeUnitSuffix(program?.feeUnit)}`
                                                       : `${formatVnd(Math.min(...tuitionUniq))} – ${formatVnd(Math.max(...tuitionUniq))}${feeUnitSuffix(program?.feeUnit)}`;
+                                            const packageCollapseSummary =
+                                                offerGroup.length <= 1
+                                                    ? `Phương thức: ${admissionMethodLabel(offerGroup[0]?.admissionMethod)} · mô tả, hồ sơ, chương trình`
+                                                    : `${offerGroup.length} phương thức · mô tả, hồ sơ & chương trình`;
                                             return (
                                                 <Box
                                                     key={`${buildPublicOfferingGroupKey(primaryOffering)}-${groupIdx}`}
@@ -2059,34 +2383,82 @@ function SchoolCampaignEnrollmentCard({
                                                             gap: {xs: 2, sm: 2.25}
                                                         }}
                                                     >
-                                                        <Box sx={{minWidth: 0, width: "100%"}}>
-                                                            <Typography
-                                                                sx={{
-                                                                    fontSize: {xs: "1.35rem", sm: "1.55rem"},
-                                                                    lineHeight: 1.3,
-                                                                    fontWeight: 900,
-                                                                    color: "#1d4ed8",
-                                                                    mb: 1.35
-                                                                }}
-                                                            >
-                                                                {displayProgramName}
-                                                            </Typography>
+                                                        <Stack
+                                                            direction={{xs: "column", sm: "row"}}
+                                                            alignItems={{xs: "flex-start", sm: "center"}}
+                                                            justifyContent="space-between"
+                                                            spacing={{xs: 0.85, sm: 1.5}}
+                                                            sx={{
+                                                                mb: 0.5,
+                                                                px: {xs: 1, sm: 1.15},
+                                                                py: 0.75,
+                                                                bgcolor: "rgba(239,246,255,0.65)",
+                                                                borderRadius: 1.5,
+                                                                border: "1px solid rgba(191,219,254,0.75)"
+                                                            }}
+                                                        >
+                                                                <Typography
+                                                                    sx={{
+                                                                        fontSize: {xs: "1.16rem", sm: "1.28rem"},
+                                                                        lineHeight: 1.35,
+                                                                        fontWeight: 700,
+                                                                        color: "#1d4ed8",
+                                                                        flex: "1 1 auto",
+                                                                        minWidth: 0,
+                                                                        pr: {sm: 1}
+                                                                    }}
+                                                                >
+                                                                    {displayProgramName}
+                                                                </Typography>
+                                                                <Typography
+                                                                    sx={{
+                                                                        fontSize: {xs: "1.04rem", sm: "1.14rem"},
+                                                                        color: "#1e40af",
+                                                                        fontWeight: 700,
+                                                                        lineHeight: 1.3,
+                                                                        flexShrink: 0,
+                                                                        whiteSpace: {sm: "nowrap"}
+                                                                    }}
+                                                                >
+                                                                    {tuitionMainLine}
+                                                                </Typography>
+                                                            </Stack>
+                                                        <CollapsibleDetailSection
+                                                            title="Chi tiết gói tuyển sinh"
+                                                            accent="blue"
+                                                            summaryCollapsed={packageCollapseSummary}
+                                                            defaultExpanded={false}
+                                                            dense
+                                                        >
                                                             <Stack direction="row" spacing={0.8} useFlexGap flexWrap="wrap" sx={{mb: 1.45}}>
                                                                 <Chip
-                                                                    size="small"
-                                                                    icon={<LanguageIcon sx={{fontSize: "0.95rem !important"}}/>}
+                                                                    size="medium"
+                                                                    icon={<LanguageIcon sx={{fontSize: "1.05rem !important"}}/>}
                                                                     label={`Dạy bằng ${languageLabels.length > 0 ? languageLabels.join(", ") : "Tiếng Việt"}`}
                                                                     sx={{borderRadius: 999, bgcolor: "rgba(59,130,246,0.1)", color: "#1d4ed8", fontWeight: 700}}
                                                                 />
                                                                 <Chip
-                                                                    size="small"
-                                                                    icon={<VerifiedIcon sx={{fontSize: "0.95rem !important"}}/>}
+                                                                    size="medium"
+                                                                    icon={<VerifiedIcon sx={{fontSize: "1.05rem !important"}}/>}
                                                                     label={curriculumTypeTag}
-                                                                    sx={{borderRadius: 999, bgcolor: "rgba(14,165,233,0.1)", color: "#0369a1", fontWeight: 700}}
+                                                                    sx={{borderRadius: 999, bgcolor: "rgba(59,130,246,0.12)", color: "#1e40af", fontWeight: 700}}
                                                                 />
+                                                                {String(primaryOffering?.learningMode || "").trim() ? (
+                                                                    <Chip
+                                                                        size="medium"
+                                                                        icon={<SchoolIcon sx={{fontSize: "1.05rem !important"}}/>}
+                                                                        label={learningModeLabel(primaryOffering.learningMode)}
+                                                                        sx={{
+                                                                            borderRadius: 999,
+                                                                            bgcolor: "rgba(59,130,246,0.1)",
+                                                                            color: "#1d4ed8",
+                                                                            fontWeight: 700
+                                                                        }}
+                                                                    />
+                                                                ) : null}
                                                             </Stack>
                                                             {previewDescription ? (
-                                                                <Typography sx={{fontSize: "0.97rem", color: "#334155", lineHeight: 1.78, mb: 1.35}}>
+                                                                <Typography sx={{fontSize: "1.04rem", color: "#334155", lineHeight: 1.74, mb: 1.35}}>
                                                                     {previewDescription}
                                                                 </Typography>
                                                             ) : null}
@@ -2099,7 +2471,13 @@ function SchoolCampaignEnrollmentCard({
                                                                     sx={{mb: offerGroup.length > 1 ? 1.85 : 1.5}}
                                                                 >
                                                                     {methodLearningMeta.slice(0, 3).map((method) => (
-                                                                        <Chip key={method.key} icon={method.icon} size="small" label={method.label} sx={{borderRadius: 999}}/>
+                                                                        <Chip key={method.key} icon={method.icon} size="medium" label={method.label} sx={{
+                                                                            borderRadius: 999,
+                                                                            bgcolor: "rgba(59,130,246,0.08)",
+                                                                            color: "#1e40af",
+                                                                            fontWeight: 650,
+                                                                            border: "1px solid rgba(147,197,253,0.55)"
+                                                                        }}/>
                                                                     ))}
                                                                 </Stack>
                                                             ) : null}
@@ -2107,50 +2485,16 @@ function SchoolCampaignEnrollmentCard({
                                                             {offerGroup.length > 1 ? (
                                                                 <Typography
                                                                     sx={{
-                                                                        fontSize: "0.92rem",
-                                                                        fontWeight: 800,
+                                                                        fontSize: "0.97rem",
+                                                                        fontWeight: 700,
                                                                         color: "#334155",
                                                                         mb: 1.15,
-                                                                        letterSpacing: "0.02em"
+                                                                        letterSpacing: "normal"
                                                                     }}
                                                                 >
                                                                     Phương thức tuyển sinh
                                                                 </Typography>
                                                             ) : null}
-                                                        </Box>
-
-                                                        <Box
-                                                            sx={{
-                                                                width: "100%",
-                                                                alignSelf: "stretch",
-                                                                borderRadius: 2,
-                                                                border: "1px solid rgba(251,146,60,0.4)",
-                                                                bgcolor: "#fff7ed",
-                                                                p: {xs: 1.25, sm: 1.45},
-                                                                boxShadow: "0 10px 22px rgba(249,115,22,0.12)",
-                                                                display: "flex",
-                                                                flexDirection: {xs: "column", sm: "row"},
-                                                                alignItems: {xs: "flex-start", sm: "center"},
-                                                                justifyContent: "space-between",
-                                                                gap: {xs: 0.75, sm: 2}
-                                                            }}
-                                                        >
-                                                            <Typography sx={{fontSize: "0.78rem", color: "#9a3412", fontWeight: 700}}>Học phí</Typography>
-                                                            <Typography
-                                                                sx={{
-                                                                    fontSize: {xs: "1.28rem", sm: "1.45rem"},
-                                                                    color: "#c2410c",
-                                                                    fontWeight: 900,
-                                                                    lineHeight: 1.16,
-                                                                    mb: 0,
-                                                                    textAlign: {xs: "left", sm: "right"},
-                                                                    width: {xs: "100%", sm: "auto"}
-                                                                }}
-                                                            >
-                                                                {tuitionMainLine}
-                                                            </Typography>
-                                                        </Box>
-
                                                         <Box sx={{width: "100%", minWidth: 0}}>
                                                             {offerGroup.map((offering, methodIdx) => {
                                                                 const quota = Number(offering?.quota);
@@ -2164,8 +2508,8 @@ function SchoolCampaignEnrollmentCard({
                                                                 const filledPercent = Math.round(filledRatio * 100);
                                                                 const isLowQuota = hasRemaining && remainingQuota < 50;
                                                                 const quotaTone = isLowQuota
-                                                                    ? {main: "#c2410c", soft: "#9a3412"}
-                                                                    : {main: "#047857", soft: "#065f46"};
+                                                                    ? {main: "#1e3a8a", soft: "#1e40af"}
+                                                                    : {main: "#1d4ed8", soft: "#2563eb"};
                                                                 const offeringMethodCode = String(offering?.admissionMethod || "").trim().toUpperCase();
                                                                 const matchedMethod =
                                                                     admissionMethodDetails.find((method) => {
@@ -2174,141 +2518,257 @@ function SchoolCampaignEnrollmentCard({
                                                                             .toUpperCase();
                                                                         return methodCode === offeringMethodCode;
                                                                     }) || null;
-                                                                const methodDocs = Array.isArray(matchedMethod?.methodDocumentRequirements)
+                                                                const methodDocsRaw = Array.isArray(matchedMethod?.methodDocumentRequirements)
                                                                     ? matchedMethod.methodDocumentRequirements
                                                                     : [];
+                                                                const methodDocs = filterMethodDocsExcludingMandatory(methodDocsRaw, mandatoryAllDocs);
                                                                 const methodSteps = Array.isArray(matchedMethod?.admissionProcessSteps)
                                                                     ? [...matchedMethod.admissionProcessSteps].sort(
                                                                           (a, b) => Number(a?.stepOrder || 0) - Number(b?.stepOrder || 0)
                                                                       )
                                                                     : [];
-                                                                const submitTarget = {campaign, offering};
-                                                                const canSubmit = String(offering?.applicationStatus || "").toUpperCase() === "OPEN";
-                                                                const methodAllowsReservation = Boolean(
-                                                                    matchedMethod?.allowReservationSubmission ||
-                                                                        offering?.allowReservationSubmission
-                                                                );
+                                                                const offeringRegSameAsMethodWindow =
+                                                                    Boolean(matchedMethod) &&
+                                                                    formatIsoDate(offering?.openDate) === formatIsoDate(matchedMethod?.startDate) &&
+                                                                    formatIsoDate(offering?.closeDate) === formatIsoDate(matchedMethod?.endDate);
+                                                                const offeringQuotaDuplicatesCampaign =
+                                                                    hasCampaignQuota &&
+                                                                    hasCampaignRemaining &&
+                                                                    hasQuota &&
+                                                                    hasRemaining &&
+                                                                    quota === campaignTotalQuota &&
+                                                                    remainingQuota === campaignRemainingQuota;
+                                                                const showReservationFeeLine =
+                                                                    matchedMethod &&
+                                                                    Number.isFinite(Number(matchedMethod?.reservationFee)) &&
+                                                                    Number(matchedMethod.reservationFee) > 0;
+                                                                const showDepositLine = Boolean(matchedMethod?.depositEndDate);
+                                                                const showConfirmationLine = Boolean(matchedMethod?.confirmationEndDate);
+                                                                const showMethodWindowInYellowBox =
+                                                                    Boolean(matchedMethod) &&
+                                                                    (matchedMethod?.startDate || matchedMethod?.endDate) &&
+                                                                    !offeringRegSameAsMethodWindow;
+                                                                const showReservationScheduleBox =
+                                                                    Boolean(matchedMethod) &&
+                                                                    (showMethodWindowInYellowBox ||
+                                                                        showReservationFeeLine ||
+                                                                        showDepositLine ||
+                                                                        showConfirmationLine);
+                                                                const methodHeadline = matchedMethod
+                                                                    ? String(
+                                                                          matchedMethod?.displayName || admissionMethodLabel(offering?.admissionMethod) || ""
+                                                                      ).trim()
+                                                                    : "";
+                                                                const methodBodyText = matchedMethod
+                                                                    ? String(matchedMethod?.description || "").trim()
+                                                                    : "";
+                                                                const showMethodBodyText =
+                                                                    Boolean(methodBodyText) &&
+                                                                    (!methodHeadline ||
+                                                                        methodBodyText.toLowerCase() !== methodHeadline.toLowerCase());
+                                                                const methodDetailExtraParts = [];
+                                                                if (showReservationScheduleBox) methodDetailExtraParts.push("Lịch & phí giữ chỗ");
+                                                                if (methodDocs.length > 0) methodDetailExtraParts.push(`${methodDocs.length} hồ sơ`);
+                                                                if (methodSteps.length > 0) methodDetailExtraParts.push(`${methodSteps.length} bước`);
+                                                                const methodDetailExtraSummary = methodDetailExtraParts.join(" · ");
+                                                                const hasMethodDetailExtra =
+                                                                    showReservationScheduleBox ||
+                                                                    methodDocs.length > 0 ||
+                                                                    methodSteps.length > 0;
+                                                                const methodHeadBand = matchedMethod
+                                                                    ? methodIdx % 2 === 0
+                                                                        ? {bg: "rgba(239,246,255,0.52)"}
+                                                                        : {bg: "rgba(219,234,254,0.62)"}
+                                                                    : methodIdx % 2 === 0
+                                                                      ? {bg: "rgba(241,245,249,0.88)"}
+                                                                      : {bg: "rgba(241,245,249,0.95)"};
                                                                 return (
                                                                     <Box
                                                                         key={`${offering?.id ?? `${groupIdx}-${methodIdx}`}-${offering?.admissionMethod ?? "method"}`}
                                                                         sx={{
-                                                                            mt: methodIdx > 0 ? 2.25 : 0
+                                                                            mt: methodIdx > 0 ? 2 : 0,
+                                                                            pt: methodIdx > 0 ? 2 : 0,
+                                                                            borderTop:
+                                                                                methodIdx > 0 ? "1px solid rgba(226,232,240,0.85)" : "none"
                                                                         }}
                                                                     >
-                                                                        <Box
-                                                                            sx={{
-                                                                                p: {xs: 1.15, sm: 1.35},
-                                                                                borderRadius: 2,
-                                                                                border: "1px solid rgba(226,232,240,0.95)",
-                                                                                bgcolor: "rgba(255,255,255,0.96)",
-                                                                                boxShadow: "0 1px 0 rgba(15,23,42,0.04)"
-                                                                            }}
-                                                                        >
                                                                             {matchedMethod ? (
                                                                                 <Box
                                                                                     sx={{
-                                                                                        mb: 1.4,
-                                                                                        p: 1.1,
+                                                                                        mb: 1.35,
+                                                                                        px: 1.15,
+                                                                                        py: 0.75,
                                                                                         borderRadius: 1.5,
-                                                                                        bgcolor: "rgba(239,246,255,0.8)",
-                                                                                        border: "1px solid rgba(191,219,254,0.7)"
+                                                                                        border: "1px solid rgba(226,232,240,0.95)",
+                                                                                        bgcolor: methodHeadBand.bg
                                                                                     }}
                                                                                 >
                                                                                     <Typography
                                                                                         sx={{
-                                                                                            fontSize: "0.8rem",
+                                                                                            fontSize: "0.9rem",
                                                                                             color: "#475569",
-                                                                                            fontWeight: 800,
+                                                                                            fontWeight: 700,
                                                                                             mb: 0.55,
-                                                                                            letterSpacing: "0.01em"
+                                                                                            letterSpacing: "normal"
                                                                                         }}
                                                                                     >
                                                                                         Phương thức xét tuyển
                                                                                     </Typography>
-                                                                                    <Box sx={detailSchoolMethodTileSx}>
-                                                                                        <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 700}}>
+                                                                                    <Box sx={{pt: 0.35}}>
+                                                                                        <Typography sx={{fontSize: "1.02rem", color: "#1e293b", fontWeight: 700}}>
                                                                                             {matchedMethod?.displayName || admissionMethodLabel(offering?.admissionMethod)}
                                                                                         </Typography>
-                                                                                        <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.55}}>
-                                                                                            {String(matchedMethod?.description || "").trim() || "—"}
-                                                                                        </Typography>
+                                                                                        {showMethodBodyText ? (
+                                                                                            <Typography sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.55}}>
+                                                                                                {methodBodyText}
+                                                                                            </Typography>
+                                                                                        ) : null}
                                                                                     </Box>
                                                                                 </Box>
                                                                             ) : (
                                                                                 <Box
                                                                                     sx={{
-                                                                                        mb: 1.4,
-                                                                                        p: 1.1,
+                                                                                        mb: 1.35,
+                                                                                        px: 1.15,
+                                                                                        py: 0.75,
                                                                                         borderRadius: 1.5,
-                                                                                        bgcolor: "rgba(248,250,252,0.95)",
-                                                                                        border: "1px solid rgba(226,232,240,0.9)"
+                                                                                        border: "1px solid rgba(226,232,240,0.95)",
+                                                                                        bgcolor: methodHeadBand.bg
                                                                                     }}
                                                                                 >
                                                                                     <Typography
                                                                                         sx={{
-                                                                                            fontSize: "0.8rem",
+                                                                                            fontSize: "0.9rem",
                                                                                             color: "#475569",
-                                                                                            fontWeight: 800,
+                                                                                            fontWeight: 700,
                                                                                             mb: 0.55,
-                                                                                            letterSpacing: "0.01em"
+                                                                                            letterSpacing: "normal"
                                                                                         }}
                                                                                     >
                                                                                         Phương thức xét tuyển
                                                                                     </Typography>
-                                                                                    <Typography sx={{fontSize: "0.95rem", color: "#1e293b", fontWeight: 700}}>
+                                                                                    <Typography sx={{fontSize: "1.02rem", color: "#1e293b", fontWeight: 700}}>
                                                                                         {admissionMethodLabel(offering?.admissionMethod)}
                                                                                     </Typography>
                                                                                 </Box>
                                                                             )}
 
                                                                             <Box sx={{mb: 1.35}}>
-                                                                                <Typography sx={{fontSize: "0.88rem", color: quotaTone.main, fontWeight: 800, mb: 0.45}}>
-                                                                                    Chỉ còn lại {offering?.remainingQuota ?? "—"} suất
-                                                                                </Typography>
-                                                                                <LinearProgress
-                                                                                    variant="determinate"
-                                                                                    value={
-                                                                                        hasQuota && hasRemaining
-                                                                                            ? Math.max(
-                                                                                                  0,
-                                                                                                  Math.min(100, ((quota - remainingQuota) / quota) * 100)
-                                                                                              )
-                                                                                            : 0
-                                                                                    }
-                                                                                    sx={{
-                                                                                        height: 9,
-                                                                                        borderRadius: 999,
-                                                                                        bgcolor: "rgba(148,163,184,0.22)",
-                                                                                        mb: 0.5,
-                                                                                        "& .MuiLinearProgress-bar": {borderRadius: 999, bgcolor: "#f97316"}
-                                                                                    }}
-                                                                                />
-                                                                                <Typography sx={{fontSize: "0.78rem", color: quotaTone.soft, fontWeight: 600, mb: 0.55}}>
-                                                                                    Đã tuyển {filledPercent}% • Tổng {offering?.quota ?? "—"}
-                                                                                </Typography>
-                                                                                <Typography sx={{fontSize: "0.84rem", color: "#7c2d12", fontWeight: 700, mb: 0}}>
-                                                                                    Hạn đăng ký: {formatIsoDate(offering?.openDate)} -{" "}
+                                                                                {offeringQuotaDuplicatesCampaign ? null : (
+                                                                                    <>
+                                                                                        <Typography sx={{fontSize: "0.96rem", color: quotaTone.main, fontWeight: 700, mb: 0.45}}>
+                                                                                            Chỉ còn lại {offering?.remainingQuota ?? "—"} suất
+                                                                                        </Typography>
+                                                                                        <LinearProgress
+                                                                                            variant="determinate"
+                                                                                            value={
+                                                                                                hasQuota && hasRemaining
+                                                                                                    ? Math.max(
+                                                                                                          0,
+                                                                                                          Math.min(100, ((quota - remainingQuota) / quota) * 100)
+                                                                                                      )
+                                                                                                    : 0
+                                                                                            }
+                                                                                            sx={{
+                                                                                                height: 9,
+                                                                                                borderRadius: 999,
+                                                                                                bgcolor: "rgba(148,163,184,0.22)",
+                                                                                                mb: 0.5,
+                                                                                                "& .MuiLinearProgress-bar": {borderRadius: 999, bgcolor: "#2563eb"}
+                                                                                            }}
+                                                                                        />
+                                                                                        <Typography sx={{fontSize: "0.88rem", color: quotaTone.soft, fontWeight: 600, mb: 0.55}}>
+                                                                                            Đã tuyển {filledPercent}% • Tổng {offering?.quota ?? "—"}
+                                                                                        </Typography>
+                                                                                    </>
+                                                                                )}
+                                                                                <Typography sx={{fontSize: "0.93rem", color: "#1e40af", fontWeight: 700, mb: 0}}>
+                                                                                    Hạn đăng ký: {formatIsoDate(offering?.openDate)} –{" "}
                                                                                     {formatIsoDate(offering?.closeDate)}
                                                                                 </Typography>
                                                                             </Box>
+                                                                            {hasMethodDetailExtra ? (
+                                                                                <CollapsibleDetailSection
+                                                                                    title="Thông tin thêm phương thức"
+                                                                                    accent="blue"
+                                                                                    summaryCollapsed={methodDetailExtraSummary}
+                                                                                    defaultExpanded={false}
+                                                                                    dense
+                                                                                >
+                                                                                    {showReservationScheduleBox ? (
+                                                                                        <Box
+                                                                                            sx={{
+                                                                                                mb: 1.15,
+                                                                                                px: 1.15,
+                                                                                                py: 0.85,
+                                                                                                borderRadius: 1.5,
+                                                                                                border: "1px solid rgba(191,219,254,0.85)",
+                                                                                                bgcolor: "rgba(239,246,255,0.65)"
+                                                                                            }}
+                                                                                        >
+                                                                                    <Typography
+                                                                                        sx={{
+                                                                                            fontSize: "0.9rem",
+                                                                                            fontWeight: 700,
+                                                                                            color: "#1e40af",
+                                                                                            mb: 0.55,
+                                                                                            letterSpacing: "normal"
+                                                                                        }}
+                                                                                    >
+                                                                                        Lịch và phí giữ chỗ
+                                                                                    </Typography>
+                                                                                    {showMethodWindowInYellowBox ? (
+                                                                                        <Typography
+                                                                                            sx={{
+                                                                                                fontSize: "0.93rem",
+                                                                                                color: "#334155",
+                                                                                                fontWeight: 600,
+                                                                                                mb: 0.35,
+                                                                                                lineHeight: 1.5
+                                                                                            }}
+                                                                                        >
+                                                                                            Khung xét theo phương thức: {formatIsoDate(matchedMethod?.startDate)} –{" "}
+                                                                                            {formatIsoDate(matchedMethod?.endDate)}
+                                                                                        </Typography>
+                                                                                    ) : null}
+                                                                                    {showReservationFeeLine ? (
+                                                                                        <Typography
+                                                                                            sx={{fontSize: "0.93rem", color: "#334155", mb: 0.25, lineHeight: 1.5}}
+                                                                                        >
+                                                                                            Phí giữ chỗ: {formatVnd(matchedMethod.reservationFee)}
+                                                                                        </Typography>
+                                                                                    ) : null}
+                                                                                    {showDepositLine ? (
+                                                                                        <Typography
+                                                                                            sx={{fontSize: "0.93rem", color: "#334155", mb: 0.25, lineHeight: 1.5}}
+                                                                                        >
+                                                                                            Hạn đặt cọc: {formatIsoDate(matchedMethod.depositEndDate)}
+                                                                                        </Typography>
+                                                                                    ) : null}
+                                                                                    {showConfirmationLine ? (
+                                                                                        <Typography sx={{fontSize: "0.93rem", color: "#334155", lineHeight: 1.5}}>
+                                                                                            Hạn xác nhận nhập học:{" "}
+                                                                                            {formatIsoDate(matchedMethod.confirmationEndDate)}
+                                                                                        </Typography>
+                                                                                    ) : null}
+                                                                                </Box>
+                                                                            ) : null}
 
                                                                             {methodDocs.length > 0 ? (
                                                                                 <Box
                                                                                     sx={{
-                                                                                        mb: 1.4,
-                                                                                        p: 1.1,
-                                                                                        borderRadius: 1.5,
-                                                                                        bgcolor: "rgba(248,250,252,0.92)",
-                                                                                        border: "1px solid rgba(226,232,240,0.9)"
+                                                                                        mb: 1.1,
+                                                                                        pt: 1.2,
+                                                                                        borderTop: "1px solid rgba(226,232,240,0.88)"
                                                                                     }}
                                                                                 >
                                                                                     <Typography
                                                                                         sx={{
-                                                                                            fontSize: "0.8rem",
+                                                                                            fontSize: "0.9rem",
                                                                                             color: "#475569",
-                                                                                            fontWeight: 800,
+                                                                                            fontWeight: 700,
                                                                                             mb: 0.6,
-                                                                                            letterSpacing: "0.01em"
+                                                                                            letterSpacing: "normal"
                                                                                         }}
                                                                                     >
                                                                                         Hồ sơ cần nộp
@@ -2328,8 +2788,8 @@ function SchoolCampaignEnrollmentCard({
                                                                                                 spacing={0.55}
                                                                                                 sx={{minWidth: 0}}
                                                                                             >
-                                                                                                <CheckCircleIcon sx={{fontSize: 15, color: "#16a34a", flexShrink: 0}}/>
-                                                                                                <Typography sx={{fontSize: "0.92rem", color: "#334155", lineHeight: 1.58}}>
+                                                                                                <CheckCircleIcon sx={{fontSize: 15, color: "#2563eb", flexShrink: 0}}/>
+                                                                                                <Typography sx={{fontSize: "1rem", color: "#334155", lineHeight: 1.58}}>
                                                                                                     {doc?.name || doc?.code || `Hồ sơ ${reqIdx + 1}`}
                                                                                                     {doc?.required ? (
                                                                                                         <Box
@@ -2349,20 +2809,18 @@ function SchoolCampaignEnrollmentCard({
                                                                             {methodSteps.length > 0 ? (
                                                                                 <Box
                                                                                     sx={{
-                                                                                        mb: methodAllowsReservation ? 1.25 : 1.45,
-                                                                                        p: 1.1,
-                                                                                        borderRadius: 1.5,
-                                                                                        bgcolor: "rgba(255,255,255,0.95)",
-                                                                                        border: "1px solid rgba(226,232,240,0.92)"
+                                                                                        mb: 0,
+                                                                                        pt: 1.2,
+                                                                                        borderTop: "1px solid rgba(226,232,240,0.88)"
                                                                                     }}
                                                                                 >
                                                                                     <Typography
                                                                                         sx={{
-                                                                                            fontSize: "0.8rem",
+                                                                                            fontSize: "0.9rem",
                                                                                             color: "#475569",
-                                                                                            fontWeight: 800,
+                                                                                            fontWeight: 700,
                                                                                             mb: 0.7,
-                                                                                            letterSpacing: "0.01em"
+                                                                                            letterSpacing: "normal"
                                                                                         }}
                                                                                     >
                                                                                         Các bước thực hiện
@@ -2389,7 +2847,7 @@ function SchoolCampaignEnrollmentCard({
                                                                                                                 justifyContent: "center",
                                                                                                                 color: "#1d4ed8",
                                                                                                                 fontSize: "0.72rem",
-                                                                                                                fontWeight: 800
+                                                                                                                fontWeight: 700
                                                                                                             }}
                                                                                                         >
                                                                                                             {Number.isFinite(stepNumber) && stepNumber > 0 ? stepNumber : stepIdx + 1}
@@ -2410,11 +2868,11 @@ function SchoolCampaignEnrollmentCard({
                                                                                                         ) : null}
                                                                                                     </Box>
                                                                                                     <Box sx={{pt: 0.03, minWidth: 0, pb: isLast ? 0 : 0.15}}>
-                                                                                                        <Typography sx={{fontSize: "0.95rem", color: "#0f172a", fontWeight: 800, lineHeight: 1.45}}>
+                                                                                                        <Typography sx={{fontSize: "1.03rem", color: "#0f172a", fontWeight: 700, lineHeight: 1.45}}>
                                                                                                             {stepName}
                                                                                                         </Typography>
                                                                                                         {stepDescription ? (
-                                                                                                            <Typography sx={{fontSize: "0.9rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}>
+                                                                                                            <Typography sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}>
                                                                                                                 {stepDescription}
                                                                                                             </Typography>
                                                                                                         ) : null}
@@ -2425,47 +2883,21 @@ function SchoolCampaignEnrollmentCard({
                                                                                     </Stack>
                                                                                 </Box>
                                                                             ) : null}
-
-                                                                            {methodAllowsReservation ? (
-                                                                                <Box sx={{mt: 0.25}}>
-                                                                                    <Button
-                                                                                        variant="contained"
-                                                                                        fullWidth
-                                                                                        disableElevation
-                                                                                        disabled={admissionSubmissionLocked || !canSubmit}
-                                                                                        onClick={() => handleSubmitApplication(submitTarget)}
-                                                                                        sx={{
-                                                                                            borderRadius: 1.6,
-                                                                                            py: 0.95,
-                                                                                            fontWeight: 900,
-                                                                                            letterSpacing: "0.01em",
-                                                                                            fontSize: "0.9rem",
-                                                                                            bgcolor: "#ea580c",
-                                                                                            color: "#fff",
-                                                                                            "&:hover": {bgcolor: "#c2410c"},
-                                                                                            "&.Mui-disabled": {bgcolor: "#fed7aa", color: "#9a3412"}
-                                                                                        }}
-                                                                                    >
-                                                                                        {admissionSubmissionLocked
-                                                                                            ? "ĐÃ NỘP HỒ SƠ"
-                                                                                            : String(offering?.applicationStatus || "").toUpperCase() === "PAUSED"
-                                                                                              ? "TẠM DỪNG NHẬN HỒ SƠ"
-                                                                                              : "NỘP HỒ SƠ"}
-                                                                                    </Button>
-                                                                                </Box>
+                                                                                </CollapsibleDetailSection>
                                                                             ) : null}
-                                                                        </Box>
                                                                     </Box>
                                                                 );
                                                             })}
                                                         </Box>
-                                                    </Box>
-                                                    <Box sx={{mt: 1.2}}>
+                                                    <Divider sx={{borderColor: "rgba(226,232,240,0.92)", mt: 2}}/>
+                                                    <Box sx={{pt: 2}}>
                                                         <SchoolCurriculumTrainingCard
                                                             curriculumList={curriculum ? [curriculum] : []}
                                                             embedded
                                                             focusSubjectsOnly
                                                         />
+                                                    </Box>
+                                                        </CollapsibleDetailSection>
                                                     </Box>
                                                 </Box>
                                             );
@@ -2483,10 +2915,10 @@ function SchoolCampaignEnrollmentCard({
 function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSubjectsOnly = false}) {
     const curriculumDataList = Array.isArray(curriculumList) ? curriculumList : [];
     const embeddedTitleSx = {
-        fontWeight: 800,
-        fontSize: {xs: "1.1rem", sm: "1.22rem"},
+        fontWeight: 700,
+        fontSize: {xs: "1.12rem", sm: "1.24rem"},
         color: BRAND_NAVY,
-        letterSpacing: "-0.02em",
+        letterSpacing: "-0.015em",
         mb: 0
     };
 
@@ -2632,7 +3064,7 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                             {subjects.length === 0 ? (
                                 <Typography
                                     sx={{
-                                        fontSize: "0.95rem",
+                                        fontSize: "1.02rem",
                                         color: "#6b7280",
                                         py: 3,
                                         px: 2.4,
@@ -2670,21 +3102,21 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                                                     }}
                                                 >
                                                     <Typography
-                                                    sx={{
+                                                        sx={{
                                                             fontWeight: 700,
-                                                            fontSize: "0.95rem",
+                                                            fontSize: "1.03rem",
                                                             color: "#111827",
                                                             mb: 0.85,
                                                             lineHeight: 1.55
                                                         }}
                                                     >
-                                                    {String(subject?.name || "").trim() || `Môn ${subjectIdx + 1}`}
+                                                        {String(subject?.name || "").trim() || `Môn ${subjectIdx + 1}`}
                                                         {subject?.isMandatory === false ? (
                                                             <Box
                                                                 component="span"
                                                                 sx={{
                                                                     ml: 0.7,
-                                                                    fontSize: "0.72rem",
+                                                                    fontSize: "0.78rem",
                                                                     fontWeight: 500,
                                                                     color: "#9ca3af"
                                                                 }}
@@ -2692,17 +3124,17 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                                                                 (Tự chọn)
                                                             </Box>
                                                         ) : null}
-                                                </Typography>
+                                                    </Typography>
                                                     <Typography
                                                         sx={{
-                                                            fontSize: "0.86rem",
+                                                            fontSize: "0.94rem",
                                                             color: "#6b7280",
                                                             lineHeight: 1.75
                                                         }}
                                                     >
-                                                {String(subject?.description || "").trim() || "Đang cập nhật mô tả."}
-                                            </Typography>
-                                        </Box>
+                                                        {String(subject?.description || "").trim() || "Đang cập nhật mô tả."}
+                                                    </Typography>
+                                                </Box>
                                             );
                                         })}
                                     </Box>
@@ -3152,8 +3584,6 @@ export default function SchoolSearchDetailView({
                   ? "school-detail-campus"
                   : section === "campaign"
                     ? "school-detail-campaign"
-                    : section === "curriculum"
-                    ? "school-detail-curriculum"
                     : section === "facility"
                       ? "school-detail-facility"
                       : section === "policy"
@@ -3189,20 +3619,18 @@ export default function SchoolSearchDetailView({
 
     const detailTabIndex =
         detailActiveSection === "location"
-            ? 7
+            ? 6
             : detailActiveSection === "consult"
-              ? 6
+              ? 5
               : detailActiveSection === "policy"
-                ? 5
+                ? 4
                 : detailActiveSection === "facility"
-                  ? 4
-                  : detailActiveSection === "curriculum"
-                    ? 3
-                    : detailActiveSection === "campaign"
-                      ? 2
-                      : detailActiveSection === "campus"
-                        ? 1
-                        : 0;
+                  ? 3
+                  : detailActiveSection === "campaign" || detailActiveSection === "curriculum"
+                    ? 2
+                    : detailActiveSection === "campus"
+                      ? 1
+                      : 0;
 
     React.useEffect(() => {
         const root = detailScrollRef.current;
@@ -3216,12 +3644,11 @@ export default function SchoolSearchDetailView({
                 const intro = detailIntroRef.current;
                 const campus = detailCampusRef.current;
                 const campaign = detailCampaignRef.current;
-                const curriculum = detailCurriculumRef.current;
                 const facility = detailFacilityRef.current;
                 const policy = detailPolicyRef.current;
                 const loc = detailLocationRef.current;
                 const consult = detailConsultRef.current;
-                if (!intro || !campus || !campaign || !curriculum || !facility || !policy || !loc || !consult) return;
+                if (!intro || !campus || !campaign || !facility || !policy || !loc || !consult) return;
                 const rootRect = root.getBoundingClientRect();
                 const anchor = rootRect.top + DETAIL_SCROLL_HEADROOM;
                 const activationLine = anchor + 24;
@@ -3229,7 +3656,6 @@ export default function SchoolSearchDetailView({
                     ["intro", intro],
                     ["campus", campus],
                     ["campaign", campaign],
-                    ["curriculum", curriculum],
                     ["facility", facility],
                     ["policy", policy],
                     ["consult", consult],
@@ -3684,12 +4110,22 @@ export default function SchoolSearchDetailView({
                     top: `calc(${DETAIL_WITH_HEADER_OFFSET}px + 8px + env(safe-area-inset-top, 0px))`,
                     left: 12,
                     zIndex: 1400,
-                    color: "#fff",
-                    bgcolor: "transparent",
-                    border: "none",
-                    boxShadow: "none",
+                    width: 40,
+                    height: 40,
+                    color: showScrollTopButton ? "#0f172a" : "#fff",
+                    bgcolor: showScrollTopButton ? "rgba(255,255,255,0.96)" : "rgba(15,23,42,0.38)",
+                    border: showScrollTopButton
+                        ? "1px solid rgba(226,232,240,0.95)"
+                        : "1px solid rgba(255,255,255,0.22)",
+                    borderRadius: "50%",
+                    boxShadow: showScrollTopButton
+                        ? "0 2px 10px rgba(15,23,42,0.12)"
+                        : "0 2px 8px rgba(15,23,42,0.2)",
                     p: 0.5,
-                    "&:hover": {bgcolor: "transparent", opacity: 0.85}
+                    transition: "color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+                    "&:hover": {
+                        bgcolor: showScrollTopButton ? "#fff" : "rgba(15,23,42,0.52)",
+                    },
                 }}
             >
                 <ArrowBackIcon/>
@@ -4096,15 +4532,16 @@ export default function SchoolSearchDetailView({
                             position: "sticky",
                             top: 0,
                             zIndex: 20,
-                            bgcolor: "rgba(255,255,255,0.97)",
-                            backdropFilter: "blur(8px)",
-                            WebkitBackdropFilter: "blur(8px)",
-                            pt: 0.35,
-                            pb: 0,
-                            mb: 1.5,
-                            borderBottom: "1px solid rgba(147,197,253,0.4)",
+                            bgcolor: "rgba(255,255,255,0.98)",
+                            backdropFilter: "blur(10px)",
+                            WebkitBackdropFilter: "blur(10px)",
+                            pt: 1,
+                            pb: 1.25,
+                            mb: 2,
+                            borderBottom: "1px solid rgba(226,232,240,0.95)",
                             pl: {xs: 6.5, sm: 7},
-                            boxShadow: "0 4px 12px rgba(15,23,42,0.04)"
+                            pr: {xs: 1.5, sm: 2},
+                            boxShadow: "0 1px 3px rgba(15,23,42,0.06)"
                         }}
                     >
                         <Tabs
@@ -4118,62 +4555,66 @@ export default function SchoolSearchDetailView({
                                           : v === 2
                                             ? "campaign"
                                             : v === 3
-                                              ? "curriculum"
+                                              ? "facility"
                                               : v === 4
-                                                ? "facility"
+                                                ? "policy"
                                                 : v === 5
-                                                  ? "policy"
-                                                  : v === 6
-                                                    ? "consult"
-                                                    : "location"
+                                                  ? "consult"
+                                                  : "location"
                                 )
                             }
                             variant="scrollable"
                             scrollButtons="auto"
                             allowScrollButtonsMobile
-                            TabIndicatorProps={{
-                                sx: {
-                                    height: 3,
-                                    borderRadius: "2px 2px 0 0",
-                                    bgcolor: "#2563eb",
-                                    transition:
-                                        "left 0.4s cubic-bezier(0.2, 0, 0, 1), width 0.4s cubic-bezier(0.2, 0, 0, 1)"
-                                }
-                            }}
+                            TabIndicatorProps={{sx: {display: "none"}}}
                             sx={{
-                                minHeight: 42,
+                                minHeight: 44,
                                 "& .MuiTabs-scrollButtons": {
-                                    width: 28,
-                                    "&.Mui-disabled": {opacity: 0.35}
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "50%",
+                                    border: "1px solid rgba(148,163,184,0.35)",
+                                    bgcolor: "#fff",
+                                    "&.Mui-disabled": {opacity: 0.32}
                                 },
+                                "& .MuiTabs-indicator": {display: "none"},
+                                "& .MuiTabs-flexContainer": {gap: 0.75, py: 0.25},
                                 "& .MuiTab-root": {
                                     textTransform: "none",
                                     fontWeight: 600,
-                                    fontSize: "0.8125rem",
-                                    letterSpacing: "0.01em",
-                                    minHeight: 42,
+                                    fontSize: "0.875rem",
+                                    letterSpacing: "normal",
+                                    minHeight: 36,
                                     minWidth: "auto",
-                                    px: 1.85,
-                                    py: 0.85,
-                                    color: "#60a5fa",
-                                    transition: "color 0.4s ease, background-color 0.4s ease",
+                                    px: 1.75,
+                                    py: 0.75,
+                                    color: "#64748b",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(226,232,240,0.95)",
+                                    bgcolor: "rgba(248,250,252,0.85)",
+                                    transition: "all 0.2s ease",
                                     "&:hover": {
-                                        color: "#38bdf8",
-                                        bgcolor: "rgba(56,189,248,0.12)"
+                                        color: "#334155",
+                                        bgcolor: "#fff",
+                                        borderColor: "rgba(148,163,184,0.45)"
                                     }
                                 },
                                 "& .Mui-selected": {
-                                    color: "#0ea5e9 !important",
-                                    fontWeight: 800,
-                                    bgcolor: "rgba(56,189,248,0.16)"
-                                },
-                                "& .MuiTabs-flexContainer": {gap: 0.25}
+                                    color: "#fff !important",
+                                    fontWeight: 700,
+                                    bgcolor: "#2563eb !important",
+                                    borderColor: "rgba(37,99,235,0.95) !important",
+                                    boxShadow: "0 2px 10px rgba(37,99,235,0.28)",
+                                    "&:hover": {
+                                        bgcolor: "#1d4ed8 !important",
+                                        borderColor: "rgba(29,78,216,0.95) !important"
+                                    }
+                                }
                             }}
                         >
                             <Tab label="Giới thiệu" disableRipple/>
                             <Tab label="Thông tin cơ sở" disableRipple/>
                             <Tab label="Chiến dịch tuyển sinh" disableRipple/>
-                            <Tab label="Chương trình đào tạo" disableRipple/>
                             <Tab label="Cơ sở vật chất" disableRipple/>
                             <Tab label="Chính sách" disableRipple/>
                             <Tab label="Đặt lịch tư vấn" disableRipple/>

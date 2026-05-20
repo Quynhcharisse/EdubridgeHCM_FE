@@ -27,8 +27,12 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
     useMediaQuery,
+    CircularProgress,
+    Tabs,
+    Tab,
 } from "@mui/material";
 import Pagination from "@mui/material/Pagination";
 import SearchIcon from "@mui/icons-material/Search";
@@ -49,73 +53,68 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
+import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {
+    confirmAdmissionReservationPayment,
     getCampusAdmissionReservationForms,
     processAdmissionReservationForm,
+    getAdmissionCampaigns,
+    autoApproveAdmissionReservations,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
+import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
+import {PaymentProofPreview} from "../admission/PaymentProofPreview.jsx";
+import RejectReasonAlert from "../admission/RejectReasonAlert.jsx";
+import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
+import {
+    HOC_BA_THCS_CODE,
+    HOC_BA_THCS_GRADE_LABELS,
+    formatReservationDateOfBirth,
+    pickCheckedDocumentsFromReservation,
+    pickProfileMetaDataFromTemplate,
+    pickReservationDateOfBirth,
+    reservationToReadonlyDocs,
+    sanitizeReservationDisplayValue,
+} from "../admission/admissionSubmissionUtils.js";
+import {
+    RESERVATION_STATUS,
+    RESERVATION_STATUS_FILTER_OPTIONS,
+    RESERVATION_STATUS_FILTER_VALUES,
+    getReservationStatusLabel,
+    getReservationStatusStyle,
+    normalizeReservationStatus,
+} from "../../../constants/reservationStatusConfig.js";
 
-const STATUS_OPTIONS = [
-    {value: "ALL", label: "Tất cả"},
-    {value: "RESERVATION_PENDING", label: "Chờ duyệt"},
-    {value: "RESERVATION_APPROVAL", label: "Đã duyệt"},
-    {value: "RESERVATION_REJECTED", label: "Từ chối"},
-    {value: "RESERVATION_CANCELLED", label: "Đã hủy"},
-];
+const STATUS_ICONS = {
+    [RESERVATION_STATUS.PENDING]: AccessTimeRoundedIcon,
+    [RESERVATION_STATUS.APPROVAL]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.PAYMENT_PENDING]: AccessTimeRoundedIcon,
+    [RESERVATION_STATUS.PAYMENT_REJECTED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.DEPOSITED]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.DEPOSIT_EXPIRED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.CONFIRMED]: CheckCircleRoundedIcon,
+    [RESERVATION_STATUS.GHOST]: CancelRoundedIcon,
+    [RESERVATION_STATUS.CANCELLED]: CancelRoundedIcon,
+    [RESERVATION_STATUS.REJECTED]: CancelRoundedIcon,
+};
 
-const VALID_STATUSES = new Set([
-    "RESERVATION_PENDING",
-    "RESERVATION_APPROVAL",
-    "RESERVATION_REJECTED",
-    "RESERVATION_CANCELLED",
-]);
-
-const STATUS_STYLES = {
-    RESERVATION_PENDING: {
-        label: "Chờ duyệt",
-        color: "#b45309",
-        bg: "#fff7ed",
-        border: "#fdba74",
-        icon: AccessTimeRoundedIcon,
-    },
-    RESERVATION_APPROVAL: {
-        label: "Đã duyệt",
-        color: "#166534",
-        bg: "#dcfce7",
-        border: "#86efac",
-        icon: CheckCircleRoundedIcon,
-    },
-    RESERVATION_REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fca5a5",
-        icon: CancelRoundedIcon,
-    },
-    RESERVATION_CANCELLED: {
-        label: "Đã hủy",
+const statusMeta = (status) => {
+    const key = normalizeReservationStatus(status);
+    const style = getReservationStatusStyle(status);
+    const icon = STATUS_ICONS[key] ?? AccessTimeRoundedIcon;
+    if (style) return {...style, icon};
+    if (!key) return {...getReservationStatusStyle(RESERVATION_STATUS.PENDING), icon};
+    return {
+        label: getReservationStatusLabel(status),
         color: "#475569",
-        bg: "#e2e8f0",
+        bg: "#f1f5f9",
         border: "#cbd5e1",
-        icon: CancelRoundedIcon,
-    },
-};
-
-const toStatusKey = (value) => {
-    const v = String(value || "").toUpperCase();
-    return VALID_STATUSES.has(v) ? v : "RESERVATION_PENDING";
-};
-
-const statusMeta = (status) => STATUS_STYLES[toStatusKey(status)] ?? STATUS_STYLES.RESERVATION_PENDING;
-
-const formatDateTime = (value) => {
-    if (!value) return "—";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString("vi-VN");
+        icon,
+    };
 };
 
 const formatDateOnly = (value) => {
@@ -162,12 +161,85 @@ const StatusChip = ({ status }) => {
     );
 };
 
-const flattenAttachments = (metadata = []) => {
+const displayOrDash = (value) => sanitizeReservationDisplayValue(value) ?? "—";
+
+const ROW_ACTION_BTN_BASE = {
+    width: 32,
+    height: 32,
+    borderRadius: 1.25,
+    border: "1px solid",
+    p: 0,
+    transition: "background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.15s ease, box-shadow 0.15s ease",
+    "& .MuiSvgIcon-root": {fontSize: 18},
+    "&.Mui-disabled": {opacity: 0.45},
+};
+
+const ROW_ACTION_VARIANTS = {
+    view: {
+        color: "#1d4ed8",
+        bgcolor: "#eff6ff",
+        borderColor: "#bfdbfe",
+        "&:hover": {
+            bgcolor: "#dbeafe",
+            borderColor: "#60a5fa",
+            boxShadow: "0 2px 8px rgba(37, 99, 235, 0.2)",
+            transform: "translateY(-1px)",
+        },
+    },
+    success: {
+        color: "#047857",
+        bgcolor: "#ecfdf5",
+        borderColor: "#86efac",
+        "&:hover": {
+            bgcolor: "#d1fae5",
+            borderColor: "#4ade80",
+            boxShadow: "0 2px 8px rgba(5, 150, 105, 0.22)",
+            transform: "translateY(-1px)",
+        },
+    },
+    danger: {
+        color: "#b91c1c",
+        bgcolor: "#fef2f2",
+        borderColor: "#fecaca",
+        "&:hover": {
+            bgcolor: "#fee2e2",
+            borderColor: "#f87171",
+            boxShadow: "0 2px 8px rgba(220, 38, 38, 0.2)",
+            transform: "translateY(-1px)",
+        },
+    },
+};
+
+function RowActionButton({variant = "view", title, disabled, onClick, children}) {
+    return (
+        <Tooltip title={title} arrow placement="top">
+            <span>
+                <IconButton
+                    size="small"
+                    disabled={disabled}
+                    onClick={onClick}
+                    aria-label={title}
+                    sx={{...ROW_ACTION_BTN_BASE, ...ROW_ACTION_VARIANTS[variant]}}
+                >
+                    {children}
+                </IconButton>
+            </span>
+        </Tooltip>
+    );
+}
+
+const flattenAttachments = (row) => {
+    if (!row) return [];
     const files = [];
-    metadata.forEach((item) => {
-        const urls = Array.isArray(item?.imageUrl) ? item.imageUrl : [];
-        urls.forEach((url) => {
-            if (url) files.push({ key: item?.key || "Tệp", url });
+    reservationToReadonlyDocs(row).forEach((doc) => {
+        const label = doc.name || doc.code || "Minh chứng";
+        (doc.slots || []).forEach((url, slotIndex) => {
+            if (!url) return;
+            const slotLabel =
+                doc.code === HOC_BA_THCS_CODE && HOC_BA_THCS_GRADE_LABELS[slotIndex]
+                    ? `${label} — ${HOC_BA_THCS_GRADE_LABELS[slotIndex]}`
+                    : label;
+            files.push({key: slotLabel, url});
         });
     });
     return files;
@@ -176,17 +248,25 @@ const flattenAttachments = (metadata = []) => {
 const mapRow = (item, index) => {
     const studentName = item?.studentName ?? item?.childName ?? item?.studentProfileName ?? "Học sinh chưa có tên";
     const parentName = item?.parentName ?? item?.guardianName ?? "Phụ huynh";
-    const status = String(item?.status ?? item?.formStatus ?? "").trim().toUpperCase();
+    const status = normalizeReservationStatus(item?.status ?? item?.formStatus);
     const submittedAt = item?.submittedAt ?? item?.createdTime ?? item?.createdAt ?? item?.createdDate;
+    const profileMetadata = pickProfileMetaDataFromTemplate(item);
+    const transcriptImages = Array.isArray(item?.transcriptImages) ? item.transcriptImages : [];
+    const dobRaw = pickReservationDateOfBirth(item);
+    const dateOfBirth = dobRaw ? formatReservationDateOfBirth(dobRaw) : "—";
     return {
         id: Number(item?.formId ?? item?.id ?? index + 1),
         campusId: Number(item?.campusId),
-        campusName: String(item?.campusName ?? "—"),
+        campusName: displayOrDash(item?.campusName),
         studentName: String(studentName),
-        currentSchool: String(item?.schoolName ?? item?.currentSchool ?? item?.currentSchoolName ?? "—"),
-        registerClass: String(item?.registerClass ?? item?.gradeName ?? item?.targetGrade ?? "—"),
-        programName: String(item?.programName ?? "—"),
-        methodName: String(item?.methodName ?? item?.admissionMethodCode ?? "—"),
+        studentCode: displayOrDash(item?.studentCode),
+        dateOfBirth,
+        currentSchool: displayOrDash(item?.schoolName ?? item?.currentSchool ?? item?.currentSchoolName),
+        registerClass: displayOrDash(item?.registerClass ?? item?.gradeName ?? item?.targetGrade),
+        programName: displayOrDash(item?.programName),
+        methodName: displayOrDash(item?.methodName ?? item?.admissionMethodCode),
+        campusProgramOfferingId: displayOrDash(item?.campusProgramOfferingId),
+        confirmCode: displayOrDash(item?.confirmCode ?? item?.confirm_code),
         submittedAt,
         parentName: String(parentName),
         phone: String(item?.parentPhone ?? item?.phone ?? "—"),
@@ -194,17 +274,21 @@ const mapRow = (item, index) => {
         address: String(item?.address ?? "—"),
         gender: String(item?.gender ?? "—"),
         identityCard: String(item?.identityCard ?? "—"),
-        profileMetadata: Array.isArray(item?.profileMetadata) ? item.profileMetadata : [],
+        profileMetadata,
+        transcriptImages,
+        paymentProofUrl: item?.paymentProofUrl ?? null,
         note: String(item?.note ?? item?.message ?? "").trim(),
         rejectReason: String(item?.rejectReason ?? "").trim(),
+        cancelReason: String(item?.cancelReason ?? "").trim(),
         status,
         raw: item,
     };
 };
 
-function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onViewDetail, onOpenPreview }) {
-    const isPending = row.status === "RESERVATION_PENDING";
-    const attachmentFiles = flattenAttachments(row.profileMetadata);
+function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onConfirmPayment, onRejectPayment, onViewDetail, onOpenPreview }) {
+    const isPending = row.status === RESERVATION_STATUS.PENDING;
+    const isPaymentPending = row.status === RESERVATION_STATUS.PAYMENT_PENDING;
+    const attachmentFiles = flattenAttachments(row);
     const meta = statusMeta(row.status);
     const StatusIcon = meta.icon;
 
@@ -251,9 +335,16 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                                 }}
                             />
                         </Stack>
-                        <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
+                        <Typography sx={{fontSize: 14, color: "#475569", mb: 0.5}}>
                             <strong>Học sinh:</strong> {row.studentName}
                         </Typography>
+                        {row.dateOfBirth !== "—" ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 1}}>
+                                <strong>Ngày sinh:</strong> {row.dateOfBirth}
+                            </Typography>
+                        ) : (
+                            <Box sx={{mb: 1}} />
+                        )}
                         <Stack direction={{xs: "column", sm: "row"}} spacing={{xs: 0.65, sm: 2}} sx={{mb: 0.7}}>
                             <Typography variant="body2" sx={{ color: "#475569" }}>
                                 <strong>SĐT:</strong> {row.phone || "—"}
@@ -267,6 +358,14 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                         <Typography variant="body2" sx={{ color: "#64748b", textAlign: {xs: "left", md: "right"} }}>
                             <strong>Ngày nộp:</strong> {formatDateOnly(row.submittedAt)}
                         </Typography>
+                        {row.status === RESERVATION_STATUS.CONFIRMED && row.confirmCode !== "—" ? (
+                            <Typography
+                                variant="body2"
+                                sx={{color: "#0369a1", fontWeight: 700, textAlign: {xs: "left", md: "right"}}}
+                            >
+                                <strong>Mã hồ sơ:</strong> {row.confirmCode}
+                            </Typography>
+                        ) : null}
                     </Stack>
                 </Stack>
                 {isPending ? (
@@ -297,6 +396,34 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                             Từ chối
                         </Button>
                     </Stack>
+                ) : isPaymentPending ? (
+                    <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 200 }, flexShrink: 0 }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<VisibilityRoundedIcon />}
+                            onClick={onViewDetail}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700, borderColor: "#bfdbfe", color: "#1e3a8a" }}
+                        >
+                            Xem chi tiết
+                        </Button>
+                        <Button
+                            variant="contained"
+                            disabled={isSubmitting}
+                            onClick={onConfirmPayment}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 800, background: "linear-gradient(90deg, #0D64DE 0%, #2563eb 100%)" }}
+                        >
+                            Xác nhận hoàn thành
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            disabled={isSubmitting}
+                            onClick={onRejectPayment}
+                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700 }}
+                        >
+                            Từ chối thanh toán
+                        </Button>
+                    </Stack>
                 ) : (
                     <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 180 }, flexShrink: 0 }}>
                         <Button
@@ -307,10 +434,6 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onVi
                         >
                             Xem chi tiết
                         </Button>
-                        <Chip
-                            label="Đã xử lý"
-                            sx={{ borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800 }}
-                        />
                     </Stack>
                 )}
             </Stack>
@@ -367,11 +490,25 @@ function DetailInfoRow({ label, value }) {
     );
 }
 
-function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onReject, isSubmitting, onOpenPreview, fullScreen }) {
-    const docs = Array.isArray(row?.profileMetadata) ? row.profileMetadata : [];
-    const isPending = row?.status === "RESERVATION_PENDING";
+function AdmissionReservationDetailDrawer({
+    open,
+    row,
+    onClose,
+    onApprove,
+    onReject,
+    onConfirmPayment,
+    onRejectPayment,
+    onPreviewPaymentProof,
+    isSubmitting,
+    fullScreen,
+}) {
+    const isPending = row?.status === RESERVATION_STATUS.PENDING;
+    const isPaymentPending = row?.status === RESERVATION_STATUS.PAYMENT_PENDING;
     const status = statusMeta(row?.status);
-    const flattened = flattenAttachments(row?.profileMetadata || []);
+    const readonlyDocs = React.useMemo(
+        () => (row ? reservationToReadonlyDocs(row) : []),
+        [row],
+    );
     return (
         <Dialog
             open={open}
@@ -402,6 +539,11 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                 <Box>
                     <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
                         Chi tiết hồ sơ nhập học
+                        {row?.status === RESERVATION_STATUS.CONFIRMED && row?.confirmCode !== "—"
+                            ? ` — ${row.confirmCode}`
+                            : row?.studentName && row.studentName !== "—"
+                              ? ` — ${row.studentName}`
+                              : ""}
                     </Typography>
                     <Typography sx={{fontSize: 13, color: "#475569", mt: 0.4}}>
                         Nộp ngày: {formatDateOnly(row?.submittedAt)}
@@ -420,6 +562,20 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
             </DialogTitle>
             <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
                 <Stack spacing={2.5}>
+                    {row?.status === RESERVATION_STATUS.REJECTED && row?.rejectReason ? (
+                        <RejectReasonAlert
+                            title="Lý do từ chối hồ sơ"
+                            reason={row.rejectReason}
+                            variant="profile"
+                        />
+                    ) : null}
+                    {row?.status === RESERVATION_STATUS.PAYMENT_REJECTED && row?.rejectReason ? (
+                        <RejectReasonAlert
+                            title="Lý do từ chối thanh toán"
+                            reason={row.rejectReason}
+                            variant="payment"
+                        />
+                    ) : null}
                     <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
                         <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
                             Thông tin học sinh
@@ -427,7 +583,12 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         <Stack spacing={0}>
                             <DetailInfoRow label="Học sinh" value={row?.studentName} />
                             <DetailInfoRow label="Giới tính" value={formatGender(row?.gender)} />
-                            <DetailInfoRow label="CCCD" value={row?.identityCard} />
+                            <DetailInfoRow
+                                label="Ngày sinh"
+                                value={row?.dateOfBirth !== "—" ? row?.dateOfBirth : undefined}
+                            />
+                            <DetailInfoRow label="CCCD học sinh" value={row?.studentCode !== "—" ? row?.studentCode : undefined} />
+                            <DetailInfoRow label="Trường đang học" value={row?.currentSchool !== "—" ? row?.currentSchool : undefined} />
                         </Stack>
                     </Paper>
 
@@ -437,6 +598,7 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                         </Typography>
                         <Stack spacing={0}>
                             <DetailInfoRow label="Phụ huynh" value={row?.parentName} />
+                            <DetailInfoRow label="CCCD phụ huynh" value={row?.identityCard} />
                             <DetailInfoRow label="Số điện thoại" value={row?.phone} />
                             <DetailInfoRow label="Email" value={row?.parentEmail} />
                             <DetailInfoRow label="Địa chỉ" value={row?.address} />
@@ -448,73 +610,54 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                             Thông tin hồ sơ tuyển sinh
                         </Typography>
                         <Stack spacing={0}>
-                            <DetailInfoRow label="Chương trình" value={row?.programName} />
-                            <DetailInfoRow label="Phương thức xét tuyển" value={row?.methodName} />
+                            <DetailInfoRow label="Chương trình" value={row?.programName !== "—" ? row?.programName : undefined} />
+                            <DetailInfoRow label="Phương thức xét tuyển" value={row?.methodName !== "—" ? row?.methodName : undefined} />
                         </Stack>
                     </Paper>
 
-                    {docs.length === 0 ? (
-                        <Paper elevation={0} sx={{p: 4, textAlign: "center", borderRadius: 3, border: "1px dashed #b8d8f4", bgcolor: "#eef7ff"}}>
-                            <Typography sx={{fontWeight: 700, color: "#475569"}}>
-                                Chưa có ảnh minh chứng trong hồ sơ này.
-                            </Typography>
-                        </Paper>
-                    ) : (
-                        docs.map((doc, docIndex) => {
-                            const images = Array.isArray(doc?.imageUrl) ? doc.imageUrl.filter(Boolean) : [];
-                            const startIndex = docs
-                                .slice(0, docIndex)
-                                .reduce((sum, item) => sum + (Array.isArray(item?.imageUrl) ? item.imageUrl.filter(Boolean).length : 0), 0);
-                            return (
-                                <Paper key={`${doc?.key || "document"}-${docIndex}`} elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}>
-                                    <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                        <Typography sx={{fontWeight: 700, color: "#1e3a8a"}}>
-                                            {doc?.key || "Minh chứng"}
-                                        </Typography>
-                                        <Chip label={`${images.length} ảnh`} size="small" sx={{bgcolor: "#eff6ff", color: "#1e3a8a", fontWeight: 800}} />
-                                    </Stack>
-                                    <Grid container spacing={1.5}>
-                                        {images.map((imageUrl, imageIndex) => (
-                                            <Grid key={`${imageUrl}-${imageIndex}`} item xs={6} sm={4} md={3}>
-                                                <Box
-                                                    component="button"
-                                                    type="button"
-                                                    onClick={() => onOpenPreview(row, startIndex + imageIndex)}
-                                                    sx={{
-                                                        display: "block",
-                                                        width: "100%",
-                                                        height: 150,
-                                                        p: 0,
-                                                        borderRadius: 2.5,
-                                                        overflow: "hidden",
-                                                        border: "1px solid #dbeafe",
-                                                        bgcolor: "#f1f5f9",
-                                                        cursor: "zoom-in",
-                                                    }}
-                                                >
-                                                    <Box component="img" src={imageUrl} alt={`${doc?.key || "Minh chứng"} ${imageIndex + 1}`} sx={{width: "100%", height: "100%", objectFit: "cover", display: "block"}} />
-                                                </Box>
-                                            </Grid>
-                                        ))}
-                                    </Grid>
-                                </Paper>
-                            );
-                        })
-                    )}
+                    <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+                        <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
+                            Minh chứng đính kèm
+                        </Typography>
+                        <AdmissionDocumentsSection
+                            docs={readonlyDocs}
+                            docsLoading={false}
+                            docsError=""
+                            cloudinaryReady
+                            uploadingSlots={new Set()}
+                            disabled
+                            readOnly
+                            onPickFile={() => {}}
+                            onRemoveSlot={() => {}}
+                            emptyMessage="Chưa có ảnh minh chứng trong hồ sơ này."
+                        />
+                    </Paper>
 
-                    {(row?.status === "RESERVATION_REJECTED" && row?.rejectReason) || row?.note ? (
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #fecaca", bgcolor: "#fef2f2"}}>
-                            <Typography sx={{fontWeight: 800, color: "#b91c1c", mb: 0.8}}>
-                                {row?.status === "RESERVATION_REJECTED" ? "Lý do từ chối" : "Ghi chú"}
+                    {isPaymentPending || row?.paymentProofUrl ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+                            <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
+                                Minh chứng thanh toán
                             </Typography>
-                            <Typography variant="body2" sx={{color: "#7f1d1d"}}>
-                                {row?.status === "RESERVATION_REJECTED" ? row?.rejectReason : row?.note}
+                            <PaymentProofPreview
+                                url={row?.paymentProofUrl}
+                                onPreview={row?.paymentProofUrl ? onPreviewPaymentProof : undefined}
+                            />
+                        </Paper>
+                    ) : null}
+
+                    {row?.note ? (
+                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}>
+                            <Typography sx={{fontWeight: 800, color: "#1e3a8a", mb: 0.8}}>
+                                Ghi chú
+                            </Typography>
+                            <Typography variant="body2" sx={{color: "#334155"}}>
+                                {row.note}
                             </Typography>
                         </Paper>
                     ) : null}
                 </Stack>
             </DialogContent>
-            <DialogActions sx={{p: 2, borderTop: "1px solid #b8d8f4", bgcolor: "#eef7ff"}}>
+            <DialogActions sx={{p: 2, borderTop: "1px solid #b8d8f4", bgcolor: "#eef7ff", flexWrap: "wrap", gap: 1}}>
                 {isPending ? (
                     <>
                         <Button variant="contained" onClick={onApprove} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
@@ -524,9 +667,16 @@ function AdmissionReservationDetailDrawer({ open, row, onClose, onApprove, onRej
                             Từ chối
                         </Button>
                     </>
-                ) : (
-                    <Chip label="Đã xử lý" sx={{borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800}} />
-                )}
+                ) : isPaymentPending ? (
+                    <>
+                        <Button variant="contained" onClick={onConfirmPayment} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                            Xác nhận hoàn thành
+                        </Button>
+                        <Button variant="outlined" color="error" onClick={onRejectPayment} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                            Từ chối thanh toán
+                        </Button>
+                    </>
+                ) : null}
             </DialogActions>
         </Dialog>
     );
@@ -552,15 +702,397 @@ function ImagePreviewModal({ open, images, selectedIndex, onChangeIndex, onClose
     );
 }
 
+const AUTO_APPROVE_STATUS_CONFIG = {
+    valid: {label: "Hợp lệ", color: "#166534", bg: "#f0fdf4", border: "#bbf7d0"},
+    invalid: {label: "Không hợp lệ", color: "#92400e", bg: "#fffbeb", border: "#fde68a"},
+    error: {label: "Hồ sơ lỗi", color: "#991b1b", bg: "#fef2f2", border: "#fecaca"},
+};
+
+function SummaryStatCard({label, value, color, bg, border, icon}) {
+    return (
+        <Paper elevation={0} sx={{flex: "1 1 0", minWidth: 110, borderRadius: 2.5, overflow: "hidden", border: `1px solid ${border}`}}>
+            <Box sx={{height: 3, bgcolor: color}} />
+            <Stack spacing={0.5} alignItems="center" sx={{p: 2, bgcolor: bg}}>
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                    {icon && <Box sx={{color, display: "flex"}}>{React.cloneElement(icon, {sx: {fontSize: 20}})}</Box>}
+                    <Typography sx={{fontSize: 30, fontWeight: 800, color, lineHeight: 1}}>{value}</Typography>
+                </Stack>
+                <Typography sx={{fontSize: 12, color, opacity: 0.72, fontWeight: 600}}>{label}</Typography>
+            </Stack>
+        </Paper>
+    );
+}
+
+function DocumentResultCard({doc}) {
+    const [open, setOpen] = React.useState(false);
+    const [imgPreview, setImgPreview] = React.useState(false);
+    const isValid = doc.status === "valid";
+    const details = Array.isArray(doc.details) ? doc.details : [];
+    const accentColor = isValid ? "#16a34a" : "#d97706";
+    return (
+        <Box sx={{borderRadius: 2, border: "1px solid #e2e8f0", overflow: "hidden", bgcolor: "#fff"}}>
+            <Box
+                onClick={() => details.length > 0 && setOpen((v) => !v)}
+                sx={{
+                    display: "flex", alignItems: "stretch",
+                    cursor: details.length > 0 ? "pointer" : "default",
+                    userSelect: "none",
+                    "&:hover": details.length > 0 ? {bgcolor: "#f8fafc"} : {},
+                    transition: "background-color 0.15s",
+                }}
+            >
+                <Box sx={{width: 3, flexShrink: 0, bgcolor: accentColor}} />
+                <Box sx={{flex: 1, minWidth: 0, px: 2, py: 1.25}}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{mb: doc.reason ? 0.4 : 0}}>
+                        <Typography sx={{fontWeight: 700, fontSize: 13, color: "#1e293b"}}>{doc.label || doc.key}</Typography>
+                        <Chip
+                            label={isValid ? "Hợp lệ" : "Không hợp lệ"}
+                            size="small"
+                            sx={{bgcolor: isValid ? "#dcfce7" : "#fef3c7", color: isValid ? "#166534" : "#92400e", fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}}
+                        />
+                    </Stack>
+                    {doc.reason && (
+                        <Typography sx={{color: "#b45309", fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
+                    )}
+                </Box>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{pr: 1.5, flexShrink: 0}} onClick={(e) => e.stopPropagation()}>
+                    {doc.submissionImage && (
+                        <Tooltip title="Xem ảnh minh chứng" arrow placement="top">
+                            <Box
+                                component="img"
+                                src={doc.submissionImage}
+                                alt={doc.label || doc.key}
+                                onClick={() => setImgPreview(true)}
+                                sx={{width: 36, height: 36, objectFit: "cover", borderRadius: 1, border: "1px solid #e2e8f0", cursor: "pointer", "&:hover": {opacity: 0.82, borderColor: "#93c5fd"}}}
+                            />
+                        </Tooltip>
+                    )}
+                    {details.length > 0 && (
+                        <Box
+                            onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+                            sx={{color: "#94a3b8", cursor: "pointer", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", display: "flex"}}
+                        >
+                            <ExpandMoreRoundedIcon sx={{fontSize: 20}} />
+                        </Box>
+                    )}
+                </Stack>
+            </Box>
+            {open && details.length > 0 && (
+                <Box sx={{px: 2, py: 1.5, bgcolor: "#f8fafc", borderTop: "1px solid #f1f5f9"}}>
+                    <Stack spacing={0.8}>
+                        {details.map((d, i) => (
+                            <Stack key={i} direction="row" spacing={1} alignItems="flex-start"
+                                sx={{p: 1, borderRadius: 1.5, bgcolor: d.passed ? "rgba(220,252,231,0.5)" : "rgba(254,226,226,0.45)"}}
+                            >
+                                <Box sx={{mt: 0.1, flexShrink: 0}}>
+                                    {d.passed
+                                        ? <CheckCircleRoundedIcon sx={{fontSize: 15, color: "#16a34a"}} />
+                                        : <CancelRoundedIcon sx={{fontSize: 15, color: "#dc2626"}} />
+                                    }
+                                </Box>
+                                <Box sx={{minWidth: 0}}>
+                                    <Typography sx={{fontSize: 12.5, color: "#1e293b", fontWeight: 600, lineHeight: 1.4}}>{d.criteria}</Typography>
+                                    {d.note && <Typography sx={{fontSize: 12, color: "#64748b", mt: 0.2, lineHeight: 1.4}}>{d.note}</Typography>}
+                                </Box>
+                            </Stack>
+                        ))}
+                    </Stack>
+                </Box>
+            )}
+            {doc.submissionImage && (
+                <Backdrop open={imgPreview} onClick={() => setImgPreview(false)} sx={{zIndex: 1500, bgcolor: "rgba(15,23,42,0.7)", backdropFilter: "blur(6px)"}}>
+                    <Fade in={imgPreview}>
+                        <Box onClick={(e) => e.stopPropagation()} sx={{position: "relative", display: "inline-flex"}}>
+                            <Box component="img" src={doc.submissionImage} alt={doc.label || doc.key} sx={{maxWidth: "88vw", maxHeight: "80vh", objectFit: "contain", borderRadius: 2, display: "block"}} />
+                            <IconButton onClick={() => setImgPreview(false)} size="small" sx={{position: "absolute", top: -12, right: -12, bgcolor: "white", "&:hover": {bgcolor: "#f1f5f9"}, boxShadow: 2}}>
+                                <CloseRoundedIcon sx={{fontSize: 18}} />
+                            </IconButton>
+                        </Box>
+                    </Fade>
+                </Backdrop>
+            )}
+        </Box>
+    );
+}
+
+function FormResultCard({form}) {
+    const [open, setOpen] = React.useState(false);
+    const s = AUTO_APPROVE_STATUS_CONFIG[form.overallStatus] ?? AUTO_APPROVE_STATUS_CONFIG.error;
+    const docs = Array.isArray(form.documents) ? form.documents : [];
+    return (
+        <Paper
+            elevation={0}
+            sx={{
+                borderRadius: 2, border: `1px solid ${s.border}`, overflow: "hidden",
+                transition: "box-shadow 0.18s",
+                "&:hover": docs.length > 0 ? {boxShadow: `0 2px 10px -2px ${s.border}`} : {},
+            }}
+        >
+            <Box
+                onClick={() => docs.length > 0 && setOpen((v) => !v)}
+                sx={{display: "flex", alignItems: "stretch", cursor: docs.length > 0 ? "pointer" : "default", userSelect: "none"}}
+            >
+                <Box sx={{width: 4, flexShrink: 0, bgcolor: s.color}} />
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{flex: 1, px: 2, py: 1.5, bgcolor: s.bg}}>
+                    <Stack direction="row" spacing={1.25} alignItems="center">
+                        <Typography sx={{fontWeight: 700, color: "#1e293b", fontSize: 14}}>
+                            Hồ sơ #{form.formId}
+                        </Typography>
+                        <Chip
+                            label={s.label}
+                            size="small"
+                            sx={{bgcolor: "rgba(255,255,255,0.85)", color: s.color, border: `1px solid ${s.border}`, fontWeight: 700, borderRadius: 999, height: 22, "& .MuiChip-label": {px: 1.25}, fontSize: 12}}
+                        />
+                    </Stack>
+                    {docs.length > 0 && (
+                        <Box sx={{color: "#94a3b8", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.22s", display: "flex"}}>
+                            <ExpandMoreRoundedIcon sx={{fontSize: 20}} />
+                        </Box>
+                    )}
+                </Stack>
+            </Box>
+            {open && docs.length > 0 && (
+                <Box sx={{p: 2, bgcolor: "#fafafa", borderTop: `1px solid ${s.border}`}}>
+                    <Stack spacing={1}>
+                        {docs.map((doc, i) => (
+                            <DocumentResultCard key={`${form.formId}-${doc.key ?? i}`} doc={doc} />
+                        ))}
+                    </Stack>
+                </Box>
+            )}
+        </Paper>
+    );
+}
+
+function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
+    const [step, setStep] = React.useState("select");
+    const [campaigns, setCampaigns] = React.useState([]);
+    const [campaignsLoading, setCampaignsLoading] = React.useState(false);
+    const [selectedCampaignId, setSelectedCampaignId] = React.useState("");
+    const [selectedCampaignName, setSelectedCampaignName] = React.useState("");
+    const [processing, setProcessing] = React.useState(false);
+    const [result, setResult] = React.useState(null);
+    const [activeTab, setActiveTab] = React.useState("valid");
+
+    // Fetch campaigns khi dialog mở
+    React.useEffect(() => {
+        if (!open) return;
+        setStep("select");
+        setResult(null);
+        setSelectedCampaignId("");
+        setSelectedCampaignName("");
+        setActiveTab("valid");
+        setCampaignsLoading(true);
+        getAdmissionCampaigns()
+            .then((data) => {
+                setCampaigns(data);
+                if (data.length === 1) {
+                    setSelectedCampaignId(String(data[0].id));
+                    setSelectedCampaignName(data[0].name ?? "");
+                }
+            })
+            .catch(() => enqueueSnackbar("Không thể lấy danh sách chiến dịch tuyển sinh.", {variant: "error"}))
+            .finally(() => setCampaignsLoading(false));
+    }, [open]);
+
+    const handleRun = async () => {
+        if (!selectedCampaignId) return;
+        setProcessing(true);
+        try {
+            const data = await autoApproveAdmissionReservations(selectedCampaignId);
+            setResult(data);
+            setStep("result");
+            onDone();
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể tự động duyệt hồ sơ."), {variant: "error"});
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const totalForms = result?.totalForms ?? 0;
+    const summary = result?.summary ?? {valid: 0, invalid: 0, error: 0};
+    const forms = Array.isArray(result?.forms) ? result.forms : [];
+    const validForms = forms.filter((f) => f.overallStatus === "valid");
+    const invalidForms = forms.filter((f) => f.overallStatus === "invalid");
+    const errorForms = forms.filter((f) => f.overallStatus === "error");
+
+    const TAB_CONFIG = [
+        {key: "valid",   label: "Hợp lệ",       count: validForms.length,   activeColor: "#166534"},
+        {key: "invalid", label: "Không hợp lệ", count: invalidForms.length, activeColor: "#d97706"},
+        {key: "error",   label: "Lỗi",           count: errorForms.length,   activeColor: "#dc2626"},
+    ];
+
+    return (
+        <Dialog
+            open={open}
+            onClose={processing ? undefined : onClose}
+            fullWidth
+            maxWidth={step === "result" ? "md" : "sm"}
+            PaperProps={{sx: {borderRadius: 3, overflow: "hidden"}}}
+        >
+            <DialogTitle sx={{display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2.25, bgcolor: "#d9ecff", borderBottom: "1px solid #b8d8f4"}}>
+                <Box>
+                    <Typography sx={{fontSize: 18, fontWeight: 700, color: "#0f172a"}}>
+                        {step === "result" ? "Kết quả xét duyệt tự động" : "Duyệt hồ sơ tự động"}
+                    </Typography>
+                    {step === "result" && selectedCampaignName && (
+                        <Typography sx={{fontSize: 13, color: "#475569", mt: 0.3}}>{selectedCampaignName}</Typography>
+                    )}
+                </Box>
+                <IconButton onClick={onClose} disabled={processing} size="small">
+                    <CloseRoundedIcon />
+                </IconButton>
+            </DialogTitle>
+
+            <DialogContent sx={{p: 0, bgcolor: "#f8fafc"}}>
+                {step === "select" ? (
+                    <Stack spacing={2.5} sx={{p: 3}}>
+                        <Typography variant="body2" sx={{color: "#475569"}}>
+                            Chọn chiến dịch tuyển sinh để hệ thống tự động xét duyệt tất cả hồ sơ đang chờ xét.
+                        </Typography>
+                        {campaignsLoading ? (
+                            <Box sx={{display: "flex", justifyContent: "center", py: 3}}>
+                                <CircularProgress size={28} />
+                            </Box>
+                        ) : (
+                            <TextField
+                                select
+                                fullWidth
+                                value={selectedCampaignId}
+                                onChange={(e) => {
+                                    const id = e.target.value;
+                                    setSelectedCampaignId(id);
+                                    setSelectedCampaignName(campaigns.find((c) => String(c.id) === id)?.name ?? "");
+                                }}
+                                size="small"
+                                sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff"}}}
+                            >
+                                {campaigns.length === 0 ? (
+                                    <MenuItem value="" disabled>Không có chiến dịch đang hoạt động</MenuItem>
+                                ) : campaigns.map((c) => (
+                                    <MenuItem key={c.id} value={String(c.id)}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <span>{c.name}</span>
+                                            {c.isActive && (
+                                                <Chip label="Đang hoạt động" size="small" sx={{bgcolor: "#dcfce7", color: "#166534", fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}} />
+                                            )}
+                                        </Stack>
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        )}
+                    </Stack>
+                ) : (
+                    <Box>
+                        {/* Summary strip */}
+                        <Box sx={{px: 3, pt: 2.5, pb: 2, bgcolor: "#fff", borderBottom: "1px solid #e2e8f0"}}>
+                            <Stack direction="row" spacing={1.5}>
+                                <SummaryStatCard label="Tổng hồ sơ" value={totalForms} color="#1e3a8a" bg="#eff6ff" border="#bfdbfe" />
+                                <SummaryStatCard label="Hợp lệ" value={summary.valid} color="#166534" bg="#f0fdf4" border="#bbf7d0" icon={<CheckCircleRoundedIcon />} />
+                                <SummaryStatCard label="Không hợp lệ" value={summary.invalid} color="#92400e" bg="#fffbeb" border="#fde68a" icon={<WarningAmberRoundedIcon />} />
+                                <SummaryStatCard label="Lỗi" value={summary.error} color="#991b1b" bg="#fef2f2" border="#fecaca" icon={<CancelRoundedIcon />} />
+                            </Stack>
+                        </Box>
+
+                        {/* Tabs */}
+                        {forms.length === 0 ? (
+                            <Stack alignItems="center" spacing={1} sx={{py: 4}}>
+                                <CheckCircleRoundedIcon sx={{fontSize: 36, color: "#86efac"}} />
+                                <Typography sx={{color: "#64748b", fontWeight: 500}}>Không có hồ sơ nào được xử lý.</Typography>
+                            </Stack>
+                        ) : (
+                            <Box>
+                                <Box sx={{borderBottom: "1px solid #e2e8f0", bgcolor: "#fff", px: 3}}>
+                                    <Tabs
+                                        value={activeTab}
+                                        onChange={(_, v) => setActiveTab(v)}
+                                        sx={{
+                                            "& .MuiTab-root": {textTransform: "none", fontWeight: 700, fontSize: 13.5, minHeight: 44, px: 2},
+                                            "& .MuiTabs-indicator": {height: 3, borderRadius: "3px 3px 0 0"},
+                                        }}
+                                    >
+                                        {TAB_CONFIG.map(({key, label, count, activeColor}) => (
+                                            <Tab
+                                                key={key}
+                                                value={key}
+                                                label={
+                                                    <Stack direction="row" spacing={0.75} alignItems="center">
+                                                        <span>{label}</span>
+                                                        <Box sx={{
+                                                            minWidth: 20, height: 20, borderRadius: 999, px: 0.75,
+                                                            bgcolor: activeTab === key ? activeColor : "#e2e8f0",
+                                                            color: activeTab === key ? "#fff" : "#64748b",
+                                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                                            fontSize: 11, fontWeight: 800, lineHeight: 1, transition: "background-color 0.2s",
+                                                        }}>
+                                                            {count}
+                                                        </Box>
+                                                    </Stack>
+                                                }
+                                            />
+                                        ))}
+                                    </Tabs>
+                                </Box>
+                                <Box sx={{px: 3, py: 2.5}}>
+                                    {activeTab === "valid" && (
+                                        validForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ hợp lệ.</Typography>
+                                            : <Stack spacing={1}>{validForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                    {activeTab === "invalid" && (
+                                        invalidForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ không hợp lệ.</Typography>
+                                            : <Stack spacing={1}>{invalidForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                    {activeTab === "error" && (
+                                        errorForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ lỗi.</Typography>
+                                            : <Stack spacing={1}>{errorForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
+                                </Box>
+                            </Box>
+                        )}
+                    </Box>
+                )}
+            </DialogContent>
+
+            <DialogActions sx={{px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "#fff", gap: 1}}>
+                {step === "select" ? (
+                    <>
+                        <Button onClick={onClose} disabled={processing} variant="outlined" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}>
+                            Hủy
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleRun}
+                            disabled={!selectedCampaignId || processing || campaignsLoading}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <DoneAllRoundedIcon />}
+                            sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}
+                        >
+                            {processing ? "Đang xử lý..." : "Duyệt tất cả"}
+                        </Button>
+                    </>
+                ) : (
+                    <Button onClick={onClose} variant="contained" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, px: 3}}>
+                        Đóng
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 export default function SchoolCampusAdmissionReservations() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-    const {currentCampusId, loading: schoolCtxLoading} = useSchool();
+    const {loading: schoolCtxLoading} = useSchool();
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [search, setSearch] = React.useState("");
-    const [statusFilter, setStatusFilter] = React.useState("RESERVATION_PENDING");
+    const [statusFilter, setStatusFilter] = React.useState("ALL");
+    const [pendingCount, setPendingCount] = React.useState(0);
     const [page, setPage] = React.useState(0);
     const [pageSize] = React.useState(12);
     const [totalItems, setTotalItems] = React.useState(0);
@@ -573,26 +1105,25 @@ export default function SchoolCampusAdmissionReservations() {
 
     const [confirmState, setConfirmState] = React.useState({open: false, form: null});
     const [rejectState, setRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
+    const [paymentConfirmState, setPaymentConfirmState] = React.useState({open: false, form: null});
+    const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
+    const [autoApproveOpen, setAutoApproveOpen] = React.useState(false);
 
-    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
-        if (!VALID_STATUSES.has(nextStatus)) return;
-        setDetailOpen(false);
-        setSelectedReservation(null);
-        setStatusFilter(nextStatus);
-        setPage(0);
-    }, []);
-
-    const loadData = React.useCallback(async () => {
+    const loadData = React.useCallback(async ({statusOverride, pageOverride} = {}) => {
+        const activeStatus = statusOverride ?? statusFilter;
+        const activePage = pageOverride ?? page;
         setLoading(true);
         setError("");
         try {
             const res = await getCampusAdmissionReservationForms({
-                status: statusFilter,
+                status: activeStatus,
             });
-            const allRows = Array.isArray(res?.items)
-                ? res.items.map(mapRow).filter((row) => VALID_STATUSES.has(row.status))
-                : [];
+            let allRows = Array.isArray(res?.items) ? res.items.map(mapRow) : [];
+            if (activeStatus !== "ALL") {
+                allRows = allRows.filter((row) => row.status === activeStatus);
+            }
+            setPendingCount(allRows.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
             allRows.sort((a, b) => {
                 const diff = new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
                 return sortBy === "OLDEST" ? -diff : diff;
@@ -603,18 +1134,22 @@ export default function SchoolCampusAdmissionReservations() {
                 ? allRows.filter((row) =>
                     [
                         row.studentName,
+                        row.studentCode,
+                        row.dateOfBirth,
+                        row.confirmCode,
                         row.parentName,
                         row.phone,
                         row.parentEmail,
                         row.currentSchool,
                         row.programName,
                         row.methodName,
+                        row.identityCard,
                     ].some((field) => String(field || "").toLowerCase().includes(kw))
                 )
                 : allRows;
 
             const total = filtered.length;
-            const start = page * pageSize;
+            const start = activePage * pageSize;
             const pagedRows = filtered.slice(start, start + pageSize);
             setRows(pagedRows);
             setTotalItems(total);
@@ -627,6 +1162,15 @@ export default function SchoolCampusAdmissionReservations() {
         }
     }, [page, pageSize, search, statusFilter, sortBy]);
 
+    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
+        if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
+        setDetailOpen(false);
+        setSelectedReservation(null);
+        setStatusFilter(nextStatus);
+        setPage(0);
+        void loadData({statusOverride: nextStatus, pageOverride: 0});
+    }, [loadData]);
+
     React.useEffect(() => {
         if (schoolCtxLoading) return;
         void loadData();
@@ -636,33 +1180,39 @@ export default function SchoolCampusAdmissionReservations() {
         setPage(0);
     }, [search, statusFilter]);
 
-    const pendingCount = React.useMemo(() => rows.filter((row) => row.status === "RESERVATION_PENDING").length, [rows]);
     const openDetail = (row) => {
         setSelectedReservation(row);
         setDetailOpen(true);
     };
     const openImagePreview = (row, index = 0) => {
-        const files = flattenAttachments(row?.profileMetadata || []);
+        const files = flattenAttachments(row);
         if (files.length === 0) return;
         setPreviewImages(files);
         setSelectedImageIndex(Math.max(0, Math.min(index, files.length - 1)));
         setImagePreviewOpen(true);
     };
+    const openPaymentProofPreview = (row) => {
+        const url = row?.paymentProofUrl;
+        if (!url) return;
+        setPreviewImages([{key: "Minh chứng thanh toán", url}]);
+        setSelectedImageIndex(0);
+        setImagePreviewOpen(true);
+    };
 
     const handleApprove = async () => {
         const form = confirmState.form;
-        const resolvedCampusId = Number(currentCampusId ?? form?.campusId ?? form?.raw?.campusId);
         if (!form) return;
+        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
-                campusId: Number.isFinite(resolvedCampusId) ? resolvedCampusId : undefined,
                 action: "APPROVE",
+                checkedDocuments,
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
             setConfirmState({open: false, form: null});
-            redirectToProcessedStatusView("RESERVATION_APPROVAL");
+            redirectToProcessedStatusView(RESERVATION_STATUS.APPROVAL);
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể phê duyệt hồ sơ."), {variant: "error"});
         } finally {
@@ -673,25 +1223,69 @@ export default function SchoolCampusAdmissionReservations() {
     const handleRejectSubmit = async () => {
         const form = rejectState.form;
         const reason = String(rejectState.reason || "").trim();
-        const resolvedCampusId = Number(currentCampusId ?? form?.campusId ?? form?.raw?.campusId);
         if (!form) return;
         if (!reason) {
             setRejectState((prev) => ({...prev, touched: true}));
             return;
         }
+        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
-                campusId: Number.isFinite(resolvedCampusId) ? resolvedCampusId : undefined,
                 action: "REJECT",
                 rejectReason: reason,
+                checkedDocuments,
             });
             enqueueSnackbar("Từ chối thành công", {variant: "success"});
             setRejectState({open: false, form: null, reason: "", touched: false});
-            redirectToProcessedStatusView("RESERVATION_REJECTED");
+            redirectToProcessedStatusView(RESERVATION_STATUS.REJECTED);
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối hồ sơ."), {variant: "error"});
+        } finally {
+            setSubmittingId(null);
+        }
+    };
+
+    const handlePaymentConfirm = async () => {
+        const form = paymentConfirmState.form;
+        if (!form) return;
+        setSubmittingId(form.id);
+        try {
+            await confirmAdmissionReservationPayment({
+                formId: form.id,
+                action: "CONFIRM",
+            });
+            enqueueSnackbar("Xác nhận hoàn thành thành công", {variant: "success"});
+            setPaymentConfirmState({open: false, form: null});
+            redirectToProcessedStatusView(RESERVATION_STATUS.DEPOSITED);
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể xác nhận thanh toán."), {variant: "error"});
+        } finally {
+            setSubmittingId(null);
+        }
+    };
+
+    const handlePaymentRejectSubmit = async () => {
+        const form = paymentRejectState.form;
+        const reason = String(paymentRejectState.reason || "").trim();
+        if (!form) return;
+        if (!reason) {
+            setPaymentRejectState((prev) => ({...prev, touched: true}));
+            return;
+        }
+        setSubmittingId(form.id);
+        try {
+            await confirmAdmissionReservationPayment({
+                formId: form.id,
+                action: "REJECT_PAYMENT",
+                rejectReason: reason,
+            });
+            enqueueSnackbar("Từ chối thanh toán thành công", {variant: "success"});
+            setPaymentRejectState({open: false, form: null, reason: "", touched: false});
+            redirectToProcessedStatusView(RESERVATION_STATUS.PAYMENT_REJECTED);
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối thanh toán."), {variant: "error"});
         } finally {
             setSubmittingId(null);
         }
@@ -722,7 +1316,31 @@ export default function SchoolCampusAdmissionReservations() {
                             </Typography>
                         </Box>
                     </Stack>
-                    <Chip label={`Còn lại: ${pendingCount} hồ sơ`} sx={{ alignSelf: {xs: "flex-start", sm: "flex-end"}, borderRadius: 999, bgcolor: "rgba(255,255,255,0.95)", color: "#0D64DE", fontWeight: 800 }} />
+                    <Stack direction={{xs: "column", sm: "row"}} spacing={1} alignItems={{xs: "flex-start", sm: "center"}}>
+                        <Chip label={`Còn lại: ${pendingCount} hồ sơ`} sx={{ borderRadius: 999, bgcolor: "rgba(255,255,255,0.95)", color: "#0D64DE", fontWeight: 800 }} />
+                        {pendingCount > 0 && (
+                            <Button
+                                variant="contained"
+                                startIcon={<DoneAllRoundedIcon />}
+                                onClick={() => setAutoApproveOpen(true)}
+                                sx={{
+                                    textTransform: "none",
+                                    borderRadius: 999,
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(255,255,255,0.18)",
+                                    color: "white",
+                                    border: "1px solid rgba(255,255,255,0.5)",
+                                    backdropFilter: "blur(4px)",
+                                    "&:hover": {bgcolor: "rgba(255,255,255,0.3)", borderColor: "white"},
+                                    "&.Mui-disabled": {opacity: 0.55, color: "white"},
+                                    boxShadow: "none",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                Duyệt hồ sơ (tự động)
+                            </Button>
+                        )}
+                    </Stack>
                 </Box>
             </Box>
 
@@ -763,7 +1381,7 @@ export default function SchoolCampusAdmissionReservations() {
                             onChange={(e) => setStatusFilter(e.target.value)}
                             sx={{minWidth: 180, "& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "white"}}}
                         >
-                            {STATUS_OPTIONS.map((s) => (
+                            {RESERVATION_STATUS_FILTER_OPTIONS.map((s) => (
                                 <MenuItem key={s.value} value={s.value}>
                                     {s.label}
                                 </MenuItem>
@@ -821,7 +1439,7 @@ export default function SchoolCampusAdmissionReservations() {
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Chương trình</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Ngày nộp</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Trạng thái</TableCell>
-                                        <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", py: 2, minWidth: 150}}>Thao tác</TableCell>
+                                        <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", py: 2, minWidth: 128}}>Thao tác</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -840,39 +1458,53 @@ export default function SchoolCampusAdmissionReservations() {
                                             <TableCell sx={{py: 2.25, whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
                                             <TableCell sx={{py: 2.25}}><StatusChip status={row.status} /></TableCell>
                                             <TableCell align="right" sx={{py: 2.25}}>
-                                                <Stack direction="row" spacing={0.25} justifyContent="flex-end">
-                                                    <IconButton
-                                                        size="small"
+                                                <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
+                                                    <RowActionButton
+                                                        variant="view"
+                                                        title="Xem chi tiết"
                                                         onClick={() => openDetail(row)}
-                                                        sx={{ color: "#64748b", "&:hover": { color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)" } }}
-                                                        aria-label="Xem chi tiết"
                                                     >
-                                                        <VisibilityRoundedIcon fontSize="small" />
-                                                    </IconButton>
-                                                    {row.status === "RESERVATION_PENDING" ? (
+                                                        <VisibilityRoundedIcon />
+                                                    </RowActionButton>
+                                                    {row.status === RESERVATION_STATUS.PENDING ? (
                                                         <>
-                                                            <IconButton
-                                                                size="small"
+                                                            <RowActionButton
+                                                                variant="success"
+                                                                title="Phê duyệt"
                                                                 disabled={submittingId === row.id}
                                                                 onClick={() => setConfirmState({open: true, form: row})}
-                                                                sx={{ color: "#64748b", "&:hover": { color: "#0D64DE", bgcolor: "rgba(13, 100, 222, 0.08)" } }}
-                                                                aria-label="Phê duyệt"
                                                             >
-                                                                <CheckCircleRoundedIcon fontSize="small" />
-                                                            </IconButton>
-                                                            <IconButton
-                                                                size="small"
+                                                                <CheckCircleRoundedIcon />
+                                                            </RowActionButton>
+                                                            <RowActionButton
+                                                                variant="danger"
+                                                                title="Từ chối hồ sơ"
                                                                 disabled={submittingId === row.id}
                                                                 onClick={() => setRejectState({open: true, form: row, reason: "", touched: false})}
-                                                                sx={{ color: "#64748b", "&:hover": { color: "#dc2626", bgcolor: "rgba(220, 38, 38, 0.08)" } }}
-                                                                aria-label="Từ chối"
                                                             >
-                                                                <CancelRoundedIcon fontSize="small" />
-                                                            </IconButton>
+                                                                <CancelRoundedIcon />
+                                                            </RowActionButton>
                                                         </>
-                                                    ) : (
-                                                        <Chip label="Đã xử lý" size="small" sx={{borderRadius: 999, bgcolor: "#f1f5f9", color: "#475569", fontWeight: 800}} />
-                                                    )}
+                                                    ) : row.status === RESERVATION_STATUS.PAYMENT_PENDING ? (
+                                                        <>
+                                                            <RowActionButton
+                                                                variant="success"
+                                                                title="Xác nhận hoàn thành"
+                                                                disabled={submittingId === row.id}
+                                                                onClick={() => setPaymentConfirmState({open: true, form: row})}
+                                                            >
+                                                                <CheckCircleRoundedIcon />
+                                                            </RowActionButton>
+                                                            <RowActionButton
+                                                                variant="danger"
+                                                                title="Từ chối thanh toán"
+                                                                disabled={submittingId === row.id}
+                                                                onClick={() => setPaymentRejectState({open: true, form: row, reason: "", touched: false})}
+                                                            >
+                                                                <CancelRoundedIcon />
+                                                            </RowActionButton>
+                                                        </>
+                                                    ) : null}
                                                 </Stack>
                                             </TableCell>
                                         </TableRow>
@@ -895,36 +1527,103 @@ export default function SchoolCampusAdmissionReservations() {
                 </>
             )}
 
-            <Dialog open={confirmState.open} onClose={() => setConfirmState({open: false, form: null})} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{fontWeight: 800}}>Xác nhận phê duyệt</DialogTitle>
-                <DialogContent><Typography>Bạn có chắc muốn duyệt đơn này?</Typography></DialogContent>
-                <DialogActions sx={{p: 2}}>
-                    <Button onClick={() => setConfirmState({open: false, form: null})} disabled={submittingId != null}>Hủy</Button>
-                    <Button variant="contained" onClick={handleApprove} disabled={submittingId != null}>Xác nhận</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={confirmState.open}
+                title="Xác nhận phê duyệt"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>phê duyệt</ConfirmHighlight> hồ sơ nhập học này?
+                    </>
+                }
+                extraDescription={
+                    <>
+                        Hồ sơ sẽ chuyển sang trạng thái <ConfirmHighlight>đã duyệt</ConfirmHighlight> và phụ huynh có thể tiếp tục thanh toán.
+                    </>
+                }
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Phê duyệt"}
+                loading={submittingId != null}
+                onCancel={() => setConfirmState({open: false, form: null})}
+                onConfirm={handleApprove}
+            />
 
-            <Dialog open={rejectState.open} onClose={() => setRejectState({open: false, form: null, reason: "", touched: false})} maxWidth="sm" fullWidth>
-                <DialogTitle sx={{fontWeight: 800}}>Xác nhận từ chối</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={1.2} sx={{pt: 0.5}}>
-                        <Typography variant="body2" sx={{color: "#475569"}}>Nhập lý do từ chối hồ sơ.</Typography>
-                        <TextField
-                            multiline
-                            minRows={3}
-                            placeholder="Nhập lý do từ chối..."
-                            value={rejectState.reason}
-                            onChange={(e) => setRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
-                            error={rejectState.touched && !String(rejectState.reason || "").trim()}
-                            helperText={rejectState.touched && !String(rejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
-                        />
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{p: 2}}>
-                    <Button onClick={() => setRejectState({open: false, form: null, reason: "", touched: false})} disabled={submittingId != null}>Hủy</Button>
-                    <Button color="error" variant="contained" onClick={handleRejectSubmit} disabled={submittingId != null}>Xác nhận từ chối</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={rejectState.open}
+                title="Xác nhận từ chối hồ sơ"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>từ chối hồ sơ</ConfirmHighlight> nhập học này?
+                    </>
+                }
+                extraDescription="Vui lòng nhập lý do từ chối bên dưới."
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận từ chối"}
+                confirmColor="error"
+                loading={submittingId != null}
+                onCancel={() => setRejectState({open: false, form: null, reason: "", touched: false})}
+                onConfirm={handleRejectSubmit}
+            >
+                <TextField
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    placeholder="Nhập lý do từ chối..."
+                    value={rejectState.reason}
+                    onChange={(e) => setRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
+                    error={rejectState.touched && !String(rejectState.reason || "").trim()}
+                    helperText={rejectState.touched && !String(rejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
+                    sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff", fontSize: 15}}}
+                />
+            </ConfirmDialog>
+
+            <ConfirmDialog
+                open={paymentConfirmState.open}
+                title="Xác nhận hoàn thành"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>xác nhận minh chứng thanh toán</ConfirmHighlight> và hoàn tất đơn này?
+                    </>
+                }
+                extraDescription={
+                    <>
+                        Đơn sẽ chuyển sang trạng thái <ConfirmHighlight>đã đặt cọc</ConfirmHighlight> sau khi xác nhận.
+                    </>
+                }
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận hoàn thành"}
+                loading={submittingId != null}
+                onCancel={() => setPaymentConfirmState({open: false, form: null})}
+                onConfirm={handlePaymentConfirm}
+            />
+
+            <ConfirmDialog
+                open={paymentRejectState.open}
+                title="Từ chối thanh toán"
+                description={
+                    <>
+                        Bạn có chắc chắn muốn <ConfirmHighlight>từ chối minh chứng thanh toán</ConfirmHighlight> này?
+                    </>
+                }
+                extraDescription="Vui lòng nhập lý do từ chối bên dưới."
+                cancelText="Hủy"
+                confirmText={submittingId != null ? "Đang xử lý..." : "Xác nhận từ chối"}
+                confirmColor="error"
+                loading={submittingId != null}
+                onCancel={() => setPaymentRejectState({open: false, form: null, reason: "", touched: false})}
+                onConfirm={handlePaymentRejectSubmit}
+            >
+                <TextField
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    placeholder="Nhập lý do từ chối..."
+                    value={paymentRejectState.reason}
+                    onChange={(e) => setPaymentRejectState((prev) => ({...prev, reason: e.target.value, touched: true}))}
+                    error={paymentRejectState.touched && !String(paymentRejectState.reason || "").trim()}
+                    helperText={paymentRejectState.touched && !String(paymentRejectState.reason || "").trim() ? "Vui lòng nhập lý do" : ""}
+                    sx={{"& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "#fff", fontSize: 15}}}
+                />
+            </ConfirmDialog>
 
             <AdmissionReservationDetailDrawer
                 open={detailOpen}
@@ -940,7 +1639,15 @@ export default function SchoolCampusAdmissionReservations() {
                     setRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
                     if (isMobile) setDetailOpen(false);
                 }}
-                onOpenPreview={openImagePreview}
+                onConfirmPayment={() => {
+                    setPaymentConfirmState({ open: true, form: selectedReservation });
+                    if (isMobile) setDetailOpen(false);
+                }}
+                onRejectPayment={() => {
+                    setPaymentRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
+                    if (isMobile) setDetailOpen(false);
+                }}
+                onPreviewPaymentProof={() => openPaymentProofPreview(selectedReservation)}
             />
 
             <ImagePreviewModal
@@ -949,6 +1656,13 @@ export default function SchoolCampusAdmissionReservations() {
                 selectedIndex={selectedImageIndex}
                 onChangeIndex={setSelectedImageIndex}
                 onClose={() => setImagePreviewOpen(false)}
+            />
+
+            <AutoApproveDialog
+                open={autoApproveOpen}
+                onClose={() => setAutoApproveOpen(false)}
+                onDone={loadData}
+                pendingCount={pendingCount}
             />
         </Box>
     );

@@ -1,18 +1,29 @@
 import React from "react";
 import {
+    Alert,
     Box,
     Button,
     ButtonBase,
     Card,
     CardMedia,
+    Checkbox,
     Chip,
     Container,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Divider,
+    Modal,
+    FormControl,
+    FormControlLabel,
     IconButton,
     InputAdornment,
     Link,
+    LinearProgress,
     MenuItem,
     Pagination,
+    Select,
     Slider,
     Stack,
     TextField,
@@ -23,10 +34,13 @@ import {
     Add as AddIcon,
     AutoAwesome as SparkleIcon,
     CheckCircle as CheckCircleIcon,
+    Close as CloseIcon,
+    FactCheck as FactCheckIcon,
     Favorite as FavoriteIcon,
     FavoriteBorder as FavoriteBorderIcon,
     Language as LanguageIcon,
     LocationOn as LocationOnIcon,
+    PersonOutline as PersonOutlineIcon,
     Phone as PhoneIcon,
     Search as SearchIcon,
     Tune as TuneIcon
@@ -48,7 +62,8 @@ import {
     MAX_COMPARE_SCHOOLS,
     setCompareSchools
 } from "../../utils/compareSchoolsStorage";
-import {showSuccessSnackbar, showWarningSnackbar} from "../ui/AppSnackbar.jsx";
+import {showErrorSnackbar, showSuccessSnackbar, showWarningSnackbar} from "../ui/AppSnackbar.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import {
     getSchoolStorageKey,
     getUserIdentity
@@ -60,9 +75,30 @@ import {
 } from "../../services/SchoolPublicService.jsx";
 import {
     deleteParentFavouriteSchool,
+    getParentAdmissionDocuments,
+    getParentAdmissionReservationFormTemplate,
+    putParentAdmissionSchoolsAvailability,
     getParentFavouriteSchools,
+    getParentStudent,
+    getParentStudentById,
+    pickAdmissionDocumentsFromResponse,
+    pickStudentDetailBodyFromResponse,
+    pickAdmissionSchoolsAvailabilityFromResponse,
+    postParentAdmissionReservationForm,
     postParentFavouriteSchool
 } from "../../services/ParentService.jsx";
+import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
+import {
+    applyReservationTemplateToDocs,
+    buildInitialDocsState,
+    buildSubmissionDocumentsPayload,
+    cloneEmptyCatalogDocs,
+    hasSavedReservationTemplateForStudent,
+    HOC_BA_THCS_GRADE_LABELS,
+    mapStudentProfileForAvailabilitySummary,
+    pickReservationTemplateBodyFromResponse,
+    pickStudentProfileIdFromTemplateBody,
+} from "./admission/admissionSubmissionUtils.js";
 import SchoolSearchDetailView from "./SchoolSearchDetailView.jsx";
 import {DEFAULT_SCHOOL_IMAGE, mapPublicSchoolDetailToRow, normalizeProvinceName} from "../../utils/schoolPublicMapper.js";
 
@@ -72,10 +108,208 @@ const FAVOURITE_SYNC_PAGE_SIZE = 200;
 const SEARCH_SCHOOLS_LIST_PATH = "/search-schools";
 const SEARCH_SCHOOLS_DETAIL_PATH = "/search-schools/detail";
 const BATCH_ADMISSION_SCHOOL_IDS_KEY = "edubridge_batch_admission_school_ids";
+const PARENT_ADMISSION_RESERVATIONS_PATH = "/parent/admission-reservations";
 const TUITION_FILTER_MAX = 100_000_000;
 
 function getSchoolUrlName(school) {
     return String(school?.school ?? school?.name ?? "").trim();
+}
+
+function getBatchRowSchoolId(school) {
+    const n = Number(school?.id);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function extractParentStudentRecordsFromResponse(response) {
+    const data = response?.data;
+    if (data == null) return [];
+    let inner = data.body ?? data;
+    if (typeof inner === "string") {
+        try {
+            inner = JSON.parse(inner);
+        } catch {
+            return [];
+        }
+    }
+    if (Array.isArray(inner)) return inner;
+    if (Array.isArray(inner?.students)) return inner.students;
+    if (Array.isArray(inner?.data)) return inner.data;
+    if (inner && typeof inner === "object") return [inner];
+    return [];
+}
+
+function pickStudentProfileIdFromRecord(student) {
+    if (!student || typeof student !== "object") return null;
+    const raw = student.studentProfileId ?? student.id ?? student.studentId ?? null;
+    const num = Number(raw);
+    return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+function pickStudentDisplayNameForSelect(student) {
+    if (!student || typeof student !== "object") return "Học sinh";
+    const name = String(
+        student.studentName || student.childName || student.fullName || student.name || ""
+    ).trim();
+    return name || "Học sinh";
+}
+
+const AVAILABILITY_SECTION_TITLE_SX = {
+    fontWeight: 700,
+    fontSize: "0.72rem",
+    letterSpacing: "0.06em",
+    color: "#64748b",
+    textTransform: "uppercase",
+    mb: 1.25,
+};
+
+const AVAILABILITY_PANEL_SX = {
+    borderRadius: 2,
+    bgcolor: "#fff",
+    border: "1px solid rgba(226,232,240,0.95)",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+    overflow: "hidden",
+};
+
+function filterAvailabilitySchoolRows(rows, query) {
+    const q = String(query ?? "").trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => String(row.schoolName ?? "").toLowerCase().includes(q));
+}
+
+function AvailabilitySelectableSchoolRow({row, selected, disabled, onToggle}) {
+    return (
+        <Box
+            sx={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 0.5,
+                borderBottom: "1px solid rgba(226,232,240,0.85)",
+                "&:last-of-type": {borderBottom: "none"},
+            }}
+        >
+            <Checkbox
+                size="small"
+                checked={selected}
+                disabled={disabled}
+                onChange={onToggle}
+                sx={{
+                    flexShrink: 0,
+                    mt: 0.65,
+                    ml: 0.35,
+                    p: 0.45,
+                    color: "#94a3b8",
+                    "&.Mui-checked": {color: "#16a34a"},
+                }}
+            />
+            <Box
+                component="label"
+                sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "block",
+                    px: 1.25,
+                    py: 1.15,
+                    m: 0,
+                    cursor: disabled ? "default" : "pointer",
+                    bgcolor: selected ? "rgba(240,253,244,0.95)" : "transparent",
+                    transition: "background-color 160ms ease",
+                    "&:hover": disabled
+                        ? {}
+                        : {bgcolor: selected ? "rgba(240,253,244,1)" : "rgba(248,250,252,0.95)"},
+                }}
+            >
+                <Typography
+                    title={row.schoolName}
+                    sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: selected ? 700 : 600,
+                        color: "#0f172a",
+                        lineHeight: 1.45,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                    }}
+                >
+                    {row.schoolName}
+                </Typography>
+            </Box>
+        </Box>
+    );
+}
+
+function AvailabilityBlockedSchoolRow({row}) {
+    return (
+        <Box
+            sx={{
+                px: 1.25,
+                py: 1.15,
+                borderBottom: "1px solid rgba(226,232,240,0.85)",
+                bgcolor: "rgba(248,250,252,0.65)",
+                "&:last-of-type": {borderBottom: "none"},
+            }}
+        >
+            <Typography
+                title={row.schoolName}
+                sx={{
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    color: "#334155",
+                    lineHeight: 1.4,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                }}
+            >
+                {row.schoolName}
+            </Typography>
+            <Typography
+                sx={{
+                    mt: 0.35,
+                    fontSize: "0.8125rem",
+                    color: "#64748b",
+                    lineHeight: 1.5,
+                    wordBreak: "break-word",
+                }}
+            >
+                <Box component="span" sx={{fontWeight: 700, color: "#475569"}}>
+                    Lý do:
+                </Box>{" "}
+                {row.reason}
+            </Typography>
+        </Box>
+    );
+}
+
+function AvailabilityInfoCell({label, value, prominent = false}) {
+    return (
+        <Box sx={{flex: 1, minWidth: 0, px: {xs: 1.5, md: 2}, py: 1.5}}>
+            <Typography
+                sx={{
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "#64748b",
+                    letterSpacing: "0.02em",
+                    mb: 0.4,
+                    lineHeight: 1.3,
+                }}
+            >
+                {label}
+            </Typography>
+            <Typography
+                sx={{
+                    fontSize: prominent ? {xs: "1.05rem", md: "1.1rem"} : "0.9375rem",
+                    fontWeight: prominent ? 800 : 600,
+                    color: "#0f172a",
+                    lineHeight: 1.45,
+                    wordBreak: "break-word",
+                }}
+            >
+                {value}
+            </Typography>
+        </Box>
+    );
 }
 
 function parseFavouriteListPayload(res) {
@@ -442,7 +676,6 @@ export default function SchoolSearchPage() {
         return schools.find((s) => getSchoolStorageKey(s) === detailKeyRaw) ?? null;
     }, [detailKeyRaw, detailRouteActive, detailSchoolNameRaw, schools]);
 
-    /** Nộp hồ sơ theo lô chỉ dành cho PARENT — role khác bỏ query batch để không kích hoạt hàng đợi. */
     React.useEffect(() => {
         if (isParent) return;
         const p = new URLSearchParams(location.search);
@@ -451,7 +684,6 @@ export default function SchoolSearchPage() {
         try {
             sessionStorage.removeItem(BATCH_ADMISSION_SCHOOL_IDS_KEY);
         } catch {
-            /* ignore */
         }
         const qs = p.toString();
         navigate({pathname: location.pathname, search: qs ? `?${qs}` : ""}, {replace: true});
@@ -510,7 +742,7 @@ export default function SchoolSearchPage() {
             } catch {
             }
             showSuccessSnackbar("Đã hoàn tất nộp hồ sơ cho các trường đã chọn.");
-            navigate("/saved-schools", {replace: true});
+            navigate(SEARCH_SCHOOLS_LIST_PATH, {replace: true});
             return;
         }
         try {
@@ -770,6 +1002,543 @@ export default function SchoolSearchPage() {
 
     const compareCount = compareSchoolKeys.size;
 
+    const [batchAdmissionSelectedIds, setBatchAdmissionSelectedIds] = React.useState([]);
+
+    const batchPageSchoolIds = React.useMemo(
+        () => shownSchools.map((s) => getBatchRowSchoolId(s)).filter((id) => id != null),
+        [shownSchools]
+    );
+
+    const allBatchPageSelected =
+        batchPageSchoolIds.length > 0 &&
+        batchPageSchoolIds.every((id) => batchAdmissionSelectedIds.includes(id));
+    const someBatchPageSelected =
+        batchPageSchoolIds.some((id) => batchAdmissionSelectedIds.includes(id)) && !allBatchPageSelected;
+
+    React.useEffect(() => {
+        setBatchAdmissionSelectedIds([]);
+    }, [
+        normalizedKeyword,
+        selectedProvince,
+        selectedDistrict,
+        selectedBoardingType,
+        selectedCurriculumType,
+        isTuitionFilterActive,
+        tuitionRange[0],
+        tuitionRange[1],
+        listLoading,
+    ]);
+
+    const toggleBatchSelectRow = React.useCallback((school) => {
+        const id = getBatchRowSchoolId(school);
+        if (id == null) return;
+        setBatchAdmissionSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    }, []);
+
+    const toggleBatchSelectAllShown = React.useCallback(() => {
+        setBatchAdmissionSelectedIds((prev) => {
+            if (batchPageSchoolIds.length === 0) return prev;
+            if (batchPageSchoolIds.every((id) => prev.includes(id))) {
+                const pageSet = new Set(batchPageSchoolIds);
+                return prev.filter((id) => !pageSet.has(id));
+            }
+            const next = new Set(prev);
+            batchPageSchoolIds.forEach((id) => next.add(id));
+            return [...next];
+        });
+    }, [batchPageSchoolIds]);
+
+    const [batchAdmissionPickerOpen, setBatchAdmissionPickerOpen] = React.useState(false);
+    const [batchAdmissionPickerLoading, setBatchAdmissionPickerLoading] = React.useState(false);
+    const [batchAdmissionPickerOptions, setBatchAdmissionPickerOptions] = React.useState([]);
+    const [batchAdmissionPickerProfileId, setBatchAdmissionPickerProfileId] = React.useState(null);
+    const [batchAdmissionPickerError, setBatchAdmissionPickerError] = React.useState("");
+
+    const availabilityCatalogRef = React.useRef([]);
+    const availabilityModalSeqRef = React.useRef(0);
+
+    const [availabilityDialogOpen, setAvailabilityDialogOpen] = React.useState(false);
+    const [availabilityPendingSchoolIds, setAvailabilityPendingSchoolIds] = React.useState([]);
+    const [availabilityStudentProfileId, setAvailabilityStudentProfileId] = React.useState(null);
+    const [availabilityStudentDisplayName, setAvailabilityStudentDisplayName] = React.useState("");
+    const [availabilityCheckLoading, setAvailabilityCheckLoading] = React.useState(false);
+    const [availabilityError, setAvailabilityError] = React.useState("");
+    const [availabilityResult, setAvailabilityResult] = React.useState({
+        unavailable: [],
+        available: [],
+        message: ""
+    });
+    const [availabilityTemplateDocs, setAvailabilityTemplateDocs] = React.useState([]);
+    const [availabilityTemplateError, setAvailabilityTemplateError] = React.useState("");
+    const [availabilitySubmitting, setAvailabilitySubmitting] = React.useState(false);
+    const [availabilityStudentSummary, setAvailabilityStudentSummary] = React.useState(null);
+    const [availabilityImagePreview, setAvailabilityImagePreview] = React.useState(null);
+    const [availabilitySelectedSchoolIds, setAvailabilitySelectedSchoolIds] = React.useState([]);
+    const [availabilitySchoolSearch, setAvailabilitySchoolSearch] = React.useState("");
+    const [availabilitySubmitConfirmOpen, setAvailabilitySubmitConfirmOpen] = React.useState(false);
+
+    const closeStudentPickerForAdmission = React.useCallback(() => {
+        setBatchAdmissionPickerOpen(false);
+        setBatchAdmissionPickerLoading(false);
+        setBatchAdmissionPickerOptions([]);
+        setBatchAdmissionPickerProfileId(null);
+        setBatchAdmissionPickerError("");
+    }, []);
+
+    const closeAdmissionAvailabilityDialog = React.useCallback(() => {
+        availabilityModalSeqRef.current += 1;
+        setAvailabilityDialogOpen(false);
+        setAvailabilityPendingSchoolIds([]);
+        setAvailabilityStudentProfileId(null);
+        setAvailabilityStudentDisplayName("");
+        setAvailabilityCheckLoading(false);
+        setAvailabilitySubmitting(false);
+        setAvailabilityError("");
+        setAvailabilityTemplateError("");
+        setAvailabilityResult({unavailable: [], available: [], message: ""});
+        setAvailabilityTemplateDocs([]);
+        setAvailabilityStudentSummary(null);
+        setAvailabilityImagePreview(null);
+        setAvailabilitySelectedSchoolIds([]);
+        setAvailabilitySchoolSearch("");
+        setAvailabilitySubmitConfirmOpen(false);
+    }, []);
+
+    const handleBatchSubmitFromSearchList = React.useCallback(() => {
+        if (!isParent) {
+            showWarningSnackbar("Bạn cần đăng nhập với vai trò Phụ huynh.");
+            return;
+        }
+        if (batchAdmissionSelectedIds.length === 0) {
+            showWarningSnackbar("Vui lòng chọn ít nhất một trường.");
+            return;
+        }
+        setBatchAdmissionPickerProfileId(null);
+        setBatchAdmissionPickerOptions([]);
+        setBatchAdmissionPickerError("");
+        setBatchAdmissionPickerOpen(true);
+    }, [batchAdmissionSelectedIds.length, isParent]);
+
+    const confirmStudentPickerForAdmission = React.useCallback(() => {
+        if (batchAdmissionPickerProfileId == null) {
+            showWarningSnackbar("Vui lòng chọn hồ sơ học sinh.");
+            return;
+        }
+        const opt = batchAdmissionPickerOptions.find((o) => o.id === batchAdmissionPickerProfileId);
+        setAvailabilityStudentProfileId(batchAdmissionPickerProfileId);
+        setAvailabilityStudentDisplayName(String(opt?.name || "").trim() || "Học sinh");
+        setAvailabilityStudentSummary(mapStudentProfileForAvailabilitySummary(opt?.raw));
+        setAvailabilityPendingSchoolIds([...batchAdmissionSelectedIds]);
+        setAvailabilityResult({unavailable: [], available: [], message: ""});
+        setAvailabilityError("");
+        setAvailabilityTemplateError("");
+        setAvailabilityTemplateDocs([]);
+        setAvailabilitySelectedSchoolIds([]);
+        setAvailabilitySchoolSearch("");
+        setAvailabilitySubmitConfirmOpen(false);
+        setBatchAdmissionPickerOpen(false);
+        setAvailabilityDialogOpen(true);
+    }, [batchAdmissionPickerOptions, batchAdmissionPickerProfileId, batchAdmissionSelectedIds]);
+
+    React.useEffect(() => {
+        if (!batchAdmissionPickerOpen) return undefined;
+        let cancelled = false;
+        setBatchAdmissionPickerLoading(true);
+        setBatchAdmissionPickerError("");
+        (async () => {
+            try {
+                const res = await getParentStudent();
+                if (cancelled) return;
+                const raw = extractParentStudentRecordsFromResponse(res);
+                const options = raw
+                    .map((r) => {
+                        const id = pickStudentProfileIdFromRecord(r);
+                        if (id == null) return null;
+                        return {id, name: pickStudentDisplayNameForSelect(r), raw: r};
+                    })
+                    .filter(Boolean);
+                setBatchAdmissionPickerOptions(options);
+                if (options.length === 0) {
+                    setBatchAdmissionPickerProfileId(null);
+                    setBatchAdmissionPickerError("Bạn chưa có hồ sơ học sinh nào. Vui lòng thêm hồ sơ trước khi nộp.");
+                } else {
+                    setBatchAdmissionPickerProfileId(options[0].id);
+                }
+            } catch (e) {
+                if (cancelled) return;
+                setBatchAdmissionPickerOptions([]);
+                setBatchAdmissionPickerProfileId(null);
+                setBatchAdmissionPickerError(
+                    e?.response?.data?.message || e?.message || "Không tải được danh sách hồ sơ học sinh."
+                );
+            } finally {
+                if (!cancelled) setBatchAdmissionPickerLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [batchAdmissionPickerOpen]);
+
+    const loadAvailabilityCatalogOnce = React.useCallback(async () => {
+        if (availabilityCatalogRef.current.length > 0) return availabilityCatalogRef.current;
+        const res = await getParentAdmissionDocuments();
+        const {required, optional} = pickAdmissionDocumentsFromResponse(res);
+        const initial = buildInitialDocsState(required, optional);
+        availabilityCatalogRef.current = cloneEmptyCatalogDocs(initial);
+        return availabilityCatalogRef.current;
+    }, []);
+
+    const fetchAvailabilityModalData = React.useCallback(async () => {
+        const sid = Number(availabilityStudentProfileId);
+        if (!Number.isFinite(sid) || sid <= 0) return;
+        if (availabilityPendingSchoolIds.length === 0) return;
+
+        const seq = ++availabilityModalSeqRef.current;
+        setAvailabilityCheckLoading(true);
+        setAvailabilityError("");
+        setAvailabilityTemplateError("");
+        setAvailabilityResult({unavailable: [], available: [], message: ""});
+        setAvailabilityTemplateDocs([]);
+        setAvailabilitySelectedSchoolIds([]);
+        setAvailabilitySchoolSearch("");
+
+        try {
+            const catalog = await loadAvailabilityCatalogOnce();
+            if (seq !== availabilityModalSeqRef.current) return;
+
+            const [templateSettled, availabilitySettled, studentSettled] = await Promise.allSettled([
+                getParentAdmissionReservationFormTemplate(sid),
+                putParentAdmissionSchoolsAvailability(sid, availabilityPendingSchoolIds),
+                getParentStudentById(sid),
+            ]);
+            if (seq !== availabilityModalSeqRef.current) return;
+
+            if (studentSettled.status === "fulfilled") {
+                const studentBody = pickStudentDetailBodyFromResponse(studentSettled.value);
+                setAvailabilityStudentSummary(mapStudentProfileForAvailabilitySummary(studentBody));
+            }
+
+            if (availabilitySettled.status === "fulfilled") {
+                setAvailabilityResult(
+                    pickAdmissionSchoolsAvailabilityFromResponse(availabilitySettled.value),
+                );
+            } else {
+                setAvailabilityResult({unavailable: [], available: [], message: ""});
+                const availErr = availabilitySettled.reason;
+                setAvailabilityError(
+                    availErr?.response?.data?.message ||
+                        availErr?.message ||
+                        "Không kiểm tra được trạng thái trường.",
+                );
+            }
+
+            if (templateSettled.status === "fulfilled") {
+                const body = pickReservationTemplateBodyFromResponse(templateSettled.value);
+                const bodySid = pickStudentProfileIdFromTemplateBody(body);
+                if (bodySid != null && bodySid !== sid) {
+                    setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
+                    setAvailabilityTemplateError(
+                        "Không tải được hồ sơ giữ chỗ của học sinh này. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+                    );
+                } else {
+                    const applied = applyReservationTemplateToDocs(catalog, body, sid);
+                    setAvailabilityTemplateDocs(applied);
+                    if (!hasSavedReservationTemplateForStudent(body, sid)) {
+                        setAvailabilityTemplateError("__TEMPLATE_OUTDATED__");
+                    }
+                }
+            } else {
+                const templateErr = templateSettled.reason;
+                setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
+                if (templateErr?.response?.status === 404) {
+                    setAvailabilityTemplateError("__TEMPLATE_NULL__");
+                } else {
+                    setAvailabilityTemplateError(
+                        templateErr?.response?.data?.message ||
+                            templateErr?.message ||
+                            "Không tải được hồ sơ giữ chỗ.",
+                    );
+                }
+            }
+        } catch (e) {
+            if (seq !== availabilityModalSeqRef.current) return;
+            setAvailabilityError(
+                e?.response?.data?.message || e?.message || "Không tải được dữ liệu kiểm tra hồ sơ.",
+            );
+        } finally {
+            if (seq === availabilityModalSeqRef.current) {
+                setAvailabilityCheckLoading(false);
+            }
+        }
+    }, [availabilityStudentProfileId, availabilityPendingSchoolIds, loadAvailabilityCatalogOnce]);
+
+    React.useEffect(() => {
+        if (!availabilityDialogOpen) return undefined;
+        if (availabilityStudentProfileId == null || availabilityPendingSchoolIds.length === 0) {
+            return undefined;
+        }
+        fetchAvailabilityModalData();
+        return () => {
+            availabilityModalSeqRef.current += 1;
+        };
+    }, [
+        availabilityDialogOpen,
+        availabilityStudentProfileId,
+        availabilityPendingSchoolIds,
+        fetchAvailabilityModalData,
+    ]);
+
+    const availabilityUnavailableRows = React.useMemo(() => {
+        const groups = Array.isArray(availabilityResult.unavailable) ? availabilityResult.unavailable : [];
+        const out = [];
+        for (const g of groups) {
+            if (Array.isArray(g?.schools)) {
+                const reason = String(g?.reason || "").trim() || "Không đủ điều kiện.";
+                for (const s of g.schools) {
+                    out.push({
+                        key: `${reason}-${s?.schoolId ?? s?.schoolName}`,
+                        schoolId: s?.schoolId,
+                        schoolName: String(s?.schoolName || "").trim() || `Trường #${s?.schoolId ?? "—"}`,
+                        reason,
+                    });
+                }
+            } else if (g?.schoolId != null || g?.schoolName) {
+                out.push({
+                    key: `u-${g?.schoolId ?? g?.schoolName}`,
+                    schoolId: g.schoolId,
+                    schoolName: String(g.schoolName || "").trim() || `Trường #${g.schoolId ?? "—"}`,
+                    reason: String(g.reason || g.message || "").trim() || "Không đủ điều kiện.",
+                });
+            }
+        }
+        return out;
+    }, [availabilityResult.unavailable]);
+
+    const availabilityOrderedDisplayRows = React.useMemo(() => {
+        if (!availabilityDialogOpen || availabilityStudentProfileId == null) return [];
+        if (availabilityCheckLoading || availabilityError) return [];
+        const availableList = Array.isArray(availabilityResult.available) ? availabilityResult.available : [];
+        const availableById = new Map();
+        for (const a of availableList) {
+            const id = Number(a?.schoolId);
+            if (Number.isFinite(id)) availableById.set(id, a);
+        }
+        const unavailableById = new Map();
+        for (const row of availabilityUnavailableRows) {
+            const id = Number(row?.schoolId);
+            if (Number.isFinite(id)) unavailableById.set(id, row);
+        }
+        return availabilityPendingSchoolIds
+            .map((rawId) => {
+                const id = Number(rawId);
+                if (!Number.isFinite(id)) return null;
+                if (availableById.has(id)) {
+                    const a = availableById.get(id);
+                    return {
+                        kind: "available",
+                        key: `a-${id}`,
+                        schoolId: id,
+                        schoolName: String(a?.schoolName || "").trim() || `Trường #${id}`,
+                    };
+                }
+                if (unavailableById.has(id)) {
+                    const u = unavailableById.get(id);
+                    return {
+                        kind: "unavailable",
+                        key: `u-${id}`,
+                        schoolId: id,
+                        schoolName: u.schoolName,
+                        reason: u.reason,
+                    };
+                }
+                const school = schools.find((s) => Number(s?.id) === id);
+                const schoolName = String(getSchoolUrlName(school) || "").trim() || `Trường #${id}`;
+                return {
+                    kind: "invalid",
+                    key: `i-${id}`,
+                    schoolId: id,
+                    schoolName,
+                    reason: "Hệ thống không trả về trạng thái kiểm tra cho trường này.",
+                };
+            })
+            .filter(Boolean);
+    }, [
+        availabilityDialogOpen,
+        availabilityStudentProfileId,
+        availabilityCheckLoading,
+        availabilityError,
+        availabilityPendingSchoolIds,
+        availabilityResult.available,
+        availabilityUnavailableRows,
+        schools,
+    ]);
+
+    const orderedAvailableAdmissionIds = React.useMemo(() => {
+        const availableIds = new Set(
+            (Array.isArray(availabilityResult.available) ? availabilityResult.available : [])
+                .map((a) => Number(a?.schoolId))
+                .filter((id) => Number.isFinite(id) && id > 0),
+        );
+        return availabilityPendingSchoolIds.filter((id) => availableIds.has(Number(id)));
+    }, [availabilityPendingSchoolIds, availabilityResult.available]);
+
+    React.useEffect(() => {
+        if (!availabilityDialogOpen || availabilityCheckLoading || availabilityError) return;
+        setAvailabilitySelectedSchoolIds(orderedAvailableAdmissionIds);
+    }, [
+        availabilityDialogOpen,
+        availabilityCheckLoading,
+        availabilityError,
+        orderedAvailableAdmissionIds,
+    ]);
+
+    const selectedAvailableAdmissionIds = React.useMemo(() => {
+        const selected = new Set(
+            (Array.isArray(availabilitySelectedSchoolIds) ? availabilitySelectedSchoolIds : [])
+                .map((id) => Number(id))
+                .filter((id) => Number.isFinite(id) && id > 0),
+        );
+        return orderedAvailableAdmissionIds.filter((id) => selected.has(Number(id)));
+    }, [orderedAvailableAdmissionIds, availabilitySelectedSchoolIds]);
+
+    const toggleAvailabilitySchoolSelected = React.useCallback((schoolId) => {
+        const id = Number(schoolId);
+        if (!Number.isFinite(id)) return;
+        setAvailabilitySelectedSchoolIds((prev) => {
+            const list = Array.isArray(prev) ? prev : [];
+            const exists = list.some((item) => Number(item) === id);
+            if (exists) return list.filter((item) => Number(item) !== id);
+            return [...list, id];
+        });
+    }, []);
+
+    const availabilitySchoolGroups = React.useMemo(() => {
+        const available = [];
+        const blocked = [];
+        for (const row of availabilityOrderedDisplayRows) {
+            if (row.kind === "available") available.push(row);
+            else blocked.push(row);
+        }
+        return {available, blocked};
+    }, [availabilityOrderedDisplayRows]);
+
+    const filteredAvailableSchoolRows = React.useMemo(
+        () => filterAvailabilitySchoolRows(availabilitySchoolGroups.available, availabilitySchoolSearch),
+        [availabilitySchoolGroups.available, availabilitySchoolSearch],
+    );
+
+    const filteredBlockedSchoolRows = React.useMemo(
+        () => filterAvailabilitySchoolRows(availabilitySchoolGroups.blocked, availabilitySchoolSearch),
+        [availabilitySchoolGroups.blocked, availabilitySchoolSearch],
+    );
+
+    const allFilteredAvailableSelected = React.useMemo(() => {
+        if (filteredAvailableSchoolRows.length === 0) return false;
+        const selected = new Set(
+            availabilitySelectedSchoolIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)),
+        );
+        return filteredAvailableSchoolRows.every((row) => selected.has(Number(row.schoolId)));
+    }, [filteredAvailableSchoolRows, availabilitySelectedSchoolIds]);
+
+    const toggleSelectAllFilteredAvailable = React.useCallback(() => {
+        const nextChecked = !allFilteredAvailableSelected;
+        setAvailabilitySelectedSchoolIds((prev) => {
+            const selected = new Set(
+                (Array.isArray(prev) ? prev : []).map((id) => Number(id)).filter((id) => Number.isFinite(id)),
+            );
+            if (nextChecked) {
+                filteredAvailableSchoolRows.forEach((row) => selected.add(Number(row.schoolId)));
+            } else {
+                filteredAvailableSchoolRows.forEach((row) => selected.delete(Number(row.schoolId)));
+            }
+            return orderedAvailableAdmissionIds.filter((id) => selected.has(Number(id)));
+        });
+    }, [allFilteredAvailableSelected, filteredAvailableSchoolRows, orderedAvailableAdmissionIds]);
+
+    const validateBeforeAvailabilitySubmit = React.useCallback(() => {
+        const sid = Number(availabilityStudentProfileId);
+        if (!Number.isFinite(sid) || sid <= 0) {
+            showWarningSnackbar("Vui lòng chọn hồ sơ học sinh.");
+            return false;
+        }
+        if (orderedAvailableAdmissionIds.length === 0) {
+            showWarningSnackbar("Không có trường nào đủ điều kiện để nộp hồ sơ.");
+            return false;
+        }
+        if (selectedAvailableAdmissionIds.length === 0) {
+            showWarningSnackbar("Vui lòng chọn ít nhất một trường hợp lệ để nộp hồ sơ.");
+            return false;
+        }
+        if (availabilityTemplateError) {
+            const templateErrMsg =
+                availabilityTemplateError === "__TEMPLATE_NULL__"
+                    ? "Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập tại trang Hồ sơ giữ chỗ."
+                    : availabilityTemplateError === "__TEMPLATE_OUTDATED__"
+                    ? "Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại tại trang Hồ sơ giữ chỗ."
+                    : availabilityTemplateError;
+            showWarningSnackbar(templateErrMsg);
+            return false;
+        }
+        const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
+        if (submissionDocuments.length === 0) {
+            showWarningSnackbar(
+                "Hồ sơ giữ chỗ chưa có minh chứng. Vui lòng lưu hồ sơ tại trang Hồ sơ giữ chỗ.",
+            );
+            return false;
+        }
+        return true;
+    }, [
+        availabilityStudentProfileId,
+        availabilityTemplateDocs,
+        availabilityTemplateError,
+        orderedAvailableAdmissionIds.length,
+        selectedAvailableAdmissionIds.length,
+    ]);
+
+    const handleRequestSubmitAdmissionAfterAvailability = React.useCallback(() => {
+        if (!validateBeforeAvailabilitySubmit()) return;
+        setAvailabilitySubmitConfirmOpen(true);
+    }, [validateBeforeAvailabilitySubmit]);
+
+    const handleConfirmAdmissionAfterAvailability = React.useCallback(async () => {
+        if (!validateBeforeAvailabilitySubmit()) return;
+
+        const sid = Number(availabilityStudentProfileId);
+        const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
+
+        setAvailabilitySubmitting(true);
+        try {
+            const res = await postParentAdmissionReservationForm({
+                studentProfileId: sid,
+                schoolIds: selectedAvailableAdmissionIds,
+                submissionDocuments,
+            });
+            showSuccessSnackbar(
+                res?.data?.message || "Nộp hồ sơ vào trường thành công.",
+            );
+            setAvailabilitySubmitConfirmOpen(false);
+            closeAdmissionAvailabilityDialog();
+            navigate(PARENT_ADMISSION_RESERVATIONS_PATH);
+        } catch (e) {
+            console.error("[SchoolSearchPage] submit admission form:", e);
+            showErrorSnackbar(
+                e?.response?.data?.message || e?.message || "Nộp hồ sơ thất bại, vui lòng thử lại.",
+            );
+        } finally {
+            setAvailabilitySubmitting(false);
+        }
+    }, [
+        availabilityStudentProfileId,
+        availabilityTemplateDocs,
+        closeAdmissionAvailabilityDialog,
+        navigate,
+        selectedAvailableAdmissionIds,
+        validateBeforeAvailabilitySubmit,
+    ]);
+
     const detailKeyForActions = detailSchool ? getSchoolStorageKey(detailSchool) : "";
     const detailIsSaved = Boolean(detailSchool?.isFavourite);
     const detailInCompare = Boolean(detailSchool && compareSchoolKeys.has(detailKeyForActions));
@@ -809,66 +1578,16 @@ export default function SchoolSearchPage() {
             }}
         >
             <Container maxWidth={false} sx={{maxWidth: '1400px', px: {xs: 2, md: 4}, pt: 1, pb: 6, position: 'relative', zIndex: 1}}>
-                <Card
+    
+
+                <Box
                     sx={{
-                        mb: 3,
-                        p: 0,
-                        overflow: 'hidden',
-                        borderRadius: 3,
-                        border: '1px solid rgba(203,213,225,0.95)',
-                        boxShadow: '0 10px 40px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)',
-                        bgcolor: '#fff'
+                        display: 'grid',
+                        gridTemplateColumns: {xs: '1fr', md: 'minmax(0, 3fr) minmax(0, 7fr)'},
+                        gap: 3,
+                        alignItems: {xs: 'start', md: 'stretch'},
                     }}
                 >
-                    <Box
-                        sx={{
-                            px: 2,
-                            py: 1.35,
-                            bgcolor: BRAND_NAVY,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1
-                        }}
-                    >
-                        <SparkleIcon sx={{fontSize: 20, color: '#fff'}}/>
-                        <Typography
-                            sx={{
-                                fontSize: '0.8125rem',
-                                fontWeight: 800,
-                                letterSpacing: '0.08em',
-                                color: '#fff'
-                            }}
-                        >
-                            TÌM TRƯỜNG PHÙ HỢP
-                        </Typography>
-                    </Box>
-                    <Box sx={{p: {xs: 2.25, md: 2.75}, bgcolor: '#fff'}}>
-                        <Typography
-                            sx={{
-                                fontWeight: 800,
-                                fontSize: {xs: '1.65rem', md: '2rem'},
-                                lineHeight: 1.2,
-                                letterSpacing: '-0.02em',
-                                mb: 1.25,
-                                color: BRAND_NAVY
-                            }}
-                        >
-                            Khám phá và so sánh trường học
-                        </Typography>
-                        <Typography
-                            sx={{
-                                color: '#64748b',
-                                fontSize: {xs: '0.95rem', md: '1.02rem'},
-                                lineHeight: 1.65,
-                                maxWidth: 720
-                            }}
-                        >
-                            Lọc theo khu vực và nhu cầu nội trú — giao diện đồng bộ với trang chủ EduBridge HCM.
-                        </Typography>
-                    </Box>
-                </Card>
-
-                <Box sx={{display: 'grid', gridTemplateColumns: {xs: '1fr', md: 'minmax(0, 3fr) minmax(0, 7fr)'}, gap: 3}}>
                     <Card
                         sx={{
                             p: 0,
@@ -877,9 +1596,12 @@ export default function SchoolSearchPage() {
                             border: '1px solid rgba(203,213,225,0.95)',
                             bgcolor: '#fff',
                             boxShadow: '0 10px 40px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)',
-                            height: 'fit-content',
+                            height: {xs: 'fit-content', md: '100%'},
+                            display: 'flex',
+                            flexDirection: 'column',
                             position: {md: 'sticky'},
-                            top: {md: 96}
+                            top: {md: 96},
+                            alignSelf: {md: 'stretch'},
                         }}
                     >
                         <Box
@@ -904,7 +1626,7 @@ export default function SchoolSearchPage() {
                                 Bộ lọc tìm trường
                             </Typography>
                         </Box>
-                        <Stack spacing={2} sx={{p: 2, pt: 2}}>
+                        <Stack spacing={2} sx={{p: 2, pt: 2, flex: 1}}>
                             <Box>
                                 <Typography sx={{fontWeight: 700, fontSize: 13, mb: 1, color: BRAND_NAVY, letterSpacing: '0.02em'}}>Tỉnh, Thành phố</Typography>
                                 <Box sx={{display: 'flex', gap: 1, flexWrap: 'wrap'}}>
@@ -1103,7 +1825,7 @@ export default function SchoolSearchPage() {
                         </Stack>
                     </Card>
 
-                    <Box>
+                    <Box sx={{display: 'flex', flexDirection: 'column', minHeight: {md: '100%'}}}>
                         <Card
                             sx={{
                                 mb: 2,
@@ -1229,6 +1951,49 @@ export default function SchoolSearchPage() {
                             </Box>
                         </Card>
 
+                        {isParent && !listLoading && shownSchools.length > 0 ? (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: {xs: 0.75, sm: 1},
+                                    mb: 2,
+                                }}
+                            >
+                                <Checkbox
+                                    checked={allBatchPageSelected}
+                                    indeterminate={someBatchPageSelected}
+                                    onChange={toggleBatchSelectAllShown}
+                                    disabled={batchPageSchoolIds.length === 0}
+                                    sx={{ flexShrink: 0, p: 0.5 }}
+                                />
+                                <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
+                                    <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
+                                        Chọn tất cả trên trang này
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        disabled={batchAdmissionSelectedIds.length === 0}
+                                        onClick={handleBatchSubmitFromSearchList}
+                                        sx={{
+                                            textTransform: "none",
+                                            fontWeight: 700,
+                                            borderRadius: 999,
+                                            px: 2.5,
+                                            py: 1,
+                                            bgcolor: BRAND_NAVY,
+                                            "&:hover": {bgcolor: APP_PRIMARY_DARK}
+                                        }}
+                                    >
+                                        Nộp hồ sơ
+                                        {batchAdmissionSelectedIds.length > 0
+                                            ? ` (${batchAdmissionSelectedIds.length})`
+                                            : ""}
+                                    </Button>
+                                </Box>
+                            </Box>
+                        ) : null}
+
                         {listError && (
                             <Typography sx={{color: "#b45309", fontSize: "0.95rem", mb: 2, fontWeight: 600}}>
                                 {listError}
@@ -1245,12 +2010,43 @@ export default function SchoolSearchPage() {
                                 const schoolKey = getSchoolStorageKey(school);
                                 const isSaved = Boolean(school?.isFavourite);
                                 const inCompare = compareSchoolKeys.has(schoolKey);
+                                const batchRowId = getBatchRowSchoolId(school);
+                                const rowBatchChecked =
+                                    batchRowId != null && batchAdmissionSelectedIds.includes(batchRowId);
+                                const rowKey =
+                                    school.id != null
+                                        ? `school-${school.id}`
+                                        : `${school.province}-${school.ward}-${school.school}`;
 
                                 return (
+                                    <Box
+                                        key={rowKey}
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: {xs: 0.75, sm: 1},
+                                        }}
+                                    >
+                                    {isParent ? (
+                                        <Checkbox
+                                            checked={rowBatchChecked}
+                                            onChange={() => toggleBatchSelectRow(school)}
+                                            disabled={batchRowId == null}
+                                            sx={{
+                                                flexShrink: 0,
+                                                mt: {xs: 1.25, sm: 1.5},
+                                                p: 0.5,
+                                            }}
+                                            inputProps={{
+                                                "aria-label": `Chọn ${school?.school || "trường"} để nộp hồ sơ theo lô`,
+                                            }}
+                                        />
+                                    ) : null}
                                     <Card
-                                        key={school.id != null ? `school-${school.id}` : `${school.province}-${school.ward}-${school.school}`}
                                         sx={{
                                             position: "relative",
+                                            flex: 1,
+                                            minWidth: 0,
                                             display: 'grid',
                                             gridTemplateColumns: {xs: '1fr', sm: 'minmax(0, 2.6fr) minmax(0, 7.4fr)'},
                                             gap: {xs: 1.25, sm: 2},
@@ -1279,7 +2075,7 @@ export default function SchoolSearchPage() {
                                             justifySelf: {sm: 'center'},
                                             alignSelf: 'stretch',
                                             minHeight: {xs: 128, sm: 132},
-                                            py: {xs: 0.35, sm: 0.25}
+                                            py: {xs: 0.35, sm: 0.25},
                                         }}
                                     >
                                         <CardMedia
@@ -1300,7 +2096,14 @@ export default function SchoolSearchPage() {
                                             }}
                                         />
                                     </Box>
-                                    <Box sx={{display: 'flex', flexDirection: 'column', minHeight: 0, justifyContent: 'center'}}>
+                                    <Box
+                                        sx={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            minHeight: 0,
+                                            justifyContent: 'center',
+                                        }}
+                                    >
                                         <Typography
                                             sx={{
                                                 fontWeight: 700,
@@ -1542,6 +2345,7 @@ export default function SchoolSearchPage() {
                                         </Box>
                                     </Box>
                                     </Card>
+                                    </Box>
                                 );
                             })}
                         </Stack>
@@ -1569,6 +2373,866 @@ export default function SchoolSearchPage() {
                     </Box>
                 </Box>
             </Container>
+
+            <Dialog
+                open={batchAdmissionPickerOpen}
+                onClose={closeStudentPickerForAdmission}
+                fullWidth
+                maxWidth="xs"
+                scroll="body"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        maxWidth: 420,
+                        boxShadow: "0 24px 48px rgba(15,23,42,0.14), 0 8px 20px rgba(15,23,42,0.06)",
+                        border: "1px solid rgba(226,232,240,0.95)",
+                        bgcolor: "#fff"
+                    }
+                }}
+            >
+                <Box
+                    aria-hidden
+                    sx={{
+                        height: 4,
+                        background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 55%, ${BRAND_SKY_LIGHT} 100%)`
+                    }}
+                />
+                <DialogTitle
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        py: 2.25,
+                        px: 2.5,
+                        pr: 1.5,
+                        background: "linear-gradient(180deg, rgba(248,250,252,0.9) 0%, #fff 100%)",
+                        borderBottom: "1px solid rgba(226,232,240,0.85)"
+                    }}
+                >
+                    <Box
+                        sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 2.5,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            bgcolor: "rgba(85,179,217,0.12)",
+                            color: BRAND_NAVY,
+                            border: `1px solid rgba(85,179,217,0.22)`
+                        }}
+                    >
+                        <PersonOutlineIcon sx={{fontSize: 28}}/>
+                    </Box>
+                    <Box sx={{minWidth: 0}}>
+                        <Typography sx={{fontWeight: 800, fontSize: "1.08rem", color: "#0f172a", lineHeight: 1.25}}>
+                            Chọn hồ sơ học sinh
+                        </Typography>
+                        <Typography sx={{mt: 0.35, fontSize: "0.82rem", color: "#64748b", lineHeight: 1.45}}>
+                            Dùng hồ sơ này để kiểm tra các trường trên trang hiện tại.
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{px: 2.5, pt: 2.5, pb: 1}}>
+                    {batchAdmissionPickerLoading ? (
+                        <Box sx={{display: "flex", justifyContent: "center", py: 4}}>
+                            <CircularProgress size={36} sx={{color: BRAND_NAVY}}/>
+                        </Box>
+                    ) : batchAdmissionPickerError ? (
+                        <Alert
+                            severity={
+                                String(batchAdmissionPickerError).includes("Không tải được") ? "error" : "warning"
+                            }
+                            sx={{
+                                mb: 0,
+                                borderRadius: 2,
+                                "& .MuiAlert-message": {width: "100%"}
+                            }}
+                        >
+                            {batchAdmissionPickerError}
+                        </Alert>
+                    ) : batchAdmissionPickerOptions.length > 0 ? (
+                        <FormControl fullWidth size="small">
+                            <Select
+                                displayEmpty
+                                value={batchAdmissionPickerProfileId ?? ""}
+                                onChange={(e) => setBatchAdmissionPickerProfileId(Number(e.target.value))}
+                                sx={{
+                                    borderRadius: 2,
+                                    bgcolor: "#fff",
+                                    fontWeight: 600,
+                                    "& .MuiOutlinedInput-notchedOutline": {borderColor: "rgba(203,213,225,0.95)"},
+                                    "&:hover .MuiOutlinedInput-notchedOutline": {borderColor: BRAND_NAVY},
+                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: BRAND_NAVY,
+                                        borderWidth: 2
+                                    }
+                                }}
+                            >
+                                {batchAdmissionPickerOptions.map((opt) => (
+                                    <MenuItem key={opt.id} value={opt.id}>
+                                        {opt.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    ) : (
+                        <Typography sx={{fontSize: "0.9rem", color: "#64748b", lineHeight: 1.55}}>
+                            Chưa có hồ sơ học sinh để chọn.
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions
+                    sx={{
+                        px: 2.5,
+                        py: 2,
+                        gap: 1.25,
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        bgcolor: "rgba(248,250,252,0.65)",
+                        borderTop: "1px solid rgba(226,232,240,0.85)"
+                    }}
+                >
+                    <Button
+                        variant="outlined"
+                        onClick={closeStudentPickerForAdmission}
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 2.25,
+                            minHeight: 40,
+                            borderColor: "rgba(203,213,225,0.95)",
+                            color: "#475569",
+                            "&:hover": {borderColor: "#94a3b8", bgcolor: "rgba(248,250,252,0.9)"}
+                        }}
+                    >
+                        Hủy
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={confirmStudentPickerForAdmission}
+                        disabled={
+                            batchAdmissionPickerLoading ||
+                            batchAdmissionPickerOptions.length === 0 ||
+                            batchAdmissionPickerProfileId == null
+                        }
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 2.5,
+                            minHeight: 40,
+                            boxShadow: "0 4px 14px rgba(45,95,115,0.22)",
+                            bgcolor: BRAND_NAVY,
+                            "&:hover": {bgcolor: APP_PRIMARY_DARK, boxShadow: "0 6px 18px rgba(45,95,115,0.28)"},
+                            "&.Mui-disabled": {bgcolor: "#e2e8f0", color: "#94a3b8", boxShadow: "none"}
+                        }}
+                    >
+                        Tiếp tục
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={availabilityDialogOpen}
+                onClose={closeAdmissionAvailabilityDialog}
+                fullWidth
+                maxWidth="lg"
+                scroll="paper"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        boxShadow: "0 24px 48px rgba(15,23,42,0.14), 0 8px 20px rgba(15,23,42,0.06)",
+                        border: "1px solid rgba(226,232,240,0.95)",
+                        bgcolor: "#fff",
+                        width: "min(96vw, 1120px)",
+                        maxWidth: "min(96vw, 1120px)",
+                        maxHeight: "min(94vh, 860px)"
+                    }
+                }}
+            >
+                <Box
+                    aria-hidden
+                    sx={{
+                        height: 4,
+                        background: `linear-gradient(90deg, ${BRAND_NAVY} 0%, ${BRAND_SKY} 55%, ${BRAND_SKY_LIGHT} 100%)`
+                    }}
+                />
+                <DialogTitle
+                    sx={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        gap: 1.5,
+                        py: 2,
+                        px: 2.5,
+                        background: "linear-gradient(180deg, rgba(248,250,252,0.9) 0%, #fff 100%)",
+                        borderBottom: "1px solid rgba(226,232,240,0.85)"
+                    }}
+                >
+                    <Stack direction="row" spacing={2} alignItems="flex-start" sx={{minWidth: 0, pr: 0.5}}>
+                        <Box
+                            sx={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 2.5,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                bgcolor: "rgba(85,179,217,0.12)",
+                                color: BRAND_NAVY,
+                                border: `1px solid rgba(85,179,217,0.22)`
+                            }}
+                        >
+                            <FactCheckIcon sx={{fontSize: 26}}/>
+                        </Box>
+                        <Box sx={{minWidth: 0}}>
+                            <Typography sx={{fontWeight: 800, fontSize: "1.08rem", color: "#0f172a", lineHeight: 1.25}}>
+                                Kiểm tra hồ sơ nộp vào trường
+                            </Typography>
+                            <Typography sx={{mt: 0.35, fontSize: "0.82rem", color: "#64748b", lineHeight: 1.45}}>
+                                Xem hồ sơ và trạng thái từng trường trước khi nộp.
+                            </Typography>
+                        </Box>
+                    </Stack>
+                    <IconButton
+                        aria-label="Đóng"
+                        size="small"
+                        onClick={closeAdmissionAvailabilityDialog}
+                        sx={{
+                            color: "#64748b",
+                            flexShrink: 0,
+                            mt: -0.25,
+                            "&:hover": {bgcolor: "rgba(15,23,42,0.06)", color: "#0f172a"}
+                        }}
+                    >
+                        <CloseIcon fontSize="small"/>
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent
+                    dividers
+                    sx={{
+                        px: {xs: 2, sm: 2.5},
+                        pt: 2.5,
+                        pb: 2.5,
+                        borderColor: "rgba(226,232,240,0.75)",
+                        bgcolor: "#fafbfc"
+                    }}
+                >
+                    <Stack spacing={2.5}>
+                        <Box sx={{minWidth: 0}}>
+                            <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ học sinh</Typography>
+                            <Box sx={{...AVAILABILITY_PANEL_SX, mb: 2}}>
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gridTemplateColumns: {xs: "1fr", md: "repeat(3, 1fr)"},
+                                    }}
+                                >
+                                    {[
+                                        {
+                                            label: "Học sinh",
+                                            prominent: true,
+                                            value:
+                                                availabilityStudentDisplayName ||
+                                                (availabilityStudentProfileId != null
+                                                    ? `Hồ sơ #${availabilityStudentProfileId}`
+                                                    : "—"),
+                                        },
+                                        {
+                                            label: "Giới tính",
+                                            value:
+                                                availabilityCheckLoading && !availabilityStudentSummary
+                                                    ? "…"
+                                                    : availabilityStudentSummary?.genderLabel || "—",
+                                        },
+                                        {
+                                            label: "CCCD học sinh",
+                                            value:
+                                                availabilityCheckLoading && !availabilityStudentSummary
+                                                    ? "…"
+                                                    : availabilityStudentSummary?.studentCode || "—",
+                                        },
+                                    ].map((field, fieldIdx, arr) => (
+                                        <Box
+                                            key={field.label}
+                                            sx={{
+                                                borderBottom: {
+                                                    xs:
+                                                        fieldIdx < arr.length - 1
+                                                            ? "1px solid rgba(226,232,240,0.95)"
+                                                            : "none",
+                                                    md: "none",
+                                                },
+                                                borderRight: {
+                                                    md:
+                                                        fieldIdx < arr.length - 1
+                                                            ? "1px solid rgba(226,232,240,0.95)"
+                                                            : "none",
+                                                },
+                                            }}
+                                        >
+                                            <AvailabilityInfoCell
+                                                label={field.label}
+                                                prominent={field.prominent === true}
+                                                value={field.value}
+                                            />
+                                        </Box>
+                                    ))}
+                                </Box>
+                                <Divider sx={{borderColor: "rgba(226,232,240,0.95)"}}/>
+                                <Box sx={{px: {xs: 1.5, md: 2}, py: 1.5, bgcolor: "#fafbfc"}}>
+                                    <Typography
+                                        sx={{
+                                            ...AVAILABILITY_SECTION_TITLE_SX,
+                                            mb: 1.25,
+                                            color: "#475569",
+                                        }}
+                                    >
+                                        Học bạ THCS (4 năm)
+                                    </Typography>
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: {
+                                                xs: "repeat(2, minmax(0, 1fr))",
+                                                md: "repeat(4, minmax(0, 1fr))",
+                                            },
+                                            gap: 1.25,
+                                        }}
+                                    >
+                                        {HOC_BA_THCS_GRADE_LABELS.map((gradeLabel, slotIndex) => {
+                                            const url = availabilityStudentSummary?.transcriptSlots?.[slotIndex];
+                                            const hasUrl = typeof url === "string" && url.trim() !== "";
+                                            return (
+                                                <Box
+                                                    key={`availability-transcript-${slotIndex}`}
+                                                    sx={{
+                                                        minWidth: 0,
+                                                        borderRadius: 1.5,
+                                                        border: "1px solid #dbeafe",
+                                                        overflow: "hidden",
+                                                        bgcolor: "#fff",
+                                                    }}
+                                                >
+                                                    <Box
+                                                        sx={{
+                                                            py: 0.7,
+                                                            px: 1,
+                                                            bgcolor: "#eef4ff",
+                                                            borderBottom: "1px solid #dbeafe",
+                                                            textAlign: "center",
+                                                        }}
+                                                    >
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: "0.8125rem",
+                                                                fontWeight: 700,
+                                                                color: "#1e40af",
+                                                                lineHeight: 1.3,
+                                                            }}
+                                                        >
+                                                            {gradeLabel}
+                                                        </Typography>
+                                                    </Box>
+                                                    {hasUrl ? (
+                                                        <Box
+                                                            component="button"
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setAvailabilityImagePreview({
+                                                                    url: url.trim(),
+                                                                    title: `Học bạ — ${gradeLabel}`,
+                                                                })
+                                                            }
+                                                            sx={{
+                                                                display: "block",
+                                                                width: "100%",
+                                                                p: 0,
+                                                                border: "none",
+                                                                overflow: "hidden",
+                                                                cursor: "pointer",
+                                                                bgcolor: "#fff",
+                                                                lineHeight: 0,
+                                                            }}
+                                                        >
+                                                            <Box
+                                                                component="img"
+                                                                src={url.trim()}
+                                                                alt={gradeLabel}
+                                                                sx={{
+                                                                    width: "100%",
+                                                                    height: {xs: 240, sm: 280, md: 320},
+                                                                    objectFit: "cover",
+                                                                    objectPosition: "center top",
+                                                                    display: "block",
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    ) : (
+                                                        <Box
+                                                            sx={{
+                                                                minHeight: {xs: 240, sm: 280, md: 320},
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                bgcolor: "#f8fafc",
+                                                            }}
+                                                        >
+                                                            <Typography
+                                                                sx={{
+                                                                    fontSize: "0.8125rem",
+                                                                    color: "#94a3b8",
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                Chưa có
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        <Box
+                            sx={{
+                                display: "grid",
+                                gridTemplateColumns: {xs: "1fr", md: "minmax(0, 1fr) minmax(0, 1fr)"},
+                                gap: {xs: 2.5, md: 0},
+                                alignItems: "stretch",
+                                minHeight: {md: 380}
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    minWidth: 0,
+                                    pr: {md: 2.5},
+                                    pb: {xs: 2.5, md: 0},
+                                    borderRight: {md: "1px solid rgba(226,232,240,0.9)"},
+                                    borderBottom: {xs: "1px solid rgba(226,232,240,0.9)", md: "none"}
+                                }}
+                            >
+                                <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ giữ chỗ</Typography>
+
+                                {availabilityTemplateError ? (
+                                    <Alert severity="warning" sx={{mb: 1.5, borderRadius: 2}}>
+                                        {availabilityTemplateError === "__TEMPLATE_NULL__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError === "__TEMPLATE_OUTDATED__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại.{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    Cấu hình lại tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError}
+                                    </Alert>
+                                ) : null}
+
+                                <AdmissionDocumentsSection
+                                    docs={availabilityTemplateDocs}
+                                    docsLoading={availabilityCheckLoading}
+                                    docsError={availabilityTemplateError && !availabilityCheckLoading ? "" : ""}
+                                    cloudinaryReady
+                                    uploadingSlots={new Set()}
+                                    disabled
+                                    readOnly
+                                    onPickFile={() => {}}
+                                    onRemoveSlot={() => {}}
+                                    emptyMessage="Chưa có hồ sơ giữ chỗ cho học sinh này."
+                                />
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    minWidth: 0,
+                                    pl: {md: 2.5},
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    flex: 1,
+                                    minHeight: {md: 400},
+                                }}
+                            >
+                                <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Các trường</Typography>
+
+                                {availabilityError ? (
+                                    <Alert
+                                        severity="error"
+                                        sx={{mb: 1.5, borderRadius: 2}}
+                                        onClose={() => setAvailabilityError("")}
+                                    >
+                                        {availabilityError}
+                                    </Alert>
+                                ) : null}
+
+                                {availabilityCheckLoading ? (
+                                    <Box sx={{mb: 1.5, borderRadius: 2, overflow: "hidden"}}>
+                                        <LinearProgress
+                                            sx={{
+                                                borderRadius: 2,
+                                                height: 5,
+                                                bgcolor: "rgba(85,179,217,0.15)",
+                                                "& .MuiLinearProgress-bar": {bgcolor: BRAND_NAVY},
+                                            }}
+                                        />
+                                    </Box>
+                                ) : null}
+
+                                {!availabilityCheckLoading &&
+                                availabilityStudentProfileId != null &&
+                                !availabilityError &&
+                                availabilityOrderedDisplayRows.length === 0 ? (
+                                    <Typography
+                                        sx={{
+                                            fontSize: "0.9rem",
+                                            color: "#64748b",
+                                            fontStyle: "italic",
+                                            lineHeight: 1.55,
+                                        }}
+                                    >
+                                        Chưa có trường nào trong kết quả kiểm tra.
+                                    </Typography>
+                                ) : null}
+
+                                {!availabilityCheckLoading && !availabilityError ? (
+                                    <Box
+                                        sx={{
+                                            ...AVAILABILITY_PANEL_SX,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            flex: 1,
+                                            minHeight: {md: 360},
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                px: 1.5,
+                                                pt: 1.75,
+                                                pb: 1.5,
+                                                borderBottom: "1px solid rgba(226,232,240,0.95)",
+                                                bgcolor: "#fafbfc",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <Stack
+                                                direction="row"
+                                                alignItems="center"
+                                                justifyContent="space-between"
+                                                spacing={1}
+                                                sx={{mb: 1}}
+                                            >
+                                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                                    <Typography
+                                                        sx={{
+                                                            fontSize: "0.8125rem",
+                                                            fontWeight: 700,
+                                                            color: "#166534",
+                                                        }}
+                                                    >
+                                                        Chọn nộp{" "}
+                                                        {selectedAvailableAdmissionIds.length}/
+                                                        {availabilitySchoolGroups.available.length}
+                                                    </Typography>
+                                                    {availabilitySchoolGroups.blocked.length > 0 ? (
+                                                        <Typography
+                                                            sx={{
+                                                                fontSize: "0.8125rem",
+                                                                fontWeight: 700,
+                                                                color: "#64748b",
+                                                            }}
+                                                        >
+                                                            · Không nộp{" "}
+                                                            {availabilitySchoolGroups.blocked.length}
+                                                        </Typography>
+                                                    ) : null}
+                                                </Stack>
+                                                {filteredAvailableSchoolRows.length > 0 ? (
+                                                    <Button
+                                                        size="small"
+                                                        variant="text"
+                                                        disabled={availabilitySubmitting}
+                                                        onClick={toggleSelectAllFilteredAvailable}
+                                                        sx={{
+                                                            flexShrink: 0,
+                                                            textTransform: "none",
+                                                            fontWeight: 700,
+                                                            fontSize: "0.8125rem",
+                                                            color: "#2563eb",
+                                                            minWidth: 0,
+                                                            px: 0.5,
+                                                        }}
+                                                    >
+                                                        {allFilteredAvailableSelected
+                                                            ? "Bỏ chọn"
+                                                            : "Chọn tất cả"}
+                                                    </Button>
+                                                ) : null}
+                                            </Stack>
+                                            <TextField
+                                                size="small"
+                                                fullWidth
+                                                placeholder="Tìm tên trường..."
+                                                value={availabilitySchoolSearch}
+                                                disabled={availabilitySubmitting}
+                                                onChange={(e) => setAvailabilitySchoolSearch(e.target.value)}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <SearchIcon sx={{fontSize: 20, color: "#94a3b8"}} />
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                                sx={{
+                                                    "& .MuiOutlinedInput-root": {
+                                                        borderRadius: 1.75,
+                                                        bgcolor: "#fff",
+                                                        fontSize: "0.9rem",
+                                                    },
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <Box
+                                            sx={{
+                                                flex: 1,
+                                                overflowY: "auto",
+                                                minHeight: {xs: 280, md: 320},
+                                                maxHeight: {xs: 420, md: "min(58vh, 620px)"},
+                                            }}
+                                        >
+                                            {filteredAvailableSchoolRows.length > 0 ||
+                                            filteredBlockedSchoolRows.length > 0 ? (
+                                                <Box>
+                                                    {filteredAvailableSchoolRows.map((row) => {
+                                                        const isSelected =
+                                                            availabilitySelectedSchoolIds.some(
+                                                                (id) =>
+                                                                    Number(id) ===
+                                                                    Number(row.schoolId),
+                                                            );
+                                                        return (
+                                                            <AvailabilitySelectableSchoolRow
+                                                                key={row.key}
+                                                                row={row}
+                                                                selected={isSelected}
+                                                                disabled={availabilitySubmitting}
+                                                                onToggle={() =>
+                                                                    toggleAvailabilitySchoolSelected(
+                                                                        row.schoolId,
+                                                                    )
+                                                                }
+                                                            />
+                                                        );
+                                                    })}
+                                                    {filteredBlockedSchoolRows.length > 0 ? (
+                                                        <>
+                                                            {filteredAvailableSchoolRows.length >
+                                                            0 ? (
+                                                                <Box
+                                                                    sx={{
+                                                                        px: 1.5,
+                                                                        py: 1,
+                                                                        bgcolor:
+                                                                            "rgba(248,250,252,0.95)",
+                                                                        borderTop:
+                                                                            "1px solid rgba(226,232,240,0.95)",
+                                                                        borderBottom:
+                                                                            "1px solid rgba(226,232,240,0.95)",
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontSize: "0.72rem",
+                                                                            fontWeight: 700,
+                                                                            letterSpacing:
+                                                                                "0.06em",
+                                                                            textTransform:
+                                                                                "uppercase",
+                                                                            color: "#64748b",
+                                                                        }}
+                                                                    >
+                                                                        Không thể nộp
+                                                                    </Typography>
+                                                                </Box>
+                                                            ) : null}
+                                                            {filteredBlockedSchoolRows.map((row) => (
+                                                                <AvailabilityBlockedSchoolRow
+                                                                    key={row.key}
+                                                                    row={row}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    ) : null}
+                                                </Box>
+                                            ) : availabilitySchoolGroups.available.length > 0 ||
+                                              availabilitySchoolGroups.blocked.length > 0 ? (
+                                                <Typography
+                                                    sx={{
+                                                        px: 1.5,
+                                                        py: 2,
+                                                        fontSize: "0.875rem",
+                                                        color: "#64748b",
+                                                        fontStyle: "italic",
+                                                    }}
+                                                >
+                                                    Không có trường khớp từ khóa tìm kiếm.
+                                                </Typography>
+                                            ) : null}
+                                        </Box>
+                                    </Box>
+                                ) : null}
+                            </Box>
+                        </Box>
+                    </Stack>
+                </DialogContent>
+                <DialogActions
+                    sx={{
+                        px: 2.5,
+                        py: 2,
+                        gap: 1.25,
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        bgcolor: "rgba(248,250,252,0.65)",
+                        borderTop: "1px solid rgba(226,232,240,0.85)"
+                    }}
+                >
+                    <Button
+                        variant="outlined"
+                        onClick={closeAdmissionAvailabilityDialog}
+                        disabled={availabilitySubmitting}
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 2.25,
+                            minHeight: 40,
+                            borderColor: "rgba(203,213,225,0.95)",
+                            color: "#475569",
+                            "&:hover": {borderColor: "#94a3b8", bgcolor: "rgba(248,250,252,0.9)"}
+                        }}
+                    >
+                        Đóng
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleRequestSubmitAdmissionAfterAvailability}
+                        disabled={
+                            availabilityCheckLoading ||
+                            availabilitySubmitting ||
+                            Boolean(availabilityTemplateError) ||
+                            orderedAvailableAdmissionIds.length === 0 ||
+                            selectedAvailableAdmissionIds.length === 0 ||
+                            availabilityStudentProfileId == null
+                        }
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 2.5,
+                            minHeight: 40,
+                            boxShadow: "0 4px 14px rgba(45,95,115,0.22)",
+                            bgcolor: BRAND_NAVY,
+                            "&:hover": {bgcolor: APP_PRIMARY_DARK, boxShadow: "0 6px 18px rgba(45,95,115,0.28)"},
+                            "&.Mui-disabled": {bgcolor: "#e2e8f0", color: "#94a3b8", boxShadow: "none"}
+                        }}
+                    >
+                        {availabilitySubmitting
+                            ? "Đang nộp..."
+                            : selectedAvailableAdmissionIds.length > 0
+                              ? `Nộp hồ sơ (${selectedAvailableAdmissionIds.length})`
+                              : "Nộp hồ sơ"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <ConfirmDialog
+                open={availabilitySubmitConfirmOpen}
+                title="Xác nhận nộp hồ sơ"
+                description={`Bạn có chắc muốn nộp hồ sơ giữ chỗ cho ${availabilityStudentDisplayName || "học sinh này"} vào ${selectedAvailableAdmissionIds.length} trường đã chọn?`}
+                confirmText="Nộp hồ sơ"
+                cancelText="Hủy"
+                loading={availabilitySubmitting}
+                onCancel={() => {
+                    if (availabilitySubmitting) return;
+                    setAvailabilitySubmitConfirmOpen(false);
+                }}
+                onConfirm={() => void handleConfirmAdmissionAfterAvailability()}
+            />
+
+            <Modal
+                open={Boolean(availabilityImagePreview?.url)}
+                onClose={() => setAvailabilityImagePreview(null)}
+                slotProps={{
+                    backdrop: {sx: {backdropFilter: "blur(8px)", bgcolor: "rgba(15, 23, 42, 0.5)"}}
+                }}
+                sx={{display: "flex", alignItems: "center", justifyContent: "center", p: {xs: 2, md: 3}}}
+            >
+                <Box sx={{position: "relative", outline: "none", maxWidth: "100%"}}>
+                    <IconButton
+                        aria-label="Đóng"
+                        onClick={() => setAvailabilityImagePreview(null)}
+                        sx={{
+                            position: "absolute",
+                            top: -44,
+                            right: 0,
+                            color: "#fff",
+                            bgcolor: "rgba(15, 23, 42, 0.55)",
+                            "&:hover": {bgcolor: "rgba(15, 23, 42, 0.75)"}
+                        }}
+                    >
+                        <CloseIcon/>
+                    </IconButton>
+                    {availabilityImagePreview?.title ? (
+                        <Typography
+                            sx={{
+                                position: "absolute",
+                                top: -44,
+                                left: 0,
+                                color: "#fff",
+                                fontWeight: 700,
+                                fontSize: "0.9rem",
+                                maxWidth: "min(70vw, 320px)"
+                            }}
+                        >
+                            {availabilityImagePreview.title}
+                        </Typography>
+                    ) : null}
+                    <Box
+                        component="img"
+                        src={availabilityImagePreview?.url || ""}
+                        alt={availabilityImagePreview?.title || "Ảnh học bạ"}
+                        sx={{
+                            maxWidth: "min(92vw, 720px)",
+                            maxHeight: "min(82vh, 640px)",
+                            borderRadius: 2,
+                            boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
+                            display: "block"
+                        }}
+                    />
+                </Box>
+            </Modal>
 
             {detailSchool && (
                 <SchoolSearchDetailView

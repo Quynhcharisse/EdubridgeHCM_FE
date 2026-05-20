@@ -784,11 +784,11 @@ export default function CampaignOfferingsSection({
                 errors.quota = `Chỉ tiêu mới không được nhỏ hơn số đã dùng (${usedQuota})`;
             } else if (
                 Number.isFinite(Number(breakdown?.remainingQuota)) &&
-                Number(breakdown?.remainingQuota) <= 0
+                Number(breakdown?.remainingQuota) + currentQuota <= 0
             ) {
                 errors.quota = "Phương thức đã hết chỉ tiêu còn lại (chỉ tiêu còn lại = 0).";
-            } else if (Number.isFinite(selectedMethodQuota) && quota > selectedMethodQuota) {
-                errors.quota = `Chỉ tiêu mới không được vượt quá ${selectedMethodQuota} (quota của phương thức tuyển sinh đã chọn)`;
+            } else if (quota > Number(breakdown?.remainingQuota) + currentQuota) {
+                errors.quota = `Chỉ tiêu mới không được vượt quá ${Number(breakdown?.remainingQuota) + currentQuota} (chỉ tiêu còn lại của phương thức)`;
             }
         }
         if (!editingRow) {

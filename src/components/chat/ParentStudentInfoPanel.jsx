@@ -68,6 +68,89 @@ export const parseMessagesHistoryPayloadRoot = (response) => {
   return payload;
 };
 
+/** Chuẩn hoá timestamp từ API (ISO, epoch, Jackson array). */
+const tryCoerceHistoryTimestampToIso = (v) => {
+  if (v == null) return null;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString();
+  if (typeof v === "string" && v.trim() !== "") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (typeof v === "number" && Number.isFinite(v)) {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (Array.isArray(v) && v.length >= 3) {
+    const y = v[0];
+    const mo = v[1];
+    const day = v[2];
+    const h = v[3] ?? 0;
+    const mi = v[4] ?? 0;
+    const s = v[5] ?? 0;
+    const ms = v[6] != null ? Math.floor(Number(v[6]) / 1e6) : 0;
+    const dt = new Date(y, mo - 1, day, h, mi, s, ms);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  return null;
+};
+
+const scanPayloadRootsForKeys = (payload, keys) => {
+  const roots = [];
+  const push = (o) => {
+    if (o && typeof o === "object" && !Array.isArray(o)) roots.push(o);
+  };
+  push(payload);
+  push(payload?.conversation);
+  push(payload?.chat);
+  push(payload?.meta);
+  push(payload?.data);
+  for (const root of roots) {
+    for (const k of keys) {
+      const iso = tryCoerceHistoryTimestampToIso(root[k]);
+      if (iso) return iso;
+    }
+  }
+  return null;
+};
+
+/**
+ * TVV: thời điểm phụ huynh đã đọc (GET history nếu BE trả về).
+ */
+export const extractParentLastReadAtFromHistoryPayload = (payload) => {
+  if (!payload || typeof payload !== "object") return null;
+  const keys = [
+    "parentLastReadAt",
+    "parentLastReadTime",
+    "lastReadByParentAt",
+    "parentReadAt",
+    "parentReadTimestamp",
+    "lastSeenByParentAt",
+    "peerParentReadAt",
+    "parentLastSeenAt",
+    "lastReadAtByParent",
+  ];
+  return scanPayloadRootsForKeys(payload, keys);
+};
+
+/**
+ * Phụ huynh: thời điểm TVV / trường đã đọc tin phụ huynh (GET history).
+ */
+export const extractCounsellorPeerReadAtFromHistoryPayload = (payload) => {
+  if (!payload || typeof payload !== "object") return null;
+  const keys = [
+    "counsellorLastReadAt",
+    "counsellorLastReadTime",
+    "lastReadByCounsellorAt",
+    "peerLastReadAt",
+    "schoolLastReadAt",
+    "tvvLastReadAt",
+    "advisorLastReadAt",
+    "lastReadAtByCounsellor",
+    "lastSeenByCounsellorAt",
+  ];
+  return scanPayloadRootsForKeys(payload, keys);
+};
+
 /**
  * subjectsInSystem có thể nằm root, trong `data`, `studentProfile`, hoặc PascalCase.
  */

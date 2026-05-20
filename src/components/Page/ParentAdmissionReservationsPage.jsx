@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Avatar,
+    Backdrop,
     Box,
     Button,
     Chip,
@@ -9,9 +10,8 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
-    Grid,
+    Fade,
     IconButton,
-    Modal,
     Paper,
     Stack,
     Tab,
@@ -21,118 +21,95 @@ import {
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import {enqueueSnackbar} from "notistack";
 import {
     getParentAdmissionReservationForms,
-    pickAdmissionReservationFormsFromResponse
+    pickAdmissionReservationFormsFromResponse,
+    putParentAdmissionReservationFormConfirmEnrollment,
 } from "../../services/ParentService.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
+import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
+import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
+import MandatoryDocumentsDialog from "./admission/MandatoryDocumentsDialog.jsx";
+import RejectReasonAlert from "./admission/RejectReasonAlert.jsx";
+import {
+    formatReservationDateOfBirth,
+    normalizeParentAdmissionReservationRow,
+    reservationToReadonlyDocs,
+    sanitizeReservationDisplayValue,
+} from "./admission/admissionSubmissionUtils.js";
 import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
+import {
+    MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS,
+    PARENT_RESERVATION_FILTERS,
+    RESERVATION_STATUS,
+    canParentConfirmEnrollment,
+    canParentOpenReservationPayment,
+    canParentRetryReservationPayment,
+    getParentReservationFilterValueForStatus,
+    getReservationStatusLabel,
+    getReservationStatusStyle,
+    isParentReservationPaymentAgain,
+    normalizeReservationStatus,
+    reservationStatusMatchesFilter,
+    shouldShowReservationPaymentRejectReason,
+} from "../../constants/reservationStatusConfig.js";
 
-const FILTERS = [
-    {value: "ALL", label: "Tất cả"},
-    {value: "PENDING", label: "Chờ duyệt", statuses: ["RESERVATION_PENDING", "PENDING"]},
-    {
-        value: "CONFIRMED",
-        label: "Đã xác nhận",
-        statuses: ["RESERVATION_APPROVAL", "RESERVATION_CONFIRMED", "CONFIRMED", "APPROVED", "ACCEPTED"]
-    },
-    {value: "REJECTED", label: "Từ chối", statuses: ["RESERVATION_REJECTED", "REJECTED"]},
-    {value: "CANCELLED", label: "Đã hủy", statuses: ["RESERVATION_CANCELLED", "CANCELLED"]}
-];
+const FILTERS = PARENT_RESERVATION_FILTERS;
 
-const STATUS_META = {
-    RESERVATION_PENDING: {
-        label: "Chờ duyệt",
-        color: "#c2410c",
-        bg: "#ffedd5",
-        border: "#fed7aa"
+const RESERVATION_CARD_ACTION_BUTTON_SX = {
+    borderRadius: 999,
+    px: 1.25,
+    py: 0.25,
+    minHeight: 30,
+    fontSize: 12.5,
+    fontWeight: 600,
+    textTransform: "none",
+    lineHeight: 1.35,
+    flex: {xs: "1 1 auto", sm: "0 0 auto"},
+    "& .MuiButton-startIcon": {
+        marginRight: 0.4,
+        "& > *:nth-of-type(1)": {fontSize: 15},
     },
-    PENDING: {
-        label: "Chờ duyệt",
-        color: "#c2410c",
-        bg: "#ffedd5",
-        border: "#fed7aa"
-    },
-    RESERVATION_CONFIRMED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    RESERVATION_APPROVAL: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    CONFIRMED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    APPROVED: {
-        label: "Đã xác nhận",
-        color: "#047857",
-        bg: "#d1fae5",
-        border: "#a7f3d0"
-    },
-    REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fecaca"
-    },
-    RESERVATION_REJECTED: {
-        label: "Từ chối",
-        color: "#b91c1c",
-        bg: "#fee2e2",
-        border: "#fecaca"
-    },
-    CANCELLED: {
-        label: "Đã hủy",
-        color: "#475569",
-        bg: "#e2e8f0",
-        border: "#cbd5e1"
-    },
-    RESERVATION_CANCELLED: {
-        label: "Đã hủy",
-        color: "#475569",
-        bg: "#e2e8f0",
-        border: "#cbd5e1"
+};
+
+function pickReservationStatusFromMutationResponse(response) {
+    const data = response?.data;
+    if (!data) return null;
+    let body = data.body ?? data;
+    if (typeof body === "string") {
+        try {
+            body = JSON.parse(body);
+        } catch {
+            return null;
+        }
     }
-};
-
-const DOCUMENT_LABELS = {
-    HOC_BA: "Học bạ",
-    GIAY_KSTN: "Giấy khai sinh",
-    ANH_THE: "Ảnh thẻ",
-    HB12: "Học bạ lớp 12",
-    CCCD: "CCCD/CMND"
-};
+    if (Array.isArray(body)) {
+        const item = body.find((row) => row && typeof row === "object");
+        return item?.status ?? item?.formStatus ?? null;
+    }
+    if (body && typeof body === "object") {
+        return body.status ?? body.formStatus ?? null;
+    }
+    return data.status ?? null;
+}
 
 const hasText = (value) => value != null && String(value).trim() !== "";
 
-const formatDateTime = (value) => {
-    if (!hasText(value)) return "Chưa cập nhật";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value).trim();
-    return date.toLocaleString("vi-VN", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-    });
-};
+const isDisplayableValue = (value) => sanitizeReservationDisplayValue(value) != null;
 
 const formatDateOnly = (value) => {
-    if (!hasText(value)) return "Chưa cập nhật";
+    if (!hasText(value)) return null;
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value).trim();
+    if (Number.isNaN(date.getTime())) {
+        const raw = String(value).trim();
+        return isDisplayableValue(raw) ? raw : null;
+    }
     return date.toLocaleDateString("vi-VN", {
         day: "2-digit",
         month: "2-digit",
@@ -141,34 +118,35 @@ const formatDateOnly = (value) => {
 };
 
 const getGenderLabel = (gender) => {
-    const key = String(gender || "").trim().toUpperCase();
+    if (!hasText(gender)) return null;
+    const key = String(gender).trim().toUpperCase();
     if (key === "MALE") return "Nam";
     if (key === "FEMALE") return "Nữ";
-    return hasText(gender) ? String(gender).trim() : "Chưa cập nhật";
-};
-
-const getDocumentLabel = (key) => {
-    const normalized = String(key || "").trim().toUpperCase();
-    return DOCUMENT_LABELS[normalized] || normalized || "Minh chứng";
+    const raw = String(gender).trim();
+    return isDisplayableValue(raw) ? raw : null;
 };
 
 const getStatusMeta = (status) => {
-    const key = String(status || "").trim().toUpperCase();
-    return STATUS_META[key] || {
-        label: hasText(status) ? String(status).replaceAll("_", " ") : "Chưa cập nhật",
+    const style = getReservationStatusStyle(status);
+    if (style) return style;
+    return {
+        label: getReservationStatusLabel(status) || "Đang xử lý",
         color: "#334155",
         bg: "#e2e8f0",
-        border: "#cbd5e1"
+        border: "#cbd5e1",
     };
 };
 
-const getFilterCount = (rows, filter) => {
-    if (filter.value === "ALL") return rows.length;
-    const allowed = new Set(filter.statuses || []);
-    return rows.filter((row) => allowed.has(String(row?.status || "").trim().toUpperCase())).length;
+const getFilterCount = (rows, filter) =>
+    rows.filter((row) => reservationStatusMatchesFilter(row?.status, filter)).length;
+
+const getReservationRowId = (row) => {
+    const id = Number(row?.admissionFormId ?? row?.id);
+    return Number.isFinite(id) && id > 0 ? id : null;
 };
 
 function InfoRow({label, value}) {
+    if (!isDisplayableValue(value)) return null;
     return (
         <Stack
             spacing={0.45}
@@ -185,13 +163,47 @@ function InfoRow({label, value}) {
                 {label}
             </Typography>
             <Typography sx={{fontSize: 14.5, color: "#1e293b", fontWeight: 600}}>
-                {hasText(value) ? value : "Chưa cập nhật"}
+                {value}
             </Typography>
         </Stack>
     );
 }
 
-function DetailLineRow({ label, value }) {
+function DetailSection({title, chip, children}) {
+    const rows = React.Children.toArray(children).filter((child) => child != null);
+    if (rows.length === 0) return null;
+    return (
+        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
+            <Stack
+                direction={{xs: "column", sm: "row"}}
+                alignItems={{xs: "flex-start", sm: "center"}}
+                justifyContent="space-between"
+                gap={1.5}
+                sx={{mb: 1.5}}
+            >
+                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>{title}</Typography>
+                {chip ?? null}
+            </Stack>
+            <Stack spacing={1}>{rows}</Stack>
+        </Paper>
+    );
+}
+
+function getDetailRejectReasonAlertProps(reservation) {
+    const reason = String(reservation?.rejectReason ?? "").trim();
+    if (!reason) return null;
+    const status = normalizeReservationStatus(reservation?.status);
+    if (status === RESERVATION_STATUS.REJECTED) {
+        return {title: "Lý do từ chối hồ sơ", reason, variant: "profile"};
+    }
+    if (shouldShowReservationPaymentRejectReason(reservation)) {
+        return {title: "Lý do từ chối thanh toán", reason, variant: "payment"};
+    }
+    return null;
+}
+
+function DetailLineRow({label, value}) {
+    if (!isDisplayableValue(value)) return null;
     return (
         <Box
             sx={{
@@ -199,20 +211,73 @@ function DetailLineRow({ label, value }) {
                 borderBottom: "1px dashed #c7d8ea"
             }}
         >
-            <Typography sx={{ fontSize: 14.5, color: "#1e293b" }}>
-                <Box component="span" sx={{ color: "#2563eb", fontWeight: 700 }}>
+            <Typography sx={{fontSize: 14.5, color: "#1e293b"}}>
+                <Box component="span" sx={{color: "#2563eb", fontWeight: 700}}>
                     {label}:
                 </Box>{" "}
-                <Box component="span" sx={{ fontWeight: 600 }}>
-                    {hasText(value) ? value : "Chưa cập nhật"}
+                <Box component="span" sx={{fontWeight: 600}}>
+                    {value}
                 </Box>
             </Typography>
         </Box>
     );
 }
 
-function ReservationCard({reservation, onOpenDetail}) {
+function ReservationCard({
+    reservation,
+    onOpenDetail,
+    onOpenPayment,
+    onOpenConfirmEnrollment,
+    onOpenMandatoryDocuments,
+    confirmEnrollmentLoadingId,
+}) {
+    const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
+    const isPaymentAgain = isParentReservationPaymentAgain(reservation);
+    const showPayment = canParentOpenReservationPayment(reservation);
+    const canRetryPayment = canParentRetryReservationPayment(reservation);
+    const paymentRejectReason = String(reservation?.rejectReason ?? "").trim();
+    const showPaymentRejectReason =
+        shouldShowReservationPaymentRejectReason(reservation) && paymentRejectReason;
+    const statusHint =
+        normalizedStatus === RESERVATION_STATUS.PENDING
+            ? "Hồ sơ đang chờ trường duyệt."
+            : normalizedStatus === RESERVATION_STATUS.APPROVAL
+              ? "Vui lòng thanh toán phí giữ chỗ theo hướng dẫn của trường."
+              : normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING
+                ? showPaymentRejectReason
+                    ? `Trường đang xác nhận thanh toán. Lý do từ chối lần trước: ${paymentRejectReason}`
+                    : "Trường đang xác nhận minh chứng thanh toán của bạn."
+                : normalizedStatus === RESERVATION_STATUS.PAYMENT_REJECTED
+                  ? showPaymentRejectReason
+                      ? `Lý do từ chối thanh toán: ${paymentRejectReason}`
+                      : "Minh chứng thanh toán bị từ chối — vui lòng thanh toán lại."
+                  : normalizedStatus === RESERVATION_STATUS.DEPOSITED
+                    ? "Đã đặt cọc thành công — vui lòng xác nhận nhập học nếu chọn trường này."
+                    : normalizedStatus === RESERVATION_STATUS.DEPOSIT_EXPIRED
+                      ? "Đơn đã hết hạn đặt cọc."
+                      : normalizedStatus === RESERVATION_STATUS.CONFIRMED
+                        ? "Bạn đã xác nhận nhập học cho đơn này."
+                        : normalizedStatus === RESERVATION_STATUS.GHOST
+                          ? "Bạn đã chốt trường khác — hồ sơ này không còn hiệu lực."
+                          : normalizedStatus === RESERVATION_STATUS.CANCELLED
+                            ? "Đơn đã được hủy."
+                            : normalizedStatus === RESERVATION_STATUS.REJECTED
+                              ? isDisplayableValue(reservation?.rejectReason)
+                                  ? `Lý do từ chối hồ sơ: ${reservation.rejectReason}`
+                                  : "Hồ sơ bị trường từ chối."
+                              : null;
+    const showConfirmEnrollment = canParentConfirmEnrollment(reservation);
+    const showMandatoryDocuments = normalizedStatus === RESERVATION_STATUS.CONFIRMED;
+    const confirmEnrollmentLoading =
+        confirmEnrollmentLoadingId != null &&
+        Number(confirmEnrollmentLoadingId) === Number(reservation?.admissionFormId ?? reservation?.id);
+    const cardTitle = isDisplayableValue(reservation?.schoolName)
+        ? reservation.schoolName
+        : isDisplayableValue(reservation?.studentName)
+          ? reservation.studentName
+          : "Đơn đăng ký";
+    const submittedDate = formatDateOnly(reservation?.createdTime);
 
     return (
         <Paper
@@ -248,7 +313,7 @@ function ReservationCard({reservation, onOpenDetail}) {
                     <Box sx={{minWidth: 0}}>
                         <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{mb: 0.6}}>
                             <Typography sx={{fontSize: 17, fontWeight: 600, color: BRAND_NAVY, lineHeight: 1.3}}>
-                                {reservation?.schoolName || "Trường đang cập nhật"}
+                                {cardTitle}
                             </Typography>
                             <Chip
                                 label={statusMeta.label}
@@ -262,51 +327,182 @@ function ReservationCard({reservation, onOpenDetail}) {
                                 }}
                             />
                         </Stack>
-                        <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
-                            {reservation?.programName || "Chương trình tuyển sinh đang cập nhật"}
-                        </Typography>
-                        <Stack spacing={0.75}>
-                            <Stack direction="row" alignItems="center" spacing={0.75}>
-                                <LocationOnRoundedIcon sx={{fontSize: 18, color: "#64748b"}} />
-                                <Typography sx={{fontSize: 13.5, color: "#475569"}}>
-                                    {reservation?.campusName || "Cơ sở chưa cập nhật"}
-                                </Typography>
-                            </Stack>
-                            <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
-                                Ngày nộp: {formatDateOnly(reservation?.createdTime)}
+                        {isDisplayableValue(reservation?.programName) ? (
+                            <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
+                                {reservation.programName}
                             </Typography>
+                        ) : null}
+                        {isDisplayableValue(reservation?.studentCode) ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
+                                CCCD học sinh: {reservation.studentCode}
+                            </Typography>
+                        ) : null}
+                        {isDisplayableValue(
+                            formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth,
+                        ) ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
+                                Ngày sinh:{" "}
+                                {formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth}
+                            </Typography>
+                        ) : null}
+                        {statusHint ? (
+                            <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mb: 0.75}}>
+                                {statusHint}
+                            </Typography>
+                        ) : null}
+                        <Stack spacing={0.75}>
+                            {isDisplayableValue(reservation?.campusName) ? (
+                                <Stack direction="row" alignItems="center" spacing={0.75}>
+                                    <LocationOnRoundedIcon sx={{fontSize: 18, color: "#64748b"}} />
+                                    <Typography sx={{fontSize: 13.5, color: "#475569"}}>
+                                        {reservation.campusName}
+                                    </Typography>
+                                </Stack>
+                            ) : null}
+                            {submittedDate ? (
+                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
+                                    Ngày nộp: {submittedDate}
+                                </Typography>
+                            ) : null}
+                            {normalizedStatus === RESERVATION_STATUS.CONFIRMED &&
+                            isDisplayableValue(reservation?.confirmCode) ? (
+                                <Typography
+                                    sx={{
+                                        fontSize: 13.5,
+                                        color: "#0369a1",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Mã hồ sơ: {reservation.confirmCode}
+                                </Typography>
+                            ) : null}
                         </Stack>
                     </Box>
                 </Stack>
-                <Button
-                    variant="outlined"
-                    startIcon={<ArticleOutlinedIcon />}
-                    onClick={() => onOpenDetail(reservation)}
-                    sx={{
-                        borderRadius: 999,
-                        px: 2.4,
-                        fontWeight: 500,
-                        borderColor: "#bfdbfe",
-                        color: BRAND_NAVY,
-                        flex: {xs: "1 1 auto", sm: "0 0 auto"}
-                    }}
+                <Stack
+                    direction={{xs: "column", sm: "row"}}
+                    spacing={1}
+                    sx={{flex: {xs: "1 1 auto", md: "0 0 auto"}, width: {xs: "100%", md: "auto"}}}
                 >
-                    Xem chi tiết
-                </Button>
+                    {showPayment ? (
+                        <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<PaymentsRoundedIcon />}
+                            disabled={isPaymentAgain && !canRetryPayment}
+                            onClick={() => {
+                                if (isPaymentAgain && !canRetryPayment) {
+                                    enqueueSnackbar(
+                                        `Đã vượt quá ${MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS} lần thanh toán lại. Vui lòng liên hệ nhà trường.`,
+                                        {variant: "warning"},
+                                    );
+                                    return;
+                                }
+                                onOpenPayment(reservation);
+                            }}
+                            sx={{
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                                bgcolor: "#059669",
+                                boxShadow: "0 4px 10px rgba(5, 150, 105, 0.18)",
+                                "&:hover": {bgcolor: "#047857"},
+                            }}
+                        >
+                            {isPaymentAgain ? "Thanh toán lại" : "Thanh toán"}
+                        </Button>
+                    ) : null}
+                    {showConfirmEnrollment ? (
+                        <Button
+                            size="small"
+                            variant="contained"
+                            disabled={confirmEnrollmentLoading}
+                            onClick={() => onOpenConfirmEnrollment(reservation)}
+                            sx={{
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                                bgcolor: BRAND_NAVY,
+                                boxShadow: "0 4px 10px rgba(45, 95, 115, 0.18)",
+                                "&:hover": {bgcolor: APP_PRIMARY_DARK},
+                            }}
+                        >
+                            {confirmEnrollmentLoading ? "Đang xử lý..." : "Xác nhận nhập học"}
+                        </Button>
+                    ) : null}
+                    {showMandatoryDocuments ? (
+                        <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<DescriptionOutlinedIcon />}
+                            onClick={() => onOpenMandatoryDocuments(reservation)}
+                            sx={{
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                                bgcolor: "#0369a1",
+                                boxShadow: "0 4px 10px rgba(3, 105, 161, 0.18)",
+                                "&:hover": {bgcolor: "#075985"},
+                            }}
+                        >
+                            Hồ sơ cần nộp
+                        </Button>
+                    ) : null}
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ArticleOutlinedIcon />}
+                        onClick={() => onOpenDetail(reservation)}
+                        sx={{
+                            ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                            fontWeight: 500,
+                            borderColor: "#bfdbfe",
+                            color: BRAND_NAVY,
+                        }}
+                    >
+                        Xem chi tiết
+                    </Button>
+                </Stack>
             </Stack>
         </Paper>
     );
 }
 
+function PaymentProofImageModal({open, url, onClose}) {
+    if (!url) return null;
+    return (
+        <Backdrop open={open} onClick={onClose} sx={{zIndex: 1400, bgcolor: "rgba(15, 23, 42, 0.38)", backdropFilter: "blur(6px)"}}>
+            <Fade in={open}>
+                <Box onClick={(e) => e.stopPropagation()} sx={{display: "flex", justifyContent: "center", alignItems: "center", p: {xs: 2, md: 4}}}>
+                    <Box
+                        component="img"
+                        src={url}
+                        alt="Minh chứng thanh toán"
+                        sx={{maxWidth: "92vw", maxHeight: "84vh", objectFit: "contain", display: "block"}}
+                    />
+                </Box>
+            </Fade>
+        </Backdrop>
+    );
+}
+
 function DetailDialog({reservation, onClose}) {
-    const documents = Array.isArray(reservation?.profileMetadata) ? reservation.profileMetadata : [];
     const open = Boolean(reservation);
+    const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
-    const [previewImage, setPreviewImage] = useState(null);
+    const [paymentPreviewOpen, setPaymentPreviewOpen] = useState(false);
+    const readonlyDocs = useMemo(
+        () => (reservation ? reservationToReadonlyDocs(reservation) : []),
+        [reservation],
+    );
 
     useEffect(() => {
-        if (!open) setPreviewImage(null);
-    }, [open]);
+        if (!open) setPaymentPreviewOpen(false);
+    }, [open, reservation?.id]);
+    const detailTitleSuffix =
+        normalizedStatus === RESERVATION_STATUS.CONFIRMED &&
+        isDisplayableValue(reservation?.confirmCode)
+            ? ` — ${reservation.confirmCode}`
+            : isDisplayableValue(reservation?.studentName)
+              ? ` — ${reservation.studentName}`
+              : isDisplayableValue(reservation?.schoolName)
+                ? ` — ${reservation.schoolName}`
+                : "";
+    const rejectReasonAlertProps = getDetailRejectReasonAlertProps(reservation);
 
     return (
         <>
@@ -335,170 +531,112 @@ function DetailDialog({reservation, onClose}) {
                         borderBottom: "1px solid #b8d8f4"
                     }}
                 >
-                    <Box>
+                    <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1}>
                         <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
-                            Chi tiết đơn giữ chỗ
+                            Chi tiết đơn giữ chỗ{detailTitleSuffix}
                         </Typography>
-                    </Box>
+                        <Chip
+                            label={statusMeta.label}
+                            size="small"
+                            sx={{
+                                bgcolor: statusMeta.bg,
+                                color: statusMeta.color,
+                                border: `1px solid ${statusMeta.border}`,
+                                fontWeight: 600,
+                                borderRadius: 999,
+                            }}
+                        />
+                    </Stack>
                     <IconButton onClick={onClose}>
                         <CloseRoundedIcon />
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
                     <Stack spacing={2.5}>
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Stack direction={{xs: "column", sm: "row"}} alignItems={{xs: "flex-start", sm: "center"}} justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>Thông tin học sinh</Typography>
-                                <Chip
-                                    label={statusMeta.label}
-                                    size="small"
-                                    sx={{ bgcolor: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.border}`, fontWeight: 600, borderRadius: 999 }}
-                                />
-                            </Stack>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Học sinh" value={reservation?.studentName} />
-                                <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
-                                <DetailLineRow label="Phương thức xét tuyển" value={reservation?.methodName || reservation?.admissionMethodCode} />
-                            </Stack>
-                        </Paper>
+                        {rejectReasonAlertProps ? (
+                            <RejectReasonAlert {...rejectReasonAlertProps} />
+                        ) : null}
+                        <DetailSection title="Thông tin học sinh">
+                            <DetailLineRow label="Học sinh" value={reservation?.studentName} />
+                            <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
+                            <DetailLineRow
+                                label="Ngày sinh"
+                                value={
+                                    formatReservationDateOfBirth(reservation?.dateOfBirth) ||
+                                    reservation?.dateOfBirth
+                                }
+                            />
+                            <DetailLineRow label="CCCD học sinh" value={reservation?.studentCode} />
+                            <DetailLineRow
+                                label="Phương thức xét tuyển"
+                                value={reservation?.methodName ?? reservation?.admissionMethodCode}
+                            />
+                        </DetailSection>
 
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>Thông tin phụ huynh</Typography>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Phụ huynh" value={reservation?.parentName} />
-                                <DetailLineRow label="Email" value={reservation?.parentEmail} />
-                                <DetailLineRow label="Điện thoại" value={reservation?.parentPhone} />
-                                <DetailLineRow label="Địa chỉ" value={reservation?.address} />
-                            </Stack>
-                        </Paper>
+                        <DetailSection title="Thông tin phụ huynh">
+                            <DetailLineRow label="Phụ huynh" value={reservation?.parentName} />
+                            <DetailLineRow label="CCCD phụ huynh" value={reservation?.identityCard} />
+                            <DetailLineRow label="Email" value={reservation?.parentEmail} />
+                            <DetailLineRow label="Điện thoại" value={reservation?.parentPhone} />
+                            <DetailLineRow label="Địa chỉ" value={reservation?.address} />
+                        </DetailSection>
 
-                        <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
-                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>Thông tin hồ sơ tuyển sinh</Typography>
-                            <Stack spacing={1}>
-                                <DetailLineRow label="Chương trình" value={reservation?.programName} />
-                                <DetailLineRow label="Cơ sở học" value={reservation?.campusName} />
-                                <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime)} />
-                                {hasText(reservation?.rejectReason) && (
-                                    <DetailLineRow label="Lý do từ chối" value={reservation.rejectReason} />
-                                )}
-                                {hasText(reservation?.cancelReason) && (
-                                    <DetailLineRow label="Lý do hủy" value={reservation.cancelReason} />
-                                )}
-                            </Stack>
-                        </Paper>
+                        <DetailSection title="Thông tin đơn tuyển sinh">
+                            <DetailLineRow label="Trường" value={reservation?.schoolName} />
+                            <DetailLineRow label="Chương trình" value={reservation?.programName} />
+                            <DetailLineRow label="Cơ sở học" value={reservation?.campusName} />
+                            <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime) ?? undefined} />
+                            <DetailLineRow label="Mã chuyển" value={reservation?.transferCode} />
+                        </DetailSection>
 
-                        {documents.length === 0 ? (
-                            <Paper elevation={0} sx={{p: 4, textAlign: "center", borderRadius: 3, border: "1px dashed #b8d8f4", bgcolor: "#eef7ff"}}>
-                                <ArticleOutlinedIcon sx={{fontSize: 48, color: "#94a3b8", mb: 1}} />
-                                <Typography sx={{fontWeight: 800, color: "#475569"}}>
-                                    Chưa có ảnh minh chứng trong đơn này.
+                        {normalizedStatus === RESERVATION_STATUS.PAYMENT_PENDING ||
+                        isDisplayableValue(reservation?.paymentProofUrl) ? (
+                            <Paper
+                                elevation={0}
+                                sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}
+                            >
+                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
+                                    Minh chứng thanh toán
                                 </Typography>
+                                <PaymentProofPreview
+                                    url={reservation?.paymentProofUrl}
+                                    onPreview={
+                                        isDisplayableValue(reservation?.paymentProofUrl)
+                                            ? () => setPaymentPreviewOpen(true)
+                                            : undefined
+                                    }
+                                />
                             </Paper>
-                        ) : (
-                            documents.map((doc, docIndex) => {
-                                const images = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
-                                return (
-                                    <Paper
-                                        key={`${doc?.key || "document"}-${docIndex}`}
-                                        elevation={0}
-                                        sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "#eef7ff"}}
-                                    >
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1.5} sx={{mb: 1.5}}>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                <ArticleOutlinedIcon sx={{color: BRAND_NAVY}} />
-                                                <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>
-                                                    {getDocumentLabel(doc?.key)}
-                                                </Typography>
-                                            </Stack>
-                                            <Chip
-                                                label={`${images.length} ảnh`}
-                                                size="small"
-                                                sx={{bgcolor: "#eff6ff", color: BRAND_NAVY, fontWeight: 800}}
-                                            />
-                                        </Stack>
-                                        <Grid container spacing={1.5}>
-                                            {images.map((imageUrl, imageIndex) => (
-                                                <Grid key={`${imageUrl}-${imageIndex}`} size={{xs: 6, sm: 4, md: 3}}>
-                                                    <Box
-                                                        component="button"
-                                                        type="button"
-                                                        onClick={() => setPreviewImage({url: imageUrl, title: `${getDocumentLabel(doc?.key)} ${imageIndex + 1}`})}
-                                                        sx={{
-                                                            display: "block",
-                                                            width: "100%",
-                                                            height: 150,
-                                                            p: 0,
-                                                            borderRadius: 2.5,
-                                                            overflow: "hidden",
-                                                            border: "1px solid #dbeafe",
-                                                            bgcolor: "#f1f5f9",
-                                                            cursor: "zoom-in"
-                                                        }}
-                                                    >
-                                                        <Box
-                                                            component="img"
-                                                            src={imageUrl}
-                                                            alt={`${getDocumentLabel(doc?.key)} ${imageIndex + 1}`}
-                                                            sx={{
-                                                                width: "100%",
-                                                                height: "100%",
-                                                                objectFit: "cover",
-                                                                display: "block"
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                </Grid>
-                                            ))}
-                                        </Grid>
-                                    </Paper>
-                                );
-                            })
-                        )}
+                        ) : null}
+
+                        <Paper
+                            elevation={0}
+                            sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}
+                        >
+                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
+                                Minh chứng đính kèm
+                            </Typography>
+                            <AdmissionDocumentsSection
+                                docs={readonlyDocs}
+                                docsLoading={false}
+                                docsError=""
+                                cloudinaryReady
+                                uploadingSlots={new Set()}
+                                disabled
+                                readOnly
+                                onPickFile={() => {}}
+                                onRemoveSlot={() => {}}
+                                emptyMessage="Chưa có ảnh minh chứng trong đơn này."
+                            />
+                        </Paper>
                     </Stack>
                 </DialogContent>
             </Dialog>
-
-            <Modal
-                open={Boolean(previewImage)}
-                onClose={() => setPreviewImage(null)}
-                slotProps={{
-                    backdrop: {
-                        sx: {
-                            backdropFilter: "blur(8px)",
-                            bgcolor: "rgba(15, 23, 42, 0.24)"
-                        }
-                    }
-                }}
-                sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    p: {xs: 2, md: 4}
-                }}
-            >
-                <Box
-                    sx={{
-                        outline: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                    }}
-                >
-                    <Box
-                        component="img"
-                        src={previewImage?.url || ""}
-                        alt={previewImage?.title || "Minh chứng"}
-                        sx={{
-                            maxWidth: "92vw",
-                            maxHeight: "84vh",
-                            objectFit: "contain",
-                            display: "block",
-                            bgcolor: "transparent",
-                            visibility: previewImage?.url ? "visible" : "hidden"
-                        }}
-                    />
-                </Box>
-            </Modal>
+            <PaymentProofImageModal
+                open={paymentPreviewOpen}
+                url={reservation?.paymentProofUrl}
+                onClose={() => setPaymentPreviewOpen(false)}
+            />
         </>
     );
 }
@@ -508,24 +646,146 @@ export default function ParentAdmissionReservationsPage() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("ALL");
     const [selectedReservation, setSelectedReservation] = useState(null);
+    const [paymentReservation, setPaymentReservation] = useState(null);
+    const [confirmEnrollmentTarget, setConfirmEnrollmentTarget] = useState(null);
+    const [confirmEnrollmentLoadingId, setConfirmEnrollmentLoadingId] = useState(null);
+    const [mandatoryDocsReservation, setMandatoryDocsReservation] = useState(null);
+    const [mandatoryDocsPayload, setMandatoryDocsPayload] = useState({
+        mandatoryDocuments: [],
+        methodDocuments: [],
+        context: {},
+    });
+    const [mandatoryDocsLoading, setMandatoryDocsLoading] = useState(false);
     const mountedRef = useRef(true);
+    const reservationStatusSnapshotRef = useRef(new Map());
 
     const loadReservations = useCallback(async ({silent = false} = {}) => {
         if (!silent) setLoading(true);
         try {
             const response = await getParentAdmissionReservationForms();
-            const rows = pickAdmissionReservationFormsFromResponse(response);
+            const raw = pickAdmissionReservationFormsFromResponse(response);
+            const rows = raw
+                .map((item, index) => normalizeParentAdmissionReservationRow(item, index))
+                .filter(Boolean);
             if (mountedRef.current) setReservations(rows);
+            return rows;
         } catch (error) {
             console.error("[ParentAdmissionReservationsPage] load error:", error);
             if (mountedRef.current && !silent) {
                 setReservations([]);
                 enqueueSnackbar("Không thể tải danh sách đơn đăng ký. Vui lòng thử lại sau.", {variant: "error"});
             }
+            return [];
         } finally {
             if (mountedRef.current && !silent) setLoading(false);
         }
     }, []);
+
+    const handleOpenMandatoryDocuments = useCallback(async (reservation) => {
+        const formId = Number(reservation?.admissionFormId ?? reservation?.id);
+        if (!Number.isFinite(formId) || formId <= 0) {
+            enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
+            return;
+        }
+        setMandatoryDocsReservation(reservation);
+        setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
+        setMandatoryDocsLoading(true);
+
+        const applyDocsPayload = (source) => {
+            setMandatoryDocsPayload({
+                mandatoryDocuments: Array.isArray(source?.mandatoryDocuments)
+                    ? source.mandatoryDocuments
+                    : [],
+                methodDocuments: Array.isArray(source?.methodDocuments) ? source.methodDocuments : [],
+                context: {
+                    schoolName: source?.schoolName ?? reservation?.schoolName,
+                    programName: source?.programName ?? reservation?.programName,
+                    methodName: source?.methodName ?? reservation?.methodName,
+                },
+            });
+        };
+
+        const rowMandatory = Array.isArray(reservation?.mandatoryDocuments)
+            ? reservation.mandatoryDocuments
+            : [];
+        const rowMethod = Array.isArray(reservation?.methodDocuments) ? reservation.methodDocuments : [];
+        if (rowMandatory.length > 0 && rowMethod.length > 0) {
+            applyDocsPayload({
+                ...reservation,
+                mandatoryDocuments: rowMandatory,
+                methodDocuments: rowMethod,
+            });
+            setMandatoryDocsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await getParentAdmissionReservationForms({
+                status: RESERVATION_STATUS.CONFIRMED,
+            });
+            const raw = pickAdmissionReservationFormsFromResponse(response);
+            const match = raw.find(
+                (item) => Number(item?.id ?? item?.admissionFormId) === formId,
+            );
+            if (!match) {
+                enqueueSnackbar(
+                    "Không tìm thấy đơn hoặc danh sách hồ sơ cần nộp.",
+                    {variant: "warning"},
+                );
+                setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
+                return;
+            }
+            applyDocsPayload(match);
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] mandatory documents:", error);
+            enqueueSnackbar(
+                error?.response?.data?.message ||
+                    error?.message ||
+                    "Không tải được danh sách hồ sơ cần nộp.",
+                {variant: "error"},
+            );
+            setMandatoryDocsReservation(null);
+        } finally {
+            setMandatoryDocsLoading(false);
+        }
+    }, []);
+
+    const handleCloseMandatoryDocuments = useCallback(() => {
+        setMandatoryDocsReservation(null);
+        setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
+        setMandatoryDocsLoading(false);
+    }, []);
+
+    const handleConfirmEnrollment = useCallback(async () => {
+        const formId = Number(
+            confirmEnrollmentTarget?.admissionFormId ?? confirmEnrollmentTarget?.id,
+        );
+        if (!Number.isFinite(formId) || formId <= 0) {
+            enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
+            return;
+        }
+        setConfirmEnrollmentLoadingId(formId);
+        try {
+            const res = await putParentAdmissionReservationFormConfirmEnrollment(formId);
+            enqueueSnackbar(
+                res?.data?.message || "Xác nhận nhập học thành công.",
+                {variant: "success"},
+            );
+            setConfirmEnrollmentTarget(null);
+            await loadReservations({silent: true});
+            const nextStatus =
+                pickReservationStatusFromMutationResponse(res) ?? RESERVATION_STATUS.CONFIRMED;
+            setFilter(getParentReservationFilterValueForStatus(nextStatus));
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] confirm enrollment:", error);
+            enqueueSnackbar(
+                error?.response?.data?.message || error?.message || "Xác nhận nhập học thất bại.",
+                {variant: "error"},
+            );
+        } finally {
+            setConfirmEnrollmentLoadingId(null);
+        }
+    }, [confirmEnrollmentTarget, loadReservations]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -558,11 +818,46 @@ export default function ParentAdmissionReservationsPage() {
         };
     }, [loadReservations]);
 
+    useEffect(() => {
+        const nextSnapshot = new Map();
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (id) nextSnapshot.set(id, normalizeReservationStatus(row?.status));
+        }
+        reservationStatusSnapshotRef.current = nextSnapshot;
+    }, [filter]);
+
+    useEffect(() => {
+        const currentFilterDef = FILTERS.find((item) => item.value === filter) ?? FILTERS[0];
+        if (currentFilterDef.value === "ALL") return;
+
+        const snapshot = reservationStatusSnapshotRef.current;
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (!id) continue;
+            const prevStatus = snapshot.get(id);
+            const nextStatus = normalizeReservationStatus(row?.status);
+            if (!prevStatus || !nextStatus || prevStatus === nextStatus) continue;
+            if (
+                reservationStatusMatchesFilter(prevStatus, currentFilterDef) &&
+                !reservationStatusMatchesFilter(nextStatus, currentFilterDef)
+            ) {
+                setFilter(getParentReservationFilterValueForStatus(nextStatus));
+                break;
+            }
+        }
+
+        const nextSnapshot = new Map();
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (id) nextSnapshot.set(id, normalizeReservationStatus(row?.status));
+        }
+        reservationStatusSnapshotRef.current = nextSnapshot;
+    }, [reservations, filter]);
+
     const filteredReservations = useMemo(() => {
-        if (filter === "ALL") return reservations;
-        const currentFilter = FILTERS.find((item) => item.value === filter);
-        const allowed = new Set(currentFilter?.statuses || []);
-        return reservations.filter((row) => allowed.has(String(row?.status || "").trim().toUpperCase()));
+        const currentFilter = FILTERS.find((item) => item.value === filter) ?? FILTERS[0];
+        return reservations.filter((row) => reservationStatusMatchesFilter(row?.status, currentFilter));
     }, [filter, reservations]);
 
     return (
@@ -586,7 +881,7 @@ export default function ParentAdmissionReservationsPage() {
                                 variant="h5"
                                 sx={{fontWeight: 600, letterSpacing: -0.2, lineHeight: 1.25}}
                             >
-                                Quản lý đơn đăng ký
+                                Quản lý hồ sơ giữ chỗ
                             </Typography>
                             <Typography sx={{mt: 0.85, color: "rgba(255,255,255,0.86)", fontSize: 14, fontWeight: 400}}>
                                 Xem lại các đơn tuyển sinh đã nộp theo từng trạng thái.
@@ -675,6 +970,10 @@ export default function ParentAdmissionReservationsPage() {
                                         key={reservation?.id ?? `${reservation?.studentName || "reservation"}-${index}`}
                                         reservation={reservation}
                                         onOpenDetail={setSelectedReservation}
+                                        onOpenPayment={setPaymentReservation}
+                                        onOpenConfirmEnrollment={setConfirmEnrollmentTarget}
+                                        onOpenMandatoryDocuments={handleOpenMandatoryDocuments}
+                                        confirmEnrollmentLoadingId={confirmEnrollmentLoadingId}
                                     />
                                 ))}
                             </Stack>
@@ -683,6 +982,53 @@ export default function ParentAdmissionReservationsPage() {
                 </Paper>
             </Container>
             <DetailDialog reservation={selectedReservation} onClose={() => setSelectedReservation(null)} />
+            <ReservationPaymentDialog
+                reservation={paymentReservation}
+                onClose={() => setPaymentReservation(null)}
+                onSubmitted={({status, response} = {}) => {
+                    const formId = Number(
+                        paymentReservation?.admissionFormId ?? paymentReservation?.id,
+                    );
+                    setPaymentReservation(null);
+                    void (async () => {
+                        const rows = await loadReservations({silent: true});
+                        const updatedRow =
+                            Number.isFinite(formId) && formId > 0
+                                ? rows.find(
+                                      (row) =>
+                                          Number(row?.admissionFormId ?? row?.id) === formId,
+                                  )
+                                : null;
+                        const nextStatus =
+                            updatedRow?.status ??
+                            pickReservationStatusFromMutationResponse(response) ??
+                            status ??
+                            RESERVATION_STATUS.PAYMENT_PENDING;
+                        setFilter(getParentReservationFilterValueForStatus(nextStatus));
+                    })();
+                }}
+            />
+            <MandatoryDocumentsDialog
+                open={Boolean(mandatoryDocsReservation)}
+                onClose={handleCloseMandatoryDocuments}
+                loading={mandatoryDocsLoading}
+                mandatoryDocuments={mandatoryDocsPayload.mandatoryDocuments}
+                methodDocuments={mandatoryDocsPayload.methodDocuments}
+                context={mandatoryDocsPayload.context}
+            />
+            <ConfirmDialog
+                open={Boolean(confirmEnrollmentTarget)}
+                title="Xác nhận nhập học"
+                description="Bạn có chắc muốn xác nhận nhập học?"
+                confirmText="Xác nhận nhập học"
+                cancelText="Hủy"
+                loading={confirmEnrollmentLoadingId != null}
+                onCancel={() => {
+                    if (confirmEnrollmentLoadingId != null) return;
+                    setConfirmEnrollmentTarget(null);
+                }}
+                onConfirm={() => void handleConfirmEnrollment()}
+            />
         </Box>
     );
 }
