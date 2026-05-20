@@ -446,50 +446,42 @@ export default function SavedSchoolsPage() {
                                 <Box
                                     sx={{
                                         display: "flex",
-                                        flexDirection: {xs: "column", sm: "row"},
-                                        alignItems: {xs: "stretch", sm: "center"},
-                                        justifyContent: "space-between",
-                                        gap: 1.5,
+                                        alignItems: "center",
+                                        gap: {xs: 0.75, sm: 1},
                                         mb: 2,
                                     }}
                                 >
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={batchAdmission.allBatchPageSelected}
-                                                indeterminate={batchAdmission.someBatchPageSelected}
-                                                onChange={batchAdmission.toggleBatchSelectAllShown}
-                                                disabled={batchAdmission.batchPageSchoolIds.length === 0}
-                                                sx={{py: 0}}
-                                            />
-                                        }
-                                        label={
-                                            <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
-                                                Chọn tất cả trên trang này
-                                            </Typography>
-                                        }
-                                        sx={{mr: 0, ml: 0}}
+                                    <Checkbox
+                                        checked={batchAdmission.allBatchPageSelected}
+                                        indeterminate={batchAdmission.someBatchPageSelected}
+                                        onChange={batchAdmission.toggleBatchSelectAllShown}
+                                        disabled={batchAdmission.batchPageSchoolIds.length === 0}
+                                        sx={{ flexShrink: 0, p: 0.5 }}
                                     />
-                                    <Button
-                                        variant="contained"
-                                        disabled={batchAdmission.batchAdmissionSelectedIds.length === 0}
-                                        onClick={batchAdmission.handleBatchSubmitFromList}
-                                        sx={{
-                                            textTransform: "none",
-                                            fontWeight: 700,
-                                            borderRadius: 999,
-                                            px: 2.5,
-                                            py: 1,
-                                            bgcolor: BRAND_NAVY,
-                                            alignSelf: {xs: "stretch", sm: "center"},
-                                            "&:hover": {bgcolor: APP_PRIMARY_DARK},
-                                        }}
-                                    >
-                                        Nộp hồ sơ
-                                        {batchAdmission.batchAdmissionSelectedIds.length > 0
-                                            ? ` (${batchAdmission.batchAdmissionSelectedIds.length})`
-                                            : ""}
-                                    </Button>
+                                    <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
+                                        <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
+                                            Chọn tất cả trên trang này
+                                        </Typography>
+                                        <Button
+                                            variant="contained"
+                                            disabled={batchAdmission.batchAdmissionSelectedIds.length === 0}
+                                            onClick={batchAdmission.handleBatchSubmitFromList}
+                                            sx={{
+                                                textTransform: "none",
+                                                fontWeight: 700,
+                                                borderRadius: 999,
+                                                px: 2.5,
+                                                py: 1,
+                                                bgcolor: BRAND_NAVY,
+                                                "&:hover": {bgcolor: APP_PRIMARY_DARK},
+                                            }}
+                                        >
+                                            Nộp hồ sơ
+                                            {batchAdmission.batchAdmissionSelectedIds.length > 0
+                                                ? ` (${batchAdmission.batchAdmissionSelectedIds.length})`
+                                                : ""}
+                                        </Button>
+                                    </Box>
                                 </Box>
                             ) : null}
                             <Stack spacing={2}>

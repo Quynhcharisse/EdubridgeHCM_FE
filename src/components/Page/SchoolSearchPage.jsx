@@ -1953,50 +1953,42 @@ export default function SchoolSearchPage() {
                             <Box
                                 sx={{
                                     display: "flex",
-                                    flexDirection: {xs: "column", sm: "row"},
-                                    alignItems: {xs: "stretch", sm: "center"},
-                                    justifyContent: "space-between",
-                                    gap: 1.5,
-                                    mb: 2
+                                    alignItems: "center",
+                                    gap: {xs: 0.75, sm: 1},
+                                    mb: 2,
                                 }}
                             >
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={allBatchPageSelected}
-                                            indeterminate={someBatchPageSelected}
-                                            onChange={toggleBatchSelectAllShown}
-                                            disabled={batchPageSchoolIds.length === 0}
-                                            sx={{py: 0}}
-                                        />
-                                    }
-                                    label={
-                                        <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
-                                            Chọn tất cả trên trang này
-                                        </Typography>
-                                    }
-                                    sx={{mr: 0, ml: 0}}
+                                <Checkbox
+                                    checked={allBatchPageSelected}
+                                    indeterminate={someBatchPageSelected}
+                                    onChange={toggleBatchSelectAllShown}
+                                    disabled={batchPageSchoolIds.length === 0}
+                                    sx={{ flexShrink: 0, p: 0.5 }}
                                 />
-                                <Button
-                                    variant="contained"
-                                    disabled={batchAdmissionSelectedIds.length === 0}
-                                    onClick={handleBatchSubmitFromSearchList}
-                                    sx={{
-                                        textTransform: "none",
-                                        fontWeight: 700,
-                                        borderRadius: 999,
-                                        px: 2.5,
-                                        py: 1,
-                                        bgcolor: BRAND_NAVY,
-                                        alignSelf: {xs: "stretch", sm: "center"},
-                                        "&:hover": {bgcolor: APP_PRIMARY_DARK}
-                                    }}
-                                >
-                                    Nộp hồ sơ
-                                    {batchAdmissionSelectedIds.length > 0
-                                        ? ` (${batchAdmissionSelectedIds.length})`
-                                        : ""}
-                                </Button>
+                                <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
+                                    <Typography sx={{fontWeight: 600, fontSize: 14, color: "#334155"}}>
+                                        Chọn tất cả trên trang này
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        disabled={batchAdmissionSelectedIds.length === 0}
+                                        onClick={handleBatchSubmitFromSearchList}
+                                        sx={{
+                                            textTransform: "none",
+                                            fontWeight: 700,
+                                            borderRadius: 999,
+                                            px: 2.5,
+                                            py: 1,
+                                            bgcolor: BRAND_NAVY,
+                                            "&:hover": {bgcolor: APP_PRIMARY_DARK}
+                                        }}
+                                    >
+                                        Nộp hồ sơ
+                                        {batchAdmissionSelectedIds.length > 0
+                                            ? ` (${batchAdmissionSelectedIds.length})`
+                                            : ""}
+                                    </Button>
+                                </Box>
                             </Box>
                         ) : null}
 

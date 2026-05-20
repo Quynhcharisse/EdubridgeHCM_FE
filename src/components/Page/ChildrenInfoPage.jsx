@@ -379,6 +379,21 @@ export default function ChildrenInfoPage() {
                                         ))}
                                     </TextField>
                                 </Grid>
+                                <Grid size={{xs: 12, sm: 6}}>
+                                    <TextField
+                                        label="Ngày tháng năm sinh"
+                                        name="dateOfBirth"
+                                        type="date"
+                                        value={form.dateOfBirth ?? ''}
+                                        onChange={handleChange}
+                                        fullWidth
+                                        size="medium"
+                                        disabled={fieldsDisabled}
+                                        InputLabelProps={{shrink: true}}
+                                        inputProps={{max: new Date().toISOString().slice(0, 10)}}
+                                        sx={formTextFieldSx}
+                                    />
+                                </Grid>
                             </Grid>
                         </CardContent>
                     </Card>
