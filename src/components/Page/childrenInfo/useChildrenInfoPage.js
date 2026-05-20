@@ -73,7 +73,7 @@ export function useChildrenInfoPage() {
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({name: '', gender: '', studentCode: ''});
+    const [form, setForm] = useState({name: '', gender: '', studentCode: '', dateOfBirth: ''});
 
     const [personalityGroups, setPersonalityGroups] = useState(null);
     const [personalityLoading, setPersonalityLoading] = useState(true);

@@ -1,4 +1,7 @@
 export function normalizeOcrCriterion(item) {
+  if (typeof item === "string") {
+    return {label: item.trim(), validations: []};
+  }
   if (!item || typeof item !== "object") {
     return {label: "", validations: []};
   }
@@ -39,14 +42,22 @@ export function mergeMandatoryDocFromImport(imported, existingDocs) {
   };
 }
 
+const LOCKED_CRITERION_SUFFIX = "phải có cấu trúc giống với hình ảnh mẫu của tài liệu";
+
+export function isLockedCriterionLabel(label) {
+  return String(label ?? "").trimEnd().endsWith(LOCKED_CRITERION_SUFFIX);
+}
+
+function isTemplateImageUrl(url) {
+  if (!url) return false;
+  if (url.includes("/image/upload/")) return true;
+  return /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+}
+
 function sanitizeOcrCriteriaForApi(criteria) {
-  const normalized = normalizeOcrCriteriaList(criteria)
-    .map((item) => ({
-      label: String(item.label ?? "").trim(),
-      validations: item.validations.map((v) => String(v).trim()).filter(Boolean),
-    }))
-    .filter((item) => item.label);
-  return normalized.length > 0 ? normalized : undefined;
+  return normalizeOcrCriteriaList(criteria)
+    .map((item) => String(item.label ?? "").trim())
+    .filter(Boolean);
 }
 
 /**
@@ -112,8 +123,15 @@ export function sanitizeAdmissionSettingsForApi(adm) {
             name: doc?.name != null ? String(doc.name) : "",
             required: doc?.required === true,
           };
-          const ocrCriteria = sanitizeOcrCriteriaForApi(doc?.ocrCriteria);
-          if (ocrCriteria) base.ocrCriteria = ocrCriteria;
+          const templateFileUrl = doc?.templateFileUrl ? String(doc.templateFileUrl).trim() : "";
+          if (templateFileUrl) base.templateFileUrl = templateFileUrl;
+          const lockedCriterion = isTemplateImageUrl(templateFileUrl)
+            ? `Hình ảnh${base.name ? ` "${base.name}"` : ""} phải có cấu trúc giống với hình ảnh mẫu của tài liệu`
+            : null;
+          const manualCriteria = sanitizeOcrCriteriaForApi(doc?.ocrCriteria).filter(
+            (label) => label !== lockedCriterion,
+          );
+          base.validateCriterion = lockedCriterion ? [lockedCriterion, ...manualCriteria] : manualCriteria;
           return base;
         })
         .filter((doc) => doc.code || doc.name)

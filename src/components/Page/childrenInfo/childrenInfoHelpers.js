@@ -358,7 +358,7 @@ export function normalizeForeignFromApi(input) {
 
 export function getEmptyStudentState() {
     return {
-        form: {name: '', gender: '', studentCode: ''},
+        form: {name: '', gender: '', studentCode: '', dateOfBirth: ''},
         selectedPersonalityId: '',
         favoriteMajorCodes: [],
         regularGrades: {},
@@ -381,6 +381,7 @@ export function applyStudentBodyToState(body) {
     const name = raw.studentName ?? raw.name ?? raw.fullName ?? '';
     const gender = raw.gender != null ? String(raw.gender) : '';
     const studentCode = raw.studentCode != null ? String(raw.studentCode).replace(/\D/g, '').slice(0, STUDENT_CODE_LENGTH) : '';
+    const dateOfBirth = raw.dateOfBirth != null ? String(raw.dateOfBirth).slice(0, 10) : '';
 
     const pid =
         raw.personalityTypeId ?? raw.personalityId ?? raw.mbtiTypeId ?? raw.personalityTypeCode;
@@ -454,7 +455,7 @@ export function applyStudentBodyToState(body) {
     }
 
     return {
-        form: {name, gender, studentCode},
+        form: {name, gender, studentCode, dateOfBirth},
         selectedPersonalityId,
         favoriteMajorCodes,
         regularGrades,
@@ -528,6 +529,7 @@ export function buildStudentPayload({
         studentName: form.name != null ? String(form.name) : '',
         studentCode: form.studentCode != null ? String(form.studentCode).trim() : '',
         gender: form.gender != null ? String(form.gender) : '',
+        dateOfBirth: form.dateOfBirth != null && String(form.dateOfBirth).trim() ? String(form.dateOfBirth).trim() : null,
         personalityTypeCode,
         favouriteJob,
         academicInfos,
