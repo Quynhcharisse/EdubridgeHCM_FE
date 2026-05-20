@@ -255,8 +255,13 @@ export const putParentAdmissionReservationFormTemplate = async (payload) => {
     return response || null;
 };
 
-export const getParentAdmissionReservationForms = async () => {
-    const response = await axiosClient.get('/parent/admission/reservation/form');
+export const getParentAdmissionReservationForms = async ({status} = {}) => {
+    const normalized = String(status ?? '').trim().toUpperCase();
+    const params = {};
+    if (normalized && normalized !== 'ALL') {
+        params.status = normalized;
+    }
+    const response = await axiosClient.get('/parent/admission/reservation/form', {params});
     return response || null;
 };
 

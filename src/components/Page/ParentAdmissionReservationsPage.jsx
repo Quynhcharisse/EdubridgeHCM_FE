@@ -21,6 +21,7 @@ import {
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
@@ -34,9 +35,9 @@ import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
 import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
+import MandatoryDocumentsDialog from "./admission/MandatoryDocumentsDialog.jsx";
 import RejectReasonAlert from "./admission/RejectReasonAlert.jsx";
 import {
-    isReservationConfirmed,
     normalizeParentAdmissionReservationRow,
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
@@ -59,6 +60,43 @@ import {
 } from "../../constants/reservationStatusConfig.js";
 
 const FILTERS = PARENT_RESERVATION_FILTERS;
+
+const RESERVATION_CARD_ACTION_BUTTON_SX = {
+    borderRadius: 999,
+    px: 1.25,
+    py: 0.25,
+    minHeight: 30,
+    fontSize: 12.5,
+    fontWeight: 600,
+    textTransform: "none",
+    lineHeight: 1.35,
+    flex: {xs: "1 1 auto", sm: "0 0 auto"},
+    "& .MuiButton-startIcon": {
+        marginRight: 0.4,
+        "& > *:nth-of-type(1)": {fontSize: 15},
+    },
+};
+
+function pickReservationStatusFromMutationResponse(response) {
+    const data = response?.data;
+    if (!data) return null;
+    let body = data.body ?? data;
+    if (typeof body === "string") {
+        try {
+            body = JSON.parse(body);
+        } catch {
+            return null;
+        }
+    }
+    if (Array.isArray(body)) {
+        const item = body.find((row) => row && typeof row === "object");
+        return item?.status ?? item?.formStatus ?? null;
+    }
+    if (body && typeof body === "object") {
+        return body.status ?? body.formStatus ?? null;
+    }
+    return data.status ?? null;
+}
 
 const hasText = (value) => value != null && String(value).trim() !== "";
 
@@ -184,6 +222,7 @@ function ReservationCard({
     onOpenDetail,
     onOpenPayment,
     onOpenConfirmEnrollment,
+    onOpenMandatoryDocuments,
     confirmEnrollmentLoadingId,
 }) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
@@ -223,6 +262,7 @@ function ReservationCard({
                                   : "Hồ sơ bị trường từ chối."
                               : null;
     const showConfirmEnrollment = canParentConfirmEnrollment(reservation);
+    const showMandatoryDocuments = normalizedStatus === RESERVATION_STATUS.CONFIRMED;
     const confirmEnrollmentLoading =
         confirmEnrollmentLoadingId != null &&
         Number(confirmEnrollmentLoadingId) === Number(reservation?.admissionFormId ?? reservation?.id);
@@ -320,6 +360,7 @@ function ReservationCard({
                 >
                     {showPayment ? (
                         <Button
+                            size="small"
                             variant="contained"
                             startIcon={<PaymentsRoundedIcon />}
                             disabled={isPaymentAgain && !canRetryPayment}
@@ -334,13 +375,10 @@ function ReservationCard({
                                 onOpenPayment(reservation);
                             }}
                             sx={{
-                                borderRadius: 999,
-                                px: 2.4,
-                                fontWeight: 600,
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
                                 bgcolor: "#059669",
-                                boxShadow: "0 8px 18px rgba(5, 150, 105, 0.22)",
+                                boxShadow: "0 4px 10px rgba(5, 150, 105, 0.18)",
                                 "&:hover": {bgcolor: "#047857"},
-                                flex: {xs: "1 1 auto", sm: "0 0 auto"},
                             }}
                         >
                             {isPaymentAgain ? "Thanh toán lại" : "Thanh toán"}
@@ -348,33 +386,46 @@ function ReservationCard({
                     ) : null}
                     {showConfirmEnrollment ? (
                         <Button
+                            size="small"
                             variant="contained"
                             disabled={confirmEnrollmentLoading}
                             onClick={() => onOpenConfirmEnrollment(reservation)}
                             sx={{
-                                borderRadius: 999,
-                                px: 2.4,
-                                fontWeight: 600,
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
                                 bgcolor: BRAND_NAVY,
-                                boxShadow: "0 8px 18px rgba(45, 95, 115, 0.22)",
+                                boxShadow: "0 4px 10px rgba(45, 95, 115, 0.18)",
                                 "&:hover": {bgcolor: APP_PRIMARY_DARK},
-                                flex: {xs: "1 1 auto", sm: "0 0 auto"},
                             }}
                         >
                             {confirmEnrollmentLoading ? "Đang xử lý..." : "Xác nhận nhập học"}
                         </Button>
                     ) : null}
+                    {showMandatoryDocuments ? (
+                        <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<DescriptionOutlinedIcon />}
+                            onClick={() => onOpenMandatoryDocuments(reservation)}
+                            sx={{
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                                bgcolor: "#0369a1",
+                                boxShadow: "0 4px 10px rgba(3, 105, 161, 0.18)",
+                                "&:hover": {bgcolor: "#075985"},
+                            }}
+                        >
+                            Hồ sơ cần nộp
+                        </Button>
+                    ) : null}
                     <Button
+                        size="small"
                         variant="outlined"
                         startIcon={<ArticleOutlinedIcon />}
                         onClick={() => onOpenDetail(reservation)}
                         sx={{
-                            borderRadius: 999,
-                            px: 2.4,
+                            ...RESERVATION_CARD_ACTION_BUTTON_SX,
                             fontWeight: 500,
                             borderColor: "#bfdbfe",
                             color: BRAND_NAVY,
-                            flex: {xs: "1 1 auto", sm: "0 0 auto"},
                         }}
                     >
                         Xem chi tiết
@@ -569,6 +620,9 @@ export default function ParentAdmissionReservationsPage() {
     const [paymentReservation, setPaymentReservation] = useState(null);
     const [confirmEnrollmentTarget, setConfirmEnrollmentTarget] = useState(null);
     const [confirmEnrollmentLoadingId, setConfirmEnrollmentLoadingId] = useState(null);
+    const [mandatoryDocsReservation, setMandatoryDocsReservation] = useState(null);
+    const [mandatoryDocsList, setMandatoryDocsList] = useState([]);
+    const [mandatoryDocsLoading, setMandatoryDocsLoading] = useState(false);
     const mountedRef = useRef(true);
 
     const loadReservations = useCallback(async ({silent = false} = {}) => {
@@ -580,15 +634,65 @@ export default function ParentAdmissionReservationsPage() {
                 .map((item, index) => normalizeParentAdmissionReservationRow(item, index))
                 .filter(Boolean);
             if (mountedRef.current) setReservations(rows);
+            return rows;
         } catch (error) {
             console.error("[ParentAdmissionReservationsPage] load error:", error);
             if (mountedRef.current && !silent) {
                 setReservations([]);
                 enqueueSnackbar("Không thể tải danh sách đơn đăng ký. Vui lòng thử lại sau.", {variant: "error"});
             }
+            return [];
         } finally {
             if (mountedRef.current && !silent) setLoading(false);
         }
+    }, []);
+
+    const handleOpenMandatoryDocuments = useCallback(async (reservation) => {
+        const formId = Number(reservation?.admissionFormId ?? reservation?.id);
+        if (!Number.isFinite(formId) || formId <= 0) {
+            enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
+            return;
+        }
+        setMandatoryDocsReservation(reservation);
+        setMandatoryDocsList([]);
+        setMandatoryDocsLoading(true);
+        try {
+            const response = await getParentAdmissionReservationForms({
+                status: RESERVATION_STATUS.CONFIRMED,
+            });
+            const raw = pickAdmissionReservationFormsFromResponse(response);
+            const match = raw.find(
+                (item) => Number(item?.id ?? item?.admissionFormId) === formId,
+            );
+            if (!match) {
+                enqueueSnackbar(
+                    "Không tìm thấy đơn hoặc danh sách hồ sơ cần nộp.",
+                    {variant: "warning"},
+                );
+                setMandatoryDocsList([]);
+                return;
+            }
+            setMandatoryDocsList(
+                Array.isArray(match.mandatoryDocuments) ? match.mandatoryDocuments : [],
+            );
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] mandatory documents:", error);
+            enqueueSnackbar(
+                error?.response?.data?.message ||
+                    error?.message ||
+                    "Không tải được danh sách hồ sơ cần nộp.",
+                {variant: "error"},
+            );
+            setMandatoryDocsReservation(null);
+        } finally {
+            setMandatoryDocsLoading(false);
+        }
+    }, []);
+
+    const handleCloseMandatoryDocuments = useCallback(() => {
+        setMandatoryDocsReservation(null);
+        setMandatoryDocsList([]);
+        setMandatoryDocsLoading(false);
     }, []);
 
     const handleConfirmEnrollment = useCallback(async () => {
@@ -607,8 +711,10 @@ export default function ParentAdmissionReservationsPage() {
                 {variant: "success"},
             );
             setConfirmEnrollmentTarget(null);
-            setFilter(getParentReservationFilterValueForStatus(RESERVATION_STATUS.CONFIRMED));
             await loadReservations({silent: true});
+            const nextStatus =
+                pickReservationStatusFromMutationResponse(res) ?? RESERVATION_STATUS.CONFIRMED;
+            setFilter(getParentReservationFilterValueForStatus(nextStatus));
         } catch (error) {
             console.error("[ParentAdmissionReservationsPage] confirm enrollment:", error);
             enqueueSnackbar(
@@ -768,6 +874,7 @@ export default function ParentAdmissionReservationsPage() {
                                         onOpenDetail={setSelectedReservation}
                                         onOpenPayment={setPaymentReservation}
                                         onOpenConfirmEnrollment={setConfirmEnrollmentTarget}
+                                        onOpenMandatoryDocuments={handleOpenMandatoryDocuments}
                                         confirmEnrollmentLoadingId={confirmEnrollmentLoadingId}
                                     />
                                 ))}
@@ -781,14 +888,32 @@ export default function ParentAdmissionReservationsPage() {
                 reservation={paymentReservation}
                 onClose={() => setPaymentReservation(null)}
                 onSubmitted={({status} = {}) => {
-                    setPaymentReservation(null);
-                    setFilter(
-                        getParentReservationFilterValueForStatus(
-                            status ?? RESERVATION_STATUS.PAYMENT_PENDING,
-                        ),
+                    const formId = Number(
+                        paymentReservation?.admissionFormId ?? paymentReservation?.id,
                     );
-                    void loadReservations({silent: true});
+                    setPaymentReservation(null);
+                    void (async () => {
+                        const rows = await loadReservations({silent: true});
+                        const updatedRow =
+                            Number.isFinite(formId) && formId > 0
+                                ? rows.find(
+                                      (row) =>
+                                          Number(row?.admissionFormId ?? row?.id) === formId,
+                                  )
+                                : null;
+                        const nextStatus =
+                            updatedRow?.status ??
+                            status ??
+                            RESERVATION_STATUS.PAYMENT_PENDING;
+                        setFilter(getParentReservationFilterValueForStatus(nextStatus));
+                    })();
                 }}
+            />
+            <MandatoryDocumentsDialog
+                open={Boolean(mandatoryDocsReservation)}
+                onClose={handleCloseMandatoryDocuments}
+                loading={mandatoryDocsLoading}
+                documents={mandatoryDocsList}
             />
             <ConfirmDialog
                 open={Boolean(confirmEnrollmentTarget)}
