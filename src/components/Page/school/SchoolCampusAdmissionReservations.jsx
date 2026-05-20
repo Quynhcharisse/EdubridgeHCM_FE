@@ -66,8 +66,10 @@ import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
 import {
     HOC_BA_THCS_CODE,
     HOC_BA_THCS_GRADE_LABELS,
+    formatReservationDateOfBirth,
     pickCheckedDocumentsFromReservation,
     pickProfileMetaDataFromTemplate,
+    pickReservationDateOfBirth,
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
 } from "../admission/admissionSubmissionUtils.js";
@@ -243,17 +245,21 @@ const mapRow = (item, index) => {
     const submittedAt = item?.submittedAt ?? item?.createdTime ?? item?.createdAt ?? item?.createdDate;
     const profileMetadata = pickProfileMetaDataFromTemplate(item);
     const transcriptImages = Array.isArray(item?.transcriptImages) ? item.transcriptImages : [];
+    const dobRaw = pickReservationDateOfBirth(item);
+    const dateOfBirth = dobRaw ? formatReservationDateOfBirth(dobRaw) : "—";
     return {
         id: Number(item?.formId ?? item?.id ?? index + 1),
         campusId: Number(item?.campusId),
         campusName: displayOrDash(item?.campusName),
         studentName: String(studentName),
         studentCode: displayOrDash(item?.studentCode),
+        dateOfBirth,
         currentSchool: displayOrDash(item?.schoolName ?? item?.currentSchool ?? item?.currentSchoolName),
         registerClass: displayOrDash(item?.registerClass ?? item?.gradeName ?? item?.targetGrade),
         programName: displayOrDash(item?.programName),
         methodName: displayOrDash(item?.methodName ?? item?.admissionMethodCode),
         campusProgramOfferingId: displayOrDash(item?.campusProgramOfferingId),
+        confirmCode: displayOrDash(item?.confirmCode ?? item?.confirm_code),
         submittedAt,
         parentName: String(parentName),
         phone: String(item?.parentPhone ?? item?.phone ?? "—"),
@@ -322,9 +328,16 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onCo
                                 }}
                             />
                         </Stack>
-                        <Typography sx={{fontSize: 14, color: "#475569", mb: 1}}>
+                        <Typography sx={{fontSize: 14, color: "#475569", mb: 0.5}}>
                             <strong>Học sinh:</strong> {row.studentName}
                         </Typography>
+                        {row.dateOfBirth !== "—" ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 1}}>
+                                <strong>Ngày sinh:</strong> {row.dateOfBirth}
+                            </Typography>
+                        ) : (
+                            <Box sx={{mb: 1}} />
+                        )}
                         <Stack direction={{xs: "column", sm: "row"}} spacing={{xs: 0.65, sm: 2}} sx={{mb: 0.7}}>
                             <Typography variant="body2" sx={{ color: "#475569" }}>
                                 <strong>SĐT:</strong> {row.phone || "—"}
@@ -338,6 +351,14 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onCo
                         <Typography variant="body2" sx={{ color: "#64748b", textAlign: {xs: "left", md: "right"} }}>
                             <strong>Ngày nộp:</strong> {formatDateOnly(row.submittedAt)}
                         </Typography>
+                        {row.status === RESERVATION_STATUS.CONFIRMED && row.confirmCode !== "—" ? (
+                            <Typography
+                                variant="body2"
+                                sx={{color: "#0369a1", fontWeight: 700, textAlign: {xs: "left", md: "right"}}}
+                            >
+                                <strong>Mã hồ sơ:</strong> {row.confirmCode}
+                            </Typography>
+                        ) : null}
                     </Stack>
                 </Stack>
                 {isPending ? (
@@ -511,6 +532,11 @@ function AdmissionReservationDetailDrawer({
                 <Box>
                     <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
                         Chi tiết hồ sơ nhập học
+                        {row?.status === RESERVATION_STATUS.CONFIRMED && row?.confirmCode !== "—"
+                            ? ` — ${row.confirmCode}`
+                            : row?.studentName && row.studentName !== "—"
+                              ? ` — ${row.studentName}`
+                              : ""}
                     </Typography>
                     <Typography sx={{fontSize: 13, color: "#475569", mt: 0.4}}>
                         Nộp ngày: {formatDateOnly(row?.submittedAt)}
@@ -550,6 +576,10 @@ function AdmissionReservationDetailDrawer({
                         <Stack spacing={0}>
                             <DetailInfoRow label="Học sinh" value={row?.studentName} />
                             <DetailInfoRow label="Giới tính" value={formatGender(row?.gender)} />
+                            <DetailInfoRow
+                                label="Ngày sinh"
+                                value={row?.dateOfBirth !== "—" ? row?.dateOfBirth : undefined}
+                            />
                             <DetailInfoRow label="CCCD học sinh" value={row?.studentCode !== "—" ? row?.studentCode : undefined} />
                             <DetailInfoRow label="Trường đang học" value={row?.currentSchool !== "—" ? row?.currentSchool : undefined} />
                         </Stack>
@@ -575,10 +605,6 @@ function AdmissionReservationDetailDrawer({
                         <Stack spacing={0}>
                             <DetailInfoRow label="Chương trình" value={row?.programName !== "—" ? row?.programName : undefined} />
                             <DetailInfoRow label="Phương thức xét tuyển" value={row?.methodName !== "—" ? row?.methodName : undefined} />
-                            <DetailInfoRow
-                                label="Mã gói tuyển sinh"
-                                value={row?.campusProgramOfferingId !== "—" ? row?.campusProgramOfferingId : undefined}
-                            />
                         </Stack>
                     </Paper>
 
@@ -695,24 +721,18 @@ export default function SchoolCampusAdmissionReservations() {
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
 
-    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
-        if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
-        setDetailOpen(false);
-        setSelectedReservation(null);
-        setStatusFilter(nextStatus);
-        setPage(0);
-    }, []);
-
-    const loadData = React.useCallback(async () => {
+    const loadData = React.useCallback(async ({statusOverride, pageOverride} = {}) => {
+        const activeStatus = statusOverride ?? statusFilter;
+        const activePage = pageOverride ?? page;
         setLoading(true);
         setError("");
         try {
             const res = await getCampusAdmissionReservationForms({
-                status: statusFilter,
+                status: activeStatus,
             });
             let allRows = Array.isArray(res?.items) ? res.items.map(mapRow) : [];
-            if (statusFilter !== "ALL") {
-                allRows = allRows.filter((row) => row.status === statusFilter);
+            if (activeStatus !== "ALL") {
+                allRows = allRows.filter((row) => row.status === activeStatus);
             }
             setPendingCount(allRows.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
             allRows.sort((a, b) => {
@@ -726,6 +746,8 @@ export default function SchoolCampusAdmissionReservations() {
                     [
                         row.studentName,
                         row.studentCode,
+                        row.dateOfBirth,
+                        row.confirmCode,
                         row.parentName,
                         row.phone,
                         row.parentEmail,
@@ -738,7 +760,7 @@ export default function SchoolCampusAdmissionReservations() {
                 : allRows;
 
             const total = filtered.length;
-            const start = page * pageSize;
+            const start = activePage * pageSize;
             const pagedRows = filtered.slice(start, start + pageSize);
             setRows(pagedRows);
             setTotalItems(total);
@@ -750,6 +772,15 @@ export default function SchoolCampusAdmissionReservations() {
             setLoading(false);
         }
     }, [page, pageSize, search, statusFilter, sortBy]);
+
+    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
+        if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
+        setDetailOpen(false);
+        setSelectedReservation(null);
+        setStatusFilter(nextStatus);
+        setPage(0);
+        void loadData({statusOverride: nextStatus, pageOverride: 0});
+    }, [loadData]);
 
     React.useEffect(() => {
         if (schoolCtxLoading) return;
