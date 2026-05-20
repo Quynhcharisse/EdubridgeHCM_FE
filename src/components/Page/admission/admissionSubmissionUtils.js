@@ -157,6 +157,38 @@ export function pickStudentBirthYear(student) {
     return m ? m[1] : '';
 }
 
+export function pickReservationDateOfBirth(item) {
+    if (!item || typeof item !== 'object') return '';
+    const raw = item.dateOfBirth ?? item.dob ?? item.birthday ?? item.studentDateOfBirth;
+    return raw != null ? String(raw).trim() : '';
+}
+
+/** Định dạng ngày sinh (ISO `YYYY-MM-DD` hoặc chuỗi ngày) sang dd/mm/yyyy. */
+export function formatReservationDateOfBirth(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) {
+        const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+        if (!Number.isNaN(d.getTime())) {
+            return d.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            });
+        }
+    }
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    }
+    return raw;
+}
+
 export function pickStudentSubLabel(student) {
     return pickStudentGenderLabel(student);
 }
@@ -488,6 +520,7 @@ export function normalizeParentAdmissionReservationRow(item, index = 0) {
         parentProfileId: pickReservationNumericId(item.parentProfileId),
         studentName: pickReservationField(item, 'studentName', 'childName', 'studentProfileName'),
         studentCode: pickReservationField(item, 'studentCode'),
+        dateOfBirth: pickReservationDateOfBirth(item) || null,
         gender: item.gender ?? null,
         identityCard: pickReservationField(item, 'identityCard'),
         schoolName: pickReservationField(item, 'schoolName'),
@@ -507,9 +540,12 @@ export function normalizeParentAdmissionReservationRow(item, index = 0) {
         cancelReason: pickReservationField(item, 'cancelReason'),
         paymentAgainCount: pickReservationPaymentAgainCount(item),
         transferCode: pickReservationField(item, 'transferCode'),
+        confirmCode: pickReservationField(item, 'confirmCode', 'confirm_code'),
         paymentProofUrl: pickReservationField(item, 'paymentProofUrl'),
         profileMetadata,
         transcriptImages,
+        mandatoryDocuments: Array.isArray(item.mandatoryDocuments) ? item.mandatoryDocuments : [],
+        methodDocuments: Array.isArray(item.methodDocuments) ? item.methodDocuments : [],
     };
 }
 

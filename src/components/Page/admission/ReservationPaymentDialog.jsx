@@ -155,8 +155,6 @@ function OfferingOptionCard({offering, selected, onSelect}) {
 function LockedProgramDisplay({reservation}) {
     const programName = String(reservation?.programName ?? "").trim() || "Chương trình đã chọn";
     const method = admissionMethodLabel(reservation?.admissionMethodCode ?? reservation?.methodName);
-    const offeringId = Number(reservation?.campusProgramOfferingId);
-
     return (
         <Paper
             elevation={0}
@@ -174,11 +172,6 @@ function LockedProgramDisplay({reservation}) {
             {method ? (
                 <Typography sx={{fontSize: 13, color: "#64748b", mt: 0.5}}>
                     Phương thức: {method}
-                </Typography>
-            ) : null}
-            {Number.isFinite(offeringId) && offeringId > 0 ? (
-                <Typography sx={{fontSize: 12.5, color: "#475569", mt: 0.35}}>
-                    Mã gói tuyển sinh: {offeringId}
                 </Typography>
             ) : null}
             <Typography sx={{fontSize: 12.5, color: "#64748b", mt: 1, lineHeight: 1.5}}>
@@ -374,7 +367,7 @@ export default function ReservationPaymentDialog({reservation, onClose, onSubmit
                 res?.data?.body?.status ??
                 res?.data?.status ??
                 RESERVATION_STATUS.PAYMENT_PENDING;
-            if (typeof onSubmitted === "function") onSubmitted({status: nextStatus});
+            if (typeof onSubmitted === "function") onSubmitted({status: nextStatus, response: res});
             else if (typeof onClose === "function") onClose();
         } catch (error) {
             console.error("[ReservationPaymentDialog] submit payment:", error);

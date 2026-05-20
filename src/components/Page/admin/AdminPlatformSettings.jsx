@@ -518,6 +518,11 @@ export default function AdminPlatformSettings() {
     const methodDocFileInputRefs = useRef({});
     const [studentFieldMenuAnchor, setStudentFieldMenuAnchor] = useState(null);
     const [studentFieldMenuDocIdx, setStudentFieldMenuDocIdx] = useState(null);
+    const [admissionImagePreview, setAdmissionImagePreview] = useState({
+        open: false,
+        url: "",
+        title: "Xem hình mẫu",
+    });
 
     const STUDENT_FIELD_OPTIONS = [
         { value: "studentName", label: "Họ Và Tên" },
@@ -667,6 +672,15 @@ export default function AdminPlatformSettings() {
         setFormatDialogError("");
         setFormatDialogOpen(true);
     };
+    const openAdmissionImagePreview = useCallback((url, title = "Xem hình mẫu") => {
+        const safeUrl = String(url ?? "").trim();
+        if (!safeUrl) return;
+        setAdmissionImagePreview({ open: true, url: safeUrl, title });
+    }, []);
+
+    const closeAdmissionImagePreview = useCallback(() => {
+        setAdmissionImagePreview((prev) => ({ ...prev, open: false }));
+    }, []);
 
     const validateBusiness = (form) => {
         const errors = {};
@@ -2985,11 +2999,19 @@ export default function AdminPlatformSettings() {
                                                             </Typography>
                                                             <Box sx={{ position: "relative", display: "inline-block" }}>
                                                                 <Box
-                                                                    component="a"
-                                                                    href={doc.templateFileUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    sx={{ display: "inline-block", borderRadius: 1.5, overflow: "hidden", border: "1px solid #cbd5e1", lineHeight: 0 }}
+                                                                    component="button"
+                                                                    type="button"
+                                                                    onClick={() => openAdmissionImagePreview(doc.templateFileUrl, "Hình ảnh mẫu")}
+                                                                    sx={{
+                                                                        display: "inline-block",
+                                                                        borderRadius: 1.5,
+                                                                        overflow: "hidden",
+                                                                        border: "1px solid #cbd5e1",
+                                                                        lineHeight: 0,
+                                                                        p: 0,
+                                                                        cursor: "pointer",
+                                                                        background: "transparent",
+                                                                    }}
                                                                 >
                                                                     <Box
                                                                         component="img"
@@ -3252,7 +3274,7 @@ export default function AdminPlatformSettings() {
                                                         <TableRow sx={{ bgcolor: "#eef4ff" }}>
                                                             <TableCell sx={{ width: 64, fontWeight: 700, color: "#374151" }}>STT</TableCell>
                                                             <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
-                                                            <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
+                                                            <TableCell align="center" sx={{ width: 190, fontWeight: 700, color: "#374151", textAlign: "center" }}>Loại</TableCell>
                                                             {canEdit ? <TableCell align="center" sx={{ width: 108, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
                                                         </TableRow>
                                                     </TableHead>
@@ -3273,97 +3295,95 @@ export default function AdminPlatformSettings() {
                                                                 <TableCell>{dIdx + 1}</TableCell>
                                                                 <TableCell>
                                                                     {canEdit ? (
-                                                                        <Stack spacing={0.75}>
-                                                                            <TextField
-                                                                                size="small"
-                                                                                fullWidth
-                                                                                value={doc?.name ?? ""}
-                                                                                onChange={(e) => {
-                                                                                    const value = e.target.value;
-                                                                                    setAdmissionTemplateForm((prev) => {
-                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                        if (gIdx < 0) return prev;
-                                                                                        const currentGroup = { ...nextGroups[gIdx] };
-                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                        currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], name: value };
-                                                                                        nextGroups[gIdx] = currentGroup;
-                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                    });
-                                                                                }}
-                                                                                placeholder="Nhập tên hồ sơ"
-                                                                                sx={admissionInputSx}
-                                                                            />
-                                                                            {templateUrl ? (
-                                                                                <Button
-                                                                                    component={Link}
-                                                                                    href={templateUrl}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    size="small"
-                                                                                    startIcon={<OpenInNewOutlinedIcon fontSize="small" />}
-                                                                                    sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0 }}
-                                                                                >
-                                                                                    Xem hình mẫu
-                                                                                </Button>
-                                                                            ) : null}
-                                                                        </Stack>
+                                                                        <TextField
+                                                                            size="small"
+                                                                            fullWidth
+                                                                            value={doc?.name ?? ""}
+                                                                            onChange={(e) => {
+                                                                                const value = e.target.value;
+                                                                                setAdmissionTemplateForm((prev) => {
+                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                    if (gIdx < 0) return prev;
+                                                                                    const currentGroup = { ...nextGroups[gIdx] };
+                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                    currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], name: value };
+                                                                                    nextGroups[gIdx] = currentGroup;
+                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                });
+                                                                            }}
+                                                                            placeholder="Nhập tên hồ sơ"
+                                                                            sx={admissionInputSx}
+                                                                        />
                                                                     ) : (
-                                                                        <Stack spacing={0.5}>
-                                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
-                                                                            {templateUrl ? (
-                                                                                <Button
-                                                                                    component={Link}
-                                                                                    href={templateUrl}
-                                                                                    target="_blank"
-                                                                                    rel="noopener noreferrer"
-                                                                                    size="small"
-                                                                                    startIcon={<OpenInNewOutlinedIcon fontSize="small" />}
-                                                                                    sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0 }}
-                                                                                >
-                                                                                    Xem hình mẫu
-                                                                                </Button>
-                                                                            ) : null}
-                                                                        </Stack>
+                                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell align="center">
-                                                                    {canEdit ? (
-                                                                        <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
-                                                                            <Switch
-                                                                                size="small"
-                                                                                checked={doc?.required === true}
-                                                                                onChange={(_, checked) => {
-                                                                                    setAdmissionTemplateForm((prev) => {
-                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                        if (gIdx < 0) return prev;
-                                                                                        const currentGroup = { ...nextGroups[gIdx] };
-                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                        currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: checked };
-                                                                                        nextGroups[gIdx] = currentGroup;
-                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                    });
-                                                                                }}
-                                                                                color="primary"
-                                                                                inputProps={{
-                                                                                    "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
-                                                                                }}
-                                                                            />
-                                                                        </Tooltip>
-                                                                    ) : (
-                                                                        <Chip
-                                                                            size="small"
-                                                                            label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
-                                                                            sx={{
-                                                                                height: 24,
-                                                                                fontWeight: 700,
-                                                                                fontSize: 11,
-                                                                                color: doc?.required ? "#b91c1c" : "#166534",
-                                                                                bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
-                                                                            }}
-                                                                        />
-                                                                    )}
+                                                                <TableCell align="center" sx={{ textAlign: "center", px: 1 }}>
+                                                                    <Box
+                                                                        sx={{
+                                                                            display: "grid",
+                                                                            gridTemplateColumns: "88px 32px",
+                                                                            columnGap: 2,
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            width: "max-content",
+                                                                            mx: "auto",
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: "flex", justifyContent: "center" }}>
+                                                                            {canEdit ? (
+                                                                                <Tooltip title={doc?.required ? "Bắt buộc" : "Tùy chọn"} placement="top">
+                                                                                    <Switch
+                                                                                        size="small"
+                                                                                        checked={doc?.required === true}
+                                                                                        onChange={(_, checked) => {
+                                                                                            setAdmissionTemplateForm((prev) => {
+                                                                                                const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                                const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                                if (gIdx < 0) return prev;
+                                                                                                const currentGroup = { ...nextGroups[gIdx] };
+                                                                                                currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                                currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], required: checked };
+                                                                                                nextGroups[gIdx] = currentGroup;
+                                                                                                return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                            });
+                                                                                        }}
+                                                                                        color="primary"
+                                                                                        inputProps={{
+                                                                                            "aria-label": doc?.required ? "Bắt buộc" : "Tùy chọn",
+                                                                                        }}
+                                                                                    />
+                                                                                </Tooltip>
+                                                                            ) : (
+                                                                                <Chip
+                                                                                    size="small"
+                                                                                    label={doc?.required ? "Bắt buộc" : "Tùy chọn"}
+                                                                                    sx={{
+                                                                                        height: 24,
+                                                                                        fontWeight: 700,
+                                                                                        fontSize: 11,
+                                                                                        color: doc?.required ? "#b91c1c" : "#166534",
+                                                                                        bgcolor: doc?.required ? "#fee2e2" : "#dcfce7",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                        <Box sx={{ display: "flex", justifyContent: "center" }}>
+                                                                            {templateUrl ? (
+                                                                                <Tooltip title="Xem hình mẫu" placement="top">
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        onClick={() => openAdmissionImagePreview(templateUrl, "Hình mẫu hồ sơ")}
+                                                                                        aria-label="Xem hình mẫu"
+                                                                                        sx={{ color: "#2563eb", p: 0.25, "&:hover": { bgcolor: "#eff6ff" } }}
+                                                                                    >
+                                                                                        <OpenInNewOutlinedIcon sx={{ fontSize: 18 }} />
+                                                                                    </IconButton>
+                                                                                </Tooltip>
+                                                                            ) : null}
+                                                                        </Box>
+                                                                    </Box>
                                                                 </TableCell>
                                                                 {canEdit ? (
                                                                     <TableCell align="center">
@@ -5102,6 +5122,44 @@ export default function AdminPlatformSettings() {
                         sx={saveButtonSx}
                     >
                         {confirmingAdmissionImport ? "Đang xử lý..." : "Có, xác nhận nhập"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={admissionImagePreview.open}
+                onClose={closeAdmissionImagePreview}
+                fullWidth
+                maxWidth="md"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        overflow: "hidden",
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>
+                    {admissionImagePreview.title}
+                </DialogTitle>
+                <DialogContent sx={{ bgcolor: "#f8fafc", display: "flex", justifyContent: "center", p: 2.5 }}>
+                    {admissionImagePreview.url ? (
+                        <Box
+                            component="img"
+                            src={admissionImagePreview.url}
+                            alt={admissionImagePreview.title}
+                            sx={{
+                                maxWidth: "100%",
+                                maxHeight: "70vh",
+                                objectFit: "contain",
+                                borderRadius: 1.5,
+                                border: "1px solid #dbeafe",
+                                bgcolor: "#ffffff",
+                            }}
+                        />
+                    ) : null}
+                </DialogContent>
+                <DialogActions sx={{ px: 2.5, pb: 2 }}>
+                    <Button variant="outlined" onClick={closeAdmissionImagePreview} sx={cancelButtonSx}>
+                        Đóng
                     </Button>
                 </DialogActions>
             </Dialog>

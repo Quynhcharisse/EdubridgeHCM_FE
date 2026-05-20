@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from "react";
+import React, {forwardRef, useMemo, useState} from "react";
 import {
     Box,
     Button,
@@ -6,15 +6,29 @@ import {
     Dialog,
     DialogContent,
     DialogTitle,
+    Fade,
+    Grow,
     IconButton,
-    Link,
     Paper,
     Stack,
     Typography,
 } from "@mui/material";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import Slide from "@mui/material/Slide";
 import {BRAND_NAVY} from "../../../constants/homeLandingTheme";
+
+const DIALOG_BG = "#e8f4fc";
+const HEADER_BG = "#d9ecff";
+const BORDER_BLUE = "#b8d8f4";
+const PANEL_BORDER = "#c7e2f8";
+
+const SlideUp = forwardRef(function SlideUp(props, ref) {
+    return <Slide direction="up" ref={ref} {...props} />;
+});
 
 function isImageUrl(url) {
     const u = String(url ?? "").trim().toLowerCase();
@@ -26,105 +40,180 @@ function isImageUrl(url) {
     );
 }
 
-function normalizeMandatoryDocuments(list) {
-    if (!Array.isArray(list)) return [];
-    return list
-        .map((doc) => ({
-            name: String(doc?.name ?? "").trim(),
-            templateFileUrl: String(doc?.templateFileUrl ?? "").trim(),
-            required: Boolean(doc?.required),
-        }))
-        .filter((doc) => doc.name || doc.templateFileUrl);
+export function normalizeSubmissionDocument(doc) {
+    return {
+        name: String(doc?.name ?? "").trim(),
+        templateUrl: String(doc?.templateFileUrl ?? doc?.templateUrl ?? "").trim(),
+        required: Boolean(doc?.required),
+    };
 }
 
-function MandatoryDocumentRow({doc, onPreviewImage}) {
-    const hasTemplate = Boolean(doc.templateFileUrl);
-    const showImage = hasTemplate && isImageUrl(doc.templateFileUrl);
+export function normalizeSubmissionDocumentList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(normalizeSubmissionDocument).filter((doc) => doc.name || doc.templateUrl);
+}
+
+function TemplatePreview({doc, onPreviewImage}) {
+    const url = doc.templateUrl;
+    if (!url) return null;
+
+    if (isImageUrl(url)) {
+        return (
+            <Button
+                variant="outlined"
+                size="small"
+                onClick={() => onPreviewImage({url, title: doc.name || "Mẫu hồ sơ"})}
+                sx={{
+                    flexShrink: 0,
+                    minWidth: 0,
+                    p: 0.5,
+                    borderColor: PANEL_BORDER,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                        borderColor: "#60a5fa",
+                        bgcolor: "#fff",
+                        transform: "scale(1.03)",
+                    },
+                }}
+            >
+                <Box
+                    component="img"
+                    src={url}
+                    alt=""
+                    sx={{width: 60, height: 60, objectFit: "cover", display: "block", borderRadius: 1.5}}
+                />
+            </Button>
+        );
+    }
 
     return (
-        <Paper
-            elevation={0}
+        <Button
+            size="small"
+            variant="text"
+            endIcon={<OpenInNewOutlinedIcon sx={{fontSize: 16}} />}
+            onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
             sx={{
-                p: 2,
-                borderRadius: 2.5,
-                border: "1px solid #c7e2f8",
-                bgcolor: "rgba(255,255,255,0.9)",
+                flexShrink: 0,
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: 13,
+                color: "#2563eb",
+                whiteSpace: "nowrap",
             }}
         >
-            <Stack
-                direction={{xs: "column", sm: "row"}}
-                spacing={2}
-                alignItems={{xs: "stretch", sm: "flex-start"}}
+            Xem mẫu
+        </Button>
+    );
+}
+
+function DocumentRow({doc, onPreviewImage, isLast, rowIndex}) {
+    return (
+        <Grow in timeout={280 + rowIndex * 60} style={{transformOrigin: "top center"}}>
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                    px: 2.25,
+                    py: 1.85,
+                    borderBottom: isLast ? "none" : `1px solid ${PANEL_BORDER}`,
+                    bgcolor: "rgba(255,255,255,0.85)",
+                    transition: "background-color 0.2s ease",
+                    "&:hover": {bgcolor: "#fff"},
+                }}
             >
-                <Box sx={{flex: 1, minWidth: 0}}>
-                    <Typography
+                <Typography
+                    component="div"
+                    sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 14.5,
+                        fontWeight: 500,
+                        color: "#1e293b",
+                        lineHeight: 1.55,
+                    }}
+                >
+                    {doc.name || "Hồ sơ"}
+                    {doc.required ? (
+                        <Box component="span" sx={{color: "#dc2626", ml: 0.25}} aria-hidden="true">
+                            *
+                        </Box>
+                    ) : null}
+                </Typography>
+                <TemplatePreview doc={doc} onPreviewImage={onPreviewImage} />
+            </Box>
+        </Grow>
+    );
+}
+
+function DocumentsPanel({title, subtitle, icon: Icon, documents, onPreviewImage, panelIndex = 0}) {
+    if (documents.length === 0) return null;
+
+    return (
+        <Grow in timeout={400 + panelIndex * 120} style={{transformOrigin: "top center"}}>
+            <Paper
+                elevation={0}
+                sx={{
+                    borderRadius: 3,
+                    border: `1px solid ${PANEL_BORDER}`,
+                    overflow: "hidden",
+                    bgcolor: "rgba(255,255,255,0.72)",
+                    boxShadow: "0 8px 24px rgba(37, 99, 235, 0.08)",
+                }}
+            >
+                <Box
+                    sx={{
+                        px: 2.25,
+                        py: 1.5,
+                        bgcolor: "rgba(219, 234, 254, 0.45)",
+                        borderBottom: `1px solid ${PANEL_BORDER}`,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.25,
+                    }}
+                >
+                    <Box
                         sx={{
-                            fontWeight: 700,
-                            color: "#0f172a",
-                            fontSize: 15,
-                            lineHeight: 1.45,
-                            mb: hasTemplate && !showImage ? 0.75 : 0,
+                            width: 36,
+                            height: 36,
+                            borderRadius: 2,
+                            bgcolor: "#fff",
+                            border: `1px solid ${PANEL_BORDER}`,
+                            color: BRAND_NAVY,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
                         }}
                     >
-                        {doc.name || "Hồ sơ"}
-                        {doc.required ? (
-                            <Box component="span" sx={{color: "#dc2626", ml: 0.25}} aria-hidden="true">
-                                {" "}
-                                *
-                            </Box>
-                        ) : null}
-                    </Typography>
-                    {hasTemplate && !showImage ? (
-                        <Button
-                            component={Link}
-                            href={doc.templateFileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            size="small"
-                            startIcon={<OpenInNewRoundedIcon fontSize="small" />}
-                            sx={{textTransform: "none", fontWeight: 600, px: 0}}
-                        >
-                            Xem mẫu hồ sơ
-                        </Button>
-                    ) : null}
-                </Box>
-                {showImage ? (
-                    <Stack spacing={0.75} sx={{flexShrink: 0, maxWidth: {xs: "100%", sm: 220}}}>
-                        <Typography sx={{fontSize: 13, fontWeight: 700, color: "#475569"}}>
-                            Hình mẫu
+                        <Icon sx={{fontSize: 20}} />
+                    </Box>
+                    <Box sx={{minWidth: 0}}>
+                        <Typography sx={{fontSize: 15, fontWeight: 700, color: BRAND_NAVY, lineHeight: 1.3}}>
+                            {title}
                         </Typography>
-                        <Box
-                            component="button"
-                            type="button"
-                            onClick={() =>
-                                onPreviewImage({url: doc.templateFileUrl, title: "Hình mẫu"})
-                            }
-                            sx={{
-                                border: "1px solid #cbd5e1",
-                                borderRadius: 2,
-                                p: 0,
-                                bgcolor: "#fff",
-                                cursor: "pointer",
-                                overflow: "hidden",
-                                lineHeight: 0,
-                            }}
-                        >
-                            <Box
-                                component="img"
-                                src={doc.templateFileUrl}
-                                alt="Hình mẫu"
-                                sx={{
-                                    display: "block",
-                                    width: "100%",
-                                    maxHeight: 160,
-                                    objectFit: "contain",
-                                }}
-                            />
-                        </Box>
-                    </Stack>
-                ) : null}
-            </Stack>
-        </Paper>
+                        {subtitle ? (
+                            <Typography sx={{fontSize: 12.5, color: "#475569", mt: 0.2, lineHeight: 1.4}}>
+                                {subtitle}
+                            </Typography>
+                        ) : null}
+                    </Box>
+                </Box>
+                <Box>
+                    {documents.map((doc, idx) => (
+                        <DocumentRow
+                            key={`${title}-${doc.name}-${idx}`}
+                            doc={doc}
+                            onPreviewImage={onPreviewImage}
+                            isLast={idx === documents.length - 1}
+                            rowIndex={idx}
+                        />
+                    ))}
+                </Box>
+            </Paper>
+        </Grow>
     );
 }
 
@@ -132,15 +221,31 @@ export default function MandatoryDocumentsDialog({
     open,
     onClose,
     loading,
-    documents,
+    mandatoryDocuments = [],
+    methodDocuments = [],
+    context = {},
 }) {
     const [imagePreview, setImagePreview] = useState(null);
-    const normalizedDocs = useMemo(() => normalizeMandatoryDocuments(documents), [documents]);
+
+    const normalizedMandatory = useMemo(
+        () => normalizeSubmissionDocumentList(mandatoryDocuments),
+        [mandatoryDocuments],
+    );
+    const normalizedMethod = useMemo(
+        () => normalizeSubmissionDocumentList(methodDocuments),
+        [methodDocuments],
+    );
+
+    const totalCount = normalizedMandatory.length + normalizedMethod.length;
 
     const handleClose = () => {
         setImagePreview(null);
         onClose();
     };
+
+    const methodSubtitle = context?.methodName
+        ? context.methodName
+        : "Theo hình thức đăng ký";
 
     return (
         <>
@@ -148,12 +253,15 @@ export default function MandatoryDocumentsDialog({
                 open={open}
                 onClose={handleClose}
                 fullWidth
-                maxWidth="sm"
+                maxWidth="md"
+                TransitionComponent={SlideUp}
+                transitionDuration={{enter: 320, exit: 220}}
                 PaperProps={{
                     sx: {
                         borderRadius: 3,
                         overflow: "hidden",
-                        bgcolor: "#e8f4fc",
+                        bgcolor: DIALOG_BG,
+                        maxHeight: "90vh",
                     },
                 }}
             >
@@ -165,82 +273,160 @@ export default function MandatoryDocumentsDialog({
                         gap: 2,
                         px: 3,
                         py: 2.25,
-                        bgcolor: "#d9ecff",
-                        borderBottom: "1px solid #b8d8f4",
+                        bgcolor: HEADER_BG,
+                        borderBottom: `1px solid ${BORDER_BLUE}`,
                     }}
                 >
-                    <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a"}}>
-                        Hồ sơ cần nộp
-                    </Typography>
-                    <IconButton onClick={handleClose} aria-label="Đóng">
+                    <Stack direction="row" alignItems="center" spacing={1.25} sx={{minWidth: 0}}>
+                        <DescriptionOutlinedIcon sx={{color: BRAND_NAVY, fontSize: 26}} />
+                        <Box sx={{minWidth: 0}}>
+                            <Typography sx={{fontSize: 20, fontWeight: 700, color: "#0f172a", lineHeight: 1.3}}>
+                                Hồ sơ cần nộp
+                            </Typography>
+                            {context?.schoolName ? (
+                                <Typography sx={{fontSize: 13.5, color: "#475569", mt: 0.25}} noWrap>
+                                    {context.schoolName}
+                                </Typography>
+                            ) : null}
+                        </Box>
+                    </Stack>
+                    <IconButton onClick={handleClose} aria-label="Đóng" sx={{color: "#475569"}}>
                         <CloseRoundedIcon />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{bgcolor: "#e8f4fc", borderColor: "#b8d8f4", p: 3}}>
+
+                <DialogContent
+                    dividers
+                    sx={{
+                        p: {xs: 2, md: 3},
+                        bgcolor: DIALOG_BG,
+                        borderColor: BORDER_BLUE,
+                    }}
+                >
                     {loading ? (
-                        <Stack alignItems="center" spacing={1.5} sx={{py: 4}}>
-                            <CircularProgress size={28} />
-                            <Typography sx={{color: "#64748b", fontWeight: 500}}>
-                                Đang tải danh sách hồ sơ...
-                            </Typography>
-                        </Stack>
-                    ) : normalizedDocs.length === 0 ? (
-                        <Typography sx={{color: "#64748b", fontWeight: 500, textAlign: "center", py: 3}}>
-                            Chưa có danh sách hồ sơ cần nộp cho đơn này.
-                        </Typography>
+                        <Fade in>
+                            <Stack alignItems="center" spacing={1.5} sx={{py: 5}}>
+                                <CircularProgress size={28} sx={{color: BRAND_NAVY}} />
+                                <Typography sx={{fontSize: 14, color: "#64748b"}}>
+                                    Đang tải danh sách...
+                                </Typography>
+                            </Stack>
+                        </Fade>
+                    ) : totalCount === 0 ? (
+                        <Fade in>
+                            <Box
+                                sx={{
+                                    py: 5,
+                                    px: 2,
+                                    textAlign: "center",
+                                    borderRadius: 3,
+                                    border: `1px dashed ${PANEL_BORDER}`,
+                                    bgcolor: "rgba(255,255,255,0.72)",
+                                }}
+                            >
+                                <DescriptionOutlinedIcon sx={{fontSize: 40, color: "#93c5fd", mb: 1}} />
+                                <Typography sx={{fontSize: 14, color: "#64748b"}}>
+                                    Chưa có danh sách hồ sơ cho đơn này.
+                                </Typography>
+                            </Box>
+                        </Fade>
                     ) : (
-                        <Stack spacing={1.5}>
-                            <Typography sx={{fontSize: 14, color: BRAND_NAVY, fontWeight: 600}}>
-                                Vui lòng chuẩn bị và nộp các hồ sơ sau theo mẫu của trường:
-                            </Typography>
-                            {normalizedDocs.map((doc, index) => (
-                                <MandatoryDocumentRow
-                                    key={`${doc.name}-${index}`}
-                                    doc={doc}
+                        <Fade in timeout={400}>
+                            <Stack spacing={2.25}>
+                                <Typography
+                                    sx={{
+                                        fontSize: 14,
+                                        color: BRAND_NAVY,
+                                        fontWeight: 600,
+                                        lineHeight: 1.55,
+                                        px: 0.25,
+                                    }}
+                                >
+                                    Chuẩn bị hồ sơ theo đúng mẫu bên dưới. Hồ sơ có dấu{" "}
+                                    <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
+                                        *
+                                    </Box>{" "}
+                                    là bắt buộc.
+                                </Typography>
+
+                                <DocumentsPanel
+                                    title="Hồ sơ chung"
+                                    subtitle="Áp dụng cho mọi học sinh"
+                                    icon={FolderOutlinedIcon}
+                                    documents={normalizedMandatory}
                                     onPreviewImage={setImagePreview}
+                                    panelIndex={0}
                                 />
-                            ))}
-                        </Stack>
+
+                                <DocumentsPanel
+                                    title="Hồ sơ theo phương thức"
+                                    subtitle={methodSubtitle}
+                                    icon={AssignmentOutlinedIcon}
+                                    documents={normalizedMethod}
+                                    onPreviewImage={setImagePreview}
+                                    panelIndex={1}
+                                />
+                            </Stack>
+                        </Fade>
                     )}
                 </DialogContent>
             </Dialog>
-            {imagePreview?.url ? (
+
+            <Fade in={Boolean(imagePreview?.url)} timeout={220}>
                 <Box
                     onClick={() => setImagePreview(null)}
                     sx={{
                         position: "fixed",
                         inset: 0,
                         zIndex: 1500,
-                        bgcolor: "rgba(15, 23, 42, 0.55)",
-                        backdropFilter: "blur(6px)",
-                        display: "flex",
+                        bgcolor: "rgba(15, 23, 42, 0.72)",
+                        backdropFilter: "blur(4px)",
+                        display: imagePreview?.url ? "flex" : "none",
                         alignItems: "center",
                         justifyContent: "center",
                         p: 2,
                     }}
                 >
-                    <Box onClick={(e) => e.stopPropagation()} sx={{maxWidth: "92vw", maxHeight: "88vh"}}>
-                        {imagePreview.title ? (
-                            <Typography
-                                sx={{
-                                    color: "#fff",
-                                    fontWeight: 700,
-                                    mb: 1,
-                                    textAlign: "center",
-                                }}
-                            >
+                    <IconButton
+                        onClick={() => setImagePreview(null)}
+                        aria-label="Đóng xem ảnh"
+                        sx={{
+                            position: "fixed",
+                            top: 16,
+                            right: 16,
+                            color: "#fff",
+                            bgcolor: "rgba(255,255,255,0.12)",
+                            "&:hover": {bgcolor: "rgba(255,255,255,0.2)"},
+                        }}
+                    >
+                        <CloseRoundedIcon />
+                    </IconButton>
+                    <Box
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{maxWidth: "min(92vw, 760px)", textAlign: "center"}}
+                    >
+                        {imagePreview?.title ? (
+                            <Typography sx={{color: "#fff", fontWeight: 600, fontSize: 15, mb: 1.5, px: 2}}>
                                 {imagePreview.title}
                             </Typography>
                         ) : null}
-                        <Box
-                            component="img"
-                            src={imagePreview.url}
-                            alt={imagePreview.title || "Mẫu hồ sơ"}
-                            sx={{maxWidth: "92vw", maxHeight: "82vh", objectFit: "contain", display: "block"}}
-                        />
+                        {imagePreview?.url ? (
+                            <Box
+                                component="img"
+                                src={imagePreview.url}
+                                alt={imagePreview.title || "Mẫu hồ sơ"}
+                                sx={{
+                                    maxWidth: "100%",
+                                    maxHeight: "80vh",
+                                    objectFit: "contain",
+                                    borderRadius: 2,
+                                    boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
+                                }}
+                            />
+                        ) : null}
                     </Box>
                 </Box>
-            ) : null}
+            </Fade>
         </>
     );
 }

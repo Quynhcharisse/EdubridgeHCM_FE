@@ -38,6 +38,7 @@ import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
 import MandatoryDocumentsDialog from "./admission/MandatoryDocumentsDialog.jsx";
 import RejectReasonAlert from "./admission/RejectReasonAlert.jsx";
 import {
+    formatReservationDateOfBirth,
     normalizeParentAdmissionReservationRow,
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
@@ -138,6 +139,11 @@ const getStatusMeta = (status) => {
 
 const getFilterCount = (rows, filter) =>
     rows.filter((row) => reservationStatusMatchesFilter(row?.status, filter)).length;
+
+const getReservationRowId = (row) => {
+    const id = Number(row?.admissionFormId ?? row?.id);
+    return Number.isFinite(id) && id > 0 ? id : null;
+};
 
 function InfoRow({label, value}) {
     if (!isDisplayableValue(value)) return null;
@@ -331,6 +337,14 @@ function ReservationCard({
                                 CCCD học sinh: {reservation.studentCode}
                             </Typography>
                         ) : null}
+                        {isDisplayableValue(
+                            formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth,
+                        ) ? (
+                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
+                                Ngày sinh:{" "}
+                                {formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth}
+                            </Typography>
+                        ) : null}
                         {statusHint ? (
                             <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mb: 0.75}}>
                                 {statusHint}
@@ -348,6 +362,18 @@ function ReservationCard({
                             {submittedDate ? (
                                 <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
                                     Ngày nộp: {submittedDate}
+                                </Typography>
+                            ) : null}
+                            {normalizedStatus === RESERVATION_STATUS.CONFIRMED &&
+                            isDisplayableValue(reservation?.confirmCode) ? (
+                                <Typography
+                                    sx={{
+                                        fontSize: 13.5,
+                                        color: "#0369a1",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    Mã hồ sơ: {reservation.confirmCode}
                                 </Typography>
                             ) : null}
                         </Stack>
@@ -467,11 +493,15 @@ function DetailDialog({reservation, onClose}) {
     useEffect(() => {
         if (!open) setPaymentPreviewOpen(false);
     }, [open, reservation?.id]);
-    const detailTitleSuffix = isDisplayableValue(reservation?.studentName)
-        ? ` — ${reservation.studentName}`
-        : isDisplayableValue(reservation?.schoolName)
-          ? ` — ${reservation.schoolName}`
-          : "";
+    const detailTitleSuffix =
+        normalizedStatus === RESERVATION_STATUS.CONFIRMED &&
+        isDisplayableValue(reservation?.confirmCode)
+            ? ` — ${reservation.confirmCode}`
+            : isDisplayableValue(reservation?.studentName)
+              ? ` — ${reservation.studentName}`
+              : isDisplayableValue(reservation?.schoolName)
+                ? ` — ${reservation.schoolName}`
+                : "";
     const rejectReasonAlertProps = getDetailRejectReasonAlertProps(reservation);
 
     return (
@@ -529,6 +559,13 @@ function DetailDialog({reservation, onClose}) {
                         <DetailSection title="Thông tin học sinh">
                             <DetailLineRow label="Học sinh" value={reservation?.studentName} />
                             <DetailLineRow label="Giới tính" value={getGenderLabel(reservation?.gender)} />
+                            <DetailLineRow
+                                label="Ngày sinh"
+                                value={
+                                    formatReservationDateOfBirth(reservation?.dateOfBirth) ||
+                                    reservation?.dateOfBirth
+                                }
+                            />
                             <DetailLineRow label="CCCD học sinh" value={reservation?.studentCode} />
                             <DetailLineRow
                                 label="Phương thức xét tuyển"
@@ -548,14 +585,6 @@ function DetailDialog({reservation, onClose}) {
                             <DetailLineRow label="Trường" value={reservation?.schoolName} />
                             <DetailLineRow label="Chương trình" value={reservation?.programName} />
                             <DetailLineRow label="Cơ sở học" value={reservation?.campusName} />
-                            <DetailLineRow
-                                label="Mã gói tuyển sinh"
-                                value={
-                                    reservation?.campusProgramOfferingId != null
-                                        ? String(reservation.campusProgramOfferingId)
-                                        : null
-                                }
-                            />
                             <DetailLineRow label="Ngày nộp" value={formatDateOnly(reservation?.createdTime) ?? undefined} />
                             <DetailLineRow label="Mã chuyển" value={reservation?.transferCode} />
                         </DetailSection>
@@ -621,9 +650,14 @@ export default function ParentAdmissionReservationsPage() {
     const [confirmEnrollmentTarget, setConfirmEnrollmentTarget] = useState(null);
     const [confirmEnrollmentLoadingId, setConfirmEnrollmentLoadingId] = useState(null);
     const [mandatoryDocsReservation, setMandatoryDocsReservation] = useState(null);
-    const [mandatoryDocsList, setMandatoryDocsList] = useState([]);
+    const [mandatoryDocsPayload, setMandatoryDocsPayload] = useState({
+        mandatoryDocuments: [],
+        methodDocuments: [],
+        context: {},
+    });
     const [mandatoryDocsLoading, setMandatoryDocsLoading] = useState(false);
     const mountedRef = useRef(true);
+    const reservationStatusSnapshotRef = useRef(new Map());
 
     const loadReservations = useCallback(async ({silent = false} = {}) => {
         if (!silent) setLoading(true);
@@ -654,8 +688,37 @@ export default function ParentAdmissionReservationsPage() {
             return;
         }
         setMandatoryDocsReservation(reservation);
-        setMandatoryDocsList([]);
+        setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
         setMandatoryDocsLoading(true);
+
+        const applyDocsPayload = (source) => {
+            setMandatoryDocsPayload({
+                mandatoryDocuments: Array.isArray(source?.mandatoryDocuments)
+                    ? source.mandatoryDocuments
+                    : [],
+                methodDocuments: Array.isArray(source?.methodDocuments) ? source.methodDocuments : [],
+                context: {
+                    schoolName: source?.schoolName ?? reservation?.schoolName,
+                    programName: source?.programName ?? reservation?.programName,
+                    methodName: source?.methodName ?? reservation?.methodName,
+                },
+            });
+        };
+
+        const rowMandatory = Array.isArray(reservation?.mandatoryDocuments)
+            ? reservation.mandatoryDocuments
+            : [];
+        const rowMethod = Array.isArray(reservation?.methodDocuments) ? reservation.methodDocuments : [];
+        if (rowMandatory.length > 0 && rowMethod.length > 0) {
+            applyDocsPayload({
+                ...reservation,
+                mandatoryDocuments: rowMandatory,
+                methodDocuments: rowMethod,
+            });
+            setMandatoryDocsLoading(false);
+            return;
+        }
+
         try {
             const response = await getParentAdmissionReservationForms({
                 status: RESERVATION_STATUS.CONFIRMED,
@@ -669,12 +732,10 @@ export default function ParentAdmissionReservationsPage() {
                     "Không tìm thấy đơn hoặc danh sách hồ sơ cần nộp.",
                     {variant: "warning"},
                 );
-                setMandatoryDocsList([]);
+                setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
                 return;
             }
-            setMandatoryDocsList(
-                Array.isArray(match.mandatoryDocuments) ? match.mandatoryDocuments : [],
-            );
+            applyDocsPayload(match);
         } catch (error) {
             console.error("[ParentAdmissionReservationsPage] mandatory documents:", error);
             enqueueSnackbar(
@@ -691,7 +752,7 @@ export default function ParentAdmissionReservationsPage() {
 
     const handleCloseMandatoryDocuments = useCallback(() => {
         setMandatoryDocsReservation(null);
-        setMandatoryDocsList([]);
+        setMandatoryDocsPayload({mandatoryDocuments: [], methodDocuments: [], context: {}});
         setMandatoryDocsLoading(false);
     }, []);
 
@@ -756,6 +817,43 @@ export default function ParentAdmissionReservationsPage() {
             document.removeEventListener("visibilitychange", refreshIfVisible);
         };
     }, [loadReservations]);
+
+    useEffect(() => {
+        const nextSnapshot = new Map();
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (id) nextSnapshot.set(id, normalizeReservationStatus(row?.status));
+        }
+        reservationStatusSnapshotRef.current = nextSnapshot;
+    }, [filter]);
+
+    useEffect(() => {
+        const currentFilterDef = FILTERS.find((item) => item.value === filter) ?? FILTERS[0];
+        if (currentFilterDef.value === "ALL") return;
+
+        const snapshot = reservationStatusSnapshotRef.current;
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (!id) continue;
+            const prevStatus = snapshot.get(id);
+            const nextStatus = normalizeReservationStatus(row?.status);
+            if (!prevStatus || !nextStatus || prevStatus === nextStatus) continue;
+            if (
+                reservationStatusMatchesFilter(prevStatus, currentFilterDef) &&
+                !reservationStatusMatchesFilter(nextStatus, currentFilterDef)
+            ) {
+                setFilter(getParentReservationFilterValueForStatus(nextStatus));
+                break;
+            }
+        }
+
+        const nextSnapshot = new Map();
+        for (const row of reservations) {
+            const id = getReservationRowId(row);
+            if (id) nextSnapshot.set(id, normalizeReservationStatus(row?.status));
+        }
+        reservationStatusSnapshotRef.current = nextSnapshot;
+    }, [reservations, filter]);
 
     const filteredReservations = useMemo(() => {
         const currentFilter = FILTERS.find((item) => item.value === filter) ?? FILTERS[0];
@@ -887,7 +985,7 @@ export default function ParentAdmissionReservationsPage() {
             <ReservationPaymentDialog
                 reservation={paymentReservation}
                 onClose={() => setPaymentReservation(null)}
-                onSubmitted={({status} = {}) => {
+                onSubmitted={({status, response} = {}) => {
                     const formId = Number(
                         paymentReservation?.admissionFormId ?? paymentReservation?.id,
                     );
@@ -903,6 +1001,7 @@ export default function ParentAdmissionReservationsPage() {
                                 : null;
                         const nextStatus =
                             updatedRow?.status ??
+                            pickReservationStatusFromMutationResponse(response) ??
                             status ??
                             RESERVATION_STATUS.PAYMENT_PENDING;
                         setFilter(getParentReservationFilterValueForStatus(nextStatus));
@@ -913,7 +1012,9 @@ export default function ParentAdmissionReservationsPage() {
                 open={Boolean(mandatoryDocsReservation)}
                 onClose={handleCloseMandatoryDocuments}
                 loading={mandatoryDocsLoading}
-                documents={mandatoryDocsList}
+                mandatoryDocuments={mandatoryDocsPayload.mandatoryDocuments}
+                methodDocuments={mandatoryDocsPayload.methodDocuments}
+                context={mandatoryDocsPayload.context}
             />
             <ConfirmDialog
                 open={Boolean(confirmEnrollmentTarget)}
