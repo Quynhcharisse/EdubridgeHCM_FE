@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     alpha,
@@ -46,7 +46,9 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
+import axiosClient from "../../../configs/APIConfig.jsx";
 import {
     confirmSystemConfigImport,
     getSystemConfig,
@@ -77,6 +79,15 @@ function mapMandatoryDocFromApi(doc) {
             ),
         ),
         templateFileUrl: doc?.templateFileUrl != null ? String(doc.templateFileUrl) : "",
+    };
+}
+
+function mapMethodDocFromApi(doc) {
+    return {
+        code: doc?.code != null ? String(doc.code) : "",
+        name: doc?.name != null ? String(doc.name) : "",
+        required: doc?.required === true,
+        templateUrl: doc?.templateUrl != null ? String(doc.templateUrl) : "",
     };
 }
 
@@ -503,6 +514,8 @@ export default function AdminPlatformSettings() {
     const [importingAdmissionTemplate, setImportingAdmissionTemplate] = useState(false);
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
     const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
+    const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
+    const methodDocFileInputRefs = useRef({});
     const [studentFieldMenuAnchor, setStudentFieldMenuAnchor] = useState(null);
     const [studentFieldMenuDocIdx, setStudentFieldMenuDocIdx] = useState(null);
 
@@ -841,11 +854,7 @@ export default function AdminPlatformSettings() {
                       const methodCode = String(row?.methodCode ?? "").trim();
                       if (!methodCode) return;
                       if (!Array.isArray(grouped[methodCode])) grouped[methodCode] = [];
-                      grouped[methodCode].push({
-                          code: row?.code != null ? String(row.code) : "",
-                          name: row?.name != null ? String(row.name) : "",
-                          required: row?.required === true,
-                      });
+                      grouped[methodCode].push(mapMethodDocFromApi(row));
                   });
                   return Object.entries(grouped).map(([methodCode, documents]) => ({
                       methodCode,
@@ -876,11 +885,7 @@ export default function AdminPlatformSettings() {
             methodDocumentRequirements: normalizedMethodDocsSource.map((group) => ({
                       methodCode: group?.methodCode != null ? String(group.methodCode) : "",
                       documents: Array.isArray(group?.documents)
-                          ? group.documents.map((doc) => ({
-                                code: doc?.code != null ? String(doc.code) : "",
-                                name: doc?.name != null ? String(doc.name) : "",
-                                required: doc?.required === true,
-                            }))
+                          ? group.documents.map((doc) => mapMethodDocFromApi(doc))
                           : [],
                   })),
             mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => mapMandatoryDocFromApi(doc)),
@@ -1628,6 +1633,55 @@ export default function AdminPlatformSettings() {
             setSaving(false);
         }
     };
+
+    const handleMethodCatalogTemplateUpload = useCallback(async (methodCode, docIdx, file) => {
+        if (!file) return;
+        const normalizedMethodCode = String(methodCode ?? "").trim();
+        if (!normalizedMethodCode) return;
+        const uploadKey = `${normalizedMethodCode}-${docIdx}`;
+        setMethodDocUploadingKeys((prev) => new Set([...prev, uploadKey]));
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await axiosClient.post("/auth/upload/file?fileType=image", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const body = res.data?.body ?? res.data;
+            const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
+            if (!fileUrl) {
+                enqueueSnackbar("Không nhận được URL file sau khi tải lên.", { variant: "error" });
+                return;
+            }
+            setAdmissionTemplateForm((prev) => {
+                const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                const gIdx = nextGroups.findIndex(
+                    (g) => String(g?.methodCode ?? "").trim() === normalizedMethodCode,
+                );
+                if (gIdx < 0) return prev;
+                const currentGroup = { ...nextGroups[gIdx] };
+                currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                if (!currentGroup.documents[docIdx]) return prev;
+                currentGroup.documents[docIdx] = {
+                    ...currentGroup.documents[docIdx],
+                    templateUrl: fileUrl,
+                };
+                nextGroups[gIdx] = currentGroup;
+                return { ...prev, methodDocumentRequirements: nextGroups };
+            });
+            enqueueSnackbar(res.data?.message || "Đã tải hình mẫu lên.", { variant: "success" });
+        } catch (e) {
+            console.error("[AdminPlatformSettings] method catalog template upload:", e);
+            enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {
+                variant: "error",
+            });
+        } finally {
+            setMethodDocUploadingKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(uploadKey);
+                return next;
+            });
+        }
+    }, []);
 
     const handleSelectAdmissionTemplateFile = () => {
         if (saving || importingAdmissionTemplate || confirmingAdmissionImport) return;
@@ -3175,10 +3229,10 @@ export default function AdminPlatformSettings() {
                                                             setAdmissionTemplateForm((prev) => {
                                                                 const nextGroups = [...(prev.methodDocumentRequirements || [])];
                                                                 const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                if (gIdx < 0) nextGroups.push({ methodCode: selectedMethodCode, documents: [{ code: "", name: "", required: false }] });
+                                                                if (gIdx < 0) nextGroups.push({ methodCode: selectedMethodCode, documents: [{ code: "", name: "", required: false, templateUrl: "" }] });
                                                                 else {
                                                                     const currentGroup = { ...nextGroups[gIdx] };
-                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : []), { code: "", name: "", required: false }];
+                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : []), { code: "", name: "", required: false, templateUrl: "" }];
                                                                     nextGroups[gIdx] = currentGroup;
                                                                 }
                                                                 return { ...prev, methodDocumentRequirements: nextGroups };
@@ -3197,7 +3251,7 @@ export default function AdminPlatformSettings() {
                                                             <TableCell sx={{ width: 64, fontWeight: 700, color: "#374151" }}>STT</TableCell>
                                                             <TableCell sx={{ fontWeight: 700, color: "#374151" }}>Tên hồ sơ</TableCell>
                                                             <TableCell sx={{ width: 160, fontWeight: 700, color: "#374151" }}>Loại</TableCell>
-                                                            {canEdit ? <TableCell align="center" sx={{ width: 64, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
+                                                            {canEdit ? <TableCell align="center" sx={{ width: 108, fontWeight: 700, whiteSpace: "nowrap", color: "#374151" }}>Thao tác</TableCell> : null}
                                                         </TableRow>
                                                     </TableHead>
                                                     <TableBody>
@@ -3208,33 +3262,67 @@ export default function AdminPlatformSettings() {
                                                                     <Typography variant="body2">Chưa có hồ sơ cho phương thức này.</Typography>
                                                                 </TableCell>
                                                             </TableRow>
-                                                        ) : selectedDocs.map((doc, dIdx) => (
+                                                        ) : selectedDocs.map((doc, dIdx) => {
+                                                            const methodDocUploadKey = `${selectedMethodCode}-${dIdx}`;
+                                                            const isUploadingMethodTemplate = methodDocUploadingKeys.has(methodDocUploadKey);
+                                                            const templateUrl = doc?.templateUrl ? String(doc.templateUrl).trim() : "";
+                                                            return (
                                                             <TableRow key={`method-doc-${selectedMethodIdx}-${dIdx}`} hover sx={{ "&:hover": { bgcolor: "#f8fbff" } }}>
                                                                 <TableCell>{dIdx + 1}</TableCell>
                                                                 <TableCell>
                                                                     {canEdit ? (
-                                                                        <TextField
-                                                                            size="small"
-                                                                            fullWidth
-                                                                            value={doc?.name ?? ""}
-                                                                            onChange={(e) => {
-                                                                                const value = e.target.value;
-                                                                                setAdmissionTemplateForm((prev) => {
-                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                    if (gIdx < 0) return prev;
-                                                                                    const currentGroup = { ...nextGroups[gIdx] };
-                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                    currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], name: value };
-                                                                                    nextGroups[gIdx] = currentGroup;
-                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                });
-                                                                            }}
-                                                                            placeholder="Nhập tên hồ sơ"
-                                                                            sx={admissionInputSx}
-                                                                        />
+                                                                        <Stack spacing={0.75}>
+                                                                            <TextField
+                                                                                size="small"
+                                                                                fullWidth
+                                                                                value={doc?.name ?? ""}
+                                                                                onChange={(e) => {
+                                                                                    const value = e.target.value;
+                                                                                    setAdmissionTemplateForm((prev) => {
+                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                        if (gIdx < 0) return prev;
+                                                                                        const currentGroup = { ...nextGroups[gIdx] };
+                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                        currentGroup.documents[dIdx] = { ...currentGroup.documents[dIdx], name: value };
+                                                                                        nextGroups[gIdx] = currentGroup;
+                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                    });
+                                                                                }}
+                                                                                placeholder="Nhập tên hồ sơ"
+                                                                                sx={admissionInputSx}
+                                                                            />
+                                                                            {templateUrl ? (
+                                                                                <Button
+                                                                                    component={Link}
+                                                                                    href={templateUrl}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    size="small"
+                                                                                    startIcon={<OpenInNewOutlinedIcon fontSize="small" />}
+                                                                                    sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0 }}
+                                                                                >
+                                                                                    Xem hình mẫu
+                                                                                </Button>
+                                                                            ) : null}
+                                                                        </Stack>
                                                                     ) : (
-                                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
+                                                                        <Stack spacing={0.5}>
+                                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{doc?.name || "-"}</Typography>
+                                                                            {templateUrl ? (
+                                                                                <Button
+                                                                                    component={Link}
+                                                                                    href={templateUrl}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    size="small"
+                                                                                    startIcon={<OpenInNewOutlinedIcon fontSize="small" />}
+                                                                                    sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0 }}
+                                                                                >
+                                                                                    Xem hình mẫu
+                                                                                </Button>
+                                                                            ) : null}
+                                                                        </Stack>
                                                                     )}
                                                                 </TableCell>
                                                                 <TableCell align="center">
@@ -3277,28 +3365,72 @@ export default function AdminPlatformSettings() {
                                                                 </TableCell>
                                                                 {canEdit ? (
                                                                     <TableCell align="center">
-                                                                        <IconButton
-                                                                            size="small"
-                                                                            color="error"
-                                                                            onClick={() => {
-                                                                                setAdmissionTemplateForm((prev) => {
-                                                                                    const nextGroups = [...(prev.methodDocumentRequirements || [])];
-                                                                                    const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
-                                                                                    if (gIdx < 0) return prev;
-                                                                                    const currentGroup = { ...nextGroups[gIdx] };
-                                                                                    currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
-                                                                                    currentGroup.documents.splice(dIdx, 1);
-                                                                                    nextGroups[gIdx] = currentGroup;
-                                                                                    return { ...prev, methodDocumentRequirements: nextGroups };
-                                                                                });
-                                                                            }}
-                                                                        >
-                                                                            <DeleteOutlineIcon fontSize="small" />
-                                                                        </IconButton>
+                                                                        <Stack direction="row" spacing={0.25} justifyContent="center" alignItems="center">
+                                                                            <input
+                                                                                type="file"
+                                                                                hidden
+                                                                                accept="image/*"
+                                                                                ref={(el) => {
+                                                                                    if (el) methodDocFileInputRefs.current[methodDocUploadKey] = el;
+                                                                                    else delete methodDocFileInputRefs.current[methodDocUploadKey];
+                                                                                }}
+                                                                                onChange={(e) => {
+                                                                                    const file = e.target.files?.[0];
+                                                                                    e.target.value = "";
+                                                                                    if (file) {
+                                                                                        void handleMethodCatalogTemplateUpload(
+                                                                                            selectedMethodCode,
+                                                                                            dIdx,
+                                                                                            file,
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                            />
+                                                                            <Tooltip title="Tải hình mẫu">
+                                                                                <span>
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        color="primary"
+                                                                                        disabled={saving || isUploadingMethodTemplate}
+                                                                                        onClick={() =>
+                                                                                            methodDocFileInputRefs.current[methodDocUploadKey]?.click()
+                                                                                        }
+                                                                                        aria-label="Tải hình mẫu"
+                                                                                    >
+                                                                                        {isUploadingMethodTemplate ? (
+                                                                                            <CircularProgress size={18} color="inherit" />
+                                                                                        ) : (
+                                                                                            <FileUploadOutlinedIcon fontSize="small" />
+                                                                                        )}
+                                                                                    </IconButton>
+                                                                                </span>
+                                                                            </Tooltip>
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                color="error"
+                                                                                disabled={saving || isUploadingMethodTemplate}
+                                                                                onClick={() => {
+                                                                                    setAdmissionTemplateForm((prev) => {
+                                                                                        const nextGroups = [...(prev.methodDocumentRequirements || [])];
+                                                                                        const gIdx = nextGroups.findIndex((g) => String(g?.methodCode ?? "").trim() === selectedMethodCode);
+                                                                                        if (gIdx < 0) return prev;
+                                                                                        const currentGroup = { ...nextGroups[gIdx] };
+                                                                                        currentGroup.documents = [...(Array.isArray(currentGroup.documents) ? currentGroup.documents : [])];
+                                                                                        currentGroup.documents.splice(dIdx, 1);
+                                                                                        nextGroups[gIdx] = currentGroup;
+                                                                                        return { ...prev, methodDocumentRequirements: nextGroups };
+                                                                                    });
+                                                                                }}
+                                                                                aria-label="Xóa hồ sơ"
+                                                                            >
+                                                                                <DeleteOutlineIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        </Stack>
                                                                     </TableCell>
                                                                 ) : null}
                                                             </TableRow>
-                                                        ))}
+                                                            );
+                                                        })}
                                                     </TableBody>
                                                 </Table>
                                             </TableContainer>

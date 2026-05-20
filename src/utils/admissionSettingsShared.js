@@ -104,11 +104,16 @@ export function sanitizeAdmissionSettingsForApi(adm) {
           const methodCode = String(group?.methodCode ?? "").trim();
           const documents = Array.isArray(group?.documents)
             ? group.documents
-                .map((doc) => ({
-                  code: String(doc?.code ?? "").trim(),
-                  name: doc?.name != null ? String(doc.name) : "",
-                  required: doc?.required === true,
-                }))
+                .map((doc) => {
+                  const row = {
+                    code: String(doc?.code ?? "").trim(),
+                    name: doc?.name != null ? String(doc.name) : "",
+                    required: doc?.required === true,
+                  };
+                  const templateUrl = doc?.templateUrl != null ? String(doc.templateUrl).trim() : "";
+                  if (templateUrl) row.templateUrl = templateUrl;
+                  return row;
+                })
                 .filter((doc) => doc.code || doc.name)
             : [];
           return {methodCode, documents};
