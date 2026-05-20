@@ -810,20 +810,22 @@ export default function AdminPlatformSettings() {
               : [];
         const methodDocsSource = Array.isArray(adm.methodDocumentRequirements)
             ? adm.methodDocumentRequirements
-            : Array.isArray(adm?.documentRequirements?.byMethod)
-              ? adm.documentRequirements.byMethod
             : Array.isArray(adm?.documentRequirementsData?.byMethod)
               ? adm.documentRequirementsData.byMethod
-              : Array.isArray(adm.byMethod)
-                ? adm.byMethod
-                : [];
-        const mandatoryDocsSource = Array.isArray(adm?.documentRequirements?.mandatoryAll)
-            ? adm.documentRequirements.mandatoryAll
+              : Array.isArray(adm?.documentRequirements?.byMethod)
+                ? adm.documentRequirements.byMethod
+                : Array.isArray(adm.byMethod)
+                  ? adm.byMethod
+                  : [];
+        const mandatoryDocsSource = Array.isArray(adm.mandatoryAllDocumentRequirements)
+            ? adm.mandatoryAllDocumentRequirements
             : Array.isArray(adm?.documentRequirementsData?.mandatoryAll)
               ? adm.documentRequirementsData.mandatoryAll
-              : Array.isArray(adm?.mandatoryAll)
-                ? adm.mandatoryAll
-                : [];
+              : Array.isArray(adm?.documentRequirements?.mandatoryAll)
+                ? adm.documentRequirements.mandatoryAll
+                : Array.isArray(adm?.mandatoryAll)
+                  ? adm.mandatoryAll
+                  : [];
         const normalizedProcessSource = processSource.some((group) => Array.isArray(group?.steps))
             ? processSource
             : (() => {
