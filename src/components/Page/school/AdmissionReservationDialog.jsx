@@ -168,7 +168,7 @@ export default function AdmissionReservationDialog({
                         setTemplateAlreadySaved(saved);
                         if (!saved) {
                             setTemplateLoadError(
-                                "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                                "Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại tại trang Hồ sơ giữ chỗ.",
                             );
                         }
                     }
@@ -178,7 +178,7 @@ export default function AdmissionReservationDialog({
                     setTemplateAlreadySaved(false);
                     if (templateErr?.response?.status === 404) {
                         setTemplateLoadError(
-                            "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
+                            "Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập tại trang Hồ sơ giữ chỗ.",
                         );
                     } else {
                         setTemplateLoadError(

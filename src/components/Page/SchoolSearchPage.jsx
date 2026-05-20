@@ -1247,18 +1247,14 @@ export default function SchoolSearchPage() {
                     const applied = applyReservationTemplateToDocs(catalog, body, sid);
                     setAvailabilityTemplateDocs(applied);
                     if (!hasSavedReservationTemplateForStudent(body, sid)) {
-                        setAvailabilityTemplateError(
-                            "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
-                        );
+                        setAvailabilityTemplateError("__TEMPLATE_OUTDATED__");
                     }
                 }
             } else {
                 const templateErr = templateSettled.reason;
                 setAvailabilityTemplateDocs(cloneEmptyCatalogDocs(catalog));
                 if (templateErr?.response?.status === 404) {
-                    setAvailabilityTemplateError(
-                        "Học sinh chưa có hồ sơ giữ chỗ. Vui lòng hoàn thành tại trang Hồ sơ giữ chỗ trước khi nộp.",
-                    );
+                    setAvailabilityTemplateError("__TEMPLATE_NULL__");
                 } else {
                     setAvailabilityTemplateError(
                         templateErr?.response?.data?.message ||
@@ -1477,7 +1473,13 @@ export default function SchoolSearchPage() {
             return false;
         }
         if (availabilityTemplateError) {
-            showWarningSnackbar(availabilityTemplateError);
+            const templateErrMsg =
+                availabilityTemplateError === "__TEMPLATE_NULL__"
+                    ? "Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập tại trang Hồ sơ giữ chỗ."
+                    : availabilityTemplateError === "__TEMPLATE_OUTDATED__"
+                    ? "Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại tại trang Hồ sơ giữ chỗ."
+                    : availabilityTemplateError;
+            showWarningSnackbar(templateErrMsg);
             return false;
         }
         const submissionDocuments = buildSubmissionDocumentsPayload(availabilityTemplateDocs);
@@ -2823,7 +2825,29 @@ export default function SchoolSearchPage() {
 
                                 {availabilityTemplateError ? (
                                     <Alert severity="warning" sx={{mb: 1.5, borderRadius: 2}}>
-                                        {availabilityTemplateError}
+                                        {availabilityTemplateError === "__TEMPLATE_NULL__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError === "__TEMPLATE_OUTDATED__" ? (
+                                            <>
+                                                Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại.{" "}
+                                                <a
+                                                    href="/parent/admission-hold-profile"
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                >
+                                                    Cấu hình lại tại đây
+                                                </a>
+                                                .
+                                            </>
+                                        ) : availabilityTemplateError}
                                     </Alert>
                                 ) : null}
 

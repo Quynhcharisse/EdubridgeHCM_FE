@@ -50,3 +50,18 @@ export const processAdmissionReservationForm = async ({formId, action, rejectRea
         headers: {"X-Device-Type": "web"},
     });
 };
+
+export const getAdmissionCampaigns = async () => {
+    const response = await axiosClient.get("/campus/admission/campaign");
+    const body = pickBody(response);
+    return Array.isArray(body) ? body : [];
+};
+
+export const autoApproveAdmissionReservations = async (admissionCampaignId) => {
+    const response = await axiosClient.put(
+        "/campus/approve/auto/admission/reservation/form",
+        null,
+        {params: {admissionCampaignId}, headers: {"X-Device-Type": "web"}},
+    );
+    return pickBody(response);
+};
