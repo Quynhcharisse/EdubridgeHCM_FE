@@ -79,6 +79,7 @@ import {fetchSystemAdmissionSettingsData, getSystemConfigByKey} from "../../../s
 import {getCurrentSchoolSubscription} from "../../../services/SchoolSubscriptionService.jsx";
 import {
   admissionSettingsComparableJson,
+  isLockedCriterionLabel,
   normalizeOcrCriteriaList,
   sanitizeAdmissionSettingsForApi,
 } from "../../../utils/admissionSettingsShared.js";
@@ -417,6 +418,32 @@ function normalizeDocItem(d) {
   };
 }
 
+/** Chuẩn hoá mandatoryAll từ GET /system/config/key?k=admissionSettingsData */
+function mapMandatoryDocFromSystemApi(doc) {
+  if (!doc || typeof doc !== "object") {
+    return normalizeMandatoryDocItem(null);
+  }
+  const templateRaw =
+    doc.templateFileUrl != null
+      ? String(doc.templateFileUrl).trim()
+      : doc.fileUrl != null
+        ? String(doc.fileUrl).trim()
+        : doc.templateUrl != null
+          ? String(doc.templateUrl).trim()
+          : "";
+  return {
+    code: doc.code != null ? String(doc.code) : "",
+    name: doc.name != null ? String(doc.name) : "",
+    required: true,
+    ocrCriteria: normalizeOcrCriteriaList(
+      (doc.validateCriterion ?? doc.ocrCriteria ?? []).filter((item) =>
+        !isLockedCriterionLabel(typeof item === "string" ? item : item?.label),
+      ),
+    ),
+    templateFileUrl: templateRaw || null,
+  };
+}
+
 /** Hồ sơ bắt buộc chung (hệ thống): ocrCriteria + templateFileUrl, luôn required. */
 function normalizeMandatoryDocItem(d) {
   if (!d || typeof d !== "object") {
@@ -491,7 +518,7 @@ function parseSystemMandatoryAllFromApiBody(body) {
       ? admissionRoot.documentRequirementsData
       : admissionRoot;
   const mandatoryRaw = Array.isArray(docRoot?.mandatoryAll) ? docRoot.mandatoryAll : [];
-  return mandatoryRaw.map(normalizeMandatoryDocItem);
+  return mandatoryRaw.map(mapMandatoryDocFromSystemApi);
 }
 
 async function fetchSystemMandatoryAllDocuments() {
@@ -2654,7 +2681,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
         documents: (g.documents || []).map((d) => ({...normalizeDocItem(d), required: true})),
       }));
       const mandatoryAllFromTemplate = Array.isArray(docRoot.mandatoryAll)
-        ? docRoot.mandatoryAll.map(normalizeMandatoryDocItem)
+        ? docRoot.mandatoryAll.map(mapMandatoryDocFromSystemApi)
         : [];
 
       setConfig((c) => ({
@@ -2673,10 +2700,35 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     }
   }, []);
 
+  const applySystemMandatoryTemplateToForm = useCallback(async () => {
+    setLoadingSystemAdmission(true);
+    try {
+      const mandatoryAllFromTemplate = await fetchSystemMandatoryAllDocuments();
+      if (!mandatoryAllFromTemplate.length) {
+        enqueueSnackbar("Không có mẫu hồ sơ bắt buộc chung trên hệ thống.", {variant: "info"});
+        return;
+      }
+      setConfig((c) => ({
+        ...c,
+        documentRequirementsData: {
+          ...c.documentRequirementsData,
+          mandatoryAll: mandatoryAllFromTemplate,
+        },
+      }));
+      enqueueSnackbar("Đã áp dụng mẫu hệ thống cho hồ sơ bắt buộc chung (chưa lưu DB).", {variant: "success"});
+    } finally {
+      setLoadingSystemAdmission(false);
+    }
+  }, []);
+
   const handleRestoreTemplateClick = useCallback((target = "admission") => {
     if (isDirty) {
       setRestoreTemplateTarget(target);
       setAdmissionRestoreConfirmOpen(true);
+      return;
+    }
+    if (target === "mandatory") {
+      void applySystemMandatoryTemplateToForm();
       return;
     }
     if (target === "documents") {
@@ -2684,7 +2736,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
       return;
     }
     void applySystemTemplateToForm();
-  }, [isDirty, applySystemTemplateToForm, applySystemDocumentTemplateToForm]);
+  }, [isDirty, applySystemTemplateToForm, applySystemDocumentTemplateToForm, applySystemMandatoryTemplateToForm]);
 
   const applyToggleAdmissionMethod = useCallback(
     (code, checked) => {
@@ -4406,7 +4458,18 @@ export default function SchoolConfig({variant = "platform"} = {}) {
             <Card sx={{borderRadius: "12px", border: "1px solid rgba(226,232,240,1)", boxShadow: "0 8px 24px rgba(15,23,42,0.06)"}}>
               <CardContent sx={{p: 3}}>
                 <Stack spacing={1.25} sx={{mb: 2}}>
-                  <Typography sx={{fontWeight: 800}}>Hồ sơ bắt buộc chung</Typography>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                    <Typography sx={{fontWeight: 800}}>Hồ sơ bắt buộc chung</Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={loadingSystemAdmission || saving || !editing}
+                      onClick={() => handleRestoreTemplateClick("mandatory")}
+                      sx={{textTransform: "none", fontWeight: 700, borderRadius: 2}}
+                    >
+                      Lấy mẫu từ hệ thống
+                    </Button>
+                  </Stack>
                   <Alert severity="info" sx={{borderRadius: 2, maxWidth: 1200}}>
                     <Typography variant="body2" component="div" sx={{fontWeight: 700, mb: 0.75}}>
                       Lưu ý:
@@ -5703,6 +5766,10 @@ export default function SchoolConfig({variant = "platform"} = {}) {
               color="warning"
               onClick={() => {
                 setAdmissionRestoreConfirmOpen(false);
+                if (restoreTemplateTarget === "mandatory") {
+                  void applySystemMandatoryTemplateToForm();
+                  return;
+                }
                 if (restoreTemplateTarget === "documents") {
                   void applySystemDocumentTemplateToForm();
                   return;
