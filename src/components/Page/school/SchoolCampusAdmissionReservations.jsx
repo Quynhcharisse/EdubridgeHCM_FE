@@ -55,6 +55,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import RemoveCircleOutlinedIcon from "@mui/icons-material/RemoveCircleOutlined";
 import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
@@ -64,6 +65,7 @@ import {
     processAdmissionReservationForm,
     getAdmissionCampaigns,
     autoApproveAdmissionReservations,
+    batchConfirmAdmissionReservationForms,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
@@ -677,9 +679,10 @@ function ImagePreviewModal({ open, images, selectedIndex, onChangeIndex, onClose
 }
 
 const AUTO_APPROVE_STATUS_CONFIG = {
-    valid: {label: "Hợp lệ", color: "#166534", bg: "#f0fdf4", border: "#bbf7d0"},
-    invalid: {label: "Không hợp lệ", color: "#92400e", bg: "#fffbeb", border: "#fde68a"},
-    error: {label: "Hồ sơ lỗi", color: "#991b1b", bg: "#fef2f2", border: "#fecaca"},
+    valid:   {label: "Hợp lệ",            color: "#166534", bg: "#f0fdf4", border: "#bbf7d0"},
+    invalid: {label: "Không hợp lệ",      color: "#92400e", bg: "#fffbeb", border: "#fde68a"},
+    skipped: {label: "Bỏ qua kiểm tra",   color: "#475569", bg: "#f8fafc", border: "#cbd5e1"},
+    error:   {label: "Hồ sơ lỗi",         color: "#991b1b", bg: "#fef2f2", border: "#fecaca"},
 };
 
 function SummaryStatCard({label, value, color, bg, border, icon}) {
@@ -697,12 +700,17 @@ function SummaryStatCard({label, value, color, bg, border, icon}) {
     );
 }
 
+const DOC_STATUS_CONFIG = {
+    valid:   {label: "Hợp lệ",      accentColor: "#16a34a", chipBg: "#dcfce7", chipColor: "#166534", reasonColor: "#b45309"},
+    invalid: {label: "Không hợp lệ", accentColor: "#d97706", chipBg: "#fef3c7", chipColor: "#92400e", reasonColor: "#b45309"},
+    skipped: {label: "Bỏ qua kiểm tra",       accentColor: "#64748b", chipBg: "#f1f5f9", chipColor: "#475569", reasonColor: "#64748b"},
+};
+
 function DocumentResultCard({doc}) {
     const [open, setOpen] = React.useState(false);
     const [imgPreview, setImgPreview] = React.useState(false);
-    const isValid = doc.status === "valid";
+    const cfg = DOC_STATUS_CONFIG[doc.status] ?? DOC_STATUS_CONFIG.invalid;
     const details = Array.isArray(doc.details) ? doc.details : [];
-    const accentColor = isValid ? "#16a34a" : "#d97706";
     return (
         <Box sx={{borderRadius: 2, border: "1px solid #e2e8f0", overflow: "hidden", bgcolor: "#fff"}}>
             <Box
@@ -715,18 +723,18 @@ function DocumentResultCard({doc}) {
                     transition: "background-color 0.15s",
                 }}
             >
-                <Box sx={{width: 3, flexShrink: 0, bgcolor: accentColor}} />
+                <Box sx={{width: 3, flexShrink: 0, bgcolor: cfg.accentColor}} />
                 <Box sx={{flex: 1, minWidth: 0, px: 2, py: 1.25}}>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{mb: doc.reason ? 0.4 : 0}}>
                         <Typography sx={{fontWeight: 700, fontSize: 13, color: "#1e293b"}}>{doc.label || doc.key}</Typography>
                         <Chip
-                            label={isValid ? "Hợp lệ" : "Không hợp lệ"}
+                            label={cfg.label}
                             size="small"
-                            sx={{bgcolor: isValid ? "#dcfce7" : "#fef3c7", color: isValid ? "#166534" : "#92400e", fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}}
+                            sx={{bgcolor: cfg.chipBg, color: cfg.chipColor, fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}}
                         />
                     </Stack>
                     {doc.reason && (
-                        <Typography sx={{color: "#b45309", fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
+                        <Typography sx={{color: cfg.reasonColor, fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
                     )}
                 </Box>
                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{pr: 1.5, flexShrink: 0}} onClick={(e) => e.stopPropagation()}>
@@ -808,18 +816,25 @@ function FormResultCard({form}) {
             >
                 <Box sx={{width: 4, flexShrink: 0, bgcolor: s.color}} />
                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{flex: 1, px: 2, py: 1.5, bgcolor: s.bg}}>
-                    <Stack direction="row" spacing={1.25} alignItems="center">
-                        <Typography sx={{fontWeight: 700, color: "#1e293b", fontSize: 14}}>
-                            Hồ sơ #{form.formId}
-                        </Typography>
-                        <Chip
-                            label={s.label}
-                            size="small"
-                            sx={{bgcolor: "rgba(255,255,255,0.85)", color: s.color, border: `1px solid ${s.border}`, fontWeight: 700, borderRadius: 999, height: 22, "& .MuiChip-label": {px: 1.25}, fontSize: 12}}
-                        />
+                    <Stack spacing={0.3}>
+                        <Stack direction="row" spacing={1.25} alignItems="center">
+                            <Typography sx={{fontWeight: 700, color: "#1e293b", fontSize: 14}}>
+                                Hồ sơ #{form.formId}
+                            </Typography>
+                            <Chip
+                                label={s.label}
+                                size="small"
+                                sx={{bgcolor: "rgba(255,255,255,0.85)", color: s.color, border: `1px solid ${s.border}`, fontWeight: 700, borderRadius: 999, height: 22, "& .MuiChip-label": {px: 1.25}, fontSize: 12}}
+                            />
+                        </Stack>
+                        {form.errorMessage && (
+                            <Typography sx={{fontSize: 12, color: s.color, opacity: 0.85, lineHeight: 1.4}}>
+                                {form.errorMessage}
+                            </Typography>
+                        )}
                     </Stack>
                     {docs.length > 0 && (
-                        <Box sx={{color: "#94a3b8", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.22s", display: "flex"}}>
+                        <Box sx={{color: "#94a3b8", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.22s", display: "flex", flexShrink: 0, ml: 1}}>
                             <ExpandMoreRoundedIcon sx={{fontSize: 20}} />
                         </Box>
                     )}
@@ -845,6 +860,7 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
     const [selectedCampaignId, setSelectedCampaignId] = React.useState("");
     const [selectedCampaignName, setSelectedCampaignName] = React.useState("");
     const [processing, setProcessing] = React.useState(false);
+    const [confirming, setConfirming] = React.useState(false);
     const [result, setResult] = React.useState(null);
     const [activeTab, setActiveTab] = React.useState("valid");
 
@@ -884,17 +900,60 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
         }
     };
 
+    const buildRejectReason = (form) => {
+        if (form.overallStatus === "error") return form.errorMessage || "Hồ sơ lỗi.";
+        const invalidDocs = (Array.isArray(form.documents) ? form.documents : [])
+            .filter((d) => d.status === "invalid");
+        return invalidDocs
+            .map((doc) => {
+                const failedNotes = (Array.isArray(doc.details) ? doc.details : [])
+                    .filter((d) => d.passed === false)
+                    .map((d) => d.note)
+                    .filter(Boolean)
+                    .join("; ");
+                return failedNotes
+                    ? `${doc.label || doc.key} không hợp lệ: ${failedNotes}`
+                    : `${doc.label || doc.key} không hợp lệ`;
+            })
+            .join("\n");
+    };
+
+    const handleConfirm = async () => {
+        const forms = Array.isArray(result?.forms) ? result.forms : [];
+        const infos = forms
+            .filter((f) => f.overallStatus === "valid" || f.overallStatus === "invalid" || f.overallStatus === "error")
+            .map((f) => {
+                const entry = {formId: f.formId, action: f.overallStatus === "valid" ? "APPROVE" : "REJECT"};
+                if (entry.action === "REJECT") entry.rejectReason = buildRejectReason(f);
+                return entry;
+            });
+        if (infos.length === 0) { onClose(); return; }
+        setConfirming(true);
+        try {
+            await batchConfirmAdmissionReservationForms(infos);
+            enqueueSnackbar("Xác nhận kết quả xét duyệt thành công.", {variant: "success"});
+            onDone();
+            onClose();
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể xác nhận kết quả xét duyệt."), {variant: "error"});
+        } finally {
+            setConfirming(false);
+        }
+    };
+
     const totalForms = result?.totalForms ?? 0;
-    const summary = result?.summary ?? {valid: 0, invalid: 0, error: 0};
+    const summary = result?.summary ?? {valid: 0, invalid: 0, skipped: 0, error: 0};
     const forms = Array.isArray(result?.forms) ? result.forms : [];
     const validForms = forms.filter((f) => f.overallStatus === "valid");
     const invalidForms = forms.filter((f) => f.overallStatus === "invalid");
+    const skippedForms = forms.filter((f) => f.overallStatus === "skipped");
     const errorForms = forms.filter((f) => f.overallStatus === "error");
 
     const TAB_CONFIG = [
-        {key: "valid",   label: "Hợp lệ",       count: validForms.length,   activeColor: "#166534"},
-        {key: "invalid", label: "Không hợp lệ", count: invalidForms.length, activeColor: "#d97706"},
-        {key: "error",   label: "Lỗi",           count: errorForms.length,   activeColor: "#dc2626"},
+        {key: "valid",   label: "Hợp lệ",            count: validForms.length,   activeColor: "#166534"},
+        {key: "invalid", label: "Không hợp lệ",      count: invalidForms.length, activeColor: "#d97706"},
+        {key: "skipped", label: "Bỏ qua kiểm tra",   count: skippedForms.length, activeColor: "#475569"},
+        {key: "error",   label: "Hồ sơ lỗi",         count: errorForms.length,   activeColor: "#dc2626"},
     ];
 
     return (
@@ -965,7 +1024,8 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
                                 <SummaryStatCard label="Tổng hồ sơ" value={totalForms} color="#1e3a8a" bg="#eff6ff" border="#bfdbfe" />
                                 <SummaryStatCard label="Hợp lệ" value={summary.valid} color="#166534" bg="#f0fdf4" border="#bbf7d0" icon={<CheckCircleRoundedIcon />} />
                                 <SummaryStatCard label="Không hợp lệ" value={summary.invalid} color="#92400e" bg="#fffbeb" border="#fde68a" icon={<WarningAmberRoundedIcon />} />
-                                <SummaryStatCard label="Lỗi" value={summary.error} color="#991b1b" bg="#fef2f2" border="#fecaca" icon={<CancelRoundedIcon />} />
+                                <SummaryStatCard label="Bỏ qua kiểm tra" value={summary.skipped ?? 0} color="#475569" bg="#f8fafc" border="#cbd5e1" icon={<RemoveCircleOutlinedIcon />} />
+                                <SummaryStatCard label="Hồ sơ lỗi" value={summary.error} color="#991b1b" bg="#fef2f2" border="#fecaca" icon={<CancelRoundedIcon />} />
                             </Stack>
                         </Box>
 
@@ -1019,6 +1079,11 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
                                             ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ không hợp lệ.</Typography>
                                             : <Stack spacing={1}>{invalidForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
                                     )}
+                                    {activeTab === "skipped" && (
+                                        skippedForms.length === 0
+                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ bỏ qua kiểm tra.</Typography>
+                                            : <Stack spacing={1}>{skippedForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                    )}
                                     {activeTab === "error" && (
                                         errorForms.length === 0
                                             ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ lỗi.</Typography>
@@ -1048,9 +1113,20 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
                         </Button>
                     </>
                 ) : (
-                    <Button onClick={onClose} variant="contained" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, px: 3}}>
-                        Đóng
-                    </Button>
+                    <>
+                        <Button onClick={onClose} disabled={confirming} variant="outlined" sx={{textTransform: "none", borderRadius: 2, fontWeight: 700}}>
+                            Hủy
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirm}
+                            disabled={confirming}
+                            startIcon={confirming ? <CircularProgress size={16} color="inherit" /> : <DoneAllRoundedIcon />}
+                            sx={{textTransform: "none", borderRadius: 2, fontWeight: 700, px: 3}}
+                        >
+                            {confirming ? "Đang xác nhận..." : "Xác nhận"}
+                        </Button>
+                    </>
                 )}
             </DialogActions>
         </Dialog>
