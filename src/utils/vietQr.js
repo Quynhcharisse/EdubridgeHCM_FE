@@ -1,3 +1,13 @@
+export function sanitizeCardAccountDigits(raw) {
+    return String(raw ?? "").replace(/\D/g, "").slice(0, 16);
+}
+
+export function formatCardAccountNoDisplay(raw) {
+    const s = sanitizeCardAccountDigits(raw);
+    if (!s) return "";
+    return s.match(/.{1,4}/g)?.join(" ") ?? s;
+}
+
 export function buildVietQrImageUrl(bankInfo, options = {}) {
     const template =
         typeof options === "string" ? options : String(options?.template ?? "compact2");
