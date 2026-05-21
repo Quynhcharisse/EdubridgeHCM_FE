@@ -93,6 +93,7 @@ import {
   termIsComplete,
   validateAcademicCalendarForSave,
 } from "../../../utils/academicCalendarUi.js";
+import {buildVietQrImageUrl} from "../../../utils/vietQr.js";
 import {
   canonicalizeWorkShiftName,
   normalizeTimeHHmm,
@@ -1245,7 +1246,7 @@ function sanitizeBankInfoDataForApi(data) {
   }
   return {
     bankId: data.bankId != null ? String(data.bankId).trim() : "",
-    accountNo: data.accountNo != null ? String(data.accountNo).trim() : "",
+    accountNo: sanitizeCardAccountDigits(data.accountNo),
     accountName: data.accountName != null ? String(data.accountName).trim() : "",
     bankName: data.bankName != null ? String(data.bankName).trim() : "",
   };
@@ -1269,16 +1270,14 @@ function normalizeVietQrBankList(raw) {
     .sort((a, b) => a.label.localeCompare(b.label, "vi"));
 }
 
-function buildVietQrQuickImageUrl(bankInfo) {
-  const bankId = String(bankInfo?.bankId ?? "").trim();
-  const accountNo = String(bankInfo?.accountNo ?? "").trim();
-  if (!bankId || !accountNo) return "";
-  const params = new URLSearchParams();
-  const accountName = String(bankInfo?.accountName ?? "").trim();
-  if (accountName) params.set("accountName", accountName);
-  const base = `https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNo)}-compact2.png`;
-  const query = params.toString();
-  return query ? `${base}?${query}` : base;
+function sanitizeCardAccountDigits(raw) {
+  return String(raw ?? "").replace(/\D/g, "").slice(0, 16);
+}
+
+function formatCardAccountNoForInput(digits) {
+  const s = sanitizeCardAccountDigits(digits);
+  if (!s) return "";
+  return s.match(/.{1,4}/g)?.join(" ") ?? s;
 }
 
 function maskBankAccountNo(raw) {
@@ -1991,8 +1990,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
   const methodDocFileInputRefs = useRef({});
   /** index mandatoryAll đang upload mẫu */
-  const [mandatoryDocUploadingKeys, setMandatoryDocUploadingKeys] = useState(() => new Set());
-  const mandatoryDocFileInputRefs = useRef({});
   const [vietQrBanks, setVietQrBanks] = useState([]);
   const [loadingVietQrBanks, setLoadingVietQrBanks] = useState(false);
   const [vietQrBanksLoaded, setVietQrBanksLoaded] = useState(false);
@@ -2948,44 +2945,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     });
   }, []);
 
-  const handleMandatoryDocumentTemplateUpload = useCallback(async (idx, file) => {
-    if (!file) return;
-    setMandatoryDocUploadingKeys((prev) => new Set([...prev, idx]));
-    try {
-      const fileType = file.type.startsWith("image/") ? "image" : "doc";
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
-        headers: {"Content-Type": "multipart/form-data"},
-      });
-      const body = res.data?.body ?? res.data;
-      const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
-      if (!fileUrl) {
-        enqueueSnackbar("Không nhận được URL file sau khi tải lên.", {variant: "error"});
-        return;
-      }
-      setConfig((c) => {
-        const list = [...(c.documentRequirementsData.mandatoryAll || [])];
-        if (!list[idx]) return c;
-        list[idx] = normalizeMandatoryDocItem({...list[idx], templateFileUrl: fileUrl});
-        return {
-          ...c,
-          documentRequirementsData: {...c.documentRequirementsData, mandatoryAll: list},
-        };
-      });
-      enqueueSnackbar(res.data?.message || "Đã tải mẫu hồ sơ lên.", {variant: "success"});
-    } catch (e) {
-      console.error(e);
-      enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {variant: "error"});
-    } finally {
-      setMandatoryDocUploadingKeys((prev) => {
-        const next = new Set(prev);
-        next.delete(idx);
-        return next;
-      });
-    }
-  }, []);
-
   const handleMethodDocumentTemplateUpload = useCallback(async (gIdx, dIdx, file) => {
     if (!file) return;
     const key = `${gIdx}-${dIdx}`;
@@ -3089,7 +3048,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
     String(bankInfoData.accountNo ?? "").trim() &&
     String(bankInfoData.accountName ?? "").trim()
   );
-  const bankQrPreviewUrl = useMemo(() => buildVietQrQuickImageUrl(bankInfoData), [bankInfoData]);
+  const bankQrPreviewUrl = useMemo(() => buildVietQrImageUrl(bankInfoData, {template: "compact"}), [bankInfoData]);
   const selectedBankOption = useMemo(
     () => vietQrBanks.find((b) => b.bankId === String(bankInfoData.bankId ?? "").trim()) || null,
     [vietQrBanks, bankInfoData.bankId]
@@ -4236,18 +4195,23 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                             <Typography sx={{fontWeight: 700, mb: 1.2}}>Thông tin tài khoản</Typography>
                             <Stack spacing={1.3}>
                               <TextField
-                                label="Số tài khoản"
-                                value={bankInfoData.accountNo ?? ""}
+                                label="Số thẻ"
+                                value={formatCardAccountNoForInput(bankInfoData.accountNo)}
                                 onChange={(e) =>
                                   setConfig((c) => ({
                                     ...c,
                                     bankInfoData: {
                                       ...c.bankInfoData,
-                                      accountNo: e.target.value,
+                                      accountNo: sanitizeCardAccountDigits(e.target.value),
                                     },
                                   }))
                                 }
-                                helperText="Hiển thị theo định dạng nhóm 4 số trong preview."
+                                helperText="Nhập đúng 16 chữ số, tự động nhóm theo 4 số."
+                                inputProps={{
+                                  inputMode: "numeric",
+                                  maxLength: 19,
+                                  pattern: "[0-9 ]*",
+                                }}
                                 InputProps={{
                                   startAdornment: (
                                     <InputAdornment position="start">
@@ -4288,7 +4252,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                           <CardContent sx={{p: {xs: 1.8, md: 2.2}}}>
                             <Typography sx={{fontWeight: 700, mb: 0.8}}>Cấu hình QR</Typography>
                             <Typography variant="body2" sx={{color: "#64748b"}}>
-                              Mã QR sẽ được tạo realtime khi có đủ ngân hàng và số tài khoản.
+                              Mã QR sẽ được tạo khi có đủ ngân hàng và số tài khoản.
                             </Typography>
                           </CardContent>
                         </Card>
@@ -4428,7 +4392,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                     const lines = [
                                       `Ngân hàng: ${bankInfoData.bankName || ""}`,
                                       `Bank ID: ${bankInfoData.bankId || ""}`,
-                                      `Số TK: ${bankInfoData.accountNo || ""}`,
+                                      `Số TK: ${formatCardAccountNoForInput(bankInfoData.accountNo) || ""}`,
                                       `Chủ TK: ${bankInfoData.accountName || ""}`,
                                     ];
                                     try {
@@ -4491,7 +4455,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                         (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
                       ).length;
                       const ocrExpanded = mandatoryOcrExpandedIdxs.includes(idx);
-                      const isUploadingMandatoryTemplate = mandatoryDocUploadingKeys.has(idx);
                       const templateFileUrl = doc.templateFileUrl ? String(doc.templateFileUrl).trim() : "";
                       return (
                         <Box
@@ -4564,38 +4527,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                               spacing={0.5}
                               sx={{flexShrink: 0, alignSelf: {xs: "flex-start", sm: "center"}}}
                             >
-                              <input
-                                type="file"
-                                hidden
-                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                                ref={(el) => {
-                                  if (el) mandatoryDocFileInputRefs.current[idx] = el;
-                                  else delete mandatoryDocFileInputRefs.current[idx];
-                                }}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  e.target.value = "";
-                                  if (file) void handleMandatoryDocumentTemplateUpload(idx, file);
-                                }}
-                              />
-                              <Tooltip title="Tải mẫu" slotProps={{tooltip: {sx: {fontSize: "0.75rem"}}}}>
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    color="primary"
-                                    disabled={fieldDisabled || isUploadingMandatoryTemplate}
-                                    onClick={() => mandatoryDocFileInputRefs.current[idx]?.click()}
-                                    aria-label="Tải mẫu"
-                                    sx={blockPointerSx}
-                                  >
-                                    {isUploadingMandatoryTemplate ? (
-                                      <CircularProgress size={18} color="inherit"/>
-                                    ) : (
-                                      <FileUploadOutlinedIcon fontSize="small"/>
-                                    )}
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
                               <Chip
                                 size="small"
                                 label="Bắt buộc"

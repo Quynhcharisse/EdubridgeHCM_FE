@@ -37,6 +37,7 @@ import { ConfirmHighlight } from "../../ui/ConfirmDialog.jsx";
 import { getProfile, updateProfile } from "../../../services/AccountService.jsx";
 import {notifyAuthUserStorageChanged, sanitizeUserForLocalStorage} from "../../../utils/userRole.js";
 import {getSchoolConfigByKey, parseSchoolConfigResponseBody} from "../../../services/SchoolFacilityService.jsx";
+import {buildVietQrImageUrl, formatCardAccountNoDisplay} from "../../../utils/vietQr.js";
 import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
 import { usePlatformMediaImageRules } from "../../../hooks/usePlatformMediaImageRules.js";
 import { CircleMarker, MapContainer, TileLayer, useMap } from "react-leaflet";
@@ -283,19 +284,6 @@ function imageItemIsUsage(item) {
     if (typeof item.isUsage === "boolean") return item.isUsage;
     if (typeof item.usage === "boolean") return item.usage;
     return true;
-}
-
-function buildVietQrImageUrl(bankInfo) {
-    const bankId = String(bankInfo?.bankId ?? "").trim();
-    const accountNo = String(bankInfo?.accountNo ?? "").trim();
-    if (!bankId || !accountNo) return "";
-    const template = "compact2";
-    const params = new URLSearchParams();
-    const accountName = String(bankInfo?.accountName ?? "").trim();
-    if (accountName) params.set("accountName", accountName);
-    const query = params.toString();
-    const base = `https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNo)}-${template}.png`;
-    return query ? `${base}?${query}` : base;
 }
 
 function RecenterMap({ center, zoom = 15 }) {
@@ -793,7 +781,7 @@ export default function SchoolProfile() {
     const campusLongitude = Number(campus.longitude);
     const hasCampusLatLng = Number.isFinite(campusLatitude) && Number.isFinite(campusLongitude);
     const campusMapCenter = hasCampusLatLng ? [campusLatitude, campusLongitude] : DEFAULT_MAP_CENTER;
-    const vietQrUrl = useMemo(() => buildVietQrImageUrl(bankInfoData), [bankInfoData]);
+    const vietQrUrl = useMemo(() => buildVietQrImageUrl(bankInfoData, {template: "compact"}), [bankInfoData]);
     const formLatitude = Number(formValues.latitude);
     const formLongitude = Number(formValues.longitude);
     const hasFormLatLng = Number.isFinite(formLatitude) && Number.isFinite(formLongitude);
@@ -1249,7 +1237,7 @@ export default function SchoolProfile() {
                             <Stack spacing={1}>
                                 <MiniInfoCard label="Mã ngân hàng" value={bankInfoData.bankId} />
                                 <MiniInfoCard label="Tên ngân hàng" value={bankInfoData.bankName} />
-                                <MiniInfoCard label="Số tài khoản" value={bankInfoData.accountNo} />
+                                <MiniInfoCard label="Số thẻ" value={formatCardAccountNoDisplay(bankInfoData.accountNo)} />
                                 <MiniInfoCard label="Tên chủ tài khoản" value={bankInfoData.accountName} />
                             </Stack>
                             <Box

@@ -847,10 +847,10 @@ export default function SchoolCampaigns() {
                     if (depositEndIso && !depositEnd) rowErr.depositEndDate = "Hạn đóng phí không hợp lệ";
                     if (confirmationEndIso && !confirmationEnd) rowErr.confirmationEndDate = "Hạn xác nhận nhập học không hợp lệ";
                     if (rowStart && rowEnd && depositEnd && depositEnd.getTime() <= rowEnd.getTime()) {
-                        rowErr.depositEndDate = "Hạn đóng phí phải sau hoặc bằng ngày kết thúc phương thức";
+                        rowErr.depositEndDate = "Hạn đóng phí phải sau ngày kết thúc phương thức";
                     }
                     if (depositEnd && confirmationEnd && confirmationEnd.getTime() <= depositEnd.getTime()) {
-                        rowErr.confirmationEndDate = "Hạn xác nhận nhập học phải sau hoặc bằng hạn đóng phí";
+                        rowErr.confirmationEndDate = "Hạn xác nhận nhập học phải sau hạn đóng phí";
                     }
                     if (campaignEnd && confirmationEnd && confirmationEnd.getTime() > campaignEnd.getTime()) {
                         rowErr.confirmationEndDate = "Hạn xác nhận nhập học không được vượt quá ngày kết thúc chiến dịch";
