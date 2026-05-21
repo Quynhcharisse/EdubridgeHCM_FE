@@ -358,8 +358,14 @@ export function pickAdmissionReservationFormTemplateIdFromBody(body, studentProf
         return Math.trunc(fromExplicit);
     }
     const bodyId = Number(body.id);
-    if (Number.isFinite(bodyId) && bodyId > 0 && (!Number.isFinite(sid) || sid <= 0 || bodyId !== sid)) {
-        return Math.trunc(bodyId);
+    if (Number.isFinite(bodyId) && bodyId > 0) {
+        // If the body has a dedicated studentProfileId field, body.id is always the template record ID.
+        const hasExplicitSid =
+            body.studentProfileId != null || body.studentId != null || body.student?.id != null;
+        if (hasExplicitSid) return Math.trunc(bodyId);
+        // No studentProfileId in body: skip body.id only if it equals the caller-supplied sid,
+        // which would mean the endpoint returned the student record, not a template record.
+        if (!Number.isFinite(sid) || sid <= 0 || bodyId !== sid) return Math.trunc(bodyId);
     }
     return null;
 }
@@ -423,7 +429,10 @@ export function hasSavedReservationTemplateForStudent(body, studentProfileId) {
     const bodySid = pickStudentProfileIdFromTemplateBody(body);
     if (bodySid != null && bodySid !== sid) return false;
     if (bodySid === sid) return true;
-    return templateBodyBelongsToStudent(body, sid);
+    // bodySid == null: body doesn't carry studentProfileId (BE omits it).
+    // The template was fetched by studentProfileId query param, so if it has
+    // saved content it belongs to this student.
+    return true;
 }
 
 export function pickProfileMetaDataFromTemplate(body) {
