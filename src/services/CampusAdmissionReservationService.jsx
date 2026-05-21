@@ -57,6 +57,15 @@ export const getAdmissionCampaigns = async () => {
     return Array.isArray(body) ? body : [];
 };
 
+export const batchConfirmAdmissionReservationForms = async (admissionReservationFormInfos) => {
+    const response = await axiosClient.put(
+        "/campus/admission/reservation/forms",
+        {admissionReservationFormInfos},
+        {headers: {"X-Device-Type": "web"}},
+    );
+    return response?.data ?? response;
+};
+
 export const autoApproveAdmissionReservations = async (admissionCampaignId) => {
     const response = await axiosClient.put(
         "/campus/approve/auto/admission/reservation/form",

@@ -97,6 +97,17 @@ function isImageUrl(url) {
     return /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
 }
 
+function generateDocKeyFromName(name) {
+    return name
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .normalize('NFD')
+        .replace(new RegExp('[\\u0300-\\u036f]', 'g'), '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
 function updateMandatoryDocScalars(setAdmissionTemplateForm, docIdx, patch) {
     setAdmissionTemplateForm((prev) => {
         const nextDocs = Array.isArray(prev.mandatoryAllDocumentRequirements)
@@ -2896,8 +2907,13 @@ export default function AdminPlatformSettings() {
                                                         value={doc?.name ?? ""}
                                                         disabled={mandatoryRowDisabled}
                                                         onChange={(e) => {
+                                                            const newName = e.target.value;
+                                                            const currentCode = doc?.code ?? "";
+                                                            const prevAutoCode = generateDocKeyFromName(doc?.name ?? "");
+                                                            const shouldAutoCode = currentCode === "" || currentCode === prevAutoCode;
                                                             updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
-                                                                name: e.target.value,
+                                                                name: newName,
+                                                                ...(shouldAutoCode && { code: generateDocKeyFromName(newName) }),
                                                             });
                                                         }}
                                                         placeholder="VD: Bản sao Giấy khai sinh"
