@@ -455,9 +455,16 @@ const formatSectionDateLabel = (value) => {
     return date.toLocaleDateString("vi-VN", {day: "2-digit", month: "2-digit", year: "numeric"});
 };
 
+/** Header cửa sổ chat phụ huynh — màu đặc (không gradient trắng), không hiển thị tư vấn viên. */
+const PARENT_CHAT_WINDOW_HEADER_BG = BRAND_NAVY;
+const PARENT_CHAT_WINDOW_HEADER_BG_UNREAD = '#b45309';
+const PARENT_CHAT_HEADER_SCHOOL_COLOR = '#ffffff';
+const PARENT_CHAT_HEADER_STUDENT_COLOR = 'rgba(255, 255, 255, 0.9)';
+const PARENT_CHAT_HEADER_ICON_COLOR = 'rgba(255, 255, 255, 0.92)';
+const PARENT_CHAT_HEADER_ICON_HOVER_BG = 'rgba(255, 255, 255, 0.14)';
+
 const STUDENT_CHAT_THEMES = [
     {
-        headerGradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 52%, #38bdf8 100%)',
         bubbleGradient: 'linear-gradient(145deg, #38bdf8 0%, #3b82f6 52%, #2563eb 100%)',
         accent: '#2563eb',
         accentSoft: 'rgba(59, 130, 246, 0.16)',
@@ -465,7 +472,6 @@ const STUDENT_CHAT_THEMES = [
         peerAvatar: '#2563eb',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #065f46 0%, #059669 55%, #2dd4bf 100%)',
         bubbleGradient: 'linear-gradient(145deg, #2dd4bf 0%, #059669 52%, #065f46 100%)',
         accent: '#047857',
         accentSoft: 'rgba(5, 150, 105, 0.16)',
@@ -473,7 +479,6 @@ const STUDENT_CHAT_THEMES = [
         peerAvatar: '#065f46',
     },
     {
-        headerGradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 55%, #f59e0b 100%)',
         bubbleGradient: 'linear-gradient(145deg, #f59e0b 0%, #ea580c 52%, #7c2d12 100%)',
         accent: '#c2410c',
         accentSoft: 'rgba(234, 88, 12, 0.16)',
@@ -513,6 +518,22 @@ const normalizeParentStudent = (student, index) => {
 
 const getConversationDisplayTitle = (c) =>
     c?.title || c?.name || c?.schoolName || c?.school || 'Cuộc trò chuyện';
+
+/** Tiêu đề trường trong header chat — không ghép tên campus. */
+const getParentChatSchoolDisplayName = (conversation) => {
+    const schoolName = String(conversation?.schoolName ?? conversation?.school ?? '').trim();
+    if (schoolName) return schoolName;
+    const title = String(conversation?.title ?? conversation?.name ?? '').trim();
+    const campusName = String(conversation?.campusName ?? '').trim();
+    if (title && campusName) {
+        const stripped = title
+            .replace(new RegExp(`\\s*[-–|•]\\s*${campusName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '')
+            .replace(new RegExp(`^${campusName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[-–|•]\\s*`, 'i'), '')
+            .trim();
+        if (stripped) return stripped;
+    }
+    return title || 'Cuộc trò chuyện';
+};
 
 const pickConversationSchoolLogoUrl = (c) => {
     if (!c || typeof c !== "object") return "";
@@ -867,6 +888,10 @@ function MainHeader() {
         const studentIndex = Math.max(0, selectedParentStudent?.index ?? 0);
         return STUDENT_CHAT_THEMES[studentIndex % STUDENT_CHAT_THEMES.length];
     }, [selectedParentStudent]);
+    const parentChatSchoolName = useMemo(
+        () => getParentChatSchoolDisplayName(selectedConversation),
+        [selectedConversation]
+    );
     const selectedStudentName =
         selectedConversation?.studentName ||
         selectedConversation?.childName ||
@@ -892,31 +917,6 @@ function MainHeader() {
 
     const selectedConversationTitle = useMemo(
         () => getConversationDisplayTitle(selectedConversation),
-        [selectedConversation]
-    );
-    const selectedCounsellorEmail = useMemo(
-        () =>
-            (
-                selectedConversation?.counsellorEmail ||
-                selectedConversation?.participantEmail ||
-                selectedConversation?.otherUser ||
-                ""
-            )
-                .toString()
-                .trim(),
-        [selectedConversation]
-    );
-    const selectedConversationCampusName = useMemo(
-        () =>
-            (
-                selectedConversation?.campusName ||
-                selectedConversation?.campus?.name ||
-                selectedConversation?.campusTitle ||
-                selectedConversation?.campusLabel ||
-                ""
-            )
-                .toString()
-                .trim(),
         [selectedConversation]
     );
     const peerChatInitial = useMemo(() => {
@@ -3307,7 +3307,7 @@ function MainHeader() {
                                             <Box sx={{maxHeight: 420, overflowY: 'auto'}}>
                                                 {filteredConversationItems.map((conversation, index) => {
                                                     const conversationId = conversation?.id || conversation?.conversationId;
-                                                    const conversationName = conversation?.title || conversation?.name || conversation?.schoolName || conversation?.participantName || 'Cuộc trò chuyện';
+                                                    const conversationName = getParentChatSchoolDisplayName(conversation);
                                                     const studentDisplayName = String(
                                                         conversation?.studentName || conversation?.childName || ''
                                                     ).trim();
@@ -3439,107 +3439,73 @@ function MainHeader() {
                                         <Box
                                             sx={{
                                                 px: 1.5,
-                                                py: 0.85,
+                                                py: 1.1,
                                                 display: 'flex',
                                                 alignItems: 'flex-start',
                                                 justifyContent: 'space-between',
-                                                background: parentChatHasUnread
-                                                    ? 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)'
-                                                    : selectedStudentTheme.headerGradient,
-                                                borderBottom: '1px solid rgba(255,255,255,0.12)',
+                                                gap: 1,
+                                                bgcolor: parentChatHasUnread
+                                                    ? PARENT_CHAT_WINDOW_HEADER_BG_UNREAD
+                                                    : PARENT_CHAT_WINDOW_HEADER_BG,
+                                                borderBottom: parentChatHasUnread
+                                                    ? '1px solid rgba(254, 215, 170, 0.45)'
+                                                    : '1px solid rgba(147, 197, 253, 0.35)',
                                                 flexShrink: 0
                                             }}
                                         >
-                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0}}>
+                                            <Box sx={{display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0, flex: 1}}>
                                                 <Avatar
                                                     src={peerSchoolLogoUrl || undefined}
                                                     sx={{
                                                         width: 36,
                                                         height: 36,
-                                                        mt: 0.15,
-                                                        bgcolor: 'rgba(255,255,255,0.22)',
+                                                        mt: 0.1,
+                                                        flexShrink: 0,
+                                                        bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                                        color: BRAND_NAVY,
                                                         fontSize: 15,
                                                         fontWeight: 800,
-                                                        border: '2px solid rgba(255,255,255,0.35)'
+                                                        border: '2px solid rgba(255, 255, 255, 0.85)',
+                                                        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)'
                                                     }}
                                                 >
                                                     {peerChatInitial}
                                                 </Avatar>
-                                                <Box
-                                                    sx={{
-                                                        minWidth: 0,
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        alignItems: 'flex-start',
-                                                        justifyContent: 'center',
-                                                        gap: 0.4
-                                                    }}
-                                                >
+                                                <Box sx={{minWidth: 0, flex: 1, pr: 0.5}}>
                                                     <Typography
                                                         sx={{
-                                                            fontSize: 14,
-                                                            fontWeight: 500,
-                                                            color: '#fff',
-                                                            lineHeight: 1.35,
-                                                            m: 0,
-                                                            display: 'block',
+                                                            fontSize: 13.5,
+                                                            fontWeight: 700,
+                                                            color: PARENT_CHAT_HEADER_SCHOOL_COLOR,
+                                                            lineHeight: 1.4,
+                                                            letterSpacing: '-0.01em',
                                                             whiteSpace: 'normal',
-                                                            overflowWrap: 'break-word',
-                                                            wordBreak: 'break-word'
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'anywhere'
                                                         }}
                                                     >
-                                                        {selectedConversationTitle}
+                                                        {parentChatSchoolName}
                                                     </Typography>
-                                                    {!!selectedCounsellorEmail && (
-                                                        <Typography
-                                                            sx={{
-                                                                fontSize: 10.5,
-                                                                color: 'rgba(255,255,255,0.85)',
-                                                                maxWidth: 220,
-                                                                lineHeight: 1.2,
-                                                                m: 0,
-                                                                display: 'block'
-                                                            }}
-                                                            noWrap
-                                                        >
-                                                            Tư vấn viên: {selectedCounsellorEmail}
-                                                        </Typography>
-                                                    )}
-                                                    {!!selectedConversationCampusName && (
-                                                        <Typography
-                                                            sx={{
-                                                                fontSize: 10.5,
-                                                                color: 'rgba(255,255,255,0.85)',
-                                                                maxWidth: 220,
-                                                                lineHeight: 1.2,
-                                                                m: 0,
-                                                                display: 'block'
-                                                            }}
-                                                            noWrap
-                                                        >
-                                                             {selectedConversationCampusName}
-                                                        </Typography>
-                                                    )}
                                                     <Box
                                                         sx={{
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            gap: 0.5,
-                                                            maxWidth: '100%',
-                                                            minHeight: 20
+                                                            gap: 0.35,
+                                                            mt: 0.35,
+                                                            minWidth: 0,
+                                                            flexWrap: 'wrap'
                                                         }}
                                                     >
                                                         <Typography
                                                             component="span"
                                                             sx={{
-                                                                fontSize: 10.5,
+                                                                fontSize: 12.5,
                                                                 fontWeight: 600,
-                                                                color: 'rgba(255,255,255,0.9)',
-                                                                lineHeight: 1.2,
-                                                                display: 'inline-block',
-                                                                m: 0
+                                                                color: PARENT_CHAT_HEADER_STUDENT_COLOR,
+                                                                lineHeight: 1.35,
+                                                                whiteSpace: 'normal',
+                                                                wordBreak: 'break-word'
                                                             }}
-                                                            noWrap
                                                         >
                                                             Học sinh: {selectedStudentName}
                                                         </Typography>
@@ -3555,39 +3521,47 @@ function MainHeader() {
                                                             sx={{
                                                                 flexShrink: 0,
                                                                 p: 0,
-                                                                width: 24,
-                                                                height: 24,
-                                                                minWidth: 24,
-                                                                minHeight: 24,
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                color: 'rgba(255,255,255,0.95)',
+                                                                width: 22,
+                                                                height: 22,
+                                                                minWidth: 22,
+                                                                minHeight: 22,
+                                                                color: PARENT_CHAT_HEADER_ICON_COLOR,
                                                                 bgcolor: 'transparent',
                                                                 border: 'none',
                                                                 borderRadius: 0,
-                                                                transition: 'transform 0.22s ease, opacity 0.22s ease',
-                                                                opacity: studentInfoOpen ? 1 : 0.92,
-                                                                transform: studentInfoOpen ? 'scale(1.08)' : 'scale(1)',
-                                                                '&:hover': {bgcolor: 'rgba(255,255,255,0.12)'}
+                                                                boxShadow: 'none',
+                                                                transition: 'opacity 0.2s ease',
+                                                                opacity: studentInfoOpen ? 1 : 0.88,
+                                                                '&:hover': {
+                                                                    bgcolor: 'transparent',
+                                                                    opacity: 1
+                                                                }
                                                             }}
                                                         >
-                                                            <InfoOutlinedIcon
-                                                                sx={{
-                                                                    fontSize: 14,
-                                                                    transition: 'transform 0.22s ease',
-                                                                    transform: studentInfoOpen ? 'rotate(12deg)' : 'none'
-                                                                }}
-                                                            />
+                                                            <InfoOutlinedIcon sx={{fontSize: 18}} />
                                                         </IconButton>
                                                     </Box>
                                                 </Box>
                                             </Box>
-                                            <Box sx={{display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0, alignSelf: 'flex-start'}}>
-                                                <IconButton size="small" onClick={handleMinimizeChatWindow} sx={{color: 'rgba(255,255,255,0.92)'}}>
+                                            <Box sx={{display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0, pt: 0.1}}>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={handleMinimizeChatWindow}
+                                                    sx={{
+                                                        color: PARENT_CHAT_HEADER_ICON_COLOR,
+                                                        '&:hover': {bgcolor: PARENT_CHAT_HEADER_ICON_HOVER_BG}
+                                                    }}
+                                                >
                                                     <RemoveIcon sx={{fontSize: 18}}/>
                                                 </IconButton>
-                                                <IconButton size="small" onClick={handleCloseChatWindow} sx={{color: 'rgba(255,255,255,0.92)'}}>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={handleCloseChatWindow}
+                                                    sx={{
+                                                        color: PARENT_CHAT_HEADER_ICON_COLOR,
+                                                        '&:hover': {bgcolor: PARENT_CHAT_HEADER_ICON_HOVER_BG}
+                                                    }}
+                                                >
                                                     <CloseIcon sx={{fontSize: 18}}/>
                                                 </IconButton>
                                             </Box>

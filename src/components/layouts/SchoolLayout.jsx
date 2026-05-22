@@ -3,14 +3,15 @@ import { Box, Drawer, Fade } from "@mui/material";
 import { ThemeProvider, createTheme, useTheme } from "@mui/material/styles";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SchoolProvider } from "../../contexts/SchoolContext.jsx";
-import { ROLE_SHELL_HEADER_HEIGHT_PX } from "../../constants/appShellLayout.js";
+import {
+  ROLE_SHELL_HEADER_HEIGHT_PX,
+  ROLE_SHELL_SIDEBAR_WIDTH_COLLAPSED_PX,
+  ROLE_SHELL_SIDEBAR_WIDTH_EXPANDED_PX,
+  ROLE_SHELL_SIDEBAR_WIDTH_TRANSITION,
+} from "../../constants/appShellLayout.js";
 import SchoolAuthHeader from "../Page/school/SchoolAuthHeader.jsx";
 import SchoolSidebar from "../partials/SchoolSidebar.jsx";
 import SchoolChatbot from "../ui/SchoolChatbot.jsx";
-
-const SIDEBAR_WIDTH_EXPANDED = 240;
-const SIDEBAR_WIDTH_COLLAPSED = 72;
-const SIDEBAR_WIDTH_TRANSITION = "280ms cubic-bezier(0.4, 0, 0.2, 1)";
 
 /** Phông chữ dùng cho toàn bộ trang School (sidebar + nội dung) */
 const SCHOOL_FONT = '"Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -59,7 +60,9 @@ export default function SchoolLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const sidebarWidth = sidebarCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
+  const sidebarWidth = sidebarCollapsed
+    ? ROLE_SHELL_SIDEBAR_WIDTH_COLLAPSED_PX
+    : ROLE_SHELL_SIDEBAR_WIDTH_EXPANDED_PX;
 
   const HEADER_HEIGHT = ROLE_SHELL_HEADER_HEIGHT_PX;
 
@@ -99,7 +102,7 @@ export default function SchoolLayout() {
           zIndex: 1100,
           width: sidebarWidth,
           flexShrink: 0,
-          transition: `width ${SIDEBAR_WIDTH_TRANSITION}`,
+          transition: `width ${ROLE_SHELL_SIDEBAR_WIDTH_TRANSITION}`,
           "& .MuiDrawer-paper": {
             width: sidebarWidth,
             boxSizing: "border-box",
@@ -113,7 +116,7 @@ export default function SchoolLayout() {
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            transition: `width ${SIDEBAR_WIDTH_TRANSITION}`,
+            transition: `width ${ROLE_SHELL_SIDEBAR_WIDTH_TRANSITION}`,
             boxShadow: "2px 0 8px rgba(0,0,0,0.04)",
           },
         }}
