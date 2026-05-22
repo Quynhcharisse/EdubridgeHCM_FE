@@ -172,6 +172,11 @@ function DocumentItem({
     onRemoveSlot,
     onViewImage,
 }) {
+    const filledSlotCount = doc.slots.filter(
+        (url) => typeof url === 'string' && url.trim() !== '',
+    ).length;
+    if (readOnly && filledSlotCount === 0) return null;
+
     const slotCount = doc.slots.length;
     const isMultiSlot = slotCount > 1;
 
@@ -217,6 +222,9 @@ function DocumentItem({
                 }}
             >
                 {doc.slots.map((url, slotIndex) => {
+                    const hasUrl = typeof url === 'string' && url.trim() !== '';
+                    if (readOnly && !hasUrl) return null;
+
                     const slotKey = `${docIndex}-${slotIndex}`;
                     const isUploading = uploadingSlots.has(slotKey);
                     const slotLabel = isMultiSlot

@@ -272,11 +272,16 @@ function ReservationCard({
     const confirmEnrollmentLoading =
         confirmEnrollmentLoadingId != null &&
         Number(confirmEnrollmentLoadingId) === Number(reservation?.admissionFormId ?? reservation?.id);
+    const confirmCode = isDisplayableValue(reservation?.confirmCode) ? reservation.confirmCode : null;
     const cardTitle = isDisplayableValue(reservation?.schoolName)
-        ? reservation.schoolName
-        : isDisplayableValue(reservation?.studentName)
-          ? reservation.studentName
-          : "Đơn đăng ký";
+        ? confirmCode
+            ? `${reservation.schoolName} - ${confirmCode}`
+            : reservation.schoolName
+        : confirmCode
+          ? confirmCode
+          : isDisplayableValue(reservation?.studentName)
+            ? reservation.studentName
+            : "Đơn đăng ký";
     const submittedDate = formatDateOnly(reservation?.createdTime);
 
     return (
@@ -332,25 +337,15 @@ function ReservationCard({
                                 {reservation.programName}
                             </Typography>
                         ) : null}
-                        {isDisplayableValue(reservation?.studentCode) ? (
+                        {isDisplayableValue(reservation?.studentName) ? (
                             <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
-                                CCCD học sinh: {reservation.studentCode}
+                                Học sinh:{" "}
+                                <Box component="span" sx={{fontWeight: 700, color: "#1e293b"}}>
+                                    {reservation.studentName}
+                                </Box>
                             </Typography>
                         ) : null}
-                        {isDisplayableValue(
-                            formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth,
-                        ) ? (
-                            <Typography sx={{fontSize: 13.5, color: "#64748b", mb: 0.75}}>
-                                Ngày sinh:{" "}
-                                {formatReservationDateOfBirth(reservation?.dateOfBirth) || reservation?.dateOfBirth}
-                            </Typography>
-                        ) : null}
-                        {statusHint ? (
-                            <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mb: 0.75}}>
-                                {statusHint}
-                            </Typography>
-                        ) : null}
-                        <Stack spacing={0.75}>
+                        <Stack spacing={0.75} sx={{mb: statusHint ? 1 : 0}}>
                             {isDisplayableValue(reservation?.campusName) ? (
                                 <Stack direction="row" alignItems="center" spacing={0.75}>
                                     <LocationOnRoundedIcon sx={{fontSize: 18, color: "#64748b"}} />
@@ -364,19 +359,12 @@ function ReservationCard({
                                     Ngày nộp: {submittedDate}
                                 </Typography>
                             ) : null}
-                            {normalizedStatus === RESERVATION_STATUS.CONFIRMED &&
-                            isDisplayableValue(reservation?.confirmCode) ? (
-                                <Typography
-                                    sx={{
-                                        fontSize: 13.5,
-                                        color: "#0369a1",
-                                        fontWeight: 600,
-                                    }}
-                                >
-                                    Mã hồ sơ: {reservation.confirmCode}
-                                </Typography>
-                            ) : null}
                         </Stack>
+                        {statusHint ? (
+                            <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mt: 0.25}}>
+                                {statusHint}
+                            </Typography>
+                        ) : null}
                     </Box>
                 </Stack>
                 <Stack

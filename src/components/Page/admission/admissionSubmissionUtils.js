@@ -6,6 +6,32 @@ import {
 export const HOC_BA_THCS_CODE = 'HOC_BA';
 export const HOC_BA_THCS_GRADE_LABELS = ['Lớp 6', 'Lớp 7', 'Lớp 8', 'Lớp 9'];
 
+const TRANSCRIPT_DOCUMENT_KEYS = new Set(['HOC_BA', 'HOC_BA_THCS']);
+
+export function parseSubmissionImageUrls(raw) {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) {
+        return raw.flatMap((item) => parseSubmissionImageUrls(item));
+    }
+    let s = String(raw).trim();
+    if (!s || s.toLowerCase() === 'null') return [];
+    if (s.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(s);
+            if (Array.isArray(parsed)) return parsed.flatMap((item) => parseSubmissionImageUrls(item));
+        } catch {
+            s = s.replace(/^\[+|\]+$/g, '').trim();
+        }
+    }
+    s = s.replace(/^["']+|["']+$/g, '').trim();
+    if (!s || !/^https?:\/\//i.test(s)) return [];
+    return [s];
+}
+
+function submissionDocHasUploadedImage(doc) {
+    return parseSubmissionImageUrls(doc?.imageUrl ?? doc?.url).length > 0;
+}
+
 export const DOCUMENT_LABELS = {
     HOC_BA: 'Học bạ',
     GIAY_KSTN: 'Giấy khai sinh',
@@ -402,13 +428,7 @@ function templateBodyHasSavedContent(body) {
     if (!body || typeof body !== 'object') return false;
     if (body.isApplied === true || body.isApplied === 'true') return true;
     const meta = pickProfileMetaDataFromTemplate(body);
-    if (
-        meta.some(
-            (d) =>
-                Array.isArray(d?.imageUrl) &&
-                d.imageUrl.some((u) => typeof u === 'string' && u.trim() !== ''),
-        )
-    ) {
+    if (meta.some((d) => submissionDocHasUploadedImage(d))) {
         return true;
     }
     const transcripts = body.transcriptImages;
@@ -453,9 +473,7 @@ export function pickCheckedDocumentsFromReservation(item) {
     for (const doc of pickProfileMetaDataFromTemplate(item)) {
         const key = String(doc?.key ?? doc?.code ?? '').trim();
         if (!key) continue;
-        const urls = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
-        const hasImage = urls.some((u) => u != null && String(u).trim() !== '');
-        if (hasImage) keys.add(key);
+        if (submissionDocHasUploadedImage(doc)) keys.add(key);
     }
     const transcripts = Array.isArray(item.transcriptImages) ? item.transcriptImages : [];
     if (transcripts.some((t) => t?.imageUrl != null && String(t.imageUrl).trim() !== '')) {
@@ -562,23 +580,20 @@ export function submissionDocumentsToReadonlyDocs(submissionDocuments) {
     if (!Array.isArray(submissionDocuments)) return [];
     return submissionDocuments
         .map((doc) => {
-            const code = String(doc?.key ?? doc?.code ?? '').trim();
-            if (!code) return null;
-            let urls = Array.isArray(doc?.imageUrl) ? doc.imageUrl : [];
-            urls = urls
-                .map((u) => (typeof u === 'string' ? u.trim() : ''))
-                .filter((u) => u !== '');
-            if (!urls.length && doc?.url != null && String(doc.url).trim() !== '') {
-                urls = [String(doc.url).trim()];
-            }
+            const code = String(doc?.key ?? doc?.code ?? '').trim().toUpperCase();
+            if (!code || TRANSCRIPT_DOCUMENT_KEYS.has(code)) return null;
+
+            const urls = parseSubmissionImageUrls(doc?.imageUrl ?? doc?.url);
             if (!urls.length) return null;
-            const slotCount = code === HOC_BA_THCS_CODE ? HOC_BA_THCS_GRADE_LABELS.length : urls.length;
-            const slots = Array.from({length: slotCount}, (_, i) => urls[i] ?? null);
+
+            const label = String(doc?.name ?? '').trim() || documentLabelForCode(code);
+            const required = doc?.required !== false && doc?.required !== 'false';
+
             return {
                 code,
-                name: documentLabelForCode(code),
-                required: true,
-                slots,
+                name: label,
+                required,
+                slots: urls.map((url) => url ?? null),
             };
         })
         .filter(Boolean);
@@ -646,9 +661,7 @@ export function applySubmissionPrefillToDocs(docs, submissionDocuments) {
             (s) => String(s?.key ?? s?.code ?? '').trim() === doc.code,
         );
         if (!match) return doc;
-        const urls = (Array.isArray(match.imageUrl) ? match.imageUrl : [])
-            .map((u) => (typeof u === 'string' ? u.trim() : ''))
-            .filter(Boolean);
+        const urls = parseSubmissionImageUrls(match?.imageUrl ?? match?.url);
         if (!urls.length) return doc;
         const slots = doc.slots.map((_, i) => urls[i] ?? null);
         return {...doc, slots};
