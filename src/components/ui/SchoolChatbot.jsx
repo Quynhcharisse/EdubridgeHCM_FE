@@ -16,6 +16,11 @@ import {
 } from '@mui/icons-material';
 import axiosClient from '../../configs/APIConfig.jsx';
 import { APP_PRIMARY_DARK, APP_PRIMARY_MAIN } from '../../constants/homeLandingTheme';
+import {
+    CHATBOT_TYPING_ANIMATION_CSS,
+    ChatbotBotReplyContent,
+    normalizeBotPayload
+} from './chatbotShared.jsx';
 
 const getStoredUser = () => {
     try {
@@ -47,102 +52,6 @@ const getUserInitial = (user) => {
     return nameCandidate.charAt(0).toUpperCase();
 };
 
-const normalizeBotPayload = (responseData) => {
-    const body = responseData?.body ?? responseData;
-    const text = String(body?.summary || body?.message || body?.text || body?.output || '').trim();
-    const details = Array.isArray(body?.details)
-        ? body.details
-              .map((item) => {
-                  if (item && typeof item === 'object') {
-                      const label = String(item?.label || '').trim();
-                      const value = String(item?.value || '').trim();
-                      if (!value) return null;
-                      return { label, value };
-                  }
-                  const textValue = String(item || '').trim();
-                  if (!textValue) return null;
-                  return { label: '', value: textValue };
-              })
-              .filter(Boolean)
-        : [];
-    const source = Array.isArray(body?.source)
-        ? body.source
-              .map((item) => {
-                  if (item && typeof item === 'object') {
-                      return {
-                          fileName: String(item.fileName || '').trim(),
-                          fileUrl: String(item.fileUrl || '').trim()
-                      };
-                  }
-                  const url = String(item || '').trim();
-                  return url ? { fileName: url, fileUrl: url } : null;
-              })
-              .filter(Boolean)
-        : [];
-    return { text, details, source };
-};
-
-const buildSourceViewUrl = (sourceUrl) => {
-    const normalized = String(sourceUrl || '').trim();
-    if (!normalized) return '';
-    return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(normalized)}`;
-};
-
-const parseSourceUrls = (source) => {
-    const raw = String(source || '').trim();
-    if (!raw) return [];
-    return raw.split(';').map((s) => s.trim()).filter(Boolean);
-};
-
-const TRAILING_UUID_RE = /_?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const stripTrailingUuid = (segment) => {
-    let s = String(segment || '').trim();
-    if (!s) return s;
-    let prev;
-    do {
-        prev = s;
-        s = s.replace(TRAILING_UUID_RE, '');
-    } while (s !== prev);
-    return s;
-};
-
-const humanizeStorageSegment = (segment) => {
-    const core = stripTrailingUuid(String(segment || '').trim()).replace(/\.[^.]+$/i, '');
-    return core.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-};
-
-const getSourceLinkLabel = (rawUrl) => {
-    const fallback = String(rawUrl || '').trim();
-    if (!fallback) return '';
-    try {
-        const u = new URL(fallback);
-        const parts = u.pathname.split('/').filter(Boolean);
-        const eduIdx = parts.findIndex((p) => p.toLowerCase() === 'edubridge');
-        const segs = eduIdx >= 0 ? parts.slice(eduIdx + 1) : parts;
-        if (segs.length === 0) return fallback;
-        const last = segs[segs.length - 1];
-        const lastIsFile = /\.[a-z0-9]{2,8}$/i.test(last);
-        const fileExt = lastIsFile ? (last.match(/(\.[^./]+)$/i)?.[1] || '').toLowerCase() : '';
-        const lastNoExt = last.replace(/\.[^.]+$/i, '');
-        const baseCore = stripTrailingUuid(lastNoExt);
-        let chosen = lastNoExt;
-        if (lastIsFile && segs.length >= 2) {
-            const parent = segs[segs.length - 2];
-            chosen = /^(school|campus)_info$/i.test(baseCore) ? parent : lastNoExt;
-        } else if (!lastIsFile) {
-            chosen = last;
-        }
-        const label = humanizeStorageSegment(chosen);
-        if (!label) return fallback;
-        const withExt = fileExt ? `${label}${fileExt}` : label;
-        if (withExt.length > 120) return `${withExt.slice(0, 117)}…`;
-        return withExt;
-    } catch {
-        return fallback;
-    }
-};
-
 const SchoolChatbot = () => {
     const user = getStoredUser();
     const userAvatarUrl = getUserAvatarUrl(user);
@@ -159,8 +68,16 @@ const SchoolChatbot = () => {
     const [inputMessage, setInputMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [isInputDisabled, setIsInputDisabled] = useState(false);
+    const [copiedKey, setCopiedKey] = useState(null);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+
+    const handleCopy = (key, text) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedKey(key);
+            setTimeout(() => setCopiedKey(null), 1500);
+        });
+    };
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -226,7 +143,7 @@ const SchoolChatbot = () => {
                     id: Date.now() + 1,
                     text: status === 400 && serverMessage ? serverMessage : fallbackText,
                     details: [],
-                    source: '',
+                    source: [],
                     sender: 'bot',
                     timestamp: new Date()
                 }
@@ -309,7 +226,6 @@ const SchoolChatbot = () => {
                                 boxShadow: '0 12px 48px rgba(0,0,0,0.15)'
                             }}
                         >
-                            {/* Header */}
                             <Box
                                 sx={{
                                     bgcolor: APP_PRIMARY_MAIN,
@@ -342,7 +258,6 @@ const SchoolChatbot = () => {
                                 </IconButton>
                             </Box>
 
-                            {/* Messages */}
                             <Box
                                 sx={{
                                     flex: 1,
@@ -361,45 +276,41 @@ const SchoolChatbot = () => {
                                     }
                                 }}
                             >
-                                {messages.map((message) => {
-                                    const sourceUrls =
-                                        message.sender === 'bot' && Array.isArray(message.source) ? message.source : [];
-                                    return (
-                                        <Box
-                                            key={message.id}
-                                            sx={{
-                                                display: 'flex',
-                                                justifyContent:
-                                                    message.sender === 'user' ? 'flex-end' : 'flex-start',
-                                                gap: 1.5,
-                                                animation: 'fadeIn 0.3s ease'
-                                            }}
-                                        >
-                                            {message.sender === 'bot' && (
-                                                <Avatar
-                                                    sx={{
-                                                        bgcolor: APP_PRIMARY_MAIN,
-                                                        width: 32,
-                                                        height: 32,
-                                                        order: 0
-                                                    }}
-                                                >
-                                                    <BotIcon sx={{ fontSize: 18 }} />
-                                                </Avatar>
-                                            )}
-                                            <Box
+                                {messages.map((message) => (
+                                    <Box
+                                        key={message.id}
+                                        sx={{
+                                            display: 'flex',
+                                            justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start',
+                                            gap: 1.5,
+                                            animation: 'fadeIn 0.3s ease'
+                                        }}
+                                    >
+                                        {message.sender === 'bot' && (
+                                            <Avatar
                                                 sx={{
-                                                    maxWidth: '75%',
-                                                    bgcolor:
-                                                        message.sender === 'user' ? APP_PRIMARY_MAIN : '#ffffff',
-                                                    color: message.sender === 'user' ? 'white' : '#333',
-                                                    p: 1.5,
-                                                    borderRadius: 2,
-                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                                    order: message.sender === 'user' ? 0 : 1
+                                                    bgcolor: APP_PRIMARY_MAIN,
+                                                    width: 32,
+                                                    height: 32,
+                                                    order: 0
                                                 }}
                                             >
-                                                {message.text && (
+                                                <BotIcon sx={{ fontSize: 18 }} />
+                                            </Avatar>
+                                        )}
+                                        <Box
+                                            sx={{
+                                                maxWidth: '75%',
+                                                bgcolor: message.sender === 'user' ? APP_PRIMARY_MAIN : '#ffffff',
+                                                color: message.sender === 'user' ? 'white' : '#333',
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                                order: message.sender === 'user' ? 0 : 1
+                                            }}
+                                        >
+                                            {message.sender === 'user' ? (
+                                                message.text ? (
                                                     <Typography
                                                         variant="body2"
                                                         sx={{
@@ -410,147 +321,44 @@ const SchoolChatbot = () => {
                                                     >
                                                         {message.text}
                                                     </Typography>
-                                                )}
-                                                {message.sender === 'bot' &&
-                                                    Array.isArray(message.details) &&
-                                                    message.details.length > 0 && (
-                                                        <Box
-                                                            sx={{
-                                                                mt: 1,
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: 0.5
-                                                            }}
-                                                        >
-                                                            {message.details.map((detail, index) => (
-                                                                <Box
-                                                                    key={`${message.id}-detail-${index}`}
-                                                                    sx={{
-                                                                        px: 1,
-                                                                        py: 0.6,
-                                                                        borderRadius: 1.2,
-                                                                        bgcolor: 'rgba(59,130,246,0.08)',
-                                                                        border: '1px solid rgba(59,130,246,0.18)'
-                                                                    }}
-                                                                >
-                                                                    {detail.label ? (
-                                                                        <Typography
-                                                                            variant="caption"
-                                                                            sx={{
-                                                                                display: 'block',
-                                                                                fontSize: '0.75rem',
-                                                                                lineHeight: 1.45,
-                                                                                color: '#334155'
-                                                                            }}
-                                                                        >
-                                                                            <Box
-                                                                                component="span"
-                                                                                sx={{
-                                                                                    fontWeight: 700,
-                                                                                    color: '#0f172a'
-                                                                                }}
-                                                                            >
-                                                                                {detail.label}
-                                                                            </Box>
-                                                                            {' : '}
-                                                                            {detail.value}
-                                                                        </Typography>
-                                                                    ) : (
-                                                                        <Typography
-                                                                            variant="caption"
-                                                                            sx={{
-                                                                                display: 'block',
-                                                                                fontSize: '0.75rem',
-                                                                                lineHeight: 1.45,
-                                                                                color: '#334155'
-                                                                            }}
-                                                                        >
-                                                                            • {detail.value}
-                                                                        </Typography>
-                                                                    )}
-                                                                </Box>
-                                                            ))}
-                                                        </Box>
-                                                    )}
-                                                {sourceUrls.length > 0 && (
-                                                    <Box
-                                                        sx={{
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: 0.5,
-                                                            mt: 0.9
-                                                        }}
-                                                    >
-                                                        {sourceUrls.map((src, idx) => {
-                                                            const key = `${message.id}-source-${idx}`;
-                                                            const label = src.fileName || getSourceLinkLabel(src.fileUrl) || src.fileUrl;
-                                                            return (
-                                                                <Box
-                                                                    key={key}
-                                                                    sx={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 0.5,
-                                                                        px: 1,
-                                                                        py: 0.5,
-                                                                        borderRadius: 1.5,
-                                                                        bgcolor: 'rgba(59,130,246,0.08)',
-                                                                        border: '1px solid rgba(59,130,246,0.18)'
-                                                                    }}
-                                                                >
-                                                                    <Typography
-                                                                        component="a"
-                                                                        href={buildSourceViewUrl(src.fileUrl)}
-                                                                        title={src.fileUrl}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        variant="caption"
-                                                                        sx={{
-                                                                            flex: 1,
-                                                                            fontSize: '0.75rem',
-                                                                            textDecoration: 'underline',
-                                                                            color: APP_PRIMARY_MAIN,
-                                                                            wordBreak: 'break-word'
-                                                                        }}
-                                                                    >
-                                                                        {label}
-                                                                    </Typography>
-                                                                </Box>
-                                                            );
-                                                        })}
-                                                    </Box>
-                                                )}
-                                                <Typography
-                                                    variant="caption"
-                                                    sx={{ display: 'block', mt: 0.5, opacity: 0.7, fontSize: '0.7rem' }}
-                                                >
-                                                    {message.timestamp.toLocaleTimeString('vi-VN', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </Typography>
-                                            </Box>
-                                            {message.sender === 'user' && (
-                                                <Avatar
-                                                    src={userAvatarUrl || undefined}
-                                                    sx={{
-                                                        bgcolor: '#dbeafe',
-                                                        color: APP_PRIMARY_MAIN,
-                                                        width: 32,
-                                                        height: 32,
-                                                        order: 1
-                                                    }}
-                                                >
-                                                    {!userAvatarUrl && (
-                                                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                                                            {userInitial}
-                                                        </Typography>
-                                                    )}
-                                                </Avatar>
+                                                ) : null
+                                            ) : (
+                                                <ChatbotBotReplyContent
+                                                    message={message}
+                                                    copiedKey={copiedKey}
+                                                    onCopy={handleCopy}
+                                                />
                                             )}
+                                            <Typography
+                                                variant="caption"
+                                                sx={{ display: 'block', mt: 0.5, opacity: 0.7, fontSize: '0.7rem' }}
+                                            >
+                                                {message.timestamp.toLocaleTimeString('vi-VN', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </Typography>
                                         </Box>
-                                    );
-                                })}
+                                        {message.sender === 'user' && (
+                                            <Avatar
+                                                src={userAvatarUrl || undefined}
+                                                sx={{
+                                                    bgcolor: '#dbeafe',
+                                                    color: APP_PRIMARY_MAIN,
+                                                    width: 32,
+                                                    height: 32,
+                                                    order: 1
+                                                }}
+                                            >
+                                                {!userAvatarUrl && (
+                                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                                                        {userInitial}
+                                                    </Typography>
+                                                )}
+                                            </Avatar>
+                                        )}
+                                    </Box>
+                                ))}
                                 {isSending && (
                                     <Box
                                         sx={{
@@ -632,7 +440,6 @@ const SchoolChatbot = () => {
                                 <div ref={messagesEndRef} />
                             </Box>
 
-                            {/* Input */}
                             <Box
                                 sx={{
                                     p: 2,
@@ -701,32 +508,7 @@ const SchoolChatbot = () => {
                 />
             )}
 
-            <style>
-                {`
-                    @keyframes pulse {
-                        0%, 100% { transform: scale(1); }
-                        50% { transform: scale(1.05); }
-                    }
-                    @keyframes fadeIn {
-                        from { opacity: 0; transform: translateY(10px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-                    @keyframes typingDots {
-                        0%, 70%, 100% {
-                            transform: translateY(0);
-                            opacity: 0.35;
-                        }
-                        35% {
-                            transform: translateY(-5px);
-                            opacity: 1;
-                        }
-                    }
-                    @keyframes typingLabelPulse {
-                        0%, 100% { opacity: 0.72; }
-                        50% { opacity: 1; }
-                    }
-                `}
-            </style>
+            <style>{CHATBOT_TYPING_ANIMATION_CSS}</style>
         </>
     );
 };

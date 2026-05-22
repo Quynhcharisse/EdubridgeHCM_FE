@@ -181,36 +181,119 @@ export async function getPublicSchoolCampaignTemplates(schoolId, year = 0) {
     return [];
 }
 
-export async function searchNearbyCampuses({lat, lng, radius = 10}) {
-    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return [];
-    const params = {
-        lat: Number(lat),
-        lng: Number(lng),
-        radius: Number(radius)
-    };
-    const endpoints = [
-        "/school/campus/search/nearby",
-        "/campus/search-nearby"
-    ];
-    const pickBodyList = (response) => {
-        const body = response?.data?.body;
-        if (Array.isArray(body)) return body;
-        if (Array.isArray(body?.items)) return body.items;
-        if (Array.isArray(body?.content)) return body.content;
-        if (Array.isArray(body?.campusList)) return body.campusList;
-        return [];
-    };
+/** Khoảng cách Haversine (km) giữa hai tọa độ WGS84. */
+export function haversineDistanceKm(lat1, lng1, lat2, lng2) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const aLat = Number(lat1);
+    const aLng = Number(lng1);
+    const bLat = Number(lat2);
+    const bLng = Number(lng2);
+    if (![aLat, aLng, bLat, bLng].every(Number.isFinite)) return null;
+    const dLat = toRad(bLat - aLat);
+    const dLng = toRad(bLng - aLng);
+    const rLat1 = toRad(aLat);
+    const rLat2 = toRad(bLat);
+    const h =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
 
+/** Chuẩn hoá danh sách campus từ JSON (BE EduBridge, API thứ 3, hoặc mảng thuần). */
+function pickNearbyCampusList(payload) {
+    if (Array.isArray(payload)) return payload;
+    const body = payload?.body ?? payload?.data?.body ?? payload?.data;
+    if (Array.isArray(body)) return body;
+    if (Array.isArray(body?.items)) return body.items;
+    if (Array.isArray(body?.content)) return body.content;
+    if (Array.isArray(body?.campusList)) return body.campusList;
+    return [];
+}
+
+/**
+ * Tính campus trong bán kính từ campusList đã có (public detail) — không cần API ngoài.
+ */
+export function searchNearbyCampusesFromCampusList(campusList, {lat, lng, radius = 10, schoolId = null} = {}) {
+    const originLat = Number(lat);
+    const originLng = Number(lng);
+    const radiusKm = Number(radius);
+    if (!Number.isFinite(originLat) || !Number.isFinite(originLng) || !Number.isFinite(radiusKm) || radiusKm <= 0) {
+        return [];
+    }
+    const sid = schoolId != null && Number.isFinite(Number(schoolId)) ? Number(schoolId) : null;
+    return (Array.isArray(campusList) ? campusList : [])
+        .map((campus, idx) => {
+            const cLat = Number(campus?.latitude);
+            const cLng = Number(campus?.longitude);
+            const distance = haversineDistanceKm(originLat, originLng, cLat, cLng);
+            if (distance == null || distance > radiusKm) return null;
+            const campusSchoolId = campus?.schoolId ?? campus?.school?.id ?? sid;
+            return {
+                ...campus,
+                id: campus?.id ?? campus?.campusId ?? idx,
+                schoolId: campusSchoolId,
+                name: campus?.name ?? campus?.campusName ?? `Campus ${idx + 1}`,
+                address: campus?.address ?? "",
+                latitude: cLat,
+                longitude: cLng,
+                distance
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => Number(a.distance) - Number(b.distance));
+}
+
+/**
+ * Tìm campus lân cận:
+ * 1) (Tuỳ chọn) GET trực tiếp API bên thứ 3 — `VITE_CAMPUS_NEARBY_SEARCH_URL` (không qua BE EduBridge).
+ * 2) Tính cục bộ từ `fallbackCampuses` (tọa độ trong chi tiết trường public).
+ */
+export async function searchNearbyCampuses({lat, lng, radius = 10, fallbackCampuses = null, schoolId = null} = {}) {
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return [];
+
+    const originLat = Number(lat);
+    const originLng = Number(lng);
+    const radiusKm = Number(radius);
+
+    const externalBase = String(import.meta.env.VITE_CAMPUS_NEARBY_SEARCH_URL || "").trim();
     let lastError = null;
-    for (const endpoint of endpoints) {
+
+    if (externalBase) {
         try {
-            const response = await axiosClient.get(endpoint, {params});
-            return pickBodyList(response);
+            const url = new URL(externalBase);
+            url.searchParams.set("lat", String(originLat));
+            url.searchParams.set("lng", String(originLng));
+            url.searchParams.set("radius", String(radiusKm));
+            const headers = {};
+            const apiKey = String(import.meta.env.VITE_CAMPUS_NEARBY_SEARCH_API_KEY || "").trim();
+            if (apiKey) {
+                headers.Authorization = `Bearer ${apiKey}`;
+                headers["X-Api-Key"] = apiKey;
+            }
+            const response = await fetch(url.toString(), {method: "GET", headers});
+            if (!response.ok) {
+                throw new Error(`Nearby API ${response.status}`);
+            }
+            const payload = await response.json();
+            const list = pickNearbyCampusList(payload);
+            if (list.length > 0) return list;
         } catch (error) {
             lastError = error;
         }
     }
-    throw lastError ?? new Error("Không gọi được API tìm campus lân cận.");
+
+    const localList = searchNearbyCampusesFromCampusList(fallbackCampuses, {
+        lat: originLat,
+        lng: originLng,
+        radius: radiusKm,
+        schoolId
+    });
+    if (localList.length > 0) return localList;
+
+    if (externalBase) {
+        throw lastError ?? new Error("Không gọi được API tìm campus lân cận (bên thứ 3).");
+    }
+    return [];
 }
 
 export async function getLanguageOptions() {

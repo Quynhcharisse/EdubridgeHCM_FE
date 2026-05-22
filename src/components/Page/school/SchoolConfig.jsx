@@ -63,6 +63,7 @@ import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import {useNavigate, useSearchParams} from "react-router-dom";
 import {closeSnackbar, enqueueSnackbar} from "notistack";
 import {motion} from "framer-motion";
+import DocumentTemplatePreview from "../../ui/DocumentTemplatePreview.jsx";
 
 import axiosClient from "../../../configs/APIConfig.jsx";
 import {extractCampusListBody, listCampuses} from "../../../services/CampusService.jsx";
@@ -4506,26 +4507,18 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                     Mã: {doc.code}
                                   </Typography>
                                 ) : null}
-                                {templateFileUrl ? (
-                                  <Button
-                                    component="a"
-                                    href={templateFileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    size="small"
-                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
-                                    sx={{mt: 0.5, textTransform: "none", fontWeight: 600, px: 0}}
-                                  >
-                                    Xem mẫu đã tải
-                                  </Button>
-                                ) : null}
                               </Box>
                             </Stack>
                             <Stack
                               direction="row"
                               alignItems="center"
-                              spacing={0.5}
-                              sx={{flexShrink: 0, alignSelf: {xs: "flex-start", sm: "center"}}}
+                              justifyContent="flex-end"
+                              spacing={0.75}
+                              sx={{
+                                flexShrink: 0,
+                                minWidth: {xs: "auto", sm: 108},
+                                alignSelf: {xs: "flex-start", sm: "center"},
+                              }}
                             >
                               <Chip
                                 size="small"
@@ -4538,6 +4531,13 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                   bgcolor: "#fee2e2",
                                 }}
                               />
+                              {templateFileUrl ? (
+                                <DocumentTemplatePreview
+                                  fileUrl={templateFileUrl}
+                                  fileName={doc.name || doc.code}
+                                  title={doc.name || doc.code || "Mẫu hồ sơ"}
+                                />
+                              ) : null}
                             </Stack>
                           </Box>
                           <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
@@ -4670,22 +4670,7 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                             }}
                           >
                             {fieldDisabled ? (
-                              <Stack spacing={0.5} sx={{flex: 1, minWidth: 0}}>
-                                <Typography>{doc.name || doc.code || "—"}</Typography>
-                                {templateUrl ? (
-                                  <Button
-                                    component="a"
-                                    href={templateUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    size="small"
-                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
-                                    sx={{alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0}}
-                                  >
-                                    Xem mẫu đã tải
-                                  </Button>
-                                ) : null}
-                              </Stack>
+                              <Typography sx={{flex: 1, minWidth: 0}}>{doc.name || doc.code || "—"}</Typography>
                             ) : (
                               <Stack spacing={1} sx={{flex: 1, minWidth: 0}}>
                                 <Stack direction={{xs: "column", sm: "row"}} spacing={1}>
@@ -4722,22 +4707,19 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                     fullWidth
                                   />
                                 </Stack>
-                                {templateUrl ? (
-                                  <Button
-                                    component="a"
-                                    href={templateUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    size="small"
-                                    startIcon={<OpenInNewOutlinedIcon fontSize="small"/>}
-                                    sx={{alignSelf: "flex-start", textTransform: "none", fontWeight: 600, px: 0}}
-                                  >
-                                    Xem mẫu đã tải
-                                  </Button>
-                                ) : null}
                               </Stack>
                             )}
-                            <Stack direction="row" alignItems="center" spacing={1} sx={{flexShrink: 0, alignSelf: {xs: "flex-end", sm: "center"}}}>
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              justifyContent="flex-end"
+                              spacing={1}
+                              sx={{
+                                flexShrink: 0,
+                                minWidth: {xs: "auto", sm: 200},
+                                alignSelf: {xs: "flex-end", sm: "center"},
+                              }}
+                            >
                               <Typography variant="caption">Bắt buộc</Typography>
                               <Switch
                                 checked={Boolean(doc.required)}
@@ -4754,6 +4736,13 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                                 }}
                                 sx={blockPointerSx}
                               />
+                              {templateUrl ? (
+                                <DocumentTemplatePreview
+                                  fileUrl={templateUrl}
+                                  fileName={doc.name || doc.code}
+                                  title={doc.name || doc.code || "Mẫu hồ sơ"}
+                                />
+                              ) : null}
                               <input
                                 type="file"
                                 hidden

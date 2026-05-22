@@ -524,11 +524,46 @@ function stripHtmlToPlainText(value) {
         .trim();
 }
 
-function curriculumDescriptionPreview(value, maxLength = 200) {
-    const plainText = stripHtmlToPlainText(value);
-    if (!plainText) return "";
-    if (plainText.length <= maxLength) return plainText;
-    return `${plainText.slice(0, maxLength).trim()}...`;
+function richTextLooksLikeHtml(raw) {
+    const s = String(raw || "").trim();
+    return /<[a-z][\s/>]/i.test(s);
+}
+
+function RichHtmlContent({html, sx, emptyLabel = null, component = "div"}) {
+    const s = String(html || "").trim();
+    if (!s) {
+        if (emptyLabel == null) return null;
+        return (
+            <Typography component="span" sx={sx}>
+                {emptyLabel}
+            </Typography>
+        );
+    }
+    if (richTextLooksLikeHtml(s)) {
+        return (
+            <Box
+                component={component}
+                sx={{
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
+                    "& p": {margin: "0.5em 0"},
+                    "& p:first-of-type": {marginTop: 0},
+                    "& p:last-of-type": {marginBottom: 0},
+                    "& ul, & ol": {pl: "1.35rem", my: 0.5},
+                    "& strong": {fontWeight: 700},
+                    "& em": {fontStyle: "italic"},
+                    "& u": {textDecoration: "underline"},
+                    ...sx
+                }}
+                dangerouslySetInnerHTML={{__html: s}}
+            />
+        );
+    }
+    return (
+        <Typography component={component} sx={{whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word", ...sx}}>
+            {s}
+        </Typography>
+    );
 }
 
 function parseHtmlBulletItems(value) {
@@ -1477,12 +1512,6 @@ function getCampusFacilityImages(campus) {
     };
 }
 
-function getCampusPolicyText(campus) {
-    const fullText = String(campus?.policyDetail?.fullTextRendered || "").trim();
-    if (fullText) return fullText;
-    return String(campus?.policyDetail || "").trim();
-}
-
 function SchoolFacilityInfoCard({school, activeCampusIndex, embedded = false}) {
     const campuses = Array.isArray(school?.campusList) ? school.campusList : [];
     const activeCampus = campuses[activeCampusIndex] || campuses[0] || null;
@@ -1806,187 +1835,6 @@ function SchoolFacilityInfoCard({school, activeCampusIndex, embedded = false}) {
     );
 }
 
-function SchoolPolicyInfoCard({school, activeCampusIndex, embedded = false}) {
-    const campuses = Array.isArray(school?.campusList) ? school.campusList : [];
-    const activeCampus = campuses[activeCampusIndex] || campuses[0] || null;
-    const policyText = getCampusPolicyText(activeCampus);
-    const policyDetail = activeCampus?.policyDetail && typeof activeCampus.policyDetail === "object" ? activeCampus.policyDetail : null;
-    const workingConfig = policyDetail?.workingConfig && typeof policyDetail.workingConfig === "object" ? policyDetail.workingConfig : null;
-    const shiftList = Array.isArray(workingConfig?.workShifts) ? workingConfig.workShifts : [];
-    const weekdayMap = {
-        MON: "Thứ Hai",
-        TUE: "Thứ Ba",
-        WED: "Thứ Tư",
-        THU: "Thứ Năm",
-        FRI: "Thứ Sáu",
-        SAT: "Thứ Bảy",
-        SUN: "Chủ Nhật"
-    };
-    const mapWeekdays = (days) =>
-        Array.isArray(days)
-            ? days
-                  .map((day) => weekdayMap[String(day || "").toUpperCase()] || String(day || "").trim())
-                  .filter(Boolean)
-                  .join(", ")
-            : "";
-    const regularDaysLabel = mapWeekdays(workingConfig?.regularDays);
-    const weekendDaysLabel = mapWeekdays(workingConfig?.weekendDays);
-    const maxCounsellorsPerSlot = Number(policyDetail?.maxCounsellorsPerSlot);
-    const hasMaxCounsellorsPerSlot = Number.isFinite(maxCounsellorsPerSlot) && maxCounsellorsPerSlot >= 0;
-    const customPolicyNote = String(policyDetail?.rawCustomNote || "").trim();
-    const policyRows = [
-        {name: "Đường dây nóng", value: String(activeCampus?.phoneNumber || "").trim()},
-        {name: "Email hỗ trợ", value: String(activeCampus?.email || "").trim()},
-        {
-            name: "Số tư vấn viên tối thiểu mỗi ca",
-            value: Number.isFinite(Number(policyDetail?.minCounsellorPerSlot))
-                ? `${Number(policyDetail.minCounsellorPerSlot)} người`
-                : ""
-        },
-        {
-            name: "Thời lượng mỗi ca tư vấn",
-            value: Number.isFinite(Number(policyDetail?.slotDurationInMinutes))
-                ? `${Number(policyDetail.slotDurationInMinutes)} phút`
-                : ""
-        },
-        {
-            name: "Số khách tối đa mỗi ca",
-            value: Number.isFinite(Number(policyDetail?.maxBookingPerSlot))
-                ? `${Number(policyDetail.maxBookingPerSlot)} người`
-                : ""
-        },
-        {
-            name: "Yêu cầu đặt lịch trước",
-            value: Number.isFinite(Number(policyDetail?.allowBookingBeforeHours))
-                ? `${Number(policyDetail.allowBookingBeforeHours)} giờ`
-                : ""
-        },
-        {
-            name: "Số tư vấn viên tối đa mỗi ca",
-            value: hasMaxCounsellorsPerSlot
-                ? maxCounsellorsPerSlot === 0
-                    ? "Không giới hạn"
-                    : `${maxCounsellorsPerSlot} người`
-                : ""
-        },
-        {
-            name: "Thời gian nghỉ giữa 2 ca",
-            value: Number.isFinite(Number(policyDetail?.bufferBetweenSlotsMinutes))
-                ? `${Number(policyDetail.bufferBetweenSlotsMinutes)} phút`
-                : ""
-        },
-        {
-            name: "Ghi chú vận hành",
-            value: customPolicyNote
-        }
-    ].filter((item) => Boolean(item.value));
-
-    const workingRows = [
-        ...shiftList.map((shift) => ({
-            name: `Ca ${String(shift?.name || "").toUpperCase() === "MORNING" ? "sáng" : String(shift?.name || "").toUpperCase() === "AFTERNOON" ? "chiều" : String(shift?.name || "").toLowerCase()}`,
-            value: `${String(shift?.startTime || "--:--")} - ${String(shift?.endTime || "--:--")}`
-        })),
-        {name: "Các ngày trong tuần", value: regularDaysLabel},
-        {name: "Ngày cuối tuần", value: weekendDaysLabel},
-        {
-            name: "Mở cửa Chủ Nhật",
-            value: typeof workingConfig?.isOpenSunday === "boolean" ? (workingConfig.isOpenSunday ? "Có" : "Nghỉ") : ""
-        },
-        {
-            name: "Ghi chú giờ làm việc",
-            value: String(workingConfig?.note || "").trim()
-        }
-    ].filter((item) => Boolean(item.value));
-
-    const policyAllRows = React.useMemo(
-        () => [...policyRows, ...workingRows],
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [activeCampus, workingConfig, policyDetail]
-    );
-    const hasStructuredPolicy = policyAllRows.length > 0;
-    const hasPolicySection = hasStructuredPolicy || Boolean(policyText);
-
-    const rootSx = embedded
-        ? {p: 0, border: "none", background: "transparent", boxShadow: "none"}
-        : detailMainColumnCardSx;
-
-    return (
-        <Box sx={rootSx}>
-            <Typography sx={mainDetailSectionTitleSx}>Chính sách</Typography>
-            {!hasPolicySection ? (
-                <Typography sx={{fontSize: "0.92rem", color: CONTACT_BODY, lineHeight: 1.6}}>
-                    Chưa có thông tin chính sách.
-                </Typography>
-            ) : null}
-                    {hasStructuredPolicy ? (
-                <Box sx={{minWidth: 0}}>
-                    <Box>
-                        {policyAllRows.map((row, idx) => (
-                            <Box
-                                key={`${row.name}-${idx}`}
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 2,
-                                    py: 1.6,
-                                    borderTop: idx === 0 ? "1px solid #e5e7eb" : "none",
-                                    borderBottom: "1px solid #e5e7eb"
-                                }}
-                            >
-                                <Typography
-                                    sx={{
-                                        fontSize: "0.95rem",
-                                        color: "#0f172a",
-                                        fontWeight: 500,
-                                        lineHeight: 1.5,
-                                        flex: 1,
-                                        minWidth: 0
-                                    }}
-                                >
-                                    {row.name}
-                                            </Typography>
-                                            <Typography
-                                                sx={{
-                                        fontSize: "0.95rem",
-                                                    color:
-                                            row.name === "Mở cửa Chủ Nhật" && String(row.value).trim().toLowerCase() === "nghỉ"
-                                                            ? "#b91c1c"
-                                                            : "#0f172a",
-                                        fontWeight: 600,
-                                        lineHeight: 1.5,
-                                        textAlign: "right",
-                                        wordBreak: "break-word",
-                                        flexShrink: 0,
-                                        maxWidth: {xs: "55%", sm: "60%"}
-                                    }}
-                                >
-                                    {row.value}
-                                            </Typography>
-                            </Box>
-                                    ))}
-                                </Box>
-                            </Box>
-            ) : hasPolicySection ? (
-                        <Typography
-                            component="pre"
-                            sx={{
-                                m: 0,
-                                fontFamily: "inherit",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                                fontSize: "0.9rem",
-                                color: CONTACT_BODY,
-                                lineHeight: 1.5
-                            }}
-                        >
-                            {policyText}
-                        </Typography>
-            ) : null}
-        </Box>
-    );
-}
-
 function SchoolCampaignEnrollmentCard({
     campaignTemplates,
     campaignLoading,
@@ -2169,15 +2017,16 @@ function SchoolCampaignEnrollmentCard({
                                     title="Giới thiệu chiến dịch"
                                     accent="blue"
                                     summaryCollapsed={(() => {
-                                        const plain = campaignDesc.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+                                        const plain = stripHtmlToPlainText(campaignDesc);
                                         if (!plain) return "Nhấn để xem";
                                         return plain.length > 100 ? `${plain.slice(0, 100)}…` : plain;
                                     })()}
                                     defaultExpanded={false}
                                 >
-                                    <Typography sx={{fontSize: "1.04rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.72}}>
-                                        {campaignDesc.replace(/<[^>]+>/g, "")}
-                                    </Typography>
+                                    <RichHtmlContent
+                                        html={campaignDesc}
+                                        sx={{fontSize: "1.04rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.72}}
+                                    />
                                 </CollapsibleDetailSection>
                             ) : null}
                             {mandatoryAllDocs.length > 0 ? (
@@ -2328,9 +2177,12 @@ function SchoolCampaignEnrollmentCard({
                                                 });
                                                 return ["Tiếng Việt", ...labelsWithoutVietnamese];
                                             })();
-                                            const previewDescription = curriculumDescriptionPreview(
-                                                curriculum?.description || program?.targetStudentDescription || program?.graduationStandard
-                                            );
+                                            const packageDescriptionHtml = String(
+                                                curriculum?.description ||
+                                                    program?.targetStudentDescription ||
+                                                    program?.graduationStandard ||
+                                                    ""
+                                            ).trim();
                                             const curriculumTypeTag =
                                                 String(curriculum?.curriculumType || "").toUpperCase() === "NATIONAL"
                                                     ? "Chuẩn MOET"
@@ -2457,10 +2309,11 @@ function SchoolCampaignEnrollmentCard({
                                                                     />
                                                                 ) : null}
                                                             </Stack>
-                                                            {previewDescription ? (
-                                                                <Typography sx={{fontSize: "1.04rem", color: "#334155", lineHeight: 1.74, mb: 1.35}}>
-                                                                    {previewDescription}
-                                                                </Typography>
+                                                            {packageDescriptionHtml ? (
+                                                                <RichHtmlContent
+                                                                    html={packageDescriptionHtml}
+                                                                    sx={{fontSize: "1.04rem", color: "#334155", lineHeight: 1.74, mb: 1.35}}
+                                                                />
                                                             ) : null}
                                                             {methodLearningMeta.length > 0 ? (
                                                                 <Stack
@@ -2619,9 +2472,10 @@ function SchoolCampaignEnrollmentCard({
                                                                                             {matchedMethod?.displayName || admissionMethodLabel(offering?.admissionMethod)}
                                                                                         </Typography>
                                                                                         {showMethodBodyText ? (
-                                                                                            <Typography sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.55}}>
-                                                                                                {methodBodyText}
-                                                                                            </Typography>
+                                                                                            <RichHtmlContent
+                                                                                                html={methodBodyText}
+                                                                                                sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.55}}
+                                                                                            />
                                                                                         ) : null}
                                                                                     </Box>
                                                                                 </Box>
@@ -2872,9 +2726,10 @@ function SchoolCampaignEnrollmentCard({
                                                                                                             {stepName}
                                                                                                         </Typography>
                                                                                                         {stepDescription ? (
-                                                                                                            <Typography sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}>
-                                                                                                                {stepDescription}
-                                                                                                            </Typography>
+                                                                                                            <RichHtmlContent
+                                                                                                                html={stepDescription}
+                                                                                                                sx={{fontSize: "0.98rem", color: "#475569", lineHeight: 1.65, mt: 0.1}}
+                                                                                                            />
                                                                                                         ) : null}
                                                                                                     </Box>
                                                                                                 </Box>
@@ -2959,7 +2814,7 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                     : Array.isArray(curriculum?.subjectOptions)
                         ? curriculum.subjectOptions
                         : [];
-                const curriculumDescription = stripHtmlToPlainText(curriculum?.description);
+                const curriculumDescriptionHtml = String(curriculum?.description || "").trim();
                 const yearLabel = Number.isFinite(Number(curriculum?.applicationYear))
                     ? String(curriculum?.applicationYear)
                     : "—";
@@ -3000,7 +2855,7 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                         </Stack>
 
                         {!focusSubjectsOnly ? (
-                            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{mb: curriculumDescription ? 1.4 : 2.4}}>
+                            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{mb: curriculumDescriptionHtml ? 1.4 : 2.4}}>
                             <Chip
                                 size="small"
                                 label={`Năm ${yearLabel}`}
@@ -3026,10 +2881,11 @@ function SchoolCurriculumTrainingCard({curriculumList, embedded = false, focusSu
                         </Stack>
                         ) : null}
 
-                        {!focusSubjectsOnly && curriculumDescription ? (
-                            <Typography sx={{fontSize: "1.04rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.85, mb: 3}}>
-                                {curriculumDescription}
-                            </Typography>
+                        {!focusSubjectsOnly && curriculumDescriptionHtml ? (
+                            <RichHtmlContent
+                                html={curriculumDescriptionHtml}
+                                sx={{fontSize: "1.04rem", color: CURRICULUM_DESCRIPTION_TEXT, lineHeight: 1.85, mb: 3}}
+                            />
                         ) : null}
 
                         {!focusSubjectsOnly && methodLearningList.length > 0 ? (
@@ -3304,7 +3160,6 @@ export default function SchoolSearchDetailView({
     const detailCampaignRef = React.useRef(null);
     const detailCurriculumRef = React.useRef(null);
     const detailFacilityRef = React.useRef(null);
-    const detailPolicyRef = React.useRef(null);
     const detailLocationRef = React.useRef(null);
     const detailConsultRef = React.useRef(null);
     const detailGeneralRef = React.useRef(null);
@@ -3506,21 +3361,20 @@ export default function SchoolSearchDetailView({
                 const list = await onSearchNearbyCampuses({
                     lat: originLat,
                     lng: originLng,
-                    radius: NEARBY_SEARCH_RADIUS_KM
+                    radius: NEARBY_SEARCH_RADIUS_KM,
+                    fallbackCampuses: campusListForDetail,
+                    schoolId: school?.id
                 });
                 if (cancelled) return;
                 setNearbyCampuses(Array.isArray(list) ? list : []);
+                setNearbyError("");
             } catch (e) {
                 if (cancelled) return;
-                const status = Number(e?.response?.status);
-                const backendMsg = String(e?.response?.data?.message || "").trim();
-                let msg = "Không tải được danh sách campus gần bạn.";
-                if (status === 403) {
-                    msg = "Bạn không có quyền truy cập dữ liệu campus lân cận.";
-                } else if (backendMsg) {
-                    msg = backendMsg;
-                }
-                setNearbyError(msg);
+                const backendMsg = String(e?.message || e?.response?.data?.message || "").trim();
+                setNearbyError(
+                    backendMsg ||
+                        "Không tải được campus lân cận từ dịch vụ bản đồ. Bản đồ vẫn hiển thị các cơ sở của trường nếu có tọa độ."
+                );
                 setNearbyCampuses([]);
             } finally {
                 if (!cancelled) setNearbyLoading(false);
@@ -3529,7 +3383,7 @@ export default function SchoolSearchDetailView({
         return () => {
             cancelled = true;
         };
-    }, [userLat, userLng, fallbackLat, fallbackLng, onSearchNearbyCampuses]);
+    }, [userLat, userLng, fallbackLat, fallbackLng, onSearchNearbyCampuses, campusListForDetail, school?.id]);
 
     React.useEffect(() => {
         const schoolId = Number(school?.id);
@@ -3586,9 +3440,7 @@ export default function SchoolSearchDetailView({
                     ? "school-detail-campaign"
                     : section === "facility"
                       ? "school-detail-facility"
-                      : section === "policy"
-                        ? "school-detail-policy"
-                    : section === "location"
+                      : section === "location"
                       ? "school-detail-location"
                       : "school-detail-consult";
         const container = detailScrollRef.current;
@@ -3619,18 +3471,16 @@ export default function SchoolSearchDetailView({
 
     const detailTabIndex =
         detailActiveSection === "location"
-            ? 6
+            ? 5
             : detailActiveSection === "consult"
-              ? 5
-              : detailActiveSection === "policy"
-                ? 4
-                : detailActiveSection === "facility"
-                  ? 3
-                  : detailActiveSection === "campaign" || detailActiveSection === "curriculum"
-                    ? 2
-                    : detailActiveSection === "campus"
-                      ? 1
-                      : 0;
+              ? 4
+              : detailActiveSection === "facility"
+                ? 3
+                : detailActiveSection === "campaign" || detailActiveSection === "curriculum"
+                  ? 2
+                  : detailActiveSection === "campus"
+                    ? 1
+                    : 0;
 
     React.useEffect(() => {
         const root = detailScrollRef.current;
@@ -3645,10 +3495,9 @@ export default function SchoolSearchDetailView({
                 const campus = detailCampusRef.current;
                 const campaign = detailCampaignRef.current;
                 const facility = detailFacilityRef.current;
-                const policy = detailPolicyRef.current;
                 const loc = detailLocationRef.current;
                 const consult = detailConsultRef.current;
-                if (!intro || !campus || !campaign || !facility || !policy || !loc || !consult) return;
+                if (!intro || !campus || !campaign || !facility || !loc || !consult) return;
                 const rootRect = root.getBoundingClientRect();
                 const anchor = rootRect.top + DETAIL_SCROLL_HEADROOM;
                 const activationLine = anchor + 24;
@@ -3657,7 +3506,6 @@ export default function SchoolSearchDetailView({
                     ["campus", campus],
                     ["campaign", campaign],
                     ["facility", facility],
-                    ["policy", policy],
                     ["consult", consult],
                     ["location", loc]
                 ];
@@ -4557,10 +4405,8 @@ export default function SchoolSearchDetailView({
                                             : v === 3
                                               ? "facility"
                                               : v === 4
-                                                ? "policy"
-                                                : v === 5
-                                                  ? "consult"
-                                                  : "location"
+                                                ? "consult"
+                                                : "location"
                                 )
                             }
                             variant="scrollable"
@@ -4616,7 +4462,6 @@ export default function SchoolSearchDetailView({
                             <Tab label="Thông tin cơ sở" disableRipple/>
                             <Tab label="Chiến dịch tuyển sinh" disableRipple/>
                             <Tab label="Cơ sở vật chất" disableRipple/>
-                            <Tab label="Chính sách" disableRipple/>
                             <Tab label="Đặt lịch tư vấn" disableRipple/>
                             <Tab label="Vị trí & bản đồ" disableRipple/>
                         </Tabs>
@@ -4665,19 +4510,28 @@ export default function SchoolSearchDetailView({
                                         }}
                                     >
                                         <Box sx={{flex: 1, minWidth: 0}}>
-                                            <Typography
-                                                sx={{
-                                                    color: "#0f172a",
-                                                    lineHeight: 1.75,
-                                                    fontSize: "0.95rem",
-                                                    overflowWrap: "anywhere",
-                                                    wordBreak: "break-word"
-                                                }}
-                                            >
-                                                {school.description
-                                                    ? String(school.description)
-                                                    : `Thông tin tổng quan về ${school.school}. Nội dung chi tiết sẽ được cập nhật từ nhà trường trên hệ thống EduBridge.`}
-                                            </Typography>
+                                            {school.description ? (
+                                                <RichHtmlContent
+                                                    html={school.description}
+                                                    sx={{
+                                                        color: "#0f172a",
+                                                        lineHeight: 1.75,
+                                                        fontSize: "0.95rem"
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Typography
+                                                    sx={{
+                                                        color: "#0f172a",
+                                                        lineHeight: 1.75,
+                                                        fontSize: "0.95rem",
+                                                        overflowWrap: "anywhere",
+                                                        wordBreak: "break-word"
+                                                    }}
+                                                >
+                                                    {`Thông tin tổng quan về ${school.school}. Nội dung chi tiết sẽ được cập nhật từ nhà trường trên hệ thống EduBridge.`}
+                                                </Typography>
+                                            )}
                                         </Box>
                                         <Box
                                             sx={{
@@ -4756,20 +4610,6 @@ export default function SchoolSearchDetailView({
                                             embedded
                                         />
                                     </Box>
-                            </Box>
-
-                            <Box
-                                ref={detailPolicyRef}
-                                id="school-detail-policy"
-                                sx={{scrollMarginTop: {xs: 56, sm: 52}, mb: 3}}
-                            >
-                                <Box sx={detailMainColumnCardSx}>
-                                        <SchoolPolicyInfoCard
-                                            school={school}
-                                            activeCampusIndex={campusDetailTabIndex}
-                                            embedded
-                                        />
-                                </Box>
                             </Box>
 
                             <Box
