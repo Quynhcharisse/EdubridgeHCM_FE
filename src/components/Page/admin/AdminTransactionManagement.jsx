@@ -551,7 +551,9 @@ export default function AdminTransactionManagement() {
                                         <TableCell align="center" sx={{ ...adminTableHeadCellSx, width: 52 }}>
                                             STT
                                         </TableCell>
-                                        <TableCell sx={{ ...adminTableHeadCellSx, width: "44%" }}>Trường học</TableCell>
+                                        <TableCell align="left" sx={{ ...adminTableHeadCellSx, width: "44%" }}>
+                                            Trường học
+                                        </TableCell>
                                         <TableCell sx={{ ...adminTableHeadCellSx, width: "10%" }}>Mã GD</TableCell>
                                         <TableCell sx={{ ...adminTableHeadCellSx, width: "11%" }}>
                                             Số tiền
@@ -588,8 +590,8 @@ export default function AdminTransactionManagement() {
                                                         sx={adminSttChipSx}
                                                     />
                                                 </TableCell>
-                                                <TableCell align="center">
-                                                    <Typography sx={{ fontWeight: 600 }} noWrap title={row.schoolName} textAlign="center">
+                                                <TableCell align="left">
+                                                    <Typography sx={{ fontWeight: 600 }} noWrap title={row.schoolName}>
                                                         {row.schoolName}
                                                     </Typography>
                                                 </TableCell>

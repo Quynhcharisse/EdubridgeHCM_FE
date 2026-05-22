@@ -1,5 +1,6 @@
-/**
- * Chiều cao header (AppBar) và dải tiêu đề sidebar — dùng chung để `border-bottom` thẳng hàng.
- * Khớp `mt` vùng main trong AdminLayout / SchoolLayout / CounsellorLayout.
- */
 export const ROLE_SHELL_HEADER_HEIGHT_PX = 65;
+
+export const ROLE_SHELL_SIDEBAR_WIDTH_EXPANDED_PX = 264;
+export const ROLE_SHELL_SIDEBAR_WIDTH_COLLAPSED_PX = 72;
+export const ROLE_SHELL_SIDEBAR_WIDTH_TRANSITION =
+    "280ms cubic-bezier(0.4, 0, 0.2, 1)";

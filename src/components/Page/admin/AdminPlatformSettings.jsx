@@ -48,6 +48,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
+import ImageLightboxOverlay from "../../ui/ImageLightboxOverlay.jsx";
 import axiosClient from "../../../configs/APIConfig.jsx";
 import {
     confirmSystemConfigImport,
@@ -690,7 +691,7 @@ export default function AdminPlatformSettings() {
     }, []);
 
     const closeAdmissionImagePreview = useCallback(() => {
-        setAdmissionImagePreview((prev) => ({ ...prev, open: false }));
+        setAdmissionImagePreview({ open: false, url: "", title: "Xem hình mẫu" });
     }, []);
 
     const validateBusiness = (form) => {
@@ -5141,44 +5142,12 @@ export default function AdminPlatformSettings() {
                     </Button>
                 </DialogActions>
             </Dialog>
-            <Dialog
+            <ImageLightboxOverlay
                 open={admissionImagePreview.open}
+                url={admissionImagePreview.url}
+                title={admissionImagePreview.title}
                 onClose={closeAdmissionImagePreview}
-                fullWidth
-                maxWidth="md"
-                PaperProps={{
-                    sx: {
-                        borderRadius: 3,
-                        overflow: "hidden",
-                    },
-                }}
-            >
-                <DialogTitle sx={{ fontWeight: 800, color: "#0f172a" }}>
-                    {admissionImagePreview.title}
-                </DialogTitle>
-                <DialogContent sx={{ bgcolor: "#f8fafc", display: "flex", justifyContent: "center", p: 2.5 }}>
-                    {admissionImagePreview.url ? (
-                        <Box
-                            component="img"
-                            src={admissionImagePreview.url}
-                            alt={admissionImagePreview.title}
-                            sx={{
-                                maxWidth: "100%",
-                                maxHeight: "70vh",
-                                objectFit: "contain",
-                                borderRadius: 1.5,
-                                border: "1px solid #dbeafe",
-                                bgcolor: "#ffffff",
-                            }}
-                        />
-                    ) : null}
-                </DialogContent>
-                <DialogActions sx={{ px: 2.5, pb: 2 }}>
-                    <Button variant="outlined" onClick={closeAdmissionImagePreview} sx={cancelButtonSx}>
-                        Đóng
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            />
         </Box>
     );
 }
