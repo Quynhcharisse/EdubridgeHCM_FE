@@ -33,6 +33,10 @@ import {
     CircularProgress,
     Tabs,
     Tab,
+    Checkbox,
+    Menu,
+    ListItemIcon,
+    ListItemText,
 } from "@mui/material";
 import Pagination from "@mui/material/Pagination";
 import SearchIcon from "@mui/icons-material/Search";
@@ -56,6 +60,10 @@ import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import RemoveCircleOutlinedIcon from "@mui/icons-material/RemoveCircleOutlined";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import FolderZipIcon from "@mui/icons-material/FolderZip";
+import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
+import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
@@ -66,6 +74,9 @@ import {
     getAdmissionCampaigns,
     autoApproveAdmissionReservations,
     batchConfirmAdmissionReservationForms,
+    downloadAdmissionFormDocumentsZip,
+    downloadConfirmedAdmissionDocumentsZip,
+    exportAdmissionFormsByStatus,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
@@ -89,6 +100,8 @@ import {
     getReservationStatusLabel,
     getReservationStatusStyle,
     normalizeReservationStatus,
+    ADMISSION_FORM_EXPORT_STATUSES,
+    canDownloadReservationForm,
 } from "../../../constants/reservationStatusConfig.js";
 
 const STATUS_ICONS = {
@@ -212,6 +225,11 @@ const ROW_ACTION_VARIANTS = {
     },
 };
 
+const EXPORT_STATUS_FILE_SUFFIX = {
+    [RESERVATION_STATUS.DEPOSITED]: "da-dat-coc",
+    [RESERVATION_STATUS.CONFIRMED]: "da-xac-nhan",
+};
+
 function RowActionButton({variant = "view", title, disabled, onClick, children}) {
     return (
         <Tooltip title={title} arrow placement="top">
@@ -245,6 +263,23 @@ const flattenAttachments = (row) => {
         });
     });
     return files;
+};
+
+const resolveZipFileName = (response, fallback) => {
+    const contentDisposition = response?.headers?.["content-disposition"] || "";
+    const fileNameFromHeader = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)?.[1];
+    return decodeURIComponent((fileNameFromHeader || "").replace(/"/g, "")) || fallback;
+};
+
+const triggerBlobDownload = (fileBlob, fileName) => {
+    const downloadUrl = window.URL.createObjectURL(fileBlob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
 };
 
 const mapRow = (item, index) => {
@@ -1192,6 +1227,122 @@ export default function SchoolCampusAdmissionReservations() {
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
     const [autoApproveOpen, setAutoApproveOpen] = React.useState(false);
+    const [selectAll, setSelectAll] = React.useState(false);
+    const [selectedRowId, setSelectedRowId] = React.useState(null);
+    const [downloadingDocuments, setDownloadingDocuments] = React.useState(false);
+    const [downloadMenuAnchor, setDownloadMenuAnchor] = React.useState(null);
+    const [exportExcelConfirmOpen, setExportExcelConfirmOpen] = React.useState(false);
+
+    const exportExcelStatusLabels = React.useMemo(
+        () => ADMISSION_FORM_EXPORT_STATUSES.map((status) => getReservationStatusLabel(status)),
+        [],
+    );
+
+    const openExportExcelConfirm = () => {
+        setDownloadMenuAnchor(null);
+        setExportExcelConfirmOpen(true);
+    };
+
+    const downloadablePageRowIds = React.useMemo(
+        () => rows.filter((row) => canDownloadReservationForm(row.status)).map((row) => row.id),
+        [rows],
+    );
+
+    const toggleRowSelection = (rowId, rowStatus) => {
+        if (!canDownloadReservationForm(rowStatus)) return;
+        setSelectAll(false);
+        setSelectedRowId((prev) => (prev === rowId ? null : rowId));
+    };
+
+    const toggleSelectAll = () => {
+        if (downloadablePageRowIds.length === 0) return;
+        setSelectAll((prev) => {
+            const next = !prev;
+            if (next) setSelectedRowId(null);
+            return next;
+        });
+    };
+
+    const downloadDocumentsResponse = (response, fallbackName) => {
+        const fileBlob = response?.data;
+        if (!fileBlob) {
+            throw new Error("EMPTY_BLOB");
+        }
+        const fileName = resolveZipFileName(response, fallbackName);
+        triggerBlobDownload(fileBlob, fileName);
+    };
+
+    const handleDownloadSingleFormDocuments = async (formId) => {
+        const response = await downloadAdmissionFormDocumentsZip(formId);
+        downloadDocumentsResponse(response, `ho-so-nhap-hoc-${formId}.zip`);
+    };
+
+    const handleDownloadAllConfirmedDocuments = async () => {
+        const response = await downloadConfirmedAdmissionDocumentsZip();
+        downloadDocumentsResponse(
+            response,
+            `ho-so-nhap-hoc-da-xac-nhan-${new Date().toISOString().slice(0, 10)}.zip`,
+        );
+        enqueueSnackbar("Tải trọn bộ file hồ sơ thành công.", {variant: "success"});
+    };
+
+    const handleDownloadZipFromSelection = async () => {
+        if (!selectAll && selectedRowId == null) {
+            enqueueSnackbar("Vui lòng chọn hồ sơ cần tải file ZIP.", {variant: "warning"});
+            return;
+        }
+        if (!selectAll) {
+            const selectedRow = rows.find((row) => row.id === selectedRowId);
+            if (!selectedRow || !canDownloadReservationForm(selectedRow.status)) {
+                enqueueSnackbar(
+                    "Chỉ hỗ trợ tải hồ sơ có trạng thái đã xác nhận nhập học.",
+                    {variant: "warning"},
+                );
+                return;
+            }
+        }
+        setDownloadingDocuments(true);
+        try {
+            if (selectAll) {
+                await handleDownloadAllConfirmedDocuments();
+            } else {
+                await handleDownloadSingleFormDocuments(selectedRowId);
+                enqueueSnackbar("Tải trọn bộ file hồ sơ thành công.", {variant: "success"});
+            }
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể tải file hồ sơ."), {variant: "error"});
+        } finally {
+            setDownloadingDocuments(false);
+        }
+    };
+
+    const downloadExportResponse = (response, status) => {
+        const suffix = EXPORT_STATUS_FILE_SUFFIX[status] || "export";
+        const date = new Date().toISOString().slice(0, 10);
+        downloadDocumentsResponse(response, `ho-so-nhap-hoc-${suffix}-${date}.xlsx`);
+    };
+
+    const handleExportExcelAll = async () => {
+        setDownloadingDocuments(true);
+        try {
+            const responses = await Promise.all(
+                ADMISSION_FORM_EXPORT_STATUSES.map((status) => exportAdmissionFormsByStatus(status)),
+            );
+            responses.forEach((response, index) => {
+                downloadExportResponse(response, ADMISSION_FORM_EXPORT_STATUSES[index]);
+            });
+            enqueueSnackbar("Tải file Excel thành công.", {variant: "success"});
+        } catch (err) {
+            enqueueSnackbar(getApiErrorMessage(err, "Không thể tải file Excel."), {variant: "error"});
+        } finally {
+            setDownloadingDocuments(false);
+        }
+    };
+
+    const handleExportExcelConfirm = async () => {
+        await handleExportExcelAll();
+        setExportExcelConfirmOpen(false);
+    };
 
     const loadData = React.useCallback(async ({statusOverride, pageOverride} = {}) => {
         const activeStatus = statusOverride ?? statusFilter;
@@ -1262,6 +1413,19 @@ export default function SchoolCampusAdmissionReservations() {
     React.useEffect(() => {
         setPage(0);
     }, [search, statusFilter]);
+
+    React.useEffect(() => {
+        setSelectAll(false);
+        setSelectedRowId(null);
+    }, [page, statusFilter, search]);
+
+    React.useEffect(() => {
+        if (selectedRowId == null) return;
+        const selectedRow = rows.find((row) => row.id === selectedRowId);
+        if (!selectedRow || !canDownloadReservationForm(selectedRow.status)) {
+            setSelectedRowId(null);
+        }
+    }, [rows, selectedRowId]);
 
     const openDetail = (row) => {
         setSelectedReservation(row);
@@ -1482,6 +1646,66 @@ export default function SchoolCampusAdmissionReservations() {
                             <MenuItem value="NEWEST">Mới nhất</MenuItem>
                             <MenuItem value="OLDEST">Cũ nhất</MenuItem>
                         </TextField>
+                        <Box sx={{ml: {md: "auto"}}}>
+                            <Button
+                                variant="contained"
+                                disabled={downloadingDocuments || loading}
+                                onClick={(e) => setDownloadMenuAnchor(e.currentTarget)}
+                                endIcon={
+                                    downloadingDocuments
+                                        ? <CircularProgress size={16} color="inherit" />
+                                        : <ArrowDropDownRoundedIcon />
+                                }
+                                startIcon={!downloadingDocuments ? <FileDownloadRoundedIcon /> : null}
+                                sx={{
+                                    textTransform: "none",
+                                    borderRadius: 2,
+                                    fontWeight: 700,
+                                    minWidth: {xs: "100%", md: 160},
+                                    bgcolor: "#0D64DE",
+                                    boxShadow: "0 4px 14px rgba(13, 100, 222, 0.28)",
+                                    "&:hover": {bgcolor: "#0b57c4"},
+                                }}
+                            >
+                                {downloadingDocuments ? "Đang tải..." : "Tải hồ sơ"}
+                            </Button>
+                            <Menu
+                                anchorEl={downloadMenuAnchor}
+                                open={Boolean(downloadMenuAnchor)}
+                                onClose={() => setDownloadMenuAnchor(null)}
+                                anchorOrigin={{vertical: "bottom", horizontal: "right"}}
+                                transformOrigin={{vertical: "top", horizontal: "right"}}
+                                slotProps={{paper: {sx: {borderRadius: 2, minWidth: 280, mt: 0.5}}}}
+                            >
+                                <MenuItem
+                                    disabled={downloadingDocuments}
+                                    onClick={openExportExcelConfirm}
+                                >
+                                    <ListItemIcon>
+                                        <GridOnRoundedIcon fontSize="small" sx={{color: "#047857"}} />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary="Tải file Excel (.xlsx)"
+                                        secondary="Xuất theo trạng thái đã đặt cọc & đã xác nhận"
+                                    />
+                                </MenuItem>
+                                <MenuItem
+                                    disabled={downloadingDocuments}
+                                    onClick={() => {
+                                        setDownloadMenuAnchor(null);
+                                        void handleDownloadZipFromSelection();
+                                    }}
+                                >
+                                    <ListItemIcon>
+                                        <FolderZipIcon fontSize="small" sx={{color: "#1d4ed8"}} />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary="Tải trọn bộ file hồ sơ (.zip)"
+                                        secondary="Chỉ hồ sơ đã xác nhận nhập học"
+                                    />
+                                </MenuItem>
+                            </Menu>
+                        </Box>
                     </Stack>
                 </CardContent>
             </Card>
@@ -1516,6 +1740,18 @@ export default function SchoolCampusAdmissionReservations() {
                             <Table sx={{minWidth: 980}}>
                                 <TableHead>
                                     <TableRow sx={{bgcolor: "#f8fafc"}}>
+                                        <TableCell padding="checkbox" sx={{py: 2, width: 48}}>
+                                            <Checkbox
+                                                size="small"
+                                                checked={selectAll}
+                                                indeterminate={!selectAll && selectedRowId != null}
+                                                disabled={
+                                                    downloadablePageRowIds.length === 0 || downloadingDocuments
+                                                }
+                                                onChange={toggleSelectAll}
+                                                inputProps={{"aria-label": "Chọn tất cả hồ sơ đã xác nhận"}}
+                                            />
+                                        </TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Phụ huynh</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Học sinh</TableCell>
                                         <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>SĐT</TableCell>
@@ -1534,6 +1770,19 @@ export default function SchoolCampusAdmissionReservations() {
                                                 "&:hover": { bgcolor: "rgba(122, 169, 235, 0.06)" },
                                             }}
                                         >
+                                            <TableCell padding="checkbox" sx={{py: 2.25}}>
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={selectAll || selectedRowId === row.id}
+                                                    disabled={
+                                                        !canDownloadReservationForm(row.status)
+                                                        || downloadingDocuments
+                                                        || selectAll
+                                                    }
+                                                    onChange={() => toggleRowSelection(row.id, row.status)}
+                                                    inputProps={{"aria-label": `Chọn hồ sơ ${row.studentName}`}}
+                                                />
+                                            </TableCell>
                                             <TableCell sx={{py: 2.25, fontWeight: 600, color: "#1e293b"}}>{row.parentName}</TableCell>
                                             <TableCell sx={{py: 2.25}}>{row.studentName}</TableCell>
                                             <TableCell sx={{py: 2.25}}>{row.phone || "—"}</TableCell>
@@ -1609,6 +1858,27 @@ export default function SchoolCampusAdmissionReservations() {
                     ) : null}
                 </>
             )}
+
+            <ConfirmDialog
+                open={exportExcelConfirmOpen}
+                title="Xác nhận xuất Excel"
+                description={
+                    <>
+                        Hệ thống chỉ tải các hồ sơ có trạng thái{" "}
+                        <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight> và{" "}
+                        <ConfirmHighlight>{exportExcelStatusLabels[1]}</ConfirmHighlight>.
+                    </>
+                }
+                extraDescription="Bạn có muốn tiếp tục tải xuống?"
+                cancelText="Hủy"
+                confirmText={downloadingDocuments ? "Đang tải..." : "Tải xuống"}
+                loading={downloadingDocuments}
+                onCancel={() => {
+                    if (downloadingDocuments) return;
+                    setExportExcelConfirmOpen(false);
+                }}
+                onConfirm={() => void handleExportExcelConfirm()}
+            />
 
             <ConfirmDialog
                 open={confirmState.open}

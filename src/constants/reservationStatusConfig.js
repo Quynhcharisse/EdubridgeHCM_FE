@@ -11,6 +11,16 @@ export const RESERVATION_STATUS = {
     REJECTED: "RESERVATION_REJECTED",
 };
 
+/** Hồ sơ được phép tải file ZIP (Tải hồ sơ) */
+export const DOWNLOADABLE_RESERVATION_STATUSES = new Set([
+    RESERVATION_STATUS.CONFIRMED,
+]);
+
+export const ADMISSION_FORM_EXPORT_STATUSES = [
+    RESERVATION_STATUS.DEPOSITED,
+    RESERVATION_STATUS.CONFIRMED,
+];
+
 export const ACTIVE_RESERVATION_STATUSES = [
     RESERVATION_STATUS.PENDING,
     RESERVATION_STATUS.APPROVAL,
@@ -124,6 +134,11 @@ export function normalizeReservationStatus(status) {
     if (!key) return "";
     if (RESERVATION_STATUS_STYLE[key]) return key;
     return LEGACY_STATUS_ALIASES[key] ?? key;
+}
+
+export function canDownloadReservationForm(status) {
+    const key = normalizeReservationStatus(status);
+    return DOWNLOADABLE_RESERVATION_STATUSES.has(key);
 }
 
 export function getReservationStatusLabel(status) {
