@@ -74,3 +74,22 @@ export const autoApproveAdmissionReservations = async (admissionCampaignId) => {
     );
     return pickBody(response);
 };
+
+export const downloadAdmissionFormDocumentsZip = async (formId) => {
+    return axiosClient.get(`/campus/admission/form/${Number(formId)}/documents.zip`, {
+        responseType: "blob",
+    });
+};
+
+export const downloadConfirmedAdmissionDocumentsZip = async () => {
+    return axiosClient.get("/campus/admission/form/documents-confirmed.zip", {
+        responseType: "blob",
+    });
+};
+
+export const exportAdmissionFormsByStatus = async (status) => {
+    return axiosClient.get("/campus/admission/form/export", {
+        params: {status: String(status || "").trim().toUpperCase()},
+        responseType: "blob",
+    });
+};
