@@ -35,6 +35,7 @@ import {
     AutoAwesome as SparkleIcon,
     CheckCircle as CheckCircleIcon,
     Close as CloseIcon,
+    EditOutlined as EditOutlinedIcon,
     FactCheck as FactCheckIcon,
     Favorite as FavoriteIcon,
     FavoriteBorder as FavoriteBorderIcon,
@@ -1078,6 +1079,29 @@ export default function SchoolSearchPage() {
     const [availabilitySelectedSchoolIds, setAvailabilitySelectedSchoolIds] = React.useState([]);
     const [availabilitySchoolSearch, setAvailabilitySchoolSearch] = React.useState("");
     const [availabilitySubmitConfirmOpen, setAvailabilitySubmitConfirmOpen] = React.useState(false);
+
+    React.useEffect(() => {
+        const saved = sessionStorage.getItem('edubridge_reopen_admission_modal');
+        if (!saved) return;
+        sessionStorage.removeItem('edubridge_reopen_admission_modal');
+        try {
+            const data = JSON.parse(saved);
+            if (!data?.studentProfileId || !Array.isArray(data?.pendingSchoolIds)) return;
+            setAvailabilityStudentProfileId(data.studentProfileId);
+            setAvailabilityStudentDisplayName(data.studentDisplayName || 'Học sinh');
+            setAvailabilityStudentSummary(data.studentSummary || null);
+            setAvailabilityPendingSchoolIds(data.pendingSchoolIds);
+            setAvailabilityResult({unavailable: [], available: [], message: ''});
+            setAvailabilityError('');
+            setAvailabilityTemplateError('');
+            setAvailabilityTemplateDocs([]);
+            setAvailabilitySelectedSchoolIds([]);
+            setAvailabilitySchoolSearch('');
+            setAvailabilitySubmitConfirmOpen(false);
+            setAvailabilityDialogOpen(true);
+        } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const closeStudentPickerForAdmission = React.useCallback(() => {
         setBatchAdmissionPickerOpen(false);
@@ -2626,7 +2650,26 @@ export default function SchoolSearchPage() {
                 >
                     <Stack spacing={2.5}>
                         <Box sx={{minWidth: 0}}>
-                            <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ học sinh</Typography>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 0.5}}>
+                                <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ học sinh</Typography>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<EditOutlinedIcon sx={{fontSize: '15px !important'}} />}
+                                    onClick={() => {
+                                        sessionStorage.setItem('edubridge_reopen_admission_modal', JSON.stringify({
+                                            studentProfileId: availabilityStudentProfileId,
+                                            studentDisplayName: availabilityStudentDisplayName,
+                                            studentSummary: availabilityStudentSummary,
+                                            pendingSchoolIds: availabilityPendingSchoolIds,
+                                        }));
+                                        navigate('/children-info', {state: {studentProfileId: availabilityStudentProfileId, returnUrl: '/search-schools'}});
+                                    }}
+                                    sx={{textTransform: 'none', fontWeight: 600, borderRadius: 1.5, fontSize: '0.8rem', py: 0.4}}
+                                >
+                                    Chỉnh sửa
+                                </Button>
+                            </Stack>
                             <Box sx={{...AVAILABILITY_PANEL_SX, mb: 2}}>
                                 <Box
                                     sx={{
@@ -2821,30 +2864,71 @@ export default function SchoolSearchPage() {
                                     borderBottom: {xs: "1px solid rgba(226,232,240,0.9)", md: "none"}
                                 }}
                             >
-                                <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ giữ chỗ</Typography>
+                                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 0.5}}>
+                                    <Typography sx={AVAILABILITY_SECTION_TITLE_SX}>Hồ sơ giữ chỗ</Typography>
+                                    {!availabilityTemplateError && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<EditOutlinedIcon sx={{fontSize: '15px !important'}} />}
+                                            onClick={() => {
+                                                sessionStorage.setItem('edubridge_reopen_admission_modal', JSON.stringify({
+                                                    studentProfileId: availabilityStudentProfileId,
+                                                    studentDisplayName: availabilityStudentDisplayName,
+                                                    studentSummary: availabilityStudentSummary,
+                                                    pendingSchoolIds: availabilityPendingSchoolIds,
+                                                }));
+                                                window.location.href = `/parent/admission-hold-profile?returnUrl=/search-schools${availabilityStudentProfileId ? `&studentId=${availabilityStudentProfileId}` : ''}`;
+                                            }}
+                                            sx={{textTransform: 'none', fontWeight: 600, borderRadius: 1.5, fontSize: '0.8rem', py: 0.4}}
+                                        >
+                                            Chỉnh sửa
+                                        </Button>
+                                    )}
+                                </Stack>
 
                                 {availabilityTemplateError ? (
                                     <Alert severity="warning" sx={{mb: 1.5, borderRadius: 2}}>
                                         {availabilityTemplateError === "__TEMPLATE_NULL__" ? (
                                             <>
                                                 Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập{" "}
-                                                <a
-                                                    href="/parent/admission-hold-profile"
-                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                <span
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={() => {
+                                                        sessionStorage.setItem('edubridge_reopen_admission_modal', JSON.stringify({
+                                                            studentProfileId: availabilityStudentProfileId,
+                                                            studentDisplayName: availabilityStudentDisplayName,
+                                                            studentSummary: availabilityStudentSummary,
+                                                            pendingSchoolIds: availabilityPendingSchoolIds,
+                                                        }));
+                                                        window.location.href = `/parent/admission-hold-profile?returnUrl=/search-schools${availabilityStudentProfileId ? `&studentId=${availabilityStudentProfileId}` : ''}`;
+                                                    }}
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer"}}
                                                 >
                                                     tại đây
-                                                </a>
+                                                </span>
                                                 .
                                             </>
                                         ) : availabilityTemplateError === "__TEMPLATE_OUTDATED__" ? (
                                             <>
                                                 Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại.{" "}
-                                                <a
-                                                    href="/parent/admission-hold-profile"
-                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
+                                                <span
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={() => {
+                                                        sessionStorage.setItem('edubridge_reopen_admission_modal', JSON.stringify({
+                                                            studentProfileId: availabilityStudentProfileId,
+                                                            studentDisplayName: availabilityStudentDisplayName,
+                                                            studentSummary: availabilityStudentSummary,
+                                                            pendingSchoolIds: availabilityPendingSchoolIds,
+                                                        }));
+                                                        window.location.href = `/parent/admission-hold-profile?returnUrl=/search-schools${availabilityStudentProfileId ? `&studentId=${availabilityStudentProfileId}` : ''}`;
+                                                    }}
+                                                    style={{color: "inherit", fontWeight: 700, textDecoration: "underline", cursor: "pointer"}}
                                                 >
                                                     Cấu hình lại tại đây
-                                                </a>
+                                                </span>
                                                 .
                                             </>
                                         ) : availabilityTemplateError}
