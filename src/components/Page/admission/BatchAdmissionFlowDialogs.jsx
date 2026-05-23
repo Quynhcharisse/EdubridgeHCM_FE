@@ -539,7 +539,7 @@ export default function BatchAdmissionFlowDialogs({
                                             <>
                                                 Cấu hình hồ sơ giữ chỗ của học sinh chưa được thiết lập. Vui lòng thiết lập{" "}
                                                 <a
-                                                    href="/parent/admission-hold-profile"
+                                                    href={`/parent/admission-hold-profile${availabilityStudentProfileId ? `?studentId=${availabilityStudentProfileId}` : ""}`}
                                                     style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
                                                 >
                                                     tại đây
@@ -550,7 +550,7 @@ export default function BatchAdmissionFlowDialogs({
                                             <>
                                                 Cấu hình hồ sơ giữ chỗ đã bị lỗi thời, cần cấu hình lại.{" "}
                                                 <a
-                                                    href="/parent/admission-hold-profile"
+                                                    href={`/parent/admission-hold-profile${availabilityStudentProfileId ? `?studentId=${availabilityStudentProfileId}` : ""}`}
                                                     style={{color: "inherit", fontWeight: 700, textDecoration: "underline"}}
                                                 >
                                                     Cấu hình lại tại đây
