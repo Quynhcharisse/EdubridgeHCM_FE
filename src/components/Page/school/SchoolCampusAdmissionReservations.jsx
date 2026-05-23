@@ -725,7 +725,7 @@ function DocumentResultCard({doc}) {
             >
                 <Box sx={{width: 3, flexShrink: 0, bgcolor: cfg.accentColor}} />
                 <Box sx={{flex: 1, minWidth: 0, px: 2, py: 1.25}}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{mb: doc.reason ? 0.4 : 0}}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{mb: doc.reason && doc.status !== "skipped" ? 0.4 : 0}}>
                         <Typography sx={{fontWeight: 700, fontSize: 13, color: "#1e293b"}}>{doc.label || doc.key}</Typography>
                         <Chip
                             label={cfg.label}
@@ -733,7 +733,7 @@ function DocumentResultCard({doc}) {
                             sx={{bgcolor: cfg.chipBg, color: cfg.chipColor, fontWeight: 700, borderRadius: 999, height: 20, "& .MuiChip-label": {px: 1}, fontSize: 11}}
                         />
                     </Stack>
-                    {doc.reason && (
+                    {doc.reason && doc.status !== "skipped" && (
                         <Typography sx={{color: cfg.reasonColor, fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
                     )}
                 </Box>
@@ -1082,7 +1082,14 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
                                     {activeTab === "skipped" && (
                                         skippedForms.length === 0
                                             ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ bỏ qua kiểm tra.</Typography>
-                                            : <Stack spacing={1}>{skippedForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                            : (
+                                                <Stack spacing={1.5}>
+                                                    <Alert severity="warning" sx={{borderRadius: 2, fontSize: "0.875rem"}}>
+                                                        Các hồ sơ bỏ qua kiểm tra cần được <strong>duyệt thủ công</strong>. Vui lòng liên hệ quản trị viên hệ thống để được hỗ trợ thêm.
+                                                    </Alert>
+                                                    <Stack spacing={1}>{skippedForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
+                                                </Stack>
+                                            )
                                     )}
                                     {activeTab === "error" && (
                                         errorForms.length === 0
