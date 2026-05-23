@@ -770,6 +770,7 @@ const DOC_STATUS_CONFIG = {
 function DocumentResultCard({doc}) {
     const [open, setOpen] = React.useState(false);
     const [imgPreview, setImgPreview] = React.useState(false);
+    const [proofPreview, setProofPreview] = React.useState(false);
     const cfg = DOC_STATUS_CONFIG[doc.status] ?? DOC_STATUS_CONFIG.invalid;
     const details = Array.isArray(doc.details) ? doc.details : [];
     return (
@@ -798,17 +799,28 @@ function DocumentResultCard({doc}) {
                         <Typography sx={{color: cfg.reasonColor, fontSize: 12, lineHeight: 1.4}}>{doc.reason}</Typography>
                     )}
                 </Box>
-                <Stack direction="row" spacing={0.5} alignItems="center" sx={{pr: 1.5, flexShrink: 0}} onClick={(e) => e.stopPropagation()}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{pr: 1.5, py: 1, flexShrink: 0}} onClick={(e) => e.stopPropagation()}>
+                    {doc.imageProof && (
+                        <Stack alignItems="center" spacing={0.3} sx={{cursor: "pointer"}} onClick={() => setProofPreview(true)}>
+                            <Box
+                                component="img"
+                                src={doc.imageProof}
+                                alt={`Mẫu - ${doc.label || doc.key}`}
+                                sx={{width: 36, height: 36, objectFit: "cover", borderRadius: 1, border: "2px solid #818cf8", "&:hover": {opacity: 0.82, borderColor: "#6366f1"}}}
+                            />
+                            <Typography sx={{fontSize: 9.5, color: "#6366f1", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap"}}>Ảnh mẫu</Typography>
+                        </Stack>
+                    )}
                     {doc.submissionImage && (
-                        <Tooltip title="Xem ảnh minh chứng" arrow placement="top">
+                        <Stack alignItems="center" spacing={0.3} sx={{cursor: "pointer"}} onClick={() => setImgPreview(true)}>
                             <Box
                                 component="img"
                                 src={doc.submissionImage}
                                 alt={doc.label || doc.key}
-                                onClick={() => setImgPreview(true)}
-                                sx={{width: 36, height: 36, objectFit: "cover", borderRadius: 1, border: "1px solid #e2e8f0", cursor: "pointer", "&:hover": {opacity: 0.82, borderColor: "#93c5fd"}}}
+                                sx={{width: 36, height: 36, objectFit: "cover", borderRadius: 1, border: "2px solid #94a3b8", "&:hover": {opacity: 0.82, borderColor: "#64748b"}}}
                             />
-                        </Tooltip>
+                            <Typography sx={{fontSize: 9.5, color: "#64748b", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap"}}>Minh chứng</Typography>
+                        </Stack>
                     )}
                     {details.length > 0 && (
                         <Box
@@ -848,6 +860,19 @@ function DocumentResultCard({doc}) {
                         <Box onClick={(e) => e.stopPropagation()} sx={{position: "relative", display: "inline-flex"}}>
                             <Box component="img" src={doc.submissionImage} alt={doc.label || doc.key} sx={{maxWidth: "88vw", maxHeight: "80vh", objectFit: "contain", borderRadius: 2, display: "block"}} />
                             <IconButton onClick={() => setImgPreview(false)} size="small" sx={{position: "absolute", top: -12, right: -12, bgcolor: "white", "&:hover": {bgcolor: "#f1f5f9"}, boxShadow: 2}}>
+                                <CloseRoundedIcon sx={{fontSize: 18}} />
+                            </IconButton>
+                        </Box>
+                    </Fade>
+                </Backdrop>
+            )}
+            {doc.imageProof && (
+                <Backdrop open={proofPreview} onClick={() => setProofPreview(false)} sx={{zIndex: 1500, bgcolor: "rgba(15,23,42,0.7)", backdropFilter: "blur(6px)"}}>
+                    <Fade in={proofPreview}>
+                        <Box onClick={(e) => e.stopPropagation()} sx={{position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1}}>
+                            <Typography sx={{color: "#fff", fontWeight: 600, fontSize: 13}}>Ảnh mẫu — {doc.label || doc.key}</Typography>
+                            <Box component="img" src={doc.imageProof} alt={`Mẫu - ${doc.label || doc.key}`} sx={{maxWidth: "88vw", maxHeight: "75vh", objectFit: "contain", borderRadius: 2, display: "block"}} />
+                            <IconButton onClick={() => setProofPreview(false)} size="small" sx={{position: "absolute", top: -12, right: -12, bgcolor: "white", "&:hover": {bgcolor: "#f1f5f9"}, boxShadow: 2}}>
                                 <CloseRoundedIcon sx={{fontSize: 18}} />
                             </IconButton>
                         </Box>

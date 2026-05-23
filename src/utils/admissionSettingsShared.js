@@ -180,9 +180,15 @@ export function sanitizeAdmissionSettingsForApi(adm) {
       return code && allowedMethodCodeSet.has(code);
     });
 
+  const transcriptTemplateImageUrl = adm.transcriptTemplateImageUrl != null
+    ? String(adm.transcriptTemplateImageUrl).trim()
+    : "";
+
   const payload = {
     allowedMethods: methods,
+    admissionProcesses: methodAdmissionProcess,
     methodAdmissionProcess,
+    transcriptTemplateImageUrl,
   };
 
   if (typeof adm.autoCloseOnFull === "boolean") {
@@ -201,10 +207,9 @@ export function sanitizeAdmissionSettingsForApi(adm) {
       pickByMethodDocumentGroups(adm),
       allowedMethodCodeSet,
     );
-    payload.documentRequirementsData = {
-      mandatoryAll,
-      byMethod,
-    };
+    payload.methodDocumentRequirements = byMethod;
+    payload.documentRequirements = {mandatoryAll, byMethod};
+    payload.documentRequirementsData = {mandatoryAll, byMethod};
   }
 
   return payload;
