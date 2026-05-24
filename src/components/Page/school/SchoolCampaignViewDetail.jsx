@@ -26,6 +26,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import EditIcon from "@mui/icons-material/Edit";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FlagCircleIcon from "@mui/icons-material/FlagCircle";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import InsightsIcon from "@mui/icons-material/Insights";
 import PlaylistAddCheckCircleIcon from "@mui/icons-material/PlaylistAddCheckCircle";
@@ -639,11 +640,42 @@ export default function SchoolCampaignViewDetail() {
                 }}
             >
                 <CardContent sx={{ p: { xs: 2.3, md: 3 } }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.4 }}>
-                        <AutoAwesomeIcon sx={{ color: "#4f46e5" }} />
-                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#111827" }}>
-                            Tổng quan
-                        </Typography>
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 1.4 }}
+                    >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                            <AutoAwesomeIcon sx={{ color: "#4f46e5" }} />
+                            <Typography variant="h6" sx={{ fontWeight: 800, color: "#111827" }}>
+                                Tổng quan
+                            </Typography>
+                        </Stack>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />}
+                            onClick={() => navigate("/school/admission-reservations")}
+                            sx={{
+                                textTransform: "none",
+                                borderRadius: 999,
+                                fontWeight: 700,
+                                border: "1px solid #0D64DE",
+                                borderColor: "#0D64DE",
+                                color: "#0D64DE",
+                                px: 1.6,
+                                flexShrink: 0,
+                                "& .MuiButton-startIcon": { color: "inherit" },
+                                "&:hover": {
+                                    borderColor: "#0D64DE",
+                                    bgcolor: "rgba(13, 100, 222, 0.06)",
+                                },
+                            }}
+                        >
+                            Xem tất cả hồ sơ
+                        </Button>
                     </Stack>
                     <Box
                         sx={{
@@ -658,6 +690,65 @@ export default function SchoolCampaignViewDetail() {
                     />
                 </CardContent>
             </Card>
+
+            {(() => {
+                const sumMethodQuota = (campaign.admissionMethodTimelines || []).reduce((s, t) => s + (Number(t?.quota) || 0), 0);
+                const apiTotal = toNullableFiniteNumber(campaign.campaignTotalQuota);
+                const totalQuota = apiTotal != null ? apiTotal : sumMethodQuota;
+                const quotaRatioLabel = campaignQuotaRatioLabel;
+                const totalApps = campaign.totalApplications ?? campaign.totalReservations ?? null;
+                const pending = campaign.pendingApplications ?? campaign.pendingCount ?? null;
+                const approved = campaign.approvedApplications ?? campaign.approvedCount ?? null;
+                const rejected = campaign.rejectedApplications ?? campaign.rejectedCount ?? null;
+                const hasStats =
+                    totalApps !== null ||
+                    pending !== null ||
+                    approved !== null ||
+                    rejected !== null ||
+                    apiTotal != null ||
+                    sumMethodQuota > 0;
+                if (!hasStats) return null;
+                return (
+                    <Card sx={{ borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
+                        <CardContent sx={{ p: { xs: 2.2, md: 3 } }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                                <InsightsIcon sx={{ color: "#2563eb", fontSize: 20 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 800, color: "#111827" }}>
+                                    Thống kê
+                                </Typography>
+                            </Stack>
+                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: 1.5 }}>
+                                {[
+                                    {
+                                        label: quotaRatioLabel ? "Chỉ tiêu (còn / tổng)" : "Tổng quota",
+                                        value:
+                                            quotaRatioLabel ||
+                                            (totalQuota > 0 ? totalQuota.toLocaleString("vi-VN") : "—"),
+                                        color: "#1d4ed8",
+                                        bg: "rgba(59,130,246,0.08)",
+                                    },
+                                    { label: "Tổng hồ sơ", value: totalApps !== null ? Number(totalApps).toLocaleString("vi-VN") : "—", color: "#0f172a", bg: "rgba(148,163,184,0.1)" },
+                                    { label: "Đang chờ xét", value: pending !== null ? Number(pending).toLocaleString("vi-VN") : "—", color: "#d97706", bg: "rgba(251,191,36,0.1)" },
+                                    { label: "Đã duyệt", value: approved !== null ? Number(approved).toLocaleString("vi-VN") : "—", color: "#16a34a", bg: "rgba(34,197,94,0.1)" },
+                                    { label: "Đã từ chối", value: rejected !== null ? Number(rejected).toLocaleString("vi-VN") : "—", color: "#dc2626", bg: "rgba(248,113,113,0.1)" },
+                                ].map((item) => (
+                                    <Box
+                                        key={item.label}
+                                        sx={{ p: 1.5, borderRadius: 2, bgcolor: item.bg, textAlign: "center" }}
+                                    >
+                                        <Typography variant="h5" sx={{ fontWeight: 800, color: item.color, lineHeight: 1.2 }}>
+                                            {item.value}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "block", mt: 0.4 }}>
+                                            {item.label}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                        </CardContent>
+                    </Card>
+                );
+            })()}
 
             <Card sx={{ borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
                 <CardContent sx={{ p: { xs: 2.2, md: 3 } }}>
@@ -754,65 +845,6 @@ export default function SchoolCampaignViewDetail() {
                     </Stack>
                 </CardContent>
             </Card>
-
-            {(() => {
-                const sumMethodQuota = (campaign.admissionMethodTimelines || []).reduce((s, t) => s + (Number(t?.quota) || 0), 0);
-                const apiTotal = toNullableFiniteNumber(campaign.campaignTotalQuota);
-                const totalQuota = apiTotal != null ? apiTotal : sumMethodQuota;
-                const quotaRatioLabel = campaignQuotaRatioLabel;
-                const totalApps = campaign.totalApplications ?? campaign.totalReservations ?? null;
-                const pending = campaign.pendingApplications ?? campaign.pendingCount ?? null;
-                const approved = campaign.approvedApplications ?? campaign.approvedCount ?? null;
-                const rejected = campaign.rejectedApplications ?? campaign.rejectedCount ?? null;
-                const hasStats =
-                    totalApps !== null ||
-                    pending !== null ||
-                    approved !== null ||
-                    rejected !== null ||
-                    apiTotal != null ||
-                    sumMethodQuota > 0;
-                if (!hasStats) return null;
-                return (
-                    <Card sx={{ borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
-                        <CardContent sx={{ p: { xs: 2.2, md: 3 } }}>
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                                <InsightsIcon sx={{ color: "#2563eb", fontSize: 20 }} />
-                                <Typography variant="h6" sx={{ fontWeight: 800, color: "#111827" }}>
-                                    Thống kê
-                                </Typography>
-                            </Stack>
-                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: 1.5 }}>
-                                {[
-                                    {
-                                        label: quotaRatioLabel ? "Chỉ tiêu (còn / tổng)" : "Tổng quota",
-                                        value:
-                                            quotaRatioLabel ||
-                                            (totalQuota > 0 ? totalQuota.toLocaleString("vi-VN") : "—"),
-                                        color: "#1d4ed8",
-                                        bg: "rgba(59,130,246,0.08)",
-                                    },
-                                    { label: "Tổng hồ sơ", value: totalApps !== null ? Number(totalApps).toLocaleString("vi-VN") : "—", color: "#0f172a", bg: "rgba(148,163,184,0.1)" },
-                                    { label: "Đang chờ xét", value: pending !== null ? Number(pending).toLocaleString("vi-VN") : "—", color: "#d97706", bg: "rgba(251,191,36,0.1)" },
-                                    { label: "Đã duyệt", value: approved !== null ? Number(approved).toLocaleString("vi-VN") : "—", color: "#16a34a", bg: "rgba(34,197,94,0.1)" },
-                                    { label: "Đã từ chối", value: rejected !== null ? Number(rejected).toLocaleString("vi-VN") : "—", color: "#dc2626", bg: "rgba(248,113,113,0.1)" },
-                                ].map((item) => (
-                                    <Box
-                                        key={item.label}
-                                        sx={{ p: 1.5, borderRadius: 2, bgcolor: item.bg, textAlign: "center" }}
-                                    >
-                                        <Typography variant="h5" sx={{ fontWeight: 800, color: item.color, lineHeight: 1.2 }}>
-                                            {item.value}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "block", mt: 0.4 }}>
-                                            {item.label}
-                                        </Typography>
-                                    </Box>
-                                ))}
-                            </Box>
-                        </CardContent>
-                    </Card>
-                );
-            })()}
 
             <Card sx={{ borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
                 <CardContent sx={{ p: { xs: 2.2, md: 3 } }}>
