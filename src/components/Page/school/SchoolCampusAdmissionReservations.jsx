@@ -33,8 +33,9 @@ import {
     CircularProgress,
     Tabs,
     Tab,
+    Collapse,
+    ListSubheader,
 } from "@mui/material";
-import Pagination from "@mui/material/Pagination";
 import SearchIcon from "@mui/icons-material/Search";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
@@ -67,7 +68,7 @@ import {
     getAdmissionCampaigns,
     autoApproveAdmissionReservations,
     batchConfirmAdmissionReservationForms,
-    exportAdmissionFormsByStatus,
+    exportAdmissionForms,
 } from "../../../services/CampusAdmissionReservationService.jsx";
 import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
@@ -215,11 +216,6 @@ const ROW_ACTION_VARIANTS = {
     },
 };
 
-const EXPORT_STATUS_FILE_SUFFIX = {
-    [RESERVATION_STATUS.DEPOSITED]: "da-dat-coc",
-    [RESERVATION_STATUS.CONFIRMED]: "da-xac-nhan",
-};
-
 function RowActionButton({variant = "view", title, disabled, onClick, children}) {
     return (
         <Tooltip title={title} arrow placement="top">
@@ -308,8 +304,99 @@ const mapRow = (item, index) => {
         rejectReason: String(item?.rejectReason ?? "").trim(),
         cancelReason: String(item?.cancelReason ?? "").trim(),
         status,
+        admissionCampaignId: Number(item?.admissionCampaignId) || null,
+        admissionCampaignName: String(item?.admissionCampaignName ?? "").trim() || "—",
+        admissionCampaignYear:
+            item?.admissionCampaignYear != null && item?.admissionCampaignYear !== ""
+                ? Number(item.admissionCampaignYear)
+                : null,
         raw: item,
     };
+};
+
+const mapCampaign = (item) => ({
+    id: Number(item?.id ?? item?.admissionCampaignId),
+    name: String(item?.name ?? item?.admissionCampaignName ?? "Chiến dịch").trim(),
+    year:
+        item?.year != null && item?.year !== ""
+            ? Number(item.year)
+            : item?.admissionCampaignYear != null && item?.admissionCampaignYear !== ""
+              ? Number(item.admissionCampaignYear)
+              : null,
+    isActive: Boolean(item?.isActive),
+});
+
+const filterAndSortForms = (forms, {search, statusFilter, sortBy}) => {
+    let result = Array.isArray(forms) ? [...forms] : [];
+    if (statusFilter !== "ALL") {
+        result = result.filter((row) => row.status === statusFilter);
+    }
+    const kw = String(search || "").trim().toLowerCase();
+    if (kw) {
+        result = result.filter((row) =>
+            [
+                row.studentName,
+                row.studentCode,
+                row.dateOfBirth,
+                row.confirmCode,
+                row.parentName,
+                row.phone,
+                row.parentEmail,
+                row.currentSchool,
+                row.programName,
+                row.methodName,
+                row.identityCard,
+                row.admissionCampaignName,
+            ].some((field) => String(field || "").toLowerCase().includes(kw)),
+        );
+    }
+    result.sort((a, b) => {
+        const diff = new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
+        return sortBy === "OLDEST" ? -diff : diff;
+    });
+    return result;
+};
+
+const buildCampaignGroups = (campaigns, forms) => {
+    const formsByCampaign = new Map();
+    forms.forEach((form) => {
+        const campaignId = form.admissionCampaignId;
+        if (!campaignId) return;
+        if (!formsByCampaign.has(campaignId)) formsByCampaign.set(campaignId, []);
+        formsByCampaign.get(campaignId).push(form);
+    });
+
+    const seen = new Set();
+    const groups = (Array.isArray(campaigns) ? campaigns : [])
+        .filter((c) => c?.id)
+        .map((campaign) => {
+            seen.add(campaign.id);
+            return {
+                ...campaign,
+                forms: formsByCampaign.get(campaign.id) ?? [],
+            };
+        });
+
+    formsByCampaign.forEach((campaignForms, campaignId) => {
+        if (seen.has(campaignId)) return;
+        const sample = campaignForms[0];
+        groups.push({
+            id: campaignId,
+            name:
+                sample?.admissionCampaignName && sample.admissionCampaignName !== "—"
+                    ? sample.admissionCampaignName
+                    : `Chiến dịch #${campaignId}`,
+            year: sample?.admissionCampaignYear ?? null,
+            isActive: false,
+            forms: campaignForms,
+        });
+    });
+
+    return groups.sort((a, b) => {
+        const yearDiff = (b.year ?? 0) - (a.year ?? 0);
+        if (yearDiff !== 0) return yearDiff;
+        return String(a.name || "").localeCompare(String(b.name || ""), "vi");
+    });
 };
 
 function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onConfirmPayment, onRejectPayment, onViewDetail, onOpenPreview }) {
@@ -1220,16 +1307,16 @@ export default function SchoolCampusAdmissionReservations() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const {loading: schoolCtxLoading} = useSchool();
-    const [rows, setRows] = React.useState([]);
+    const [campaigns, setCampaigns] = React.useState([]);
+    const [allForms, setAllForms] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [search, setSearch] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState("ALL");
+    const [campaignFilter, setCampaignFilter] = React.useState("ALL");
     const [pendingCount, setPendingCount] = React.useState(0);
-    const [page, setPage] = React.useState(0);
-    const [pageSize] = React.useState(12);
-    const [totalItems, setTotalItems] = React.useState(0);
     const [sortBy, setSortBy] = React.useState("NEWEST");
+    const [expandedCampaignIds, setExpandedCampaignIds] = React.useState(() => new Set());
     const [selectedReservation, setSelectedReservation] = React.useState(null);
     const [detailOpen, setDetailOpen] = React.useState(false);
     const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
@@ -1242,8 +1329,12 @@ export default function SchoolCampusAdmissionReservations() {
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [submittingId, setSubmittingId] = React.useState(null);
     const [autoApproveOpen, setAutoApproveOpen] = React.useState(false);
-    const [exportingExcel, setExportingExcel] = React.useState(false);
-    const [exportExcelConfirmOpen, setExportExcelConfirmOpen] = React.useState(false);
+    const [exportingCampaignId, setExportingCampaignId] = React.useState(null);
+    const [exportExcelConfirm, setExportExcelConfirm] = React.useState({
+        open: false,
+        campaignId: null,
+        campaignName: "",
+    });
 
     const exportExcelStatusLabels = React.useMemo(
         () => ADMISSION_FORM_EXPORT_STATUSES.map((status) => getReservationStatusLabel(status)),
@@ -1259,93 +1350,97 @@ export default function SchoolCampusAdmissionReservations() {
         triggerBlobDownload(fileBlob, fileName);
     };
 
-    const downloadExportResponse = (response, status) => {
-        const suffix = EXPORT_STATUS_FILE_SUFFIX[status] || "export";
-        const date = new Date().toISOString().slice(0, 10);
-        downloadBlobResponse(response, `ho-so-nhap-hoc-${suffix}-${date}.xlsx`);
-    };
-
-    const handleExportExcelAll = async () => {
-        setExportingExcel(true);
+    const handleExportCampaignExcel = async (campaignId, campaignName) => {
+        setExportingCampaignId(Number(campaignId));
         try {
-            const responses = await Promise.all(
-                ADMISSION_FORM_EXPORT_STATUSES.map((status) => exportAdmissionFormsByStatus(status)),
-            );
-            responses.forEach((response, index) => {
-                downloadExportResponse(response, ADMISSION_FORM_EXPORT_STATUSES[index]);
+            const response = await exportAdmissionForms({
+                campaignId,
+                statuses: ADMISSION_FORM_EXPORT_STATUSES,
             });
+            const date = new Date().toISOString().slice(0, 10);
+            const slug = String(campaignName || "chien-dich")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 48) || "chien-dich";
+            downloadBlobResponse(response, `ho-so-nhap-hoc-${slug}-${date}.xlsx`);
             enqueueSnackbar("Xuất file Excel thành công.", {variant: "success"});
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể xuất file Excel."), {variant: "error"});
         } finally {
-            setExportingExcel(false);
+            setExportingCampaignId(null);
         }
     };
 
     const handleExportExcelConfirm = async () => {
-        await handleExportExcelAll();
-        setExportExcelConfirmOpen(false);
+        const {campaignId, campaignName} = exportExcelConfirm;
+        if (!campaignId) return;
+        await handleExportCampaignExcel(campaignId, campaignName);
+        setExportExcelConfirm({open: false, campaignId: null, campaignName: ""});
     };
 
-    const loadData = React.useCallback(async ({statusOverride, pageOverride} = {}) => {
+    const filteredForms = React.useMemo(
+        () => filterAndSortForms(allForms, {search, statusFilter, sortBy}),
+        [allForms, search, statusFilter, sortBy],
+    );
+
+    const visibleCampaignGroups = React.useMemo(() => {
+        const groups = buildCampaignGroups(campaigns, filteredForms);
+        if (campaignFilter === "ALL") return groups;
+        return groups.filter((g) => String(g.id) === campaignFilter);
+    }, [campaigns, filteredForms, campaignFilter]);
+
+    const selectedCampaignLabel = React.useMemo(() => {
+        if (campaignFilter === "ALL") return "";
+        const found = campaigns.find((c) => String(c.id) === campaignFilter);
+        return found?.name ?? visibleCampaignGroups[0]?.name ?? "";
+    }, [campaignFilter, campaigns, visibleCampaignGroups]);
+
+    const campaignYears = React.useMemo(() => {
+        const years = new Set();
+        campaigns.forEach((c) => {
+            if (c.year != null) years.add(c.year);
+        });
+        return [...years].sort((a, b) => b - a);
+    }, [campaigns]);
+
+    const loadData = React.useCallback(async ({statusOverride} = {}) => {
         const activeStatus = statusOverride ?? statusFilter;
-        const activePage = pageOverride ?? page;
         setLoading(true);
         setError("");
         try {
-            const res = await getCampusAdmissionReservationForms({
-                status: activeStatus,
-            });
-            let allRows = Array.isArray(res?.items) ? res.items.map(mapRow) : [];
+            const [campaignList, res] = await Promise.all([
+                getAdmissionCampaigns(),
+                getCampusAdmissionReservationForms({status: activeStatus}),
+            ]);
+            const mappedCampaigns = (Array.isArray(campaignList) ? campaignList : [])
+                .map(mapCampaign)
+                .filter((c) => Number.isFinite(c.id) && c.id > 0);
+            setCampaigns(mappedCampaigns);
+
+            let mappedForms = Array.isArray(res?.items) ? res.items.map(mapRow) : [];
             if (activeStatus !== "ALL") {
-                allRows = allRows.filter((row) => row.status === activeStatus);
+                mappedForms = mappedForms.filter((row) => row.status === activeStatus);
             }
-            setPendingCount(allRows.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
-            allRows.sort((a, b) => {
-                const diff = new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
-                return sortBy === "OLDEST" ? -diff : diff;
-            });
-
-            const kw = String(search || "").trim().toLowerCase();
-            const filtered = kw
-                ? allRows.filter((row) =>
-                    [
-                        row.studentName,
-                        row.studentCode,
-                        row.dateOfBirth,
-                        row.confirmCode,
-                        row.parentName,
-                        row.phone,
-                        row.parentEmail,
-                        row.currentSchool,
-                        row.programName,
-                        row.methodName,
-                        row.identityCard,
-                    ].some((field) => String(field || "").toLowerCase().includes(kw))
-                )
-                : allRows;
-
-            const total = filtered.length;
-            const start = activePage * pageSize;
-            const pagedRows = filtered.slice(start, start + pageSize);
-            setRows(pagedRows);
-            setTotalItems(total);
+            setAllForms(mappedForms);
+            setPendingCount(mappedForms.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
         } catch (err) {
-            setRows([]);
-            setTotalItems(0);
+            setCampaigns([]);
+            setAllForms([]);
+            setPendingCount(0);
             setError(getApiErrorMessage(err, "Không tải được danh sách hồ sơ nhập học."));
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, search, statusFilter, sortBy]);
+    }, [statusFilter]);
 
     const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
         if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
         setDetailOpen(false);
         setSelectedReservation(null);
         setStatusFilter(nextStatus);
-        setPage(0);
-        void loadData({statusOverride: nextStatus, pageOverride: 0});
+        void loadData({statusOverride: nextStatus});
     }, [loadData]);
 
     React.useEffect(() => {
@@ -1354,8 +1449,24 @@ export default function SchoolCampusAdmissionReservations() {
     }, [schoolCtxLoading, loadData]);
 
     React.useEffect(() => {
-        setPage(0);
-    }, [search, statusFilter]);
+        if (campaignFilter !== "ALL") {
+            setExpandedCampaignIds(new Set([campaignFilter]));
+            return;
+        }
+        if (visibleCampaignGroups.length === 1) {
+            setExpandedCampaignIds(new Set([String(visibleCampaignGroups[0].id)]));
+        }
+    }, [campaignFilter, visibleCampaignGroups]);
+
+    const toggleCampaignExpand = (campaignId) => {
+        const key = String(campaignId);
+        setExpandedCampaignIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
 
     const openDetail = (row) => {
         setSelectedReservation(row);
@@ -1375,6 +1486,53 @@ export default function SchoolCampusAdmissionReservations() {
         setSelectedImageIndex(0);
         setImagePreviewOpen(true);
     };
+
+    const renderFormActions = (row) => (
+        <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
+            <RowActionButton variant="view" title="Xem chi tiết" onClick={() => openDetail(row)}>
+                <VisibilityRoundedIcon />
+            </RowActionButton>
+            {row.status === RESERVATION_STATUS.PENDING ? (
+                <>
+                    <RowActionButton
+                        variant="success"
+                        title="Phê duyệt"
+                        disabled={submittingId === row.id}
+                        onClick={() => setConfirmState({open: true, form: row})}
+                    >
+                        <CheckCircleRoundedIcon />
+                    </RowActionButton>
+                    <RowActionButton
+                        variant="danger"
+                        title="Từ chối hồ sơ"
+                        disabled={submittingId === row.id}
+                        onClick={() => setRejectState({open: true, form: row, reason: "", touched: false})}
+                    >
+                        <CancelRoundedIcon />
+                    </RowActionButton>
+                </>
+            ) : row.status === RESERVATION_STATUS.PAYMENT_PENDING ? (
+                <>
+                    <RowActionButton
+                        variant="success"
+                        title="Xác nhận hoàn thành"
+                        disabled={submittingId === row.id}
+                        onClick={() => setPaymentConfirmState({open: true, form: row})}
+                    >
+                        <CheckCircleRoundedIcon />
+                    </RowActionButton>
+                    <RowActionButton
+                        variant="danger"
+                        title="Từ chối thanh toán"
+                        disabled={submittingId === row.id}
+                        onClick={() => setPaymentRejectState({open: true, form: row, reason: "", touched: false})}
+                    >
+                        <CancelRoundedIcon />
+                    </RowActionButton>
+                </>
+            ) : null}
+        </Stack>
+    );
 
     const handleApprove = async () => {
         const form = confirmState.form;
@@ -1493,8 +1651,22 @@ export default function SchoolCampusAdmissionReservations() {
                             </Typography>
                         </Box>
                     </Stack>
-                    <Stack direction={{xs: "column", sm: "row"}} spacing={1} alignItems={{xs: "flex-start", sm: "center"}}>
+                    <Stack direction={{xs: "column", sm: "row"}} spacing={1} alignItems={{xs: "flex-start", sm: "center"}} flexWrap="wrap">
                         <Chip label={`Còn lại: ${pendingCount} hồ sơ`} sx={{ borderRadius: 999, bgcolor: "rgba(255,255,255,0.95)", color: "#0D64DE", fontWeight: 800 }} />
+                        {campaignFilter !== "ALL" && selectedCampaignLabel ? (
+                            <Chip
+                                label={selectedCampaignLabel}
+                                onDelete={() => setCampaignFilter("ALL")}
+                                sx={{
+                                    borderRadius: 999,
+                                    maxWidth: {xs: "100%", sm: 280},
+                                    bgcolor: "rgba(255,255,255,0.95)",
+                                    color: "#0D64DE",
+                                    fontWeight: 700,
+                                    "& .MuiChip-deleteIcon": {color: "#64748b"},
+                                }}
+                            />
+                        ) : null}
                         {pendingCount > 0 && (
                             <Button
                                 variant="contained"
@@ -1553,7 +1725,43 @@ export default function SchoolCampusAdmissionReservations() {
                         <TextField
                             select
                             size="small"
-                            label="Trạng thái"
+                            label="Chiến dịch"
+                            value={campaignFilter}
+                            onChange={(e) => setCampaignFilter(e.target.value)}
+                            sx={{minWidth: 220, maxWidth: {md: 320}, "& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "white"}}}
+                        >
+                            <MenuItem value="ALL">Tất cả chiến dịch</MenuItem>
+                            {campaignYears.flatMap((year) => [
+                                <ListSubheader key={`year-${year}`} sx={{fontWeight: 700, color: "#64748b", lineHeight: "32px"}}>
+                                    Năm {year}
+                                </ListSubheader>,
+                                ...campaigns
+                                    .filter((c) => c.year === year)
+                                    .map((c) => (
+                                        <MenuItem key={c.id} value={String(c.id)} sx={{pl: 3}}>
+                                            {c.name}
+                                        </MenuItem>
+                                    )),
+                            ])}
+                            {campaigns.some((c) => c.year == null)
+                                ? [
+                                      <ListSubheader key="year-other" sx={{fontWeight: 700, color: "#64748b", lineHeight: "32px"}}>
+                                          Khác
+                                      </ListSubheader>,
+                                      ...campaigns
+                                          .filter((c) => c.year == null)
+                                          .map((c) => (
+                                              <MenuItem key={c.id} value={String(c.id)} sx={{pl: 3}}>
+                                                  {c.name}
+                                              </MenuItem>
+                                          )),
+                                  ]
+                                : null}
+                        </TextField>
+                        <TextField
+                            select
+                            size="small"
+                            label="Trạng thái hồ sơ"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                             sx={{minWidth: 180, "& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "white"}}}
@@ -1576,28 +1784,6 @@ export default function SchoolCampusAdmissionReservations() {
                             <MenuItem value="NEWEST">Mới nhất</MenuItem>
                             <MenuItem value="OLDEST">Cũ nhất</MenuItem>
                         </TextField>
-                        <Button
-                            variant="contained"
-                            disabled={exportingExcel || loading}
-                            onClick={() => setExportExcelConfirmOpen(true)}
-                            startIcon={
-                                exportingExcel
-                                    ? <CircularProgress size={16} color="inherit" />
-                                    : <GridOnRoundedIcon />
-                            }
-                            sx={{
-                                ml: {md: "auto"},
-                                textTransform: "none",
-                                borderRadius: 2,
-                                fontWeight: 700,
-                                minWidth: {xs: "100%", md: 160},
-                                bgcolor: "#047857",
-                                boxShadow: "0 4px 14px rgba(4, 120, 87, 0.28)",
-                                "&:hover": {bgcolor: "#065f46"},
-                            }}
-                        >
-                            {exportingExcel ? "Đang xuất..." : "Xuất Excel"}
-                        </Button>
                     </Stack>
                 </CardContent>
             </Card>
@@ -1620,7 +1806,7 @@ export default function SchoolCampusAdmissionReservations() {
                                 <Skeleton />
                             </CardContent>
                         </Card>
-                    ) : rows.length === 0 ? (
+                    ) : visibleCampaignGroups.length === 0 ? (
                         <Card elevation={0} sx={{borderRadius: 4, border: "1px dashed #cbd5e1", textAlign: "center"}}>
                             <CardContent>
                                 <Typography sx={{fontWeight: 800, color: "#334155"}}>Không có hồ sơ phù hợp</Typography>
@@ -1632,117 +1818,175 @@ export default function SchoolCampusAdmissionReservations() {
                             <Table sx={{minWidth: 980}}>
                                 <TableHead>
                                     <TableRow sx={{bgcolor: "#f8fafc"}}>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Phụ huynh</TableCell>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Học sinh</TableCell>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>SĐT</TableCell>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Chương trình</TableCell>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Ngày nộp</TableCell>
-                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Trạng thái</TableCell>
-                                        <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", py: 2, minWidth: 128}}>Thao tác</TableCell>
+                                        <TableCell sx={{width: 48, py: 2}} />
+                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2}}>Chiến dịch tuyển sinh</TableCell>
+                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2, width: 100}}>Năm</TableCell>
+                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2, width: 120}}>Số hồ sơ</TableCell>
+                                        <TableCell sx={{fontWeight: 700, color: "#1e293b", py: 2, width: 160}}>Tình trạng</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {rows.map((row) => (
-                                        <TableRow
-                                            key={row.id}
-                                            hover
-                                            sx={{
-                                                "&:hover": { bgcolor: "rgba(122, 169, 235, 0.06)" },
-                                            }}
-                                        >
-                                            <TableCell sx={{py: 2.25, fontWeight: 600, color: "#1e293b"}}>{row.parentName}</TableCell>
-                                            <TableCell sx={{py: 2.25}}>{row.studentName}</TableCell>
-                                            <TableCell sx={{py: 2.25}}>{row.phone || "—"}</TableCell>
-                                            <TableCell sx={{py: 2.25}}>{row.programName || "—"}</TableCell>
-                                            <TableCell sx={{py: 2.25, whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
-                                            <TableCell sx={{py: 2.25}}><StatusChip status={row.status} /></TableCell>
-                                            <TableCell align="right" sx={{py: 2.25}}>
-                                                <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
-                                                    <RowActionButton
-                                                        variant="view"
-                                                        title="Xem chi tiết"
-                                                        onClick={() => openDetail(row)}
-                                                    >
-                                                        <VisibilityRoundedIcon />
-                                                    </RowActionButton>
-                                                    {row.status === RESERVATION_STATUS.PENDING ? (
-                                                        <>
-                                                            <RowActionButton
-                                                                variant="success"
-                                                                title="Phê duyệt"
-                                                                disabled={submittingId === row.id}
-                                                                onClick={() => setConfirmState({open: true, form: row})}
-                                                            >
-                                                                <CheckCircleRoundedIcon />
-                                                            </RowActionButton>
-                                                            <RowActionButton
-                                                                variant="danger"
-                                                                title="Từ chối hồ sơ"
-                                                                disabled={submittingId === row.id}
-                                                                onClick={() => setRejectState({open: true, form: row, reason: "", touched: false})}
-                                                            >
-                                                                <CancelRoundedIcon />
-                                                            </RowActionButton>
-                                                        </>
-                                                    ) : row.status === RESERVATION_STATUS.PAYMENT_PENDING ? (
-                                                        <>
-                                                            <RowActionButton
-                                                                variant="success"
-                                                                title="Xác nhận hoàn thành"
-                                                                disabled={submittingId === row.id}
-                                                                onClick={() => setPaymentConfirmState({open: true, form: row})}
-                                                            >
-                                                                <CheckCircleRoundedIcon />
-                                                            </RowActionButton>
-                                                            <RowActionButton
-                                                                variant="danger"
-                                                                title="Từ chối thanh toán"
-                                                                disabled={submittingId === row.id}
-                                                                onClick={() => setPaymentRejectState({open: true, form: row, reason: "", touched: false})}
-                                                            >
-                                                                <CancelRoundedIcon />
-                                                            </RowActionButton>
-                                                        </>
-                                                    ) : null}
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {visibleCampaignGroups.map((group) => {
+                                        const expanded = expandedCampaignIds.has(String(group.id));
+                                        const formCount = group.forms.length;
+                                        return (
+                                            <React.Fragment key={group.id}>
+                                                <TableRow
+                                                    hover
+                                                    onClick={() => toggleCampaignExpand(group.id)}
+                                                    sx={{
+                                                        cursor: "pointer",
+                                                        bgcolor: expanded ? "rgba(122, 169, 235, 0.08)" : "#fff",
+                                                        "&:hover": {bgcolor: "rgba(122, 169, 235, 0.1)"},
+                                                    }}
+                                                >
+                                                    <TableCell sx={{py: 2}}>
+                                                        <ExpandMoreRoundedIcon
+                                                            sx={{
+                                                                fontSize: 22,
+                                                                color: "#64748b",
+                                                                transform: expanded ? "rotate(180deg)" : "none",
+                                                                transition: "transform 0.2s",
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell sx={{py: 2, fontWeight: 700, color: "#1e293b"}}>
+                                                        {group.name}
+                                                    </TableCell>
+                                                    <TableCell sx={{py: 2, color: "#475569"}}>
+                                                        {group.year ?? "—"}
+                                                    </TableCell>
+                                                    <TableCell sx={{py: 2}}>
+                                                        <Chip
+                                                            label={`${formCount} hồ sơ`}
+                                                            size="small"
+                                                            sx={{
+                                                                borderRadius: 999,
+                                                                bgcolor: "#eff6ff",
+                                                                color: "#1d4ed8",
+                                                                fontWeight: 700,
+                                                                border: "1px solid #bfdbfe",
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell sx={{py: 2}}>
+                                                        <Chip
+                                                            label={group.isActive ? "Đang hoạt động" : "Không hoạt động"}
+                                                            size="small"
+                                                            sx={{
+                                                                borderRadius: 999,
+                                                                bgcolor: group.isActive ? "#dcfce7" : "#f1f5f9",
+                                                                color: group.isActive ? "#166534" : "#64748b",
+                                                                fontWeight: 700,
+                                                                border: `1px solid ${group.isActive ? "#86efac" : "#e2e8f0"}`,
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                                <TableRow>
+                                                    <TableCell colSpan={5} sx={{p: 0, borderBottom: expanded ? undefined : "none"}}>
+                                                        <Collapse in={expanded} timeout="auto" unmountOnExit>
+                                                            <Box sx={{px: 2, pb: 2, pt: 0.5, bgcolor: "#f8fafc"}}>
+                                                                <Stack
+                                                                    direction="row"
+                                                                    justifyContent="flex-end"
+                                                                    sx={{py: 1.25, px: 0.5}}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant="contained"
+                                                                        disabled={exportingCampaignId === group.id}
+                                                                        startIcon={
+                                                                            exportingCampaignId === group.id
+                                                                                ? <CircularProgress size={14} color="inherit" />
+                                                                                : <GridOnRoundedIcon />
+                                                                        }
+                                                                        onClick={() =>
+                                                                            setExportExcelConfirm({
+                                                                                open: true,
+                                                                                campaignId: group.id,
+                                                                                campaignName: group.name,
+                                                                            })
+                                                                        }
+                                                                        sx={{
+                                                                            textTransform: "none",
+                                                                            borderRadius: 2,
+                                                                            fontWeight: 700,
+                                                                            bgcolor: "#047857",
+                                                                            boxShadow: "none",
+                                                                            "&:hover": {bgcolor: "#065f46"},
+                                                                        }}
+                                                                    >
+                                                                        {exportingCampaignId === group.id
+                                                                            ? "Đang xuất..."
+                                                                            : "Xuất Excel"}
+                                                                    </Button>
+                                                                </Stack>
+                                                                {formCount === 0 ? (
+                                                                    <Typography variant="body2" sx={{py: 2, px: 1, color: "#64748b"}}>
+                                                                        Chưa có hồ sơ phù hợp trong chiến dịch này.
+                                                                    </Typography>
+                                                                ) : (
+                                                                    <Table size="small" sx={{bgcolor: "#fff", borderRadius: 2, border: "1px solid #e2e8f0"}}>
+                                                                        <TableHead>
+                                                                            <TableRow sx={{bgcolor: "#f8fafc"}}>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Phụ huynh</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Học sinh</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>SĐT</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Chương trình</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Ngày nộp</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Trạng thái</TableCell>
+                                                                                <TableCell align="right" sx={{fontWeight: 700, color: "#1e293b", minWidth: 128}}>Thao tác</TableCell>
+                                                                            </TableRow>
+                                                                        </TableHead>
+                                                                        <TableBody>
+                                                                            {group.forms.map((row) => (
+                                                                                <TableRow key={row.id} hover sx={{"&:hover": {bgcolor: "rgba(122, 169, 235, 0.06)"}}}>
+                                                                                    <TableCell sx={{fontWeight: 600, color: "#1e293b"}}>{row.parentName}</TableCell>
+                                                                                    <TableCell>{row.studentName}</TableCell>
+                                                                                    <TableCell>{row.phone || "—"}</TableCell>
+                                                                                    <TableCell>{row.programName || "—"}</TableCell>
+                                                                                    <TableCell sx={{whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
+                                                                                    <TableCell><StatusChip status={row.status} /></TableCell>
+                                                                                    <TableCell align="right">{renderFormActions(row)}</TableCell>
+                                                                                </TableRow>
+                                                                            ))}
+                                                                        </TableBody>
+                                                                    </Table>
+                                                                )}
+                                                            </Box>
+                                                        </Collapse>
+                                                    </TableCell>
+                                                </TableRow>
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </TableContainer>
                     )}
-                    {totalItems > pageSize ? (
-                        <Box sx={{display: "flex", justifyContent: "flex-end", pt: 1}}>
-                            <Pagination
-                                count={Math.ceil(totalItems / pageSize)}
-                                page={page + 1}
-                                onChange={(_, p) => setPage(p - 1)}
-                                color="primary"
-                                shape="rounded"
-                            />
-                        </Box>
-                    ) : null}
                 </>
             )}
 
             <ConfirmDialog
-                open={exportExcelConfirmOpen}
+                open={exportExcelConfirm.open}
                 title="Xác nhận xuất Excel"
                 description={
                     <>
-                        Hệ thống chỉ tải các hồ sơ có trạng thái{" "}
-                        <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight> và{" "}
+                        Xuất hồ sơ chiến dịch{" "}
+                        <ConfirmHighlight>{exportExcelConfirm.campaignName || "này"}</ConfirmHighlight> với
+                        trạng thái <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight> và{" "}
                         <ConfirmHighlight>{exportExcelStatusLabels[1]}</ConfirmHighlight>.
                     </>
                 }
                 extraDescription="Bạn có muốn tiếp tục tải xuống?"
                 cancelText="Hủy"
-                confirmText={exportingExcel ? "Đang xuất..." : "Tải xuống"}
-                loading={exportingExcel}
+                confirmText={exportingCampaignId != null ? "Đang xuất..." : "Tải xuống"}
+                loading={exportingCampaignId != null}
                 onCancel={() => {
-                    if (exportingExcel) return;
-                    setExportExcelConfirmOpen(false);
+                    if (exportingCampaignId != null) return;
+                    setExportExcelConfirm({open: false, campaignId: null, campaignName: ""});
                 }}
                 onConfirm={() => void handleExportExcelConfirm()}
             />

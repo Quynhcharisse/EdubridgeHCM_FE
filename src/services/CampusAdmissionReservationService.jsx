@@ -75,9 +75,18 @@ export const autoApproveAdmissionReservations = async (admissionCampaignId) => {
     return pickBody(response);
 };
 
-export const exportAdmissionFormsByStatus = async (status) => {
-    return axiosClient.get("/campus/admission/form/export", {
-        params: {status: String(status || "").trim().toUpperCase()},
+/**
+ * GET /campus/admission/form/export?status=...&status=...&campaignId=...
+ * @param {{ campaignId: number, statuses?: string[] }} options
+ */
+export const exportAdmissionForms = async ({campaignId, statuses}) => {
+    const normalizedStatuses = (Array.isArray(statuses) ? statuses : [])
+        .map((status) => String(status || "").trim().toUpperCase())
+        .filter(Boolean);
+    const params = new URLSearchParams();
+    params.set("campaignId", String(Number(campaignId)));
+    normalizedStatuses.forEach((status) => params.append("status", status));
+    return axiosClient.get(`/campus/admission/form/export?${params.toString()}`, {
         responseType: "blob",
     });
 };
