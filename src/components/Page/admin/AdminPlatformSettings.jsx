@@ -513,6 +513,7 @@ export default function AdminPlatformSettings() {
         methodAdmissionProcess: [],
         methodDocumentRequirements: [],
         mandatoryAllDocumentRequirements: [],
+        transcriptTemplateImageUrl: "",
     });
     const [importType, setImportType] = useState("ALLOWED_METHODS");
     const [admissionImportRows, setAdmissionImportRows] = useState([]);
@@ -522,6 +523,7 @@ export default function AdminPlatformSettings() {
     const [admissionMethodsEditing, setAdmissionMethodsEditing] = useState(false);
     const [admissionMandatoryEditing, setAdmissionMandatoryEditing] = useState(false);
     const [admissionDocumentsEditing, setAdmissionDocumentsEditing] = useState(false);
+    const [admissionTranscriptEditing, setAdmissionTranscriptEditing] = useState(false);
     const [admissionImportPreview, setAdmissionImportPreview] = useState(null);
     const [importingAdmissionTemplate, setImportingAdmissionTemplate] = useState(false);
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
@@ -917,6 +919,12 @@ export default function AdminPlatformSettings() {
                           : [],
                   })),
             mandatoryAllDocumentRequirements: mandatoryDocsSource.map((doc) => mapMandatoryDocFromApi(doc)),
+            transcriptTemplateImageUrl: (() => {
+                const url = adm?.transcriptTemplateImageUrl
+                    ?? adm?.documentRequirementsData?.transcriptTemplateImageUrl
+                    ?? adm?.documentRequirements?.transcriptTemplateImageUrl;
+                return url != null ? String(url) : "";
+            })(),
         };
     };
 
@@ -1029,6 +1037,7 @@ export default function AdminPlatformSettings() {
         setAdmissionMethodsEditing(false);
         setAdmissionMandatoryEditing(false);
         setAdmissionDocumentsEditing(false);
+        setAdmissionTranscriptEditing(false);
         setMandatoryOcrExpandedIdxs([]);
     }, [configBody]);
 
@@ -1040,6 +1049,7 @@ export default function AdminPlatformSettings() {
             setAdmissionMethodsEditing(false);
             setAdmissionMandatoryEditing(false);
             setAdmissionDocumentsEditing(false);
+            setAdmissionTranscriptEditing(false);
         }
     }, [activeTabKey]);
 
@@ -1570,6 +1580,7 @@ export default function AdminPlatformSettings() {
         METHODS: "methods",
         MANDATORY: "mandatory",
         DOCUMENTS: "documents",
+        TRANSCRIPT: "transcript",
     };
 
     const isAdmissionImportEditingDraft = (type) => {
@@ -1601,6 +1612,8 @@ export default function AdminPlatformSettings() {
                         methodDocumentRequirements: base.methodDocumentRequirements,
                         methodAdmissionProcess: base.methodAdmissionProcess,
                     };
+                case ADMISSION_EDIT_SECTION.TRANSCRIPT:
+                    return { ...prev, transcriptTemplateImageUrl: base.transcriptTemplateImageUrl };
                 default:
                     return prev;
             }
@@ -1628,6 +1641,11 @@ export default function AdminPlatformSettings() {
                     methodDocumentRequirements: form.methodDocumentRequirements,
                     methodAdmissionProcess: form.methodAdmissionProcess,
                 });
+            case ADMISSION_EDIT_SECTION.TRANSCRIPT:
+                return sanitizeAdmissionSettingsForApi({
+                    ...base,
+                    transcriptTemplateImageUrl: form.transcriptTemplateImageUrl,
+                });
             default:
                 return sanitizeAdmissionSettingsForApi(base);
         }
@@ -1639,6 +1657,7 @@ export default function AdminPlatformSettings() {
             [ADMISSION_EDIT_SECTION.METHODS]: "Đã cập nhật phương thức tuyển sinh.",
             [ADMISSION_EDIT_SECTION.MANDATORY]: "Đã cập nhật hồ sơ bắt buộc chung.",
             [ADMISSION_EDIT_SECTION.DOCUMENTS]: "Đã cập nhật hồ sơ và quy trình tuyển sinh.",
+            [ADMISSION_EDIT_SECTION.TRANSCRIPT]: "Đã cập nhật hình ảnh mẫu học bạ.",
         };
         setSaving(true);
         setStatus({ type: "", message: "" });
@@ -3129,6 +3148,133 @@ export default function AdminPlatformSettings() {
                             })}
                         </Stack>
                     )}
+                </Box>
+
+                {/* Hồ sơ học bạ */}
+                <Box
+                    sx={{
+                        p: 1.5,
+                        borderRadius: 2.25,
+                        border: "1px solid rgba(191, 219, 254, 0.9)",
+                        bgcolor: "rgba(248,251,255,0.78)",
+                        boxShadow: "0 10px 22px rgba(37, 99, 235, 0.08)",
+                        transition: "all 220ms ease",
+                        "&:hover": {
+                            borderColor: "rgba(96, 165, 250, 0.65)",
+                            boxShadow: "0 14px 28px rgba(37, 99, 235, 0.14)",
+                        },
+                    }}
+                >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#1d4ed8" }}>
+                                Hồ sơ học bạ
+                            </Typography>
+                            {admissionTemplateForm.transcriptTemplateImageUrl ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography
+                                        component="a"
+                                        href={admissionTemplateForm.transcriptTemplateImageUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        variant="caption"
+                                        sx={{
+                                            color: "#2563eb",
+                                            textDecoration: "underline",
+                                            maxWidth: 260,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                            display: "block",
+                                        }}
+                                    >
+                                        {admissionTemplateForm.transcriptTemplateImageUrl}
+                                    </Typography>
+                                    {admissionTranscriptEditing && (
+                                        <>
+                                            <CloudinaryUpload
+                                                accept="image/*"
+                                                multiple={false}
+                                                disabled={saving}
+                                                onSuccess={(results) => {
+                                                    const url = results?.[0]?.url ?? "";
+                                                    setAdmissionTemplateForm((prev) => ({ ...prev, transcriptTemplateImageUrl: url }));
+                                                }}
+                                                onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
+                                            >
+                                                {({ inputId, loading }) => (
+                                                    <label htmlFor={inputId}>
+                                                        <Tooltip title="Thay hình ảnh">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    component="span"
+                                                                    disabled={saving || loading}
+                                                                    sx={{ border: "1px solid #cbd5e1", "&:hover": { bgcolor: "#f1f5f9" } }}
+                                                                >
+                                                                    <FileUploadOutlinedIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    </label>
+                                                )}
+                                            </CloudinaryUpload>
+                                            <Tooltip title="Xóa hình ảnh">
+                                                <IconButton
+                                                    size="small"
+                                                    disabled={saving}
+                                                    onClick={() => setAdmissionTemplateForm((prev) => ({ ...prev, transcriptTemplateImageUrl: "" }))}
+                                                    sx={{ border: "1px solid #fca5a5", color: "#dc2626", "&:hover": { bgcolor: "#fff1f2" } }}
+                                                >
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </>
+                                    )}
+                                </Stack>
+                            ) : admissionTranscriptEditing ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <CloudinaryUpload
+                                        accept="image/*"
+                                        multiple={false}
+                                        disabled={saving}
+                                        onSuccess={(results) => {
+                                            const url = results?.[0]?.url ?? "";
+                                            setAdmissionTemplateForm((prev) => ({ ...prev, transcriptTemplateImageUrl: url }));
+                                        }}
+                                        onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
+                                    >
+                                        {({ inputId, loading }) => (
+                                            <label htmlFor={inputId}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    component="span"
+                                                    disabled={saving || loading}
+                                                    startIcon={<InsertDriveFileOutlinedIcon fontSize="small" />}
+                                                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, whiteSpace: "nowrap" }}
+                                                >
+                                                    {loading ? "Đang tải..." : "Tải hình ảnh mẫu"}
+                                                </Button>
+                                            </label>
+                                        )}
+                                    </CloudinaryUpload>
+                                    <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                                        Chưa có hình ảnh mẫu
+                                    </Typography>
+                                </Stack>
+                            ) : (
+                                <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                                    Chưa có hình ảnh mẫu
+                                </Typography>
+                            )}
+                        </Stack>
+                        {renderSectionEditActions(
+                            ADMISSION_EDIT_SECTION.TRANSCRIPT,
+                            admissionTranscriptEditing,
+                            setAdmissionTranscriptEditing,
+                        )}
+                    </Box>
                 </Box>
 
                 {preview ? (() => {
