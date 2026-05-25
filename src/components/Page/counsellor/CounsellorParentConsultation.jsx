@@ -1299,8 +1299,9 @@ export default function CounsellorParentConsultation() {
       const body = res.data?.body ?? res.data;
       const uploaded = { fileName: body.fileName, fileUrl: body.fileUrl };
       handleSendWithFiles([uploaded]);
-    } catch {
-      enqueueSnackbar("Tải file thất bại, vui lòng thử lại.", { variant: "error" });
+    } catch (e) {
+      const apiMsg = e?.response?.data?.message;
+      enqueueSnackbar(apiMsg || "Tải file thất bại, vui lòng thử lại.", { variant: "error" });
     } finally {
       setIsUploading(false);
     }
