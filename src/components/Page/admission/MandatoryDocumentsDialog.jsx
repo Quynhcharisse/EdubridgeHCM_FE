@@ -247,6 +247,20 @@ export default function MandatoryDocumentsDialog({
         ? context.methodName
         : "Theo hình thức đăng ký";
 
+    const confirmEndDateFormatted = (() => {
+        const raw = context?.confirmEndDate;
+        if (!raw) return null;
+        if (Array.isArray(raw) && raw.length >= 3) {
+            const [y, m, d] = raw;
+            return new Date(y, m - 1, d).toLocaleDateString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+            });
+        }
+        return null;
+    })();
+
     return (
         <>
             <Dialog
@@ -342,7 +356,13 @@ export default function MandatoryDocumentsDialog({
                                         px: 0.25,
                                     }}
                                 >
-                                    Chuẩn bị hồ sơ theo đúng mẫu bên dưới. Hồ sơ có dấu{" "}
+                                    Chuẩn bị hồ sơ và nộp tại trường tới ngày{" "}
+                                    {confirmEndDateFormatted ? (
+                                        <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
+                                            {confirmEndDateFormatted}
+                                        </Box>
+                                    ) : "—"}
+                                    . Hồ sơ có dấu{" "}
                                     <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
                                         *
                                     </Box>{" "}
