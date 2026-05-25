@@ -48,6 +48,7 @@ import {
 } from "../../constants/homeLandingTheme";
 import {getPublicSchoolCampaignTemplates, getPublicSchoolDetail} from "../../services/SchoolPublicService.jsx";
 import {mapPublicSchoolDetailToRow} from "../../utils/schoolPublicMapper.js";
+import {normalizeBoardingTypeForApi, parseBoardingType} from "../../constants/schoolBoardingType.js";
 
 const SCHOOL_ICON_TINTS = ["#2563eb", "#3b82f6", "#0ea5e9", "#38bdf8"];
 const NEARBY_MARK_KM = 10;
@@ -98,6 +99,12 @@ function formatDistanceKm(value) {
 
 function formatDateDisplay(value) {
     if (!value) return "—";
+    if (Array.isArray(value) && value.length >= 3) {
+        const [y, m, d] = value;
+        if ([y, m, d].every((n) => Number.isFinite(Number(n)))) {
+            return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+        }
+    }
     const dt = new Date(value);
     if (Number.isNaN(dt.getTime())) return String(value);
     const dd = String(dt.getDate()).padStart(2, "0");
@@ -106,12 +113,120 @@ function formatDateDisplay(value) {
     return `${dd}/${mm}/${yyyy}`;
 }
 
-function mapCurriculumType(type) {
-    const s = String(type || "").trim().toUpperCase();
-    if (s === "NATIONAL") return "Quốc gia (MOET)";
-    if (s === "INTERNATIONAL") return "Quốc tế";
-    if (s === "BILINGUAL") return "Song ngữ";
-    return s || "Đang cập nhật";
+function formatFoundingDate(value) {
+    if (!value) return "—";
+    const text = String(value).trim();
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    return formatDateDisplay(value);
+}
+
+function mapCampaignStatusLabel(status) {
+    const key = String(status || "").trim().toUpperCase();
+    if (key === "OPEN_ADMISSION_CAMPAIGN" || key === "OPEN") return "Đang mở nhận hồ sơ";
+    if (key === "CLOSED_ADMISSION_CAMPAIGN" || key === "CLOSED") return "Đã đóng";
+    if (key === "DRAFT") return "Nháp";
+    return key ? key : "—";
+}
+
+function mapBoardingTypeLabel(raw) {
+    const parsed = parseBoardingType(raw);
+    if (parsed) return normalizeBoardingTypeForApi(parsed);
+    const text = String(raw || "").trim();
+    return text || "—";
+}
+
+function feeUnitLabel(value) {
+    const key = String(value || "").trim().toUpperCase();
+    if (key === "YEAR") return "năm";
+    if (key === "SEMESTER") return "học kỳ";
+    if (key === "QUARTER") return "quý";
+    if (key === "MONTH") return "tháng";
+    return key ? key.toLowerCase() : "";
+}
+
+function pickPrimaryCampaign(campaigns) {
+    const list = Array.isArray(campaigns) ? campaigns : [];
+    const open = list.find((c) => String(c?.status || "").toUpperCase() === "OPEN_ADMISSION_CAMPAIGN");
+    return open || list[0] || null;
+}
+
+function collectAllowedMethods(campaigns) {
+    const map = new Map();
+    (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+        const sources = [
+            ...(Array.isArray(campaign?.schoolAllowedMethods) ? campaign.schoolAllowedMethods : []),
+            ...(Array.isArray(campaign?.campaignConfig?.allowedMethods) ? campaign.campaignConfig.allowedMethods : [])
+        ];
+        sources.forEach((method) => {
+            const name = String(method?.displayName || method?.code || "").trim();
+            if (!name) return;
+            map.set(String(method?.code || name), name);
+        });
+    });
+    return Array.from(map.values());
+}
+
+function collectProgramOfferings(campaigns) {
+    const map = new Map();
+    (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+        (Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : []).forEach((offering) => {
+            const id = Number(offering?.id);
+            const key = Number.isFinite(id) && id > 0 ? `id:${id}` : `${offering?.campusId}-${offering?.program?.id}`;
+            if (!map.has(key)) map.set(key, offering);
+        });
+    });
+    return Array.from(map.values());
+}
+
+function mergePublicDetailForCompare(detailRaw) {
+    const mapped = mapPublicSchoolDetailToRow(detailRaw);
+    if (!mapped) return detailRaw || null;
+    return {
+        ...mapped,
+        name: mapped.school || detailRaw?.name,
+        hotline: detailRaw?.hotline ?? null,
+        websiteUrl: detailRaw?.websiteUrl ?? mapped?.website ?? "",
+        foundingDate: detailRaw?.foundingDate ?? mapped?.foundingDate ?? null,
+        totalCampus: detailRaw?.totalCampus ?? mapped?.totalCampus ?? null
+    };
+}
+
+function collectFacilitySummary(campusList) {
+    const overviews = [];
+    const itemLines = [];
+    const images = [];
+    const seenUrls = new Set();
+    const pushImage = (url, name) => {
+        const normalizedUrl = String(url || "").trim();
+        if (!normalizedUrl || seenUrls.has(normalizedUrl)) return;
+        seenUrls.add(normalizedUrl);
+        images.push({
+            key: normalizedUrl,
+            url: normalizedUrl,
+            name: String(name || "").trim() || "Ảnh CSVC"
+        });
+    };
+    (Array.isArray(campusList) ? campusList : []).forEach((campus) => {
+        const facility = campus?.facility && typeof campus.facility === "object" ? campus.facility : {};
+        const overviewText = stripHtml(facility?.overview);
+        if (overviewText) overviews.push(overviewText);
+        (Array.isArray(facility?.itemList) ? facility.itemList : []).forEach((item) => {
+            const name = String(item?.name || "").trim();
+            if (!name) return;
+            const value = item?.value;
+            const unit = String(item?.unit || "").trim();
+            const valueText = value == null || value === "" ? "" : ` ${value}`;
+            const unitText = unit ? ` ${unit}` : "";
+            itemLines.push(`${name}: ${String(valueText + unitText).trim() || "—"}`);
+        });
+        const imageData = facility?.imageData || {};
+        pushImage(imageData?.coverUrl, "Ảnh đại diện");
+        (Array.isArray(imageData?.imageList) ? imageData.imageList : []).forEach((img, idx) => {
+            pushImage(img?.url, img?.name || img?.altName || `Ảnh ${idx + 1}`);
+        });
+    });
+    return {overviews, itemLines, images};
 }
 
 function mapMethodLabel(method) {
@@ -146,23 +261,6 @@ function metricIconByLabel(label) {
     return DescriptionOutlinedIcon;
 }
 
-function campusBoardingSummary(campusList) {
-    const set = new Set();
-    (Array.isArray(campusList) ? campusList : []).forEach((campus) => {
-        const text = String(campus?.boardingType || "").trim().toLowerCase();
-        if (!text) return;
-        if (text.includes("both")) {
-            set.add("Nội trú");
-            set.add("Bán trú");
-            return;
-        }
-        if (text.includes("full_boarding") || text.includes("nội trú")) set.add("Nội trú");
-        if (text.includes("day_boarding") || text.includes("bán trú")) set.add("Bán trú");
-    });
-    const list = Array.from(set);
-    return list.length ? list.join(" / ") : "Đang cập nhật";
-}
-
 function haversineKm(a, b) {
     const lat1 = Number(a?.lat);
     const lon1 = Number(a?.lng);
@@ -193,109 +291,35 @@ function getSchoolDistanceKm(detail, userLocation) {
     return min;
 }
 
-function collectCampaignTuitionStats(campaigns) {
-    const values = [];
-    const perCampus = new Map();
-    (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
-        const offerings = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
-        offerings.forEach((offering) => {
-            const tuition = Number(offering?.tuitionFee);
-            if (!Number.isFinite(tuition)) return;
-            values.push(tuition);
-            const campusName = toText(offering?.campusName, `Campus ${offering?.campusId ?? "?"}`);
-            if (!perCampus.has(campusName)) perCampus.set(campusName, []);
-            perCampus.get(campusName).push(tuition);
-        });
-    });
-    const min = values.length ? Math.min(...values) : null;
-    const max = values.length ? Math.max(...values) : null;
-    const campusLines = Array.from(perCampus.entries())
-        .slice(0, 3)
-        .map(([name, list]) => {
-            const cMin = Math.min(...list);
-            const cMax = Math.max(...list);
-            return `${name}: ${formatMoney(cMin)}${cMin !== cMax ? ` - ${formatMoney(cMax)}` : ""}`;
-        });
-    return {
-        min,
-        max,
-        summary: min == null ? "Chưa có dữ liệu học phí final" : `${formatMoney(min)}${min !== max ? ` - ${formatMoney(max)}` : ""}`,
-        campusLines
-    };
-}
-
 function buildComparisonPayload(row, detail, campaigns, userLocation) {
     const campusList = Array.isArray(detail?.campusList) ? detail.campusList : [];
-    const curriculumList = Array.isArray(detail?.curriculumList) ? detail.curriculumList : [];
-    const tuitionStats = collectCampaignTuitionStats(campaigns);
+    const campaignList = Array.isArray(campaigns) ? campaigns : [];
+    const primaryCampaign = pickPrimaryCampaign(campaignList);
     const distanceKm = getSchoolDistanceKm(detail, userLocation);
     const campusDistricts = Array.from(
-        new Set(
-            campusList
-                .map((campus) => String(campus?.district || "").trim())
-                .filter(Boolean)
-        )
+        new Set(campusList.map((campus) => String(campus?.district || "").trim()).filter(Boolean))
     );
-    const curriculumTypes = Array.from(new Set(curriculumList.map((item) => mapCurriculumType(item?.curriculumType))));
-    const methods = Array.from(
-        new Set(
-            curriculumList
-                .flatMap((item) => (Array.isArray(item?.methodLearningList) ? item.methodLearningList : []))
-                .map((item) => mapMethodLabel(item))
-                .filter(Boolean)
-        )
+    const boardingLabels = Array.from(
+        new Set(campusList.map((campus) => mapBoardingTypeLabel(campus?.boardingType)).filter((x) => x && x !== "—"))
     );
-    const subjects = Array.from(
-        new Set(
-            curriculumList.flatMap((item) =>
-                (Array.isArray(item?.subjectsJsonb) ? item.subjectsJsonb : [])
-                    .map((subject) => String(subject?.name || "").trim())
-                    .filter(Boolean)
-            )
-        )
-    );
-    const methodsAdmission = Array.from(
-        new Set(
-            (Array.isArray(campaigns) ? campaigns : []).flatMap((campaign) =>
-                (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : [])
-                    .map((method) => toText(method?.displayName || method?.methodCode, ""))
-                    .filter(Boolean)
-            )
-        )
-    );
-    const hasInterview = (Array.isArray(campaigns) ? campaigns : []).some((campaign) =>
-        (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).some((method) => {
-            const methodName = String(method?.displayName || method?.methodCode || "").toLowerCase();
-            const methodDesc = String(method?.description || "").toLowerCase();
-            const stepNames = (Array.isArray(method?.admissionProcessSteps) ? method.admissionProcessSteps : [])
-                .map((step) => String(step?.stepName || step?.description || "").toLowerCase())
-                .join(" ");
-            const haystack = `${methodName} ${methodDesc} ${stepNames}`;
-            return haystack.includes("phỏng vấn") || haystack.includes("phong van") || haystack.includes("interview");
-        })
-    );
-    const processStepCount = (Array.isArray(campaigns) ? campaigns : []).reduce((sum, campaign) => {
-        const count = (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).reduce(
-            (n, method) => n + (Array.isArray(method?.admissionProcessSteps) ? method.admissionProcessSteps.length : 0),
-            0
-        );
-        return Math.max(sum, count);
-    }, 0);
-    const methodStepMax = (Array.isArray(campaigns) ? campaigns : []).reduce((sum, campaign) => {
-        const count = (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).reduce(
-            (n, method) => Math.max(n, Array.isArray(method?.admissionProcessSteps) ? method.admissionProcessSteps.length : 0),
-            0
-        );
-        return Math.max(sum, count);
-    }, 0);
+    const campusAddressLines = campusList
+        .map((campus) => toText(campus?.address, ""))
+        .filter((address) => address && address !== "—");
+    const hotline = toText(detail?.hotline, "");
+    const website = toText(detail?.website || detail?.websiteUrl, "");
+    const hotlineWebsite = [hotline !== "—" ? `Hotline: ${hotline}` : "", website !== "—" ? `Website: ${website}` : ""]
+        .filter(Boolean)
+        .join(" | ");
+    const allowedMethods = collectAllowedMethods(campaignList);
+    const allowedMethodsLines = allowedMethods.length
+        ? allowedMethods.map((name) => `- ${name}`)
+        : ["—"];
     const processStepsPreview = (() => {
         let bestSteps = [];
-        (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+        campaignList.forEach((campaign) => {
             (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).forEach((method) => {
                 const steps = Array.isArray(method?.admissionProcessSteps) ? method.admissionProcessSteps : [];
-                if (steps.length > bestSteps.length) {
-                    bestSteps = steps;
-                }
+                if (steps.length > bestSteps.length) bestSteps = steps;
             });
         });
         return bestSteps
@@ -307,166 +331,136 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
             })
             .slice(0, 8);
     })();
-    const documentsCount = (Array.isArray(campaigns) ? campaigns : []).reduce((sum, campaign) => {
-        const allDocs = Array.isArray(campaign?.mandatoryAll) ? campaign.mandatoryAll.length : 0;
-        return Math.max(sum, allDocs);
-    }, 0);
-    const specialDocumentsList = Array.from(
+    const mandatoryDocLines = Array.from(
         new Set(
-            (Array.isArray(campaigns) ? campaigns : []).flatMap((campaign) =>
+            campaignList.flatMap((campaign) =>
                 (Array.isArray(campaign?.mandatoryAll) ? campaign.mandatoryAll : [])
                     .map((doc) => String(doc?.name || doc?.code || "").trim())
                     .filter(Boolean)
             )
         )
-    ).slice(0, 8);
-    const documentsCountLines = (Array.isArray(campaigns) ? campaigns : [])
+    ).map((name) => `- ${name}`);
+    const reservationFeeLines = campaignList
+        .flatMap((campaign) =>
+            (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).map((method) => {
+                const fee = Number(method?.reservationFee);
+                if (!Number.isFinite(fee)) return "";
+                const label = toText(method?.displayName || method?.methodCode, "Phương thức");
+                return `${label}: ${formatMoney(fee)}`;
+            })
+        )
+        .filter(Boolean);
+    const quotaTotalLines = campaignList
         .map((campaign) => {
-            const count = Array.isArray(campaign?.mandatoryAll) ? campaign.mandatoryAll.length : 0;
-            if (count <= 0) return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: ${count} loại hồ sơ`;
+            const total = Number(campaign?.campaignTotalQuota);
+            if (!Number.isFinite(total)) return "";
+            return `${toText(campaign?.name, "Chiến dịch")}: ${total} học sinh`;
         })
         .filter(Boolean);
-    const campaignStatuses = Array.from(
-        new Set((Array.isArray(campaigns) ? campaigns : []).map((campaign) => toText(campaign?.status, "")).filter(Boolean))
-    );
-    const campaignTimeline = (Array.isArray(campaigns) ? campaigns : [])
+    const quotaRemainingLines = campaignList
         .map((campaign) => {
-            const startMs = new Date(campaign?.startDate).getTime();
-            const endMs = new Date(campaign?.endDate).getTime();
-            return {
-                name: toText(campaign?.name, "Chiến dịch"),
-                startMs: Number.isFinite(startMs) ? startMs : null,
-                endMs: Number.isFinite(endMs) ? endMs : null,
-                startDate: campaign?.startDate,
-                endDate: campaign?.endDate
-            };
+            const remaining = Number(campaign?.campaignRemainingQuota);
+            if (!Number.isFinite(remaining)) return "";
+            return `${toText(campaign?.name, "Chiến dịch")}: còn ${remaining} chỉ tiêu`;
         })
-        .filter((item) => item.startMs != null || item.endMs != null);
-    const earliestStart = campaignTimeline.length
-        ? campaignTimeline.reduce((min, item) => (min == null || (item.startMs != null && item.startMs < min) ? item.startMs : min), null)
-        : null;
-    const latestEnd = campaignTimeline.length
-        ? campaignTimeline.reduce((max, item) => (max == null || (item.endMs != null && item.endMs > max) ? item.endMs : max), null)
-        : null;
-    const subjectCount = subjects.length;
-    const programListFlat = curriculumList.flatMap((curriculum) =>
-        Array.isArray(curriculum?.programList) ? curriculum.programList : []
-    );
-    const programNames = Array.from(
+        .filter(Boolean);
+    const campaignTimelineLines = campaignList
+        .map((campaign) => {
+            const start = formatDateDisplay(campaign?.startDate);
+            const end = formatDateDisplay(campaign?.endDate);
+            if (start === "—" && end === "—") return "";
+            return `${toText(campaign?.name, "Chiến dịch")}: ${start} - ${end}`;
+        })
+        .filter(Boolean);
+    const campaignStatusLines = campaignList
+        .map((campaign) => `${toText(campaign?.name, "Chiến dịch")}: ${mapCampaignStatusLabel(campaign?.status)}`)
+        .filter(Boolean);
+    const offerings = collectProgramOfferings(campaignList);
+    const programNameLines = offerings
+        .map((offering) => {
+            const program = offering?.program || {};
+            const curriculum = offering?.curriculum || program?.curriculum || {};
+            const name = String(curriculum?.name || program?.name || offering?.programName || "").trim();
+            if (!name) return "";
+            return `- ${name}`;
+        })
+        .filter(Boolean);
+    const tuitionFeeLines = offerings
+        .map((offering) => {
+            const program = offering?.program || {};
+            const tuition = Number(offering?.tuitionFee ?? program?.baseTuitionFee);
+            if (!Number.isFinite(tuition)) return "";
+            const unit = feeUnitLabel(program?.feeUnit);
+            const feeText = `${formatMoney(tuition)}${unit ? ` / ${unit}` : ""}`;
+            return `- ${feeText}`;
+        })
+        .filter(Boolean);
+    const learningMethodsLines = Array.from(
         new Set(
-            programListFlat
-                .map((program) => String(program?.name || "").trim())
-                .filter(Boolean)
-        )
-    );
-    const programBaseFees = programListFlat
-        .map((program) => Number(program?.baseTuitionFee))
-        .filter((n) => Number.isFinite(n));
-    const programBaseFeeSummary = programBaseFees.length
-        ? (() => {
-              const minFee = Math.min(...programBaseFees);
-              const maxFee = Math.max(...programBaseFees);
-              return minFee === maxFee ? formatMoney(minFee) : `${formatMoney(minFee)} - ${formatMoney(maxFee)}`;
-          })()
-        : "Đang cập nhật";
-    const programTargetStudentLines = Array.from(
-        new Set(
-            programListFlat
-                .map((program) => stripHtml(program?.targetStudentDescription))
-                .filter(Boolean)
+            offerings.flatMap((offering) => {
+                const program = offering?.program || {};
+                const curriculum = offering?.curriculum || program?.curriculum || {};
+                return (Array.isArray(curriculum?.methodLearnings) ? curriculum.methodLearnings : []).map((m) =>
+                    mapMethodLabel(m)
+                );
+            })
         )
     )
-        .slice(0, 4)
-        .map((text) => `- ${text}`);
-    const programGraduationStandardLines = Array.from(
-        new Set(
-            programListFlat
-                .map((program) => stripHtml(program?.graduationStandard))
-                .filter(Boolean)
-        )
-    )
-        .slice(0, 4)
-        .map((text) => `- ${text}`);
-    const subjectCountLines = curriculumList
-        .map((curriculum, idx) => {
-            const cName = toText(curriculum?.name, `Khung ${idx + 1}`);
-            const subjectNames = (Array.isArray(curriculum?.subjectsJsonb) ? curriculum.subjectsJsonb : [])
-                .map((subject) => String(subject?.name || "").trim())
-                .filter(Boolean);
-            const cSubjects = subjectNames.length;
-            if (!cSubjects) return [`${cName}: 0 môn`];
-            return [`${cName}: ${cSubjects} môn`, ...subjectNames.map((name) => `- ${name}`)];
+        .filter(Boolean)
+        .map((label) => `- ${label}`);
+    const graduationStandardLines = offerings
+        .map((offering) => {
+            const program = offering?.program || {};
+            const text = stripHtml(program?.graduationStandard);
+            if (!text) return "";
+            return `- ${text}`;
         })
-        .filter((lines) => Array.isArray(lines) && lines.length > 0)
-        .flat()
-        .slice(0, 8);
-    const nearestCampusAddress = campusList.length ? toText(campusList[0]?.address) : "Đang cập nhật";
-    const now = new Date().getTime();
-    const hasOpenCampaign = (Array.isArray(campaigns) ? campaigns : []).some((campaign) => {
-        const start = new Date(campaign?.startDate).getTime();
-        const end = new Date(campaign?.endDate).getTime();
-        return Number.isFinite(start) && Number.isFinite(end) && start <= now && now <= end;
-    });
+        .filter(Boolean);
+    const facilitySummary = collectFacilitySummary(campusList);
+    const facilityOverviewLines = facilitySummary.overviews.length
+        ? facilitySummary.overviews.map((line) => `- ${line}`)
+        : ["—"];
+    const facilityItemLines = facilitySummary.itemLines.length
+        ? facilitySummary.itemLines.map((line) => `- ${line}`)
+        : ["—"];
+    const facilityImages = facilitySummary.images;
+    const now = Date.now();
+    const latestEnd = campaignList.reduce((max, campaign) => {
+        const endMs = new Date(campaign?.endDate).getTime();
+        return Number.isFinite(endMs) && (max == null || endMs > max) ? endMs : max;
+    }, null);
 
     return {
         logoUrl: toText(detail?.logoUrl || row?.logoUrl, ""),
         schoolName: toText(detail?.name || row?.schoolName),
-        campusCount: campusList.length,
-        campusAddresses: campusList.slice(0, 3).map((campus) => toText(campus?.address)).join(" | ") || "Đang cập nhật",
-        nearestCampusAddress,
-        districts: campusDistricts.length ? campusDistricts.join(", ") : "Đang cập nhật",
-        distanceLabel: distanceKm == null ? "Đang cập nhật" : formatDistanceKm(distanceKm),
+        foundingDateLabel: formatFoundingDate(detail?.foundingDate),
+        boardingTypeLabel: boardingLabels.length ? boardingLabels.join(" / ") : "—",
+        campusAddressLines: campusAddressLines.length ? campusAddressLines : ["—"],
+        districts: campusDistricts.length ? campusDistricts.join(", ") : "—",
+        hotlineWebsite: hotlineWebsite || "—",
+        campaignStatusLabel: primaryCampaign
+            ? mapCampaignStatusLabel(primaryCampaign.status)
+            : campaignStatusLines[0] || "—",
+        campaignStatusLines: campaignStatusLines.length ? campaignStatusLines : ["—"],
+        campaignTimeLines: campaignTimelineLines.length ? campaignTimelineLines : ["—"],
+        allowedMethodsLines,
+        processStepsPreview,
+        quotaTotalLines: quotaTotalLines.length ? quotaTotalLines : ["—"],
+        quotaRemainingLines: quotaRemainingLines.length ? quotaRemainingLines : ["—"],
+        mandatoryDocLines: mandatoryDocLines.length ? mandatoryDocLines : ["—"],
+        reservationFeeLines: reservationFeeLines.length ? reservationFeeLines : ["—"],
+        programNameLines: programNameLines.length ? programNameLines : ["—"],
+        tuitionFeeLines: tuitionFeeLines.length ? tuitionFeeLines : ["—"],
+        learningMethodsLines: learningMethodsLines.length ? learningMethodsLines : ["—"],
+        learningMethodsChipText: learningMethodsLines.map((l) => l.replace(/^\s*-\s*/, "")).join(" | "),
+        graduationStandardLines: graduationStandardLines.length ? graduationStandardLines : ["—"],
+        facilityOverviewLines,
+        facilityItemLines,
+        facilityImages,
         distanceKmNumber: Number.isFinite(distanceKm) ? distanceKm : null,
-        distanceBadge: distanceKm == null ? "" : distanceKm <= NEARBY_MARK_KM ? "Gần nhà" : "Cần cân nhắc di chuyển",
-        distanceFlag: distanceKm != null ? (distanceKm <= NEARBY_MARK_KM ? "Trong 10km" : "Ngoài 10km") : "Chưa xác định GPS",
-        tuitionSummary: tuitionStats.summary,
-        tuitionCampusLines: tuitionStats.campusLines,
-        annualTuition:
-            tuitionStats.min == null
-                ? "—"
-                : `${formatMoney(tuitionStats.min * 12)}${tuitionStats.max !== tuitionStats.min ? ` - ${formatMoney(tuitionStats.max * 12)}` : ""}`,
-        curriculumTypes: curriculumTypes.length ? curriculumTypes.join(" | ") : "Đang cập nhật",
-        learningMethods: methods.length ? methods.join(" | ") : "Đang cập nhật",
-        subjectCountLabel: subjectCount > 0 ? `${subjectCount} môn (ước tính theo dữ liệu public)` : "Đang cập nhật",
-        subjectCountLines: subjectCountLines.length ? subjectCountLines : ["Đang cập nhật"],
-        subjectsPreview: subjects.slice(0, 6).join(", ") || "Đang cập nhật",
-        boardingType: campusBoardingSummary(campusList),
-        quotaInfo: "Chưa thể so sánh chính xác (API chưa có quota)",
-        admissionMethods: methodsAdmission.length ? methodsAdmission.join(" | ") : "Đang cập nhật",
-        hasInterviewLabel: hasInterview ? "Có phỏng vấn / tương tác" : "Chưa thấy yêu cầu phỏng vấn",
-        methodStepMaxLabel: methodStepMax > 0 ? `${methodStepMax} bước` : "Đang cập nhật",
-        processStepsPreview: processStepsPreview.length ? processStepsPreview : [],
-        processDifficulty:
-            processStepCount <= 0 ? "Đang cập nhật" : processStepCount <= 3 ? `${processStepCount} bước (gọn)` : `${processStepCount} bước (khá chi tiết)`,
-        documentsInfo: documentsCount > 0 ? `${documentsCount} loại hồ sơ` : "Đang cập nhật",
-        documentsCountLines: documentsCountLines.length ? documentsCountLines : [documentsCount > 0 ? `${documentsCount} loại hồ sơ` : "Đang cập nhật"],
-        documentsCountNumber: documentsCount > 0 ? documentsCount : null,
-        specialDocumentsInfo: specialDocumentsList.join(" | ") || "Không có yêu cầu đặc biệt nổi bật",
-        specialDocumentsList: specialDocumentsList.length ? specialDocumentsList.map((name) => `- ${name}`) : ["Không có yêu cầu đặc biệt nổi bật"],
-        campaignTime:
-            (Array.isArray(campaigns) ? campaigns : [])
-                .slice(0, 2)
-                .map((campaign) => `${toText(campaign?.name, "Chiến dịch")}: ${toText(campaign?.startDate, "—")} -> ${toText(campaign?.endDate, "—")}`)
-                .join(" | ") || "Đang cập nhật",
-        campaignWindow:
-            earliestStart != null || latestEnd != null
-                ? `${formatDateDisplay(earliestStart)} - ${formatDateDisplay(latestEnd)}`
-                : "Đang cập nhật",
-        earliestStartMs: earliestStart,
-        latestEndMs: latestEnd,
+        distanceLabel: distanceKm == null ? "—" : formatDistanceKm(distanceKm),
         deadlineDays:
-            latestEnd != null && Number.isFinite(latestEnd) ? Math.floor((latestEnd - now) / (1000 * 60 * 60 * 24)) : null,
-        campaignStatus: hasOpenCampaign ? "Đang mở nhận hồ sơ" : campaignStatuses.join(" | ") || "Đang cập nhật",
-        foundingDate: toText(detail?.foundingDate),
-        description: stripHtml(detail?.description) || "Đang cập nhật",
-        feeReliability: "Chưa thể so sánh chuẩn (thiếu finalTuitionFee theo campus/năm/hệ)",
-        programDepth: curriculumList.length > 0 ? `${curriculumList.length} khung chương trình` : "Đang cập nhật"
-        ,
-        programNamesLines: programNames.length ? programNames.map((name) => `- ${name}`) : ["Đang cập nhật"],
-        programBaseFeeSummary,
-        programTargetStudentLines: programTargetStudentLines.length ? programTargetStudentLines : ["Đang cập nhật"],
-        programGraduationStandardLines: programGraduationStandardLines.length ? programGraduationStandardLines : ["Đang cập nhật"]
+            latestEnd != null && Number.isFinite(latestEnd) ? Math.floor((latestEnd - now) / (1000 * 60 * 60 * 24)) : null
     };
 }
 
@@ -539,7 +533,7 @@ export default function CompareSchoolsPage() {
                             getPublicSchoolDetail(schoolId),
                             getPublicSchoolCampaignTemplates(schoolId, 0).catch(() => [])
                         ]);
-                        const detail = mapPublicSchoolDetailToRow(detailRaw) || detailRaw || null;
+                        const detail = mergePublicDetailForCompare(detailRaw);
                         return [
                             row?.schoolKey,
                             buildComparisonPayload(row, detail, campaigns, userLocation)
@@ -727,76 +721,110 @@ export default function CompareSchoolsPage() {
 
     const sections = [
         {
-            key: "location",
-            title: "1. Vị trí",
+            key: "general",
+            title: "1. Thông tin chung",
             tone: "#2563eb",
             rows: [
-                {label: "Địa chỉ", render: (d) => d.nearestCampusAddress},
-                {label: "Quận/Huyện", render: (d) => d.districts},
-                {label: "Số campus", render: (d) => `${d.campusCount} cơ sở`}
+                {label: "Năm thành lập", render: (d) => d.foundingDateLabel},
+                {label: "Hình thức đào tạo", render: (d) => d.boardingTypeLabel}
             ]
         },
         {
-            key: "boarding",
-            title: "2. Loại hình",
-            tone: "#7c3aed",
-            rows: [{label: "Nội trú/Bán trú", render: (d) => d.boardingType}]
+            key: "location",
+            title: "2. Vị trí & Liên hệ",
+            tone: "#0d9488",
+            rows: [
+                {label: "Địa chỉ", render: (d) => d.campusAddressLines},
+                {label: "Khu vực (Quận/Huyện)", render: (d) => d.districts},
+                {label: "Hotline / Website", render: (d) => d.hotlineWebsite}
+            ]
         },
         {
             key: "admission",
-            title: "3. Tuyển sinh",
+            title: "3. Thông tin tuyển sinh",
             tone: "#ca8a04",
             rows: [
-                {label: "Phương thức", render: (d) => d.admissionMethods},
-                {label: "Phỏng vấn", render: (d) => d.hasInterviewLabel},
-                {label: "Quy trình", render: (d) => d.methodStepMaxLabel}
-            ]
-        },
-        {
-            key: "documents",
-            title: "4. Hồ sơ",
-            tone: "#ea580c",
-            rows: [
-                {label: "Số lượng hồ sơ", render: (d) => d.documentsCountLines},
-                {label: "Hồ sơ đặc biệt", render: (d) => d.specialDocumentsList}
-            ]
-        },
-        {
-            key: "timeline",
-            title: "5. Thời gian",
-            tone: "#dc2626",
-            rows: [
-                {label: "Mốc tuyển sinh", render: (d) => d.campaignWindow},
-                {label: "Trạng thái", render: (d) => d.campaignStatus},
+                {label: "Trạng thái tuyển sinh", render: (d) => d.campaignStatusLabel},
+                {label: "Thời gian tuyển sinh", render: (d) => d.campaignTimeLines},
+                {label: "Phương thức xét tuyển", render: (d) => d.allowedMethodsLines},
                 {
-                    label: "Deadline còn lại",
+                    label: "Quy trình các bước",
                     render: (d) =>
-                        Number.isFinite(d.deadlineDays)
-                            ? d.deadlineDays >= 0
-                                ? `${d.deadlineDays} ngày`
-                                : `Đã quá hạn ${Math.abs(d.deadlineDays)} ngày`
-                            : "Đang cập nhật"
+                        Array.isArray(d.processStepsPreview) && d.processStepsPreview.length ? "" : "—"
                 }
             ]
         },
         {
+            key: "quota",
+            title: "4. Chỉ tiêu & Hồ sơ",
+            tone: "#ea580c",
+            rows: [
+                {label: "Tổng chỉ tiêu năm nay", render: (d) => d.quotaTotalLines},
+                {label: "Chỉ tiêu còn lại", render: (d) => d.quotaRemainingLines},
+                {label: "Hồ sơ bắt buộc", render: (d) => d.mandatoryDocLines},
+                {label: "Lệ phí giữ chỗ", render: (d) => d.reservationFeeLines}
+            ]
+        },
+        {
             key: "curriculum",
-            title: "6. Chương trình học",
+            title: "5. Chương trình học & Học phí",
             tone: "#6d28d9",
             rows: [
-                {label: "Loại chương trình", render: (d) => d.curriculumTypes},
-                {label: "Chương trình thành phần", render: (d) => d.programNamesLines},
-                {label: "Học phí gốc (program)", render: (d) => d.programBaseFeeSummary},
-                {label: "Đối tượng học sinh", render: (d) => d.programTargetStudentLines},
-                {label: "Chuẩn đầu ra", render: (d) => d.programGraduationStandardLines},
-                {label: "Số môn", render: (d) => d.subjectCountLines},
-                {label: "Phương pháp học", render: (d) => d.learningMethods}
+                {label: "Tên chương trình", render: (d) => d.programNameLines},
+                {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines},
+                {label: "Hình thức học tập", render: (d) => d.learningMethodsChipText},
+                {label: "Chuẩn đầu ra", render: (d) => d.graduationStandardLines}
+            ]
+        },
+        {
+            key: "facility",
+            title: "6. Cơ sở vật chất",
+            tone: "#0369a1",
+            rows: [
+                {label: "Tổng quan CSVC", render: (d) => d.facilityOverviewLines},
+                {label: "Danh sách phòng chức năng", render: (d) => d.facilityItemLines},
+                {label: "Ảnh CSVC", render: (d) => d.facilityImages, isFacilityImages: true}
             ]
         }
     ];
 
     const sectionStripeBg = (index) => (index % 2 === 0 ? "#ffffff" : "#eff6ff");
     const leftCriteriaColBg = "#ffffff";
+    const compareCellTextSx = {
+        fontSize: "0.9rem",
+        color: "#475569",
+        fontWeight: 400,
+        lineHeight: 1.55
+    };
+
+    const renderFacilityImages = (images) => {
+        const list = Array.isArray(images) ? images : [];
+        if (!list.length) {
+            return <Typography sx={compareCellTextSx}>—</Typography>;
+        }
+        return (
+            <Box sx={{display: "flex", flexWrap: "wrap", gap: 0.75}}>
+                {list.slice(0, 8).map((img) => (
+                    <Box
+                        key={img.key}
+                        component="img"
+                        src={img.url}
+                        alt={img.name || "Ảnh CSVC"}
+                        loading="lazy"
+                        title={img.name || "Ảnh CSVC"}
+                        sx={{
+                            width: 92,
+                            height: 68,
+                            objectFit: "cover",
+                            borderRadius: 1,
+                            border: "1px solid #e2e8f0",
+                            bgcolor: "#f8fafc"
+                        }}
+                    />
+                ))}
+            </Box>
+        );
+    };
 
     const renderProcessTimeline = (detail) => {
         const steps = Array.isArray(detail?.processStepsPreview) ? detail.processStepsPreview : [];
@@ -817,7 +845,7 @@ export default function CompareSchoolsPage() {
                                         border: "1px solid rgba(37,99,235,0.4)",
                                         color: "#1d4ed8",
                                         fontSize: "0.63rem",
-                                        fontWeight: 800,
+                                        fontWeight: 600,
                                         display: "inline-flex",
                                         alignItems: "center",
                                         justifyContent: "center"
@@ -840,7 +868,7 @@ export default function CompareSchoolsPage() {
                                     />
                                 ) : null}
                             </Box>
-                            <Typography sx={{fontSize: "0.82rem", color: "#1e293b", lineHeight: 1.4, mt: 0.05}}>
+                            <Typography sx={{...compareCellTextSx, fontSize: "0.85rem", mt: 0.05}}>
                                 {step.replace(/^\d+\.\s*/, "")}
                             </Typography>
                         </Box>
@@ -1038,7 +1066,7 @@ export default function CompareSchoolsPage() {
                                                         zIndex: 3
                                                     }}
                                                 />
-                                                <Typography sx={{fontSize: "0.9rem", color: "#1e3a8a", fontWeight: 800}}>
+                                                <Typography sx={{fontSize: "0.9rem", color: "#475569", fontWeight: 600}}>
                                                     {section.title}
                                                 </Typography>
                                             </Box>
@@ -1155,7 +1183,7 @@ export default function CompareSchoolsPage() {
                                                             const MetricIcon = metricIconByLabel(rowMeta.label);
                                                             return <MetricIcon sx={{fontSize: 16, color: "#1d4ed8", flexShrink: 0}}/>;
                                                         })()}
-                                                        <Typography sx={{fontSize: "0.88rem", fontWeight: 700, color: "#1e3a8a"}}>
+                                                        <Typography sx={{fontSize: "0.88rem", fontWeight: 600, color: "#334155"}}>
                                                             {rowMeta.label}
                                                         </Typography>
                                                     </Stack>
@@ -1217,7 +1245,9 @@ export default function CompareSchoolsPage() {
                                                                     zIndex: 2
                                                                 }}
                                                             />
-                                                            {section.key === "boarding" ? (
+                                                            {rowMeta.isFacilityImages ? (
+                                                                renderFacilityImages(cellText)
+                                                            ) : section.key === "general" && rowMeta.label === "Hình thức đào tạo" ? (
                                                                 <Stack direction="row" flexWrap="wrap" useFlexGap sx={{gap: 0.5}}>
                                                                     {String(cellText)
                                                                         .split("/")
@@ -1231,7 +1261,7 @@ export default function CompareSchoolsPage() {
                                                                                 sx={{
                                                                                     height: 22,
                                                                                     fontSize: "0.72rem",
-                                                                                    fontWeight: 700,
+                                                                                    fontWeight: 500,
                                                                                     bgcolor: label.includes("Nội trú")
                                                                                         ? "rgba(124,58,237,0.14)"
                                                                                         : "rgba(37,99,235,0.14)",
@@ -1241,7 +1271,7 @@ export default function CompareSchoolsPage() {
                                                                             />
                                                                         ))}
                                                                 </Stack>
-                                                            ) : section.key === "curriculum" && rowMeta.label === "Phương pháp học" ? (
+                                                            ) : section.key === "curriculum" && rowMeta.label === "Hình thức học tập" ? (
                                                                 <Stack direction="row" flexWrap="wrap" useFlexGap sx={{gap: 0.45}}>
                                                                     {String(cellText)
                                                                         .split("|")
@@ -1255,7 +1285,7 @@ export default function CompareSchoolsPage() {
                                                                                 sx={{
                                                                                     height: 22,
                                                                                     fontSize: "0.72rem",
-                                                                                    fontWeight: 700,
+                                                                                    fontWeight: 500,
                                                                                     bgcolor: "rgba(59,130,246,0.1)",
                                                                                     color: "#1d4ed8",
                                                                                     border: "1px solid rgba(59,130,246,0.24)"
@@ -1291,14 +1321,7 @@ export default function CompareSchoolsPage() {
                                                                                                     flexShrink: 0
                                                                                                 }}
                                                                                             />
-                                                                                            <Typography
-                                                                                                sx={{
-                                                                                                    fontSize: "0.92rem",
-                                                                                                    color: "#1f2937",
-                                                                                                    fontWeight: 600,
-                                                                                                    lineHeight: 1.58
-                                                                                                }}
-                                                                                            >
+                                                                                            <Typography sx={compareCellTextSx}>
                                                                                                 {bulletText}
                                                                                             </Typography>
                                                                                         </Box>
@@ -1307,13 +1330,7 @@ export default function CompareSchoolsPage() {
                                                                                 return (
                                                                                     <Typography
                                                                                         key={`${section.key}-${rowMeta.label}-${item.raw?.schoolKey}-${idx}`}
-                                                                                        sx={{
-                                                                                            fontSize: idx === 0 ? "0.99rem" : "0.93rem",
-                                                                                            color: idx === 0 ? "#0b3b91" : "#1e293b",
-                                                                                            fontWeight: idx === 0 ? 800 : 650,
-                                                                                            lineHeight: 1.58,
-                                                                                            whiteSpace: "pre-line"
-                                                                                        }}
+                                                                                        sx={{...compareCellTextSx, whiteSpace: "pre-line"}}
                                                                                     >
                                                                                         {normalizedLine}
                                                                                     </Typography>
@@ -1321,11 +1338,11 @@ export default function CompareSchoolsPage() {
                                                                             })}
                                                                         </Stack>
                                                                     ) : (
-                                                                        <Typography sx={{fontSize: "1rem", color: "#0b3b91", fontWeight: 750, lineHeight: 1.6}}>
+                                                                        <Typography sx={compareCellTextSx}>
                                                                             {cellText}
                                                                         </Typography>
                                                                     )}
-                                                                    {section.key === "admission" && rowMeta.label === "Quy trình"
+                                                                    {section.key === "admission" && rowMeta.label === "Quy trình các bước"
                                                                         ? renderProcessTimeline(item.detail)
                                                                         : null}
                                                                 </>
