@@ -558,7 +558,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         campaignList.flatMap((campaign) =>
             (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).map((method) => {
                 const fee = Number(method?.reservationFee);
-                if (!Number.isFinite(fee)) return "";
+                if (!Number.isFinite(fee) || fee <= 0) return "";
                 const label = toText(method?.displayName || method?.methodCode, "Phương thức");
                 return `${label}: ${formatMoney(fee)}`;
             })
