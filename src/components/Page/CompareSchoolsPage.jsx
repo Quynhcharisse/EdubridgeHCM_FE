@@ -570,7 +570,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         .map((campaign) => {
             const total = Number(campaign?.campaignTotalQuota);
             if (!Number.isFinite(total)) return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: ${total} học sinh`;
+            return `${total} học sinh`;
         }),
         {bullet: false}
     );
@@ -578,7 +578,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         campaignList.map((campaign) => {
             const remaining = Number(campaign?.campaignRemainingQuota);
             if (!Number.isFinite(remaining)) return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: còn ${remaining} chỉ tiêu`;
+            return `còn ${remaining} chỉ tiêu`;
         }),
         {bullet: false}
     );
@@ -1010,10 +1010,10 @@ export default function CompareSchoolsPage() {
             title: "4. Chỉ tiêu & Hồ sơ",
             tone: "#ea580c",
             rows: [
-                {label: "Tổng chỉ tiêu năm nay", render: (d) => d.quotaTotalLines},
-                {label: "Chỉ tiêu còn lại", render: (d) => d.quotaRemainingLines},
+                {label: "Tổng chỉ tiêu năm nay", render: (d) => d.quotaTotalLines, emphasizeNumbers: true},
+                {label: "Chỉ tiêu còn lại", render: (d) => d.quotaRemainingLines, emphasizeNumbers: true},
                 {label: "Hồ sơ bắt buộc", render: (d) => d.mandatoryDocLines},
-                {label: "Lệ phí giữ chỗ", render: (d) => d.reservationFeeLines}
+                {label: "Lệ phí giữ chỗ", render: (d) => d.reservationFeeLines, emphasizeNumbers: true}
             ]
         },
         {
@@ -1022,7 +1022,7 @@ export default function CompareSchoolsPage() {
             tone: "#6d28d9",
             rows: [
                 {label: "Tên chương trình", render: (d) => d.programNameLines},
-                {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines},
+                {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines, emphasizeNumbers: true},
                 {label: "Hình thức học tập", render: (d) => d.learningMethodsChipText},
                 {
                     label: "Tiêu chuẩn đầu ra",
@@ -1076,6 +1076,27 @@ export default function CompareSchoolsPage() {
         if (!text) return "";
         if (/^https?:\/\//i.test(text)) return text;
         return `https://${text}`;
+    };
+
+    const renderCompareLineWithBoldNumbers = (line) => {
+        const text = String(line || "");
+        if (!text || text === "—") {
+            return <Typography sx={compareCellTextSx}>{text || "—"}</Typography>;
+        }
+        const parts = text.split(/(\d[\d.,]*)/g);
+        return (
+            <Typography sx={{...compareCellTextSx, whiteSpace: "pre-line"}} component="span" display="block">
+                {parts.map((part, idx) =>
+                    /^\d[\d.,]*$/.test(part) ? (
+                        <Box key={idx} component="span" sx={{fontWeight: 600, color: "#334155"}}>
+                            {part}
+                        </Box>
+                    ) : (
+                        <span key={idx}>{part}</span>
+                    )
+                )}
+            </Typography>
+        );
     };
 
     const compareRichHtmlSx = {
@@ -1855,9 +1876,22 @@ export default function CompareSchoolsPage() {
                                                                                                     flexShrink: 0
                                                                                                 }}
                                                                                             />
-                                                                                            <Typography sx={compareCellTextSx}>
-                                                                                                {bulletText}
-                                                                                            </Typography>
+                                                                                            {rowMeta.emphasizeNumbers ? (
+                                                                                                renderCompareLineWithBoldNumbers(bulletText)
+                                                                                            ) : (
+                                                                                                <Typography sx={compareCellTextSx}>
+                                                                                                    {bulletText}
+                                                                                                </Typography>
+                                                                                            )}
+                                                                                        </Box>
+                                                                                    );
+                                                                                }
+                                                                                if (rowMeta.emphasizeNumbers) {
+                                                                                    return (
+                                                                                        <Box
+                                                                                            key={`${section.key}-${rowMeta.label}-${item.raw?.schoolKey}-${idx}`}
+                                                                                        >
+                                                                                            {renderCompareLineWithBoldNumbers(normalizedLine)}
                                                                                         </Box>
                                                                                     );
                                                                                 }
@@ -1871,6 +1905,8 @@ export default function CompareSchoolsPage() {
                                                                                 );
                                                                             })}
                                                                         </Stack>
+                                                                    ) : rowMeta.emphasizeNumbers ? (
+                                                                        renderCompareLineWithBoldNumbers(cellText)
                                                                     ) : (
                                                                         <Typography sx={compareCellTextSx}>
                                                                             {cellText}
