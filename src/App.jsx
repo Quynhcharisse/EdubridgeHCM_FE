@@ -357,6 +357,10 @@ const router = createBrowserRouter([
                 )
             } ,
             {
+                path: 'consultation',
+                element: <Navigate to="/school/consultation-stats" replace/>
+            },
+            {
                 path: 'consultation-stats',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
@@ -435,6 +439,10 @@ const router = createBrowserRouter([
                         <SchoolCounselors/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'schedule',
+                element: <Navigate to="/school/counselor-schedule" replace/>
             },
             {
                 path: 'counselor-schedule',
@@ -757,6 +765,10 @@ const router = createBrowserRouter([
                         <ParentOfflineConsultationsPage/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'reservations',
+                element: <Navigate to="/parent/admission-reservations" replace/>
             },
             {
                 path: 'admission-reservations',
