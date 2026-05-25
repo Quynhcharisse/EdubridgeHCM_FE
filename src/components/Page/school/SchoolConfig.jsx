@@ -433,15 +433,13 @@ function mapMandatoryDocFromSystemApi(doc) {
         : doc.templateUrl != null
           ? String(doc.templateUrl).trim()
           : "";
+  const allCriteria = normalizeOcrCriteriaList(doc.validateCriterion ?? doc.ocrCriteria ?? []);
   return {
     code: doc.code != null ? String(doc.code) : "",
     name: doc.name != null ? String(doc.name) : "",
     required: true,
-    ocrCriteria: normalizeOcrCriteriaList(
-      (doc.validateCriterion ?? doc.ocrCriteria ?? []).filter((item) =>
-        !isLockedCriterionLabel(typeof item === "string" ? item : item?.label),
-      ),
-    ),
+    allValidateCriteria: allCriteria,
+    ocrCriteria: allCriteria.filter((item) => !isLockedCriterionLabel(item.label)),
     templateFileUrl: templateRaw || null,
   };
 }
@@ -449,7 +447,7 @@ function mapMandatoryDocFromSystemApi(doc) {
 /** Hồ sơ bắt buộc chung (hệ thống): ocrCriteria + templateFileUrl, luôn required. */
 function normalizeMandatoryDocItem(d) {
   if (!d || typeof d !== "object") {
-    return {code: "", name: "", required: true, ocrCriteria: [], templateFileUrl: null};
+    return {code: "", name: "", required: true, allValidateCriteria: [], ocrCriteria: [], templateFileUrl: null};
   }
   const templateRaw =
     d.templateFileUrl != null
@@ -463,6 +461,7 @@ function normalizeMandatoryDocItem(d) {
     code: d.code != null ? String(d.code) : "",
     name: d.name != null ? String(d.name) : "",
     required: true,
+    allValidateCriteria: normalizeOcrCriteriaList(d.allValidateCriteria ?? d.ocrCriteria),
     ocrCriteria: normalizeOcrCriteriaList(d.ocrCriteria),
     templateFileUrl: templateRaw || null,
   };
@@ -530,13 +529,13 @@ async function fetchSystemMandatoryAllDocuments() {
 }
 
 function MandatoryOcrCriteriaReadOnlyPanel({doc}) {
-  const criteria = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
+  const criteria = normalizeOcrCriteriaList(doc?.allValidateCriteria ?? doc?.ocrCriteria).filter(
     (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
   );
   if (criteria.length === 0) {
     return (
       <Typography variant="body2" sx={{color: "#64748b", fontStyle: "italic"}}>
-        Chưa có tiêu chí OCR cho hồ sơ này.
+        Chưa có tiêu chí kiểm tra cho hồ sơ này.
       </Typography>
     );
   }
@@ -544,6 +543,11 @@ function MandatoryOcrCriteriaReadOnlyPanel({doc}) {
     <Stack component="ul" spacing={1} sx={{m: 0, p: 0, listStyle: "none"}}>
       {criteria.map((item, cIdx) => {
         const rule = String(item.validations[0] ?? "").trim();
+        const rawLabel = String(item.label || "");
+        const matchLabel = rawLabel.match(/khớp với\s+(.+?)\s+trong hình ảnh/i);
+        const displayLabel = matchLabel
+          ? rawLabel.replace(/\{[^}]+\}/, matchLabel[1])
+          : rawLabel;
         return (
           <Box
             component="li"
@@ -567,7 +571,7 @@ function MandatoryOcrCriteriaReadOnlyPanel({doc}) {
             </Typography>
             <Box sx={{minWidth: 0, flex: 1}}>
               <Typography variant="body2" sx={{fontWeight: 600, color: "#1e3a8a", lineHeight: 1.5}}>
-                {item.label || "—"}
+                {displayLabel || "—"}
               </Typography>
               {rule ? (
                 <Typography variant="body2" sx={{color: "#475569", mt: 0.35, lineHeight: 1.55}}>
@@ -1986,7 +1990,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
   const [loadingSystemAdmission, setLoadingSystemAdmission] = useState(false);
   const [resourceSummaryReport, setResourceSummaryReport] = useState(null);
   const [resourceSummaryLoading, setResourceSummaryLoading] = useState(false);
-  const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
   /** `${groupIdx}-${docIdx}` đang upload mẫu hồ sơ theo phương thức */
   const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
   const methodDocFileInputRefs = useRef({});
@@ -4452,10 +4455,6 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                     </Typography>
                   ) : (
                     (config.documentRequirementsData.mandatoryAll || []).map((doc, idx) => {
-                      const ocrCriteriaCount = normalizeOcrCriteriaList(doc?.ocrCriteria).filter(
-                        (item) => String(item.label || "").trim() || item.validations.some((rule) => String(rule).trim()),
-                      ).length;
-                      const ocrExpanded = mandatoryOcrExpandedIdxs.includes(idx);
                       const templateFileUrl = doc.templateFileUrl ? String(doc.templateFileUrl).trim() : "";
                       return (
                         <Box
@@ -4473,42 +4472,16 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                               bgcolor: "#fff",
                             }}
                           >
-                            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{flex: 1, minWidth: 0}}>
-                              <Tooltip
-                                title={
-                                  ocrCriteriaCount > 0
-                                    ? ocrExpanded
-                                      ? "Thu gọn tiêu chí OCR"
-                                      : `Xem ${ocrCriteriaCount} tiêu chí OCR`
-                                    : "Không có tiêu chí OCR"
-                                }
-                              >
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    disabled={ocrCriteriaCount === 0}
-                                    onClick={() =>
-                                      setMandatoryOcrExpandedIdxs((prev) =>
-                                        prev.includes(idx) ? prev.filter((item) => item !== idx) : [...prev, idx],
-                                      )
-                                    }
-                                    sx={{color: "#2563eb", mt: 0.25}}
-                                  >
-                                    {ocrExpanded ? <ExpandLessIcon fontSize="small"/> : <ExpandMoreIcon fontSize="small"/>}
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                              <Box sx={{minWidth: 0}}>
-                                <Typography sx={{fontWeight: 700, color: "#0f172a"}}>
-                                  {doc.name || doc.code || "—"}
+                            <Box sx={{minWidth: 0}}>
+                              <Typography sx={{fontWeight: 700, color: "#0f172a"}}>
+                                {doc.name || doc.code || "—"}
+                              </Typography>
+                              {doc.code ? (
+                                <Typography variant="caption" sx={{color: "#64748b", display: "block", mt: 0.25}}>
+                                  Mã: {doc.code}
                                 </Typography>
-                                {doc.code ? (
-                                  <Typography variant="caption" sx={{color: "#64748b", display: "block", mt: 0.25}}>
-                                    Mã: {doc.code}
-                                  </Typography>
-                                ) : null}
-                              </Box>
-                            </Stack>
+                              ) : null}
+                            </Box>
                             <Stack
                               direction="row"
                               alignItems="center"
@@ -4540,11 +4513,12 @@ export default function SchoolConfig({variant = "platform"} = {}) {
                               ) : null}
                             </Stack>
                           </Box>
-                          <Collapse in={ocrExpanded} timeout="auto" unmountOnExit>
-                            <Box sx={{px: 1.5, pb: 1.5, pt: 1.25, bgcolor: "#f8fbff", borderTop: "1px dashed #bfdbfe"}}>
-                              <MandatoryOcrCriteriaReadOnlyPanel doc={doc}/>
-                            </Box>
-                          </Collapse>
+                          <Box sx={{px: 1.5, pb: 1.5, pt: 1.25, bgcolor: "#f8fbff", borderTop: "1px dashed #bfdbfe"}}>
+                            <Typography variant="caption" sx={{fontWeight: 700, color: "#64748b", display: "block", mb: 0.75, textTransform: "uppercase", letterSpacing: 0.5}}>
+                              Tiêu chí kiểm tra
+                            </Typography>
+                            <MandatoryOcrCriteriaReadOnlyPanel doc={doc}/>
+                          </Box>
                         </Box>
                       );
                     })
