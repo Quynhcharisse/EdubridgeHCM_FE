@@ -90,13 +90,22 @@ export async function getPublicSchoolCampaignTemplates(schoolId, year = 0) {
 
     const normalizeProgramOffering = (item) => {
         if (!item || typeof item !== "object") return null;
-        const program = item?.program && typeof item.program === "object" ? item.program : {};
-        const curriculum =
-            item?.curriculum && typeof item.curriculum === "object"
-                ? item.curriculum
-                : program?.curriculum && typeof program.curriculum === "object"
-                    ? program.curriculum
-                    : {};
+        const curriculumRaw =
+            item?.curriculum && typeof item.curriculum === "object" ? item.curriculum : {};
+        const programFromItem = item?.program && typeof item.program === "object" ? item.program : {};
+        const programFromCurriculum =
+            curriculumRaw?.program && typeof curriculumRaw.program === "object" ? curriculumRaw.program : {};
+        const program =
+            Object.keys(programFromItem).length > 0 ? programFromItem : programFromCurriculum;
+        let curriculum = curriculumRaw;
+        if (curriculumRaw?.program) {
+            const {program: _nestedProgram, ...curriculumWithoutProgram} = curriculumRaw;
+            curriculum =
+                Object.keys(curriculumWithoutProgram).length > 0 ? curriculumWithoutProgram : curriculumRaw;
+        }
+        if ((!curriculum || !Object.keys(curriculum).length) && program?.curriculum) {
+            curriculum = program.curriculum;
+        }
         const tuitionFee =
             item?.tuitionFee ??
             item?.netTuitionFee ??

@@ -1013,9 +1013,25 @@ const detailOfferingCardSx = {
 
 
 
+function resolveOfferingProgramCurriculum(offering) {
+    const curriculumRaw = offering?.curriculum && typeof offering.curriculum === "object" ? offering.curriculum : {};
+    const programFromItem = offering?.program && typeof offering.program === "object" ? offering.program : {};
+    const programFromCurriculum =
+        curriculumRaw?.program && typeof curriculumRaw.program === "object" ? curriculumRaw.program : {};
+    const program = Object.keys(programFromItem).length > 0 ? programFromItem : programFromCurriculum;
+    let curriculum = curriculumRaw;
+    if (curriculumRaw?.program) {
+        const {program: _nested, ...rest} = curriculumRaw;
+        curriculum = Object.keys(rest).length > 0 ? rest : curriculumRaw;
+    }
+    if ((!curriculum || !Object.keys(curriculum).length) && program?.curriculum) {
+        curriculum = program.curriculum;
+    }
+    return {program, curriculum};
+}
+
 function buildPublicOfferingGroupKey(offering) {
-    const program = offering?.program || {};
-    const curriculum = offering?.curriculum || program?.curriculum || {};
+    const {program, curriculum} = resolveOfferingProgramCurriculum(offering);
     const campusId = offering?.campusId != null ? String(offering.campusId) : "";
     const programId = program?.id != null ? String(program.id) : String(offering?.programId ?? "");
     const curriculumId = curriculum?.id != null ? String(curriculum.id) : String(offering?.curriculumId ?? "");
@@ -1873,8 +1889,9 @@ function SchoolCampaignEnrollmentCard({
         for (const campaign of list) {
             const offerings = Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [];
             for (const offering of offerings) {
-                pushCurriculum(offering?.curriculum);
-                pushCurriculum(offering?.program?.curriculum);
+                const {program, curriculum} = resolveOfferingProgramCurriculum(offering);
+                pushCurriculum(curriculum);
+                pushCurriculum(program?.curriculum);
             }
         }
         return acc;
@@ -2159,8 +2176,7 @@ function SchoolCampaignEnrollmentCard({
                                     >
                                         {groupCampusProgramOfferingsForPublicDetail(campusProgramOfferings).map((offerGroup, groupIdx) => {
                                             const primaryOffering = offerGroup[0];
-                                            const program = primaryOffering?.program || {};
-                                            const curriculum = primaryOffering?.curriculum || program?.curriculum || {};
+                                            const {program, curriculum} = resolveOfferingProgramCurriculum(primaryOffering);
                                             const normalizedCampaignName = String(campaign?.name || "").trim().toLowerCase();
                                             const rawProgramName = String(primaryOffering?.programName || program?.name || "").trim();
                                             const normalizedProgramName = rawProgramName.toLowerCase();
