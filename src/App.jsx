@@ -693,6 +693,10 @@ const router = createBrowserRouter([
                 )
             },
             {
+                path: 'schedule',
+                element: <Navigate to="/counsellor/calendar" replace/>
+            },
+            {
                 path: 'calendar',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
@@ -743,6 +747,10 @@ const router = createBrowserRouter([
                 )
             },
             {
+                path: 'consultation',
+                element: <Navigate to={'/parent/offline-consultations'} replace/>
+            },
+            {
                 path: 'offline-consultations',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
@@ -771,8 +779,7 @@ const router = createBrowserRouter([
 ])
 
 
-function App() {
-
+function NotificationManager() {
     const {enqueueSnackbar, closeSnackbar} = useSnackbar();
     useEffect(() => {
         let currentUser = getCurrentAuthUser();
@@ -827,6 +834,10 @@ function App() {
         };
     }, [closeSnackbar, enqueueSnackbar]);
 
+    return null;
+}
+
+function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline/>
@@ -838,6 +849,7 @@ function App() {
                     TransitionComponent={Slide}
                     preventDuplicate={true}
                 >
+                    <NotificationManager/>
                     <RouterProvider router={router}/>
                     <GlobalLoadingOverlay/>
                 </SnackbarProvider>
