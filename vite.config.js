@@ -6,7 +6,7 @@ function manualChunks(id) {
     return undefined
   }
 
-  // React internals + MUI + emotion + motion must stay together to avoid circular chunks
+  // React internals + MUI + emotion + notistack must stay together to avoid circular chunks
   if (
     id.includes('/react/') ||
     id.includes('/react-dom/') ||
@@ -18,10 +18,13 @@ function manualChunks(id) {
     id.includes('@mui/utils') ||
     id.includes('@mui/base') ||
     id.includes('@emotion') ||
-    id.includes('framer-motion') ||
     id.includes('notistack')
   ) {
     return 'vendor-ui-core'
+  }
+
+  if (id.includes('framer-motion')) {
+    return 'vendor-motion'
   }
 
   if (id.includes('@mui/icons-material')) {
@@ -45,14 +48,6 @@ function manualChunks(id) {
   }
 
   if (
-    id.includes('xlsx') ||
-    id.includes('jwt-decode') ||
-    id.includes('debounce')
-  ) {
-    return 'vendor-data'
-  }
-
-  if (
     id.includes('@stomp/stompjs') ||
     id.includes('sockjs-client') ||
     id.includes('/faye-websocket/') ||
@@ -65,6 +60,14 @@ function manualChunks(id) {
 
   if (id.includes('@react-oauth/google') || id.includes('axios')) {
     return 'vendor-ui-core'
+  }
+
+  if (
+    id.includes('xlsx') ||
+    id.includes('jwt-decode') ||
+    id.includes('debounce')
+  ) {
+    return 'vendor-data'
   }
 
   if (id.includes('react-icons')) {
