@@ -225,12 +225,60 @@ function collectProcessStepsByMethod(campaigns) {
     return orderKeys.map((key) => map.get(key)).filter((group) => group?.displayName);
 }
 
+function resolveOfferingForCompare(offering) {
+    const curriculumRaw = offering?.curriculum && typeof offering.curriculum === "object" ? offering.curriculum : {};
+    const programFromItem = offering?.program && typeof offering.program === "object" ? offering.program : {};
+    const programFromCurriculum =
+        curriculumRaw?.program && typeof curriculumRaw.program === "object" ? curriculumRaw.program : {};
+    const program = Object.keys(programFromItem).length > 0 ? programFromItem : programFromCurriculum;
+    let curriculum = curriculumRaw;
+    if (curriculumRaw?.program) {
+        const {program: _nested, ...rest} = curriculumRaw;
+        curriculum = Object.keys(rest).length > 0 ? rest : curriculumRaw;
+    }
+    if ((!curriculum || !Object.keys(curriculum).length) && program?.curriculum) {
+        curriculum = program.curriculum;
+    }
+    return {program, curriculum};
+}
+
+/** Loại bỏ dòng trùng trong cùng một cột trường (so sánh). */
+function uniqueCompareLines(lines, {bullet = true} = {}) {
+    const seen = new Set();
+    const result = [];
+    (Array.isArray(lines) ? lines : []).forEach((line) => {
+        const raw = String(line || "").trim();
+        if (!raw || raw === "—") return;
+        const normalized = raw.replace(/^\s*-\s*/, "").trim().toLowerCase();
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        if (bullet && !raw.startsWith("-")) {
+            result.push(`- ${raw}`);
+            return;
+        }
+        result.push(raw);
+    });
+    return result;
+}
+
 function collectProgramOfferings(campaigns) {
     const map = new Map();
     (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
         (Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : []).forEach((offering) => {
-            const id = Number(offering?.id);
-            const key = Number.isFinite(id) && id > 0 ? `id:${id}` : `${offering?.campusId}-${offering?.program?.id}`;
+            const {program, curriculum} = resolveOfferingForCompare(offering);
+            const curriculumId = Number(curriculum?.id);
+            const nameKey = String(curriculum?.name || program?.name || offering?.programName || "")
+                .trim()
+                .toLowerCase();
+            const offeringId = Number(offering?.id);
+            const key =
+                Number.isFinite(curriculumId) && curriculumId > 0
+                    ? `cur:${curriculumId}`
+                    : nameKey
+                      ? `name:${nameKey}`
+                      : Number.isFinite(offeringId) && offeringId > 0
+                        ? `id:${offeringId}`
+                        : `${offering?.campusId}-${offering?.admissionMethod}`;
             if (!map.has(key)) map.set(key, offering);
         });
     });
@@ -268,7 +316,7 @@ function collectFacilitySummary(campusList) {
     (Array.isArray(campusList) ? campusList : []).forEach((campus) => {
         const facility = campus?.facility && typeof campus.facility === "object" ? campus.facility : {};
         const overviewText = stripHtml(facility?.overview);
-        if (overviewText) overviews.push(overviewText);
+        if (overviewText && !overviews.includes(overviewText)) overviews.push(overviewText);
         (Array.isArray(facility?.itemList) ? facility.itemList : []).forEach((item) => {
             const name = String(item?.name || "").trim();
             if (!name) return;
@@ -276,7 +324,8 @@ function collectFacilitySummary(campusList) {
             const unit = String(item?.unit || "").trim();
             const valueText = value == null || value === "" ? "" : ` ${value}`;
             const unitText = unit ? ` ${unit}` : "";
-            itemLines.push(`${name}: ${String(valueText + unitText).trim() || "—"}`);
+            const itemLine = `${name}: ${String(valueText + unitText).trim() || "—"}`;
+            if (!itemLines.includes(itemLine)) itemLines.push(itemLine);
         });
         const imageData = facility?.imageData || {};
         pushImage(imageData?.coverUrl, "Ảnh đại diện");
@@ -360,9 +409,10 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     const boardingLabels = Array.from(
         new Set(campusList.map((campus) => mapBoardingTypeLabel(campus?.boardingType)).filter((x) => x && x !== "—"))
     );
-    const campusAddressLines = campusList
-        .map((campus) => toText(campus?.address, ""))
-        .filter((address) => address && address !== "—");
+    const campusAddressLines = uniqueCompareLines(
+        campusList.map((campus) => toText(campus?.address, "")).filter((address) => address && address !== "—"),
+        {bullet: false}
+    );
     const hotline = toText(detail?.hotline, "");
     const website = toText(detail?.website || detail?.websiteUrl, "");
     const allowedMethods = collectAllowedMethods(campaignList);
@@ -379,61 +429,66 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
             )
         )
     ).map((name) => `- ${name}`);
-    const reservationFeeLines = campaignList
-        .flatMap((campaign) =>
+    const reservationFeeLines = uniqueCompareLines(
+        campaignList.flatMap((campaign) =>
             (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).map((method) => {
                 const fee = Number(method?.reservationFee);
                 if (!Number.isFinite(fee)) return "";
                 const label = toText(method?.displayName || method?.methodCode, "Phương thức");
                 return `${label}: ${formatMoney(fee)}`;
             })
-        )
-        .filter(Boolean);
-    const quotaTotalLines = campaignList
+        ),
+        {bullet: false}
+    );
+    const quotaTotalLines = uniqueCompareLines(
+        campaignList
         .map((campaign) => {
             const total = Number(campaign?.campaignTotalQuota);
             if (!Number.isFinite(total)) return "";
             return `${toText(campaign?.name, "Chiến dịch")}: ${total} học sinh`;
-        })
-        .filter(Boolean);
-    const quotaRemainingLines = campaignList
-        .map((campaign) => {
+        }),
+        {bullet: false}
+    );
+    const quotaRemainingLines = uniqueCompareLines(
+        campaignList.map((campaign) => {
             const remaining = Number(campaign?.campaignRemainingQuota);
             if (!Number.isFinite(remaining)) return "";
             return `${toText(campaign?.name, "Chiến dịch")}: còn ${remaining} chỉ tiêu`;
-        })
-        .filter(Boolean);
-    const campaignTimelineLines = campaignList
-        .map((campaign) => {
+        }),
+        {bullet: false}
+    );
+    const campaignTimelineLines = uniqueCompareLines(
+        campaignList.map((campaign) => {
             const start = formatDateDisplay(campaign?.startDate);
             const end = formatDateDisplay(campaign?.endDate);
             if (start === "—" && end === "—") return "";
             return `${toText(campaign?.name, "Chiến dịch")}: ${start} - ${end}`;
-        })
-        .filter(Boolean);
-    const campaignStatusLines = campaignList
-        .map((campaign) => `${toText(campaign?.name, "Chiến dịch")}: ${mapCampaignStatusLabel(campaign?.status)}`)
-        .filter(Boolean);
+        }),
+        {bullet: false}
+    );
+    const campaignStatusLines = uniqueCompareLines(
+        campaignList.map(
+            (campaign) => `${toText(campaign?.name, "Chiến dịch")}: ${mapCampaignStatusLabel(campaign?.status)}`
+        ),
+        {bullet: false}
+    );
     const offerings = collectProgramOfferings(campaignList);
-    const programNameLines = offerings
-        .map((offering) => {
-            const program = offering?.program || {};
-            const curriculum = offering?.curriculum || program?.curriculum || {};
+    const programNameLines = uniqueCompareLines(
+        offerings.map((offering) => {
+            const {program, curriculum} = resolveOfferingForCompare(offering);
             const name = String(curriculum?.name || program?.name || offering?.programName || "").trim();
-            if (!name) return "";
-            return `- ${name}`;
+            return name || "";
         })
-        .filter(Boolean);
-    const tuitionFeeLines = offerings
-        .map((offering) => {
-            const program = offering?.program || {};
+    );
+    const tuitionFeeLines = uniqueCompareLines(
+        offerings.map((offering) => {
+            const {program} = resolveOfferingForCompare(offering);
             const tuition = Number(offering?.tuitionFee ?? program?.baseTuitionFee);
             if (!Number.isFinite(tuition)) return "";
             const unit = feeUnitLabel(program?.feeUnit);
-            const feeText = `${formatMoney(tuition)}${unit ? ` / ${unit}` : ""}`;
-            return `- ${feeText}`;
+            return `${formatMoney(tuition)}${unit ? ` / ${unit}` : ""}`;
         })
-        .filter(Boolean);
+    );
     const learningMethodsLines = Array.from(
         new Set(
             offerings.flatMap((offering) => {
@@ -447,20 +502,18 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     )
         .filter(Boolean)
         .map((label) => `- ${label}`);
-    const graduationStandardLines = offerings
-        .map((offering) => {
-            const program = offering?.program || {};
-            const text = stripHtml(program?.graduationStandard);
-            if (!text) return "";
-            return `- ${text}`;
+    const graduationStandardLines = uniqueCompareLines(
+        offerings.map((offering) => {
+            const {program} = resolveOfferingForCompare(offering);
+            return stripHtml(program?.graduationStandard);
         })
-        .filter(Boolean);
+    );
     const facilitySummary = collectFacilitySummary(campusList);
     const facilityOverviewLines = facilitySummary.overviews.length
-        ? facilitySummary.overviews.map((line) => `- ${line}`)
+        ? uniqueCompareLines(facilitySummary.overviews)
         : ["—"];
     const facilityItemLines = facilitySummary.itemLines.length
-        ? facilitySummary.itemLines.map((line) => `- ${line}`)
+        ? uniqueCompareLines(facilitySummary.itemLines)
         : ["—"];
     const facilityImages = facilitySummary.images;
     const now = Date.now();
