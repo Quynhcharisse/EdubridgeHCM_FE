@@ -657,7 +657,7 @@ export default function SchoolCampaignViewDetail() {
                             size="small"
                             variant="outlined"
                             startIcon={<DescriptionOutlinedIcon sx={{ fontSize: 18 }} />}
-                            onClick={() => navigate("/school/admission-reservations")}
+                            onClick={() => navigate(`/school/admission-reservations?campaignId=${campaign.id}`)}
                             sx={{
                                 textTransform: "none",
                                 borderRadius: 999,
