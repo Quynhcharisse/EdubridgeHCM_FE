@@ -1686,32 +1686,6 @@ export default function CounsellorConsultationManagement() {
                                   </span>
                                 </Tooltip>
                               )}
-                              {activeListStatus === "pending" && (
-                                <Tooltip title="Hủy lịch hẹn">
-                                  <span>
-                                    <IconButton
-                                      size="small"
-                                      aria-label="Hủy lịch hẹn"
-                                      onClick={() => openCancelFromRow(row)}
-                                      disabled={
-                                        (cancelSubmitLoading && Number(cancelTargetRow?.id) === Number(row?.id)) ||
-                                        confirmingRowId === Number(row?.id)
-                                      }
-                                      sx={{
-                                        ...viewActionSx,
-                                        color: "#dc2626",
-                                        "&:hover": { bgcolor: "rgba(239,68,68,0.10)" },
-                                      }}
-                                    >
-                                      {cancelSubmitLoading && Number(cancelTargetRow?.id) === Number(row?.id) ? (
-                                        <CircularProgress size={16} thickness={4} sx={{ color: "#dc2626" }} />
-                                      ) : (
-                                        <HighlightOffOutlinedIcon fontSize="small" />
-                                      )}
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                              )}
                               <Tooltip title="Xem chi tiết">
                                 <IconButton
                                   size="small"
@@ -1900,10 +1874,15 @@ export default function CounsellorConsultationManagement() {
                 justifyContent: "space-between",
               }}
             >
+              <Tooltip
+                title={detailRow?.confirmingBy == null ? "Chỉ có thể hủy khi đang tiếp nhận" : ""}
+                placement="top"
+              >
+                <span>
               <Button
                 variant="outlined"
                 color="error"
-                disabled={cancelSubmitLoading}
+                disabled={cancelSubmitLoading || detailRow?.confirmingBy == null}
                 onClick={() => openCancelFromRow(detailRow)}
                 sx={{
                   textTransform: "none",
@@ -1918,6 +1897,8 @@ export default function CounsellorConsultationManagement() {
               >
                 Hủy lịch hẹn
               </Button>
+                </span>
+              </Tooltip>
               <Tooltip
                 title={
                   detailRow?.confirmingBy == null
@@ -1945,7 +1926,7 @@ export default function CounsellorConsultationManagement() {
                       "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
                     }}
                   >
-                    Chỉnh sửa
+                    Xác nhận
                   </Button>
                 </span>
               </Tooltip>
