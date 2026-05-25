@@ -779,8 +779,7 @@ const router = createBrowserRouter([
 ])
 
 
-function App() {
-
+function NotificationManager() {
     const {enqueueSnackbar, closeSnackbar} = useSnackbar();
     useEffect(() => {
         let currentUser = getCurrentAuthUser();
@@ -835,6 +834,10 @@ function App() {
         };
     }, [closeSnackbar, enqueueSnackbar]);
 
+    return null;
+}
+
+function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline/>
@@ -846,6 +849,7 @@ function App() {
                     TransitionComponent={Slide}
                     preventDuplicate={true}
                 >
+                    <NotificationManager/>
                     <RouterProvider router={router}/>
                     <GlobalLoadingOverlay/>
                 </SnackbarProvider>
