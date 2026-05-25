@@ -167,6 +167,64 @@ function collectAllowedMethods(campaigns) {
     return Array.from(map.values());
 }
 
+function normalizeProcessSteps(rawSteps) {
+    const steps = Array.isArray(rawSteps) ? rawSteps : [];
+    return steps
+        .map((step, idx) => {
+            const order = Number(step?.stepOrder);
+            const stepNo = Number.isFinite(order) ? order : idx + 1;
+            const stepName = String(step?.stepName || "").trim() || `Bước ${stepNo}`;
+            return {stepOrder: stepNo, stepName, label: `${stepNo}. ${stepName}`};
+        })
+        .sort((a, b) => a.stepOrder - b.stepOrder)
+        .slice(0, 12);
+}
+
+/** Quy trình tuyển sinh theo từng phương thức (allowedMethods + admissionMethodDetails). */
+function collectProcessStepsByMethod(campaigns) {
+    const map = new Map();
+    const orderKeys = [];
+
+    const ensureMethod = (code, displayName) => {
+        const key = String(code || displayName || "").trim();
+        if (!key) return null;
+        if (!map.has(key)) {
+            map.set(key, {
+                methodCode: String(code || "").trim(),
+                displayName: String(displayName || code || "").trim(),
+                steps: []
+            });
+            orderKeys.push(key);
+        }
+        return map.get(key);
+    };
+
+    (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
+        const allowedSources = [
+            ...(Array.isArray(campaign?.schoolAllowedMethods) ? campaign.schoolAllowedMethods : []),
+            ...(Array.isArray(campaign?.campaignConfig?.allowedMethods) ? campaign.campaignConfig.allowedMethods : [])
+        ];
+        allowedSources.forEach((method) => {
+            const code = String(method?.code || "").trim();
+            const name = String(method?.displayName || code).trim();
+            const entry = ensureMethod(code, name);
+            if (entry && name) entry.displayName = name;
+        });
+
+        (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).forEach((timeline) => {
+            const code = String(timeline?.methodCode || "").trim();
+            const name = String(timeline?.displayName || code).trim();
+            const entry = ensureMethod(code, name);
+            if (!entry) return;
+            if (name) entry.displayName = name;
+            const nextSteps = normalizeProcessSteps(timeline?.admissionProcessSteps);
+            if (nextSteps.length > entry.steps.length) entry.steps = nextSteps;
+        });
+    });
+
+    return orderKeys.map((key) => map.get(key)).filter((group) => group?.displayName);
+}
+
 function collectProgramOfferings(campaigns) {
     const map = new Map();
     (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => {
@@ -307,30 +365,11 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         .filter((address) => address && address !== "—");
     const hotline = toText(detail?.hotline, "");
     const website = toText(detail?.website || detail?.websiteUrl, "");
-    const hotlineWebsite = [hotline !== "—" ? `Hotline: ${hotline}` : "", website !== "—" ? `Website: ${website}` : ""]
-        .filter(Boolean)
-        .join(" | ");
     const allowedMethods = collectAllowedMethods(campaignList);
     const allowedMethodsLines = allowedMethods.length
         ? allowedMethods.map((name) => `- ${name}`)
         : ["—"];
-    const processStepsPreview = (() => {
-        let bestSteps = [];
-        campaignList.forEach((campaign) => {
-            (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).forEach((method) => {
-                const steps = Array.isArray(method?.admissionProcessSteps) ? method.admissionProcessSteps : [];
-                if (steps.length > bestSteps.length) bestSteps = steps;
-            });
-        });
-        return bestSteps
-            .map((step, idx) => {
-                const order = Number(step?.stepOrder);
-                const stepNo = Number.isFinite(order) ? order : idx + 1;
-                const stepName = String(step?.stepName || "").trim() || `Bước ${stepNo}`;
-                return `${stepNo}. ${stepName}`;
-            })
-            .slice(0, 8);
-    })();
+    const processStepsByMethod = collectProcessStepsByMethod(campaignList);
     const mandatoryDocLines = Array.from(
         new Set(
             campaignList.flatMap((campaign) =>
@@ -437,14 +476,15 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         boardingTypeLabel: boardingLabels.length ? boardingLabels.join(" / ") : "—",
         campusAddressLines: campusAddressLines.length ? campusAddressLines : ["—"],
         districts: campusDistricts.length ? campusDistricts.join(", ") : "—",
-        hotlineWebsite: hotlineWebsite || "—",
+        hotlineContact: hotline !== "—" ? hotline : "",
+        websiteUrl: website !== "—" ? website : "",
         campaignStatusLabel: primaryCampaign
             ? mapCampaignStatusLabel(primaryCampaign.status)
             : campaignStatusLines[0] || "—",
         campaignStatusLines: campaignStatusLines.length ? campaignStatusLines : ["—"],
         campaignTimeLines: campaignTimelineLines.length ? campaignTimelineLines : ["—"],
         allowedMethodsLines,
-        processStepsPreview,
+        processStepsByMethod,
         quotaTotalLines: quotaTotalLines.length ? quotaTotalLines : ["—"],
         quotaRemainingLines: quotaRemainingLines.length ? quotaRemainingLines : ["—"],
         mandatoryDocLines: mandatoryDocLines.length ? mandatoryDocLines : ["—"],
@@ -736,7 +776,7 @@ export default function CompareSchoolsPage() {
             rows: [
                 {label: "Địa chỉ", render: (d) => d.campusAddressLines},
                 {label: "Khu vực (Quận/Huyện)", render: (d) => d.districts},
-                {label: "Hotline / Website", render: (d) => d.hotlineWebsite}
+                {label: "Hotline / Website", render: () => "", isHotlineWebsite: true}
             ]
         },
         {
@@ -749,8 +789,8 @@ export default function CompareSchoolsPage() {
                 {label: "Phương thức xét tuyển", render: (d) => d.allowedMethodsLines},
                 {
                     label: "Quy trình các bước",
-                    render: (d) =>
-                        Array.isArray(d.processStepsPreview) && d.processStepsPreview.length ? "" : "—"
+                    render: (d) => (Array.isArray(d.processStepsByMethod) && d.processStepsByMethod.length ? "" : "—"),
+                    isProcessByMethod: true
                 }
             ]
         },
@@ -796,6 +836,57 @@ export default function CompareSchoolsPage() {
         fontWeight: 400,
         lineHeight: 1.55
     };
+    const sectionTitleSx = (tone) => ({
+        fontSize: "0.98rem",
+        fontWeight: 800,
+        color: tone || "#1e3a8a",
+        letterSpacing: "0.02em",
+        lineHeight: 1.35
+    });
+    const rowLabelSx = {
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        color: "#1e293b",
+        lineHeight: 1.4
+    };
+
+    const normalizeWebsiteHref = (url) => {
+        const text = String(url || "").trim();
+        if (!text) return "";
+        if (/^https?:\/\//i.test(text)) return text;
+        return `https://${text}`;
+    };
+
+    const renderHotlineWebsite = (detail) => {
+        const hotline = String(detail?.hotlineContact || "").trim();
+        const website = String(detail?.websiteUrl || "").trim();
+        const href = normalizeWebsiteHref(website);
+        if (!hotline && !website) {
+            return <Typography sx={compareCellTextSx}>—</Typography>;
+        }
+        return (
+            <Stack spacing={0.4}>
+                {hotline ? <Typography sx={compareCellTextSx}>{hotline}</Typography> : null}
+                {website ? (
+                    <Typography
+                        component="a"
+                        href={href || undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                            ...compareCellTextSx,
+                            color: href ? "#2563eb" : "#475569",
+                            textDecoration: href ? "underline" : "none",
+                            wordBreak: "break-all",
+                            "&:hover": href ? {color: "#1d4ed8"} : undefined
+                        }}
+                    >
+                        {website}
+                    </Typography>
+                ) : null}
+            </Stack>
+        );
+    };
 
     const renderFacilityImages = (images) => {
         const list = Array.isArray(images) ? images : [];
@@ -826,15 +917,15 @@ export default function CompareSchoolsPage() {
         );
     };
 
-    const renderProcessTimeline = (detail) => {
-        const steps = Array.isArray(detail?.processStepsPreview) ? detail.processStepsPreview : [];
-        if (!steps.length) return null;
+    const renderMethodStepTimeline = (steps, methodKey) => {
+        const list = Array.isArray(steps) ? steps : [];
+        if (!list.length) return null;
         return (
-            <Stack spacing={0.35} sx={{mt: 0.45}}>
-                {steps.map((step, idx) => {
-                    const isLast = idx === steps.length - 1;
+            <Stack spacing={0.35}>
+                {list.map((step, idx) => {
+                    const isLast = idx === list.length - 1;
                     return (
-                        <Box key={`${detail.schoolName}-step-${idx}`} sx={{display: "flex", alignItems: "center", gap: 0.55}}>
+                        <Box key={`${methodKey}-step-${idx}`} sx={{display: "flex", alignItems: "center", gap: 0.55}}>
                             <Box sx={{position: "relative", flexShrink: 0}}>
                                 <Box
                                     sx={{
@@ -851,7 +942,7 @@ export default function CompareSchoolsPage() {
                                         justifyContent: "center"
                                     }}
                                 >
-                                    {idx + 1}
+                                    {step.stepOrder}
                                 </Box>
                                 {!isLast ? (
                                     <Box
@@ -869,8 +960,42 @@ export default function CompareSchoolsPage() {
                                 ) : null}
                             </Box>
                             <Typography sx={{...compareCellTextSx, fontSize: "0.85rem", mt: 0.05}}>
-                                {step.replace(/^\d+\.\s*/, "")}
+                                {step.stepName}
                             </Typography>
+                        </Box>
+                    );
+                })}
+            </Stack>
+        );
+    };
+
+    const renderProcessByMethod = (detail) => {
+        const groups = Array.isArray(detail?.processStepsByMethod) ? detail.processStepsByMethod : [];
+        if (!groups.length) return null;
+        return (
+            <Stack spacing={1.1} sx={{mt: 0.45}}>
+                {groups.map((group) => {
+                    const methodKey = `${detail?.schoolName || "school"}-${group.methodCode || group.displayName}`;
+                    return (
+                        <Box key={methodKey}>
+                            <Typography
+                                sx={{
+                                    fontSize: "0.9rem",
+                                    fontWeight: 700,
+                                    color: "#1e293b",
+                                    lineHeight: 1.4,
+                                    mb: group.steps?.length ? 0.4 : 0.2
+                                }}
+                            >
+                                {group.displayName}
+                            </Typography>
+                            {group.steps?.length ? (
+                                renderMethodStepTimeline(group.steps, methodKey)
+                            ) : (
+                                <Typography sx={{...compareCellTextSx, fontSize: "0.85rem", color: "#94a3b8"}}>
+                                    Chưa có quy trình chi tiết
+                                </Typography>
+                            )}
                         </Box>
                     );
                 })}
@@ -1038,6 +1163,7 @@ export default function CompareSchoolsPage() {
                                                     py: 1.15,
                                                     bgcolor: leftCriteriaColBg,
                                                     borderRight: "1px solid rgba(59,130,246,0.2)",
+                                                    borderLeft: `4px solid ${section.tone || "#2563eb"}`,
                                                     borderRadius: "10px",
                                                     boxShadow: "0 3px 10px rgba(37,99,235,0.14)",
                                                     "&::after": {
@@ -1061,14 +1187,12 @@ export default function CompareSchoolsPage() {
                                                         width: 7,
                                                         height: 7,
                                                         borderRadius: "50%",
-                                                        bgcolor: "#1d4ed8",
+                                                        bgcolor: section.tone || "#1d4ed8",
                                                         opacity: 0.88,
                                                         zIndex: 3
                                                     }}
                                                 />
-                                                <Typography sx={{fontSize: "0.9rem", color: "#475569", fontWeight: 600}}>
-                                                    {section.title}
-                                                </Typography>
+                                                <Typography sx={sectionTitleSx(section.tone)}>{section.title}</Typography>
                                             </Box>
                                             {richRows.map((item, colIdx) => {
                                                 const isLastCol = colIdx === richRows.length - 1;
@@ -1181,11 +1305,13 @@ export default function CompareSchoolsPage() {
                                                     <Stack direction="row" spacing={0.7} alignItems="center">
                                                         {(() => {
                                                             const MetricIcon = metricIconByLabel(rowMeta.label);
-                                                            return <MetricIcon sx={{fontSize: 16, color: "#1d4ed8", flexShrink: 0}}/>;
+                                                            return (
+                                                                <MetricIcon
+                                                                    sx={{fontSize: 17, color: section.tone || "#1d4ed8", flexShrink: 0}}
+                                                                />
+                                                            );
                                                         })()}
-                                                        <Typography sx={{fontSize: "0.88rem", fontWeight: 600, color: "#334155"}}>
-                                                            {rowMeta.label}
-                                                        </Typography>
+                                                        <Typography sx={rowLabelSx}>{rowMeta.label}</Typography>
                                                     </Stack>
                                                 </Box>
                                                 {richRows.map((item, colIdx) => {
@@ -1247,6 +1373,10 @@ export default function CompareSchoolsPage() {
                                                             />
                                                             {rowMeta.isFacilityImages ? (
                                                                 renderFacilityImages(cellText)
+                                                            ) : rowMeta.isHotlineWebsite ? (
+                                                                renderHotlineWebsite(item.detail)
+                                                            ) : rowMeta.isProcessByMethod ? (
+                                                                renderProcessByMethod(item.detail)
                                                             ) : section.key === "general" && rowMeta.label === "Hình thức đào tạo" ? (
                                                                 <Stack direction="row" flexWrap="wrap" useFlexGap sx={{gap: 0.5}}>
                                                                     {String(cellText)
@@ -1342,9 +1472,6 @@ export default function CompareSchoolsPage() {
                                                                             {cellText}
                                                                         </Typography>
                                                                     )}
-                                                                    {section.key === "admission" && rowMeta.label === "Quy trình các bước"
-                                                                        ? renderProcessTimeline(item.detail)
-                                                                        : null}
                                                                 </>
                                                             )}
                                                         </Box>
