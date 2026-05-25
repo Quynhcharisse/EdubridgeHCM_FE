@@ -14,6 +14,7 @@ import {
     Divider,
     Grid,
     InputAdornment,
+    IconButton,
     MenuItem,
     Stack,
     Table,
@@ -26,6 +27,7 @@ import {
     TextField,
     Typography,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
@@ -54,6 +56,8 @@ const normalizeChildren = (parent) => {
         id: child?.id ?? `child-${parent?.id ?? "unknown"}-${index}`,
         name: String(child?.name || "Học sinh chưa có tên"),
         gender: child?.gender || "",
+        dateOfBirth: child?.dateOfBirth || null,
+        studentCode: child?.studentCode || "",
     }));
 };
 
@@ -71,6 +75,33 @@ const toSubjectTypeLabel = (value) => {
     if (v === "regular") return "Môn chính";
     if (v === "foreign_language") return "Ngoại ngữ";
     return String(value || "-");
+};
+
+const formatDateOnly = (value) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    }).format(date);
+};
+
+const toGradeLabel = (value, fallback = "Không rõ lớp") => {
+    const raw = String(value || "").trim();
+    if (!raw) return fallback;
+
+    const prefixedMatch = raw.match(/^(?:GRADE|CLASS|LOP|LỚP)[\s_-]*0*(\d{1,2})$/i);
+    if (prefixedMatch) {
+        return `Lớp ${Number(prefixedMatch[1])}`;
+    }
+
+    if (/^\d{1,2}$/.test(raw)) {
+        return `Lớp ${Number(raw)}`;
+    }
+
+    return raw;
 };
 
 const getScoreTone = (score, isAvailable) => {
@@ -269,9 +300,6 @@ export default function SchoolParentsInterestPage() {
                             <Box>
                                 <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
                                     Danh sách phụ huynh quan tâm trường
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: "#475569", fontWeight: 600 }}>
-                                    Trang theo dõi chi tiết và lọc nâng cao
                                 </Typography>
                             </Box>
                         </Stack>
@@ -552,14 +580,23 @@ export default function SchoolParentsInterestPage() {
                         pb: 1.4,
                         background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
                         borderBottom: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
                     }}
                 >
                     <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a", letterSpacing: "-0.01em" }}>
                         {`Chi tiết hồ sơ học sinh${selectedChild?.name ? ` - ${selectedChild.name}` : ""}`}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-                        Student profile + academic profile
-                    </Typography>
+                    <IconButton
+                        onClick={handleCloseDetail}
+                        aria-label="Đóng"
+                        size="small"
+                        sx={{ color: "#334155", flexShrink: 0 }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
                 </DialogTitle>
                 <DialogContent dividers>
                     {detailLoading ? (
@@ -581,42 +618,56 @@ export default function SchoolParentsInterestPage() {
                         <Stack spacing={2.2}>
                             <Box sx={{ p: 1.6, border: "1px solid #dbeafe", borderRadius: 2.5, bgcolor: "#f8fbff" }}>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1.2 }}>
-                                    Student Profile
+                                    Hồ sơ học sinh
                                 </Typography>
-                                <Grid container spacing={1.5}>
-                                    <Grid item xs={12} md={6}>
-                                        <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0" }}>
+                                <Box
+                                    sx={{
+                                        display: "grid",
+                                        gap: 1.5,
+                                        gridTemplateColumns: {
+                                            xs: "1fr",
+                                            sm: "repeat(2, minmax(0, 1fr))",
+                                            lg: "repeat(3, minmax(0, 1fr))",
+                                        },
+                                    }}
+                                >
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
                                             <Typography variant="body2" sx={{ color: "#64748b" }}>Học sinh</Typography>
                                             <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
                                                 {studentDetail.studentName || selectedChild?.name || "-"}
                                             </Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0" }}>
+                                    </Box>
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
                                             <Typography variant="body2" sx={{ color: "#64748b" }}>Giới tính</Typography>
                                             <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
                                                 {toGenderLabel(studentDetail.gender)}
                                             </Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0" }}>
+                                    </Box>
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
+                                            <Typography variant="body2" sx={{ color: "#64748b" }}>Mã học sinh</Typography>
+                                            <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
+                                                {studentDetail.studentCode || selectedChild?.studentCode || "-"}
+                                            </Typography>
+                                    </Box>
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
+                                            <Typography variant="body2" sx={{ color: "#64748b" }}>Ngày sinh</Typography>
+                                            <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
+                                                {formatDateOnly(studentDetail.dateOfBirth)}
+                                            </Typography>
+                                    </Box>
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
                                             <Typography variant="body2" sx={{ color: "#64748b" }}>Tính cách</Typography>
                                             <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
                                                 {studentDetail.personalityTypeCode || studentDetail.personalityCode || "-"}
                                             </Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} md={6}>
-                                        <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0" }}>
+                                    </Box>
+                                    <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #e2e8f0", height: "100%" }}>
                                             <Typography variant="body2" sx={{ color: "#64748b" }}>Ngành yêu thích</Typography>
                                             <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
                                                 {studentDetail.favouriteJob || "-"}
                                             </Typography>
-                                        </Box>
-                                    </Grid>
-                                </Grid>
+                                    </Box>
+                                </Box>
                                 {Array.isArray(studentDetail.traits) && studentDetail.traits.length > 0 ? (
                                     <Stack direction="row" spacing={1} sx={{ mt: 1.4, flexWrap: "wrap", rowGap: 1 }}>
                                         {studentDetail.traits.map((trait, traitIndex) => (
@@ -634,7 +685,7 @@ export default function SchoolParentsInterestPage() {
 
                             <Box>
                                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1.2 }}>
-                                    Academic Profile
+                                    Hồ sơ học bạ
                                 </Typography>
 
                                 {Array.isArray(studentDetail.academicProfileMetadata) &&
@@ -644,7 +695,7 @@ export default function SchoolParentsInterestPage() {
                                             const subjects = Array.isArray(gradeMeta?.subjectResults)
                                                 ? gradeMeta.subjectResults
                                                 : [];
-                                            const gradeLabel = String(gradeMeta?.gradeLevel || `GRADE_${index + 1}`);
+                                            const gradeLabel = toGradeLabel(gradeMeta?.gradeLevel, `Lớp ${index + 1}`);
 
                                             return (
                                                 <Card
@@ -734,68 +785,6 @@ export default function SchoolParentsInterestPage() {
                                     </Typography>
                                 )}
                             </Box>
-
-                            <Box>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#0f172a", mb: 1.2 }}>
-                                    Transcript Images
-                                </Typography>
-
-                                {Array.isArray(studentDetail.transcriptImages) && studentDetail.transcriptImages.length > 0 ? (
-                                    <Grid container spacing={1.2}>
-                                        {studentDetail.transcriptImages.map((image, idx) => (
-                                            <Grid item xs={12} md={6} key={`${String(image?.grade || "grade")}-${idx}`}>
-                                                <Card elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2.2, overflow: "hidden" }}>
-                                                    <Box
-                                                        sx={{
-                                                            height: 132,
-                                                            bgcolor: "#f8fafc",
-                                                            borderBottom: "1px solid #e2e8f0",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            overflow: "hidden",
-                                                        }}
-                                                    >
-                                                        {image?.imageUrl ? (
-                                                            <Box
-                                                                component="img"
-                                                                src={image.imageUrl}
-                                                                alt={String(image?.grade || "Transcript")}
-                                                                sx={{ width: "100%", height: "100%", objectFit: "cover" }}
-                                                            />
-                                                        ) : (
-                                                            <Typography variant="caption" sx={{ color: "#64748b" }}>Không có ảnh</Typography>
-                                                        )}
-                                                    </Box>
-                                                    <CardContent sx={{ p: 1.2 }}>
-                                                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                                            <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b" }}>
-                                                                {image?.grade || "Không rõ khối"}
-                                                            </Typography>
-                                                            <Button
-                                                                component="a"
-                                                                href={image?.imageUrl || "#"}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                size="small"
-                                                                variant="outlined"
-                                                                disabled={!image?.imageUrl}
-                                                                sx={{ textTransform: "none", borderRadius: 999 }}
-                                                            >
-                                                                Xem ảnh
-                                                            </Button>
-                                                        </Stack>
-                                                    </CardContent>
-                                                </Card>
-                                            </Grid>
-                                        ))}
-                                    </Grid>
-                                ) : (
-                                    <Typography variant="body2" sx={{ color: "#64748b" }}>
-                                        Chưa có ảnh học bạ.
-                                    </Typography>
-                                )}
-                            </Box>
                         </Stack>
                     )}
                 </DialogContent>
@@ -819,14 +808,28 @@ export default function SchoolParentsInterestPage() {
                         pb: 1.4,
                         background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
                         borderBottom: "1px solid #e2e8f0",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
                     }}
                 >
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
-                        Hồ sơ học sinh của {selectedParentRow?.name || "phụ huynh"}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-                        Chọn một hồ sơ để xem chi tiết
-                    </Typography>
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a" }}>
+                            Hồ sơ học sinh của {selectedParentRow?.name || "phụ huynh"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                            Chọn một hồ sơ để xem chi tiết
+                        </Typography>
+                    </Box>
+                    <IconButton
+                        onClick={handleCloseChildrenDialog}
+                        aria-label="Đóng"
+                        size="small"
+                        sx={{ color: "#334155", flexShrink: 0 }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
                 </DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={1.2}>
@@ -839,7 +842,7 @@ export default function SchoolParentsInterestPage() {
                                                 <Typography sx={{ fontWeight: 700, color: "#1e293b" }}>
                                                     {child.name}
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ color: "#64748b" }}>
+                                                <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
                                                     {toGenderLabel(child.gender)}
                                                 </Typography>
                                             </Box>
