@@ -693,6 +693,10 @@ const router = createBrowserRouter([
                 )
             },
             {
+                path: 'schedule',
+                element: <Navigate to="/counsellor/calendar" replace/>
+            },
+            {
                 path: 'calendar',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
@@ -741,6 +745,10 @@ const router = createBrowserRouter([
                         <ParentProfile/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'consultation',
+                element: <Navigate to={'/parent/offline-consultations'} replace/>
             },
             {
                 path: 'offline-consultations',
