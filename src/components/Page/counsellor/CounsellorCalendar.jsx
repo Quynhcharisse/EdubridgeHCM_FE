@@ -1358,7 +1358,7 @@ export default function CounsellorCalendar() {
                           "&:hover": { bgcolor: "#0d47a1", boxShadow: "0 6px 18px rgba(13, 71, 161, 0.38)" },
                         }}
                       >
-                        Bắt đầu
+                        Đồng ý tham gia
                       </Button>
                     </Stack>
                   </Box>
@@ -1449,7 +1449,7 @@ export default function CounsellorCalendar() {
               "&:hover": { bgcolor: "#0d47a1" },
             }}
           >
-            Bắt đầu
+            Đồng ý tham gia
           </Button>
         </DialogActions>
       </Dialog>
