@@ -60,6 +60,7 @@ import RemoveCircleOutlinedIcon from "@mui/icons-material/RemoveCircleOutlined";
 import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
 import {enqueueSnackbar} from "notistack";
 import {useTheme} from "@mui/material/styles";
+import {useSearchParams} from "react-router-dom";
 import {useSchool} from "../../../contexts/SchoolContext.jsx";
 import {
     confirmAdmissionReservationPayment,
@@ -1307,6 +1308,9 @@ export default function SchoolCampusAdmissionReservations() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const {loading: schoolCtxLoading} = useSchool();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const campaignRowRefs = React.useRef(new Map());
+    const hasAutoScrolledToCampaignRef = React.useRef(false);
     const [campaigns, setCampaigns] = React.useState([]);
     const [allForms, setAllForms] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
@@ -1335,6 +1339,8 @@ export default function SchoolCampusAdmissionReservations() {
         campaignId: null,
         campaignName: "",
     });
+
+    const selectedCampaignIdFromUrl = searchParams.get("campaignId") ?? "";
 
     const exportExcelStatusLabels = React.useMemo(
         () => ADMISSION_FORM_EXPORT_STATUSES.map((status) => getReservationStatusLabel(status)),
@@ -1449,6 +1455,18 @@ export default function SchoolCampusAdmissionReservations() {
     }, [schoolCtxLoading, loadData]);
 
     React.useEffect(() => {
+        if (!selectedCampaignIdFromUrl) return;
+        if (!campaigns.some((campaign) => String(campaign.id) === selectedCampaignIdFromUrl)) return;
+        if (campaignFilter !== selectedCampaignIdFromUrl) {
+            setCampaignFilter(selectedCampaignIdFromUrl);
+        }
+    }, [campaignFilter, campaigns, selectedCampaignIdFromUrl]);
+
+    React.useEffect(() => {
+        hasAutoScrolledToCampaignRef.current = false;
+    }, [selectedCampaignIdFromUrl]);
+
+    React.useEffect(() => {
         if (campaignFilter !== "ALL") {
             setExpandedCampaignIds(new Set([campaignFilter]));
             return;
@@ -1457,6 +1475,21 @@ export default function SchoolCampusAdmissionReservations() {
             setExpandedCampaignIds(new Set([String(visibleCampaignGroups[0].id)]));
         }
     }, [campaignFilter, visibleCampaignGroups]);
+
+    React.useEffect(() => {
+        if (!selectedCampaignIdFromUrl) return;
+        if (campaignFilter !== selectedCampaignIdFromUrl) return;
+        if (expandedCampaignIds.size === 0 && visibleCampaignGroups.length > 1) return;
+        if (hasAutoScrolledToCampaignRef.current) return;
+
+        const row = campaignRowRefs.current.get(selectedCampaignIdFromUrl);
+        if (!row) return;
+
+        hasAutoScrolledToCampaignRef.current = true;
+        requestAnimationFrame(() => {
+            row.scrollIntoView({behavior: "smooth", block: "start", inline: "nearest"});
+        });
+    }, [campaignFilter, expandedCampaignIds, selectedCampaignIdFromUrl, visibleCampaignGroups.length]);
 
     const toggleCampaignExpand = (campaignId) => {
         const key = String(campaignId);
@@ -1656,7 +1689,10 @@ export default function SchoolCampusAdmissionReservations() {
                         {campaignFilter !== "ALL" && selectedCampaignLabel ? (
                             <Chip
                                 label={selectedCampaignLabel}
-                                onDelete={() => setCampaignFilter("ALL")}
+                                onDelete={() => {
+                                    setCampaignFilter("ALL");
+                                    setSearchParams({}, { replace: true });
+                                }}
                                 sx={{
                                     borderRadius: 999,
                                     maxWidth: {xs: "100%", sm: 280},
@@ -1727,7 +1763,15 @@ export default function SchoolCampusAdmissionReservations() {
                             size="small"
                             label="Chiến dịch"
                             value={campaignFilter}
-                            onChange={(e) => setCampaignFilter(e.target.value)}
+                            onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setCampaignFilter(nextValue);
+                                if (nextValue === "ALL") {
+                                    setSearchParams({}, { replace: true });
+                                } else {
+                                    setSearchParams({ campaignId: nextValue }, { replace: true });
+                                }
+                            }}
                             sx={{minWidth: 220, maxWidth: {md: 320}, "& .MuiOutlinedInput-root": {borderRadius: 2, bgcolor: "white"}}}
                         >
                             <MenuItem value="ALL">Tất cả chiến dịch</MenuItem>
@@ -1832,6 +1876,11 @@ export default function SchoolCampusAdmissionReservations() {
                                         return (
                                             <React.Fragment key={group.id}>
                                                 <TableRow
+                                                    ref={(node) => {
+                                                        const key = String(group.id);
+                                                        if (node) campaignRowRefs.current.set(key, node);
+                                                        else campaignRowRefs.current.delete(key);
+                                                    }}
                                                     hover
                                                     onClick={() => toggleCampaignExpand(group.id)}
                                                     sx={{
