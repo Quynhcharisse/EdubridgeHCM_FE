@@ -283,6 +283,19 @@ function ReservationCard({
             ? reservation.studentName
             : "Đơn đăng ký";
     const submittedDate = formatDateOnly(reservation?.createdTime);
+    const confirmEndDate = (() => {
+        const raw = reservation?.confirmEndDate;
+        if (!raw) return null;
+        if (Array.isArray(raw) && raw.length >= 3) {
+            const [y, m, d] = raw;
+            return new Date(y, m - 1, d).toLocaleDateString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+            });
+        }
+        return formatDateOnly(raw);
+    })();
 
     return (
         <Paper
@@ -357,6 +370,11 @@ function ReservationCard({
                             {submittedDate ? (
                                 <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
                                     Ngày nộp: {submittedDate}
+                                </Typography>
+                            ) : null}
+                            {showMandatoryDocuments && confirmEndDate ? (
+                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
+                                    Ngày hạn nộp hồ sơ tại trường: {confirmEndDate}
                                 </Typography>
                             ) : null}
                         </Stack>
@@ -689,6 +707,7 @@ export default function ParentAdmissionReservationsPage() {
                     schoolName: source?.schoolName ?? reservation?.schoolName,
                     programName: source?.programName ?? reservation?.programName,
                     methodName: source?.methodName ?? reservation?.methodName,
+                    confirmEndDate: source?.confirmEndDate ?? reservation?.confirmEndDate,
                 },
             });
         };
