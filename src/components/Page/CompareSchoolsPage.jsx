@@ -54,16 +54,27 @@ const SCHOOL_ICON_TINTS = ["#2563eb", "#3b82f6", "#0ea5e9", "#38bdf8"];
 const NEARBY_MARK_KM = 10;
 const COMPARE_LABEL_COL_WIDTH = 220;
 const COMPARE_SCHOOL_COL_WIDTH = 260;
+const COMPARE_SCHOOL_COL_MIN = 180;
 const COMPARE_TABLE_COL_GAP = 16;
+const COMPARE_TABLE_FIT_ALL_COLS_AT = 4;
 
 function compareTableGridColumns(schoolCount) {
     const n = Math.max(1, Number(schoolCount) || 1);
-    return `${COMPARE_LABEL_COL_WIDTH}px repeat(${n}, ${COMPARE_SCHOOL_COL_WIDTH}px)`;
+    const schoolCols =
+        n >= COMPARE_TABLE_FIT_ALL_COLS_AT
+            ? `repeat(${n}, minmax(${COMPARE_SCHOOL_COL_MIN}px, 1fr))`
+            : `repeat(${n}, ${COMPARE_SCHOOL_COL_WIDTH}px)`;
+    return `${COMPARE_LABEL_COL_WIDTH}px ${schoolCols}`;
 }
 
 function compareTableScrollMinWidth(schoolCount) {
     const n = Math.max(1, Number(schoolCount) || 1);
-    return COMPARE_LABEL_COL_WIDTH + n * COMPARE_SCHOOL_COL_WIDTH + (n - 1) * COMPARE_TABLE_COL_GAP;
+    const schoolColWidth = n >= COMPARE_TABLE_FIT_ALL_COLS_AT ? COMPARE_SCHOOL_COL_MIN : COMPARE_SCHOOL_COL_WIDTH;
+    return COMPARE_LABEL_COL_WIDTH + n * schoolColWidth + (n - 1) * COMPARE_TABLE_COL_GAP;
+}
+
+function compareTableInnerWidth(schoolCount) {
+    return Math.max(1, Number(schoolCount) || 1) >= COMPARE_TABLE_FIT_ALL_COLS_AT ? "100%" : "max-content";
 }
 
 function formatLocation(row) {
@@ -962,6 +973,12 @@ export default function CompareSchoolsPage() {
         fontWeight: 400,
         lineHeight: 1.55
     };
+    const compareSchoolColSx =
+        richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT
+            ? {minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word"}
+            : {};
+    const compareTableRowSx =
+        richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT ? {width: "100%"} : {};
     const sectionTitleSx = (tone) => ({
         fontSize: "0.98rem",
         fontWeight: 800,
@@ -1267,7 +1284,11 @@ export default function CompareSchoolsPage() {
                             </Box>
                         ) : null}
 
-                        {richRows.length >= 3 ? (
+                        {richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT ? (
+                            <Typography sx={{fontSize: "0.82rem", color: "#64748b", mb: 0.75, display: {xs: "block", md: "none"}}}>
+                                Cuộn ngang để xem đủ {richRows.length} trường trên màn hình nhỏ
+                            </Typography>
+                        ) : richRows.length >= 3 ? (
                             <Typography sx={{fontSize: "0.82rem", color: "#64748b", mb: 0.75}}>
                                 Cuộn ngang để xem đủ {richRows.length} trường
                             </Typography>
@@ -1279,6 +1300,7 @@ export default function CompareSchoolsPage() {
                                 overflowX: "auto",
                                 overflowY: "hidden",
                                 WebkitOverflowScrolling: "touch",
+                                scrollbarGutter: "stable",
                                 bgcolor: "transparent",
                                 pb: 1.5,
                                 mx: {xs: -1, sm: 0}
@@ -1286,13 +1308,15 @@ export default function CompareSchoolsPage() {
                         >
                             <Box
                                 sx={{
-                                    width: "max-content",
+                                    width: compareTableInnerWidth(richRows.length),
                                     minWidth: compareTableScrollMinWidth(richRows.length),
-                                    pr: 2
+                                    pr: 2,
+                                    boxSizing: "border-box"
                                 }}
                             >
                                 <Box
                                     sx={{
+                                        ...compareTableRowSx,
                                         display: "grid",
                                         gridTemplateColumns: compareTableGridColumns(richRows.length),
                                         columnGap: `${COMPARE_TABLE_COL_GAP}px`,
@@ -1321,6 +1345,7 @@ export default function CompareSchoolsPage() {
                                         <Box
                                             key={`sticky-head-${item.raw?.schoolKey}`}
                                             sx={{
+                                                ...compareSchoolColSx,
                                                 px: 1.2,
                                                 py: 1.1,
                                                 borderLeft: "1px solid rgba(59,130,246,0.2)",
@@ -1357,6 +1382,7 @@ export default function CompareSchoolsPage() {
                                     <Box key={section.key} sx={{bgcolor: sectionStripeBg(sectionIdx)}}>
                                         <Box
                                             sx={{
+                                                ...compareTableRowSx,
                                                 display: "grid",
                                                 gridTemplateColumns: compareTableGridColumns(richRows.length),
                                                 columnGap: `${COMPARE_TABLE_COL_GAP}px`,
@@ -1409,6 +1435,7 @@ export default function CompareSchoolsPage() {
                                                     <Box
                                                         key={`sec-head-${section.key}-${item.raw?.schoolKey}`}
                                                         sx={{
+                                                            ...compareSchoolColSx,
                                                             position: "relative",
                                                             px: 1.2,
                                                             py: 1.1,
@@ -1467,6 +1494,7 @@ export default function CompareSchoolsPage() {
                                             <Box
                                                 key={`${section.key}-${rowMeta.label}`}
                                                 sx={{
+                                                    ...compareTableRowSx,
                                                     display: "grid",
                                                     gridTemplateColumns: compareTableGridColumns(richRows.length),
                                                     columnGap: `${COMPARE_TABLE_COL_GAP}px`,
@@ -1530,6 +1558,7 @@ export default function CompareSchoolsPage() {
                                                         <Box
                                                             key={`${section.key}-${rowMeta.label}-${item.raw?.schoolKey}`}
                                                             sx={{
+                                                                ...compareSchoolColSx,
                                                                 position: "relative",
                                                                 pl: 2.4,
                                                                 pr: 1.2,
