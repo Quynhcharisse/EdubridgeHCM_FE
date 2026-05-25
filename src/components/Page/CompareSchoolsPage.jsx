@@ -52,6 +52,19 @@ import {normalizeBoardingTypeForApi, parseBoardingType} from "../../constants/sc
 
 const SCHOOL_ICON_TINTS = ["#2563eb", "#3b82f6", "#0ea5e9", "#38bdf8"];
 const NEARBY_MARK_KM = 10;
+const COMPARE_LABEL_COL_WIDTH = 220;
+const COMPARE_SCHOOL_COL_WIDTH = 260;
+const COMPARE_TABLE_COL_GAP = 16;
+
+function compareTableGridColumns(schoolCount) {
+    const n = Math.max(1, Number(schoolCount) || 1);
+    return `${COMPARE_LABEL_COL_WIDTH}px repeat(${n}, ${COMPARE_SCHOOL_COL_WIDTH}px)`;
+}
+
+function compareTableScrollMinWidth(schoolCount) {
+    const n = Math.max(1, Number(schoolCount) || 1);
+    return COMPARE_LABEL_COL_WIDTH + n * COMPARE_SCHOOL_COL_WIDTH + (n - 1) * COMPARE_TABLE_COL_GAP;
+}
 
 function formatLocation(row) {
     if (row?.locationLabel) return String(row.locationLabel);
@@ -73,12 +86,51 @@ function toText(value, fallback = "—") {
     return t || fallback;
 }
 
-function stripHtml(value) {
-    return String(value || "")
+function decodeHtmlToPlainText(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (typeof document !== "undefined") {
+        const div = document.createElement("div");
+        div.innerHTML = raw;
+        return String(div.innerText || div.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+    return raw
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<\/p>/gi, " ")
+        .replace(/<\/li>/gi, " ")
         .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
         .replace(/&nbsp;/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+/** Chuyển HTML thành các dòng plain text (giữ đoạn từ p, li, br...). */
+function htmlToComparePlainLines(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return [];
+    if (typeof document !== "undefined") {
+        const div = document.createElement("div");
+        div.innerHTML = raw;
+        return String(div.innerText || div.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .split(/\n+/)
+            .map((line) => line.replace(/\s+/g, " ").trim())
+            .filter(Boolean);
+    }
+    const single = decodeHtmlToPlainText(raw);
+    return single ? [single] : [];
+}
+
+function stripHtml(value) {
+    return decodeHtmlToPlainText(value);
 }
 
 function formatMoney(value) {
@@ -502,11 +554,27 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     )
         .filter(Boolean)
         .map((label) => `- ${label}`);
-    const graduationStandardLines = uniqueCompareLines(
-        offerings.map((offering) => {
+    const graduationStandardHtmlList = (() => {
+        const seen = new Set();
+        const list = [];
+        offerings.forEach((offering) => {
             const {program} = resolveOfferingForCompare(offering);
-            return stripHtml(program?.graduationStandard);
-        })
+            const html = String(program?.graduationStandard || "").trim();
+            if (!html) return;
+            const key = html.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            list.push(html);
+        });
+        return list;
+    })();
+    const graduationStandardLines = uniqueCompareLines(
+        graduationStandardHtmlList.length
+            ? graduationStandardHtmlList.flatMap((html) => htmlToComparePlainLines(html))
+            : offerings.flatMap((offering) => {
+                  const {program} = resolveOfferingForCompare(offering);
+                  return htmlToComparePlainLines(program?.graduationStandard);
+              })
     );
     const facilitySummary = collectFacilitySummary(campusList);
     const facilityOverviewLines = facilitySummary.overviews.length
@@ -547,6 +615,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         learningMethodsLines: learningMethodsLines.length ? learningMethodsLines : ["—"],
         learningMethodsChipText: learningMethodsLines.map((l) => l.replace(/^\s*-\s*/, "")).join(" | "),
         graduationStandardLines: graduationStandardLines.length ? graduationStandardLines : ["—"],
+        graduationStandardHtmlList,
         facilityOverviewLines,
         facilityItemLines,
         facilityImages,
@@ -866,7 +935,11 @@ export default function CompareSchoolsPage() {
                 {label: "Tên chương trình", render: (d) => d.programNameLines},
                 {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines},
                 {label: "Hình thức học tập", render: (d) => d.learningMethodsChipText},
-                {label: "Chuẩn đầu ra", render: (d) => d.graduationStandardLines}
+                {
+                    label: "Chuẩn đầu ra",
+                    render: (d) => d.graduationStandardHtmlList,
+                    isGraduationHtml: true
+                }
             ]
         },
         {
@@ -908,6 +981,52 @@ export default function CompareSchoolsPage() {
         if (!text) return "";
         if (/^https?:\/\//i.test(text)) return text;
         return `https://${text}`;
+    };
+
+    const compareRichHtmlSx = {
+        fontSize: "0.9rem",
+        color: "#475569",
+        fontWeight: 400,
+        lineHeight: 1.6,
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        "& p": {margin: "0.4em 0"},
+        "& ul, & ol": {margin: "0.35em 0", pl: 2.2},
+        "& li": {marginBottom: "0.25em"},
+        "& strong, & b": {fontWeight: 600, color: "#334155"}
+    };
+
+    const renderGraduationStandardHtml = (detail) => {
+        const htmlList = Array.isArray(detail?.graduationStandardHtmlList) ? detail.graduationStandardHtmlList : [];
+        if (htmlList.length > 0) {
+            return (
+                <Stack spacing={1}>
+                    {htmlList.map((html, idx) => (
+                        <Box
+                            key={`grad-html-${idx}`}
+                            sx={compareRichHtmlSx}
+                            dangerouslySetInnerHTML={{__html: html}}
+                        />
+                    ))}
+                </Stack>
+            );
+        }
+        const lines = Array.isArray(detail?.graduationStandardLines) ? detail.graduationStandardLines : [];
+        if (!lines.length || (lines.length === 1 && lines[0] === "—")) {
+            return <Typography sx={compareCellTextSx}>—</Typography>;
+        }
+        return (
+            <Stack spacing={0.45}>
+                {lines.map((line, idx) => {
+                    const text = String(line || "").replace(/^\s*-\s*/, "").trim();
+                    return (
+                        <Typography key={`grad-line-${idx}`} sx={compareCellTextSx}>
+                            {text}
+                        </Typography>
+                    );
+                })}
+            </Stack>
+        );
     };
 
     const renderHotlineWebsite = (detail) => {
@@ -1099,20 +1218,35 @@ export default function CompareSchoolsPage() {
 
                 <Box
                     sx={{
-                        display: "grid",
-                        gridTemplateColumns: {
-                            xs: "1fr",
-                            sm: "repeat(2, minmax(0, 1fr))",
-                            lg: "repeat(4, minmax(0, 1fr))"
-                        },
-                        gap: 2
+                        width: "100%",
+                        maxWidth: "100%",
+                        overflowX: rows.length >= 3 ? "auto" : "visible",
+                        WebkitOverflowScrolling: "touch",
+                        pb: rows.length >= 3 ? 0.5 : 0
                     }}
                 >
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                rows.length >= 4
+                                    ? `repeat(${rows.length}, minmax(220px, 1fr))`
+                                    : {
+                                          xs: "1fr",
+                                          sm: "repeat(2, minmax(0, 1fr))",
+                                          lg: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))`
+                                      },
+                            gap: 2,
+                            width: rows.length >= 4 ? "max-content" : "100%",
+                            minWidth: rows.length >= 4 ? rows.length * 220 + (rows.length - 1) * 16 : undefined
+                        }}
+                    >
                     {rows.map((row, i) => renderSchoolCard(row, i))}
                     {activeAddCount > 0 ? renderAddCard(false) : null}
                     {Array.from({length: lockedAddCount}).map((_, i) => (
                         <React.Fragment key={`lock-${i}`}>{renderAddCard(true)}</React.Fragment>
                     ))}
+                    </Box>
                 </Box>
 
                 {rows.length > 0 ? (
@@ -1133,13 +1267,35 @@ export default function CompareSchoolsPage() {
                             </Box>
                         ) : null}
 
-                        <Box sx={{overflowX: "auto", overflowY: "hidden", bgcolor: "transparent", p: 0}}>
-                            <Box sx={{minWidth: 240 + Math.max(1, richRows.length) * 270}}>
+                        {richRows.length >= 3 ? (
+                            <Typography sx={{fontSize: "0.82rem", color: "#64748b", mb: 0.75}}>
+                                Cuộn ngang để xem đủ {richRows.length} trường
+                            </Typography>
+                        ) : null}
+                        <Box
+                            sx={{
+                                width: "100%",
+                                maxWidth: "100%",
+                                overflowX: "auto",
+                                overflowY: "hidden",
+                                WebkitOverflowScrolling: "touch",
+                                bgcolor: "transparent",
+                                pb: 1.5,
+                                mx: {xs: -1, sm: 0}
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    width: "max-content",
+                                    minWidth: compareTableScrollMinWidth(richRows.length),
+                                    pr: 2
+                                }}
+                            >
                                 <Box
                                     sx={{
                                         display: "grid",
-                                        gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                        columnGap: "16px",
+                                        gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                        columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                         position: "sticky",
                                         top: 0,
                                         zIndex: 5,
@@ -1202,8 +1358,8 @@ export default function CompareSchoolsPage() {
                                         <Box
                                             sx={{
                                                 display: "grid",
-                                                gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                                columnGap: "16px",
+                                                gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                                columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                                 borderTop: "1px solid rgba(59,130,246,0.16)"
                                             }}
                                         >
@@ -1312,8 +1468,8 @@ export default function CompareSchoolsPage() {
                                                 key={`${section.key}-${rowMeta.label}`}
                                                 sx={{
                                                     display: "grid",
-                                                    gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                                    columnGap: "16px",
+                                                    gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                                    columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                                     borderTop: "1px dashed rgba(59,130,246,0.22)"
                                                 }}
                                             >
@@ -1426,6 +1582,8 @@ export default function CompareSchoolsPage() {
                                                             />
                                                             {rowMeta.isFacilityImages ? (
                                                                 renderFacilityImages(cellText)
+                                                            ) : rowMeta.isGraduationHtml ? (
+                                                                renderGraduationStandardHtml(item.detail)
                                                             ) : rowMeta.isHotlineWebsite ? (
                                                                 renderHotlineWebsite(item.detail)
                                                             ) : rowMeta.isProcessByMethod ? (
