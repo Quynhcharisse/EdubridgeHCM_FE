@@ -236,45 +236,11 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
                 .filter(Boolean)
         )
     );
-    const campaignProgramList = (Array.isArray(campaigns) ? campaigns : []).flatMap((campaign) =>
-        (Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : [])
-            .map((offering) => ({
-                ...((offering?.program && typeof offering.program === "object") ? offering.program : {}),
-                _campaignOffering: offering,
-                curriculum:
-                    offering?.program && typeof offering.program === "object" && offering.program.curriculum && typeof offering.program.curriculum === "object"
-                        ? offering.program.curriculum
-                        : offering?.curriculum && typeof offering.curriculum === "object"
-                            ? offering.curriculum
-                            : null
-            }))
-            .filter((program) => program && typeof program === "object")
-    );
-    const curriculumTypes = Array.from(
-        new Set(
-            [
-                ...curriculumList.map((item) => item?.curriculumType),
-                ...campaignProgramList.map((program) => program?.curriculum?.curriculumType)
-            ]
-                .map((type) => mapCurriculumType(type))
-                .filter(Boolean)
-        )
-    );
+    const curriculumTypes = Array.from(new Set(curriculumList.map((item) => mapCurriculumType(item?.curriculumType))));
     const methods = Array.from(
         new Set(
-            [
-                ...curriculumList.flatMap((item) => {
-                    const directList = Array.isArray(item?.methodLearningList) ? item.methodLearningList : [];
-                    const altList = Array.isArray(item?.methodLearnings) ? item.methodLearnings : [];
-                    return [...directList, ...altList];
-                }),
-                ...campaignProgramList.flatMap((program) => {
-                    const curriculum = program?.curriculum;
-                    const directList = Array.isArray(curriculum?.methodLearnings) ? curriculum.methodLearnings : [];
-                    const altList = Array.isArray(curriculum?.methodLearningList) ? curriculum.methodLearningList : [];
-                    return [...directList, ...altList];
-                })
-            ]
+            curriculumList
+                .flatMap((item) => (Array.isArray(item?.methodLearningList) ? item.methodLearningList : []))
                 .map((item) => mapMethodLabel(item))
                 .filter(Boolean)
         )
@@ -384,10 +350,9 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         ? campaignTimeline.reduce((max, item) => (max == null || (item.endMs != null && item.endMs > max) ? item.endMs : max), null)
         : null;
     const subjectCount = subjects.length;
-    const programListFlat = [
-        ...curriculumList.flatMap((curriculum) => (Array.isArray(curriculum?.programList) ? curriculum.programList : [])),
-        ...campaignProgramList
-    ];
+    const programListFlat = curriculumList.flatMap((curriculum) =>
+        Array.isArray(curriculum?.programList) ? curriculum.programList : []
+    );
     const programNames = Array.from(
         new Set(
             programListFlat
@@ -408,7 +373,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     const programTargetStudentLines = Array.from(
         new Set(
             programListFlat
-                .map((program) => stripHtml(program?.targetStudentDescription || program?.targetStudent || program?.program?.targetStudentDescription))
+                .map((program) => stripHtml(program?.targetStudentDescription))
                 .filter(Boolean)
         )
     )
@@ -417,7 +382,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     const programGraduationStandardLines = Array.from(
         new Set(
             programListFlat
-                .map((program) => stripHtml(program?.graduationStandard || program?.program?.graduationStandard))
+                .map((program) => stripHtml(program?.graduationStandard))
                 .filter(Boolean)
         )
     )
@@ -427,7 +392,6 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         .map((curriculum, idx) => {
             const cName = toText(curriculum?.name, `Khung ${idx + 1}`);
             const subjectNames = (Array.isArray(curriculum?.subjectsJsonb) ? curriculum.subjectsJsonb : [])
-                .concat(Array.isArray(curriculum?.subjectOptions) ? curriculum.subjectOptions : [])
                 .map((subject) => String(subject?.name || "").trim())
                 .filter(Boolean);
             const cSubjects = subjectNames.length;
@@ -437,20 +401,6 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         .filter((lines) => Array.isArray(lines) && lines.length > 0)
         .flat()
         .slice(0, 8);
-    const campaignSubjectCountLines = (Array.isArray(campaigns) ? campaigns : [])
-        .flatMap((campaign) => (Array.isArray(campaign?.campusProgramOfferings) ? campaign.campusProgramOfferings : []))
-        .map((offering, idx) => {
-            const curriculum = offering?.program?.curriculum;
-            const subjectNames = Array.isArray(curriculum?.subjectOptions)
-                ? curriculum.subjectOptions.map((subject) => String(subject?.name || "").trim()).filter(Boolean)
-                : [];
-            const cName = toText(curriculum?.name || offering?.program?.name, `Khung ${idx + 1}`);
-            if (!subjectNames.length) return [];
-            return [`${cName}: ${subjectNames.length} môn`, ...subjectNames.map((name) => `- ${name}`)];
-        })
-        .flat()
-        .slice(0, 8);
-    const finalSubjectCountLines = subjectCountLines.length ? subjectCountLines : campaignSubjectCountLines;
     const nearestCampusAddress = campusList.length ? toText(campusList[0]?.address) : "Đang cập nhật";
     const now = new Date().getTime();
     const hasOpenCampaign = (Array.isArray(campaigns) ? campaigns : []).some((campaign) => {
@@ -479,7 +429,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         curriculumTypes: curriculumTypes.length ? curriculumTypes.join(" | ") : "Đang cập nhật",
         learningMethods: methods.length ? methods.join(" | ") : "Đang cập nhật",
         subjectCountLabel: subjectCount > 0 ? `${subjectCount} môn (ước tính theo dữ liệu public)` : "Đang cập nhật",
-        subjectCountLines: finalSubjectCountLines.length ? finalSubjectCountLines : ["Đang cập nhật"],
+        subjectCountLines: subjectCountLines.length ? subjectCountLines : ["Đang cập nhật"],
         subjectsPreview: subjects.slice(0, 6).join(", ") || "Đang cập nhật",
         boardingType: campusBoardingSummary(campusList),
         quotaInfo: "Chưa thể so sánh chính xác (API chưa có quota)",
@@ -511,7 +461,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         foundingDate: toText(detail?.foundingDate),
         description: stripHtml(detail?.description) || "Đang cập nhật",
         feeReliability: "Chưa thể so sánh chuẩn (thiếu finalTuitionFee theo campus/năm/hệ)",
-        programDepth: programListFlat.length > 0 ? `${programListFlat.length} khung/chương trình` : "Đang cập nhật"
+        programDepth: curriculumList.length > 0 ? `${curriculumList.length} khung chương trình` : "Đang cập nhật"
         ,
         programNamesLines: programNames.length ? programNames.map((name) => `- ${name}`) : ["Đang cập nhật"],
         programBaseFeeSummary,
@@ -836,7 +786,7 @@ export default function CompareSchoolsPage() {
             rows: [
                 {label: "Loại chương trình", render: (d) => d.curriculumTypes},
                 {label: "Chương trình thành phần", render: (d) => d.programNamesLines},
-                {label: "Học phí gốc", render: (d) => d.programBaseFeeSummary},
+                {label: "Học phí gốc (program)", render: (d) => d.programBaseFeeSummary},
                 {label: "Đối tượng học sinh", render: (d) => d.programTargetStudentLines},
                 {label: "Chuẩn đầu ra", render: (d) => d.programGraduationStandardLines},
                 {label: "Số môn", render: (d) => d.subjectCountLines},
