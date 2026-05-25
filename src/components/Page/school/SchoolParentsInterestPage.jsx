@@ -845,12 +845,6 @@ export default function SchoolParentsInterestPage() {
                                                 <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
                                                     {toGenderLabel(child.gender)}
                                                 </Typography>
-                                                <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
-                                                    {`Mã học sinh: ${child.studentCode || "-"}`}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
-                                                    {`Ngày sinh: ${formatDateOnly(child.dateOfBirth)}`}
-                                                </Typography>
                                             </Box>
                                             <Button
                                                 size="small"
