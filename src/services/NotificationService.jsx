@@ -128,7 +128,7 @@ export const resolveNotificationRoute = ({eventType, data = {}, role}) => {
         case NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW:
             if (role === "PARENT") return "/parent/offline-consultations";
             if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
-            if (role === "SCHOOL") return "/school/counselor-schedule";
+            if (role === "SCHOOL") return "/school/consultation-stats";
             return "/home";
         default:
             if (role === "ADMIN") return "/admin/dashboard";
