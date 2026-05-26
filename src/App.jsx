@@ -358,10 +358,6 @@ const router = createBrowserRouter([
                 )
             } ,
             {
-                path: 'consultation',
-                element: <Navigate to="/school/consultation-stats" replace/>
-            },
-            {
                 path: 'consultation-stats',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
