@@ -4494,7 +4494,7 @@ function MainHeader() {
                                                     transition: 'background 0.2s, color 0.2s',
                                                 }}
                                             >
-                                                <EventAvailableIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Lịch tư vấn viên
+                                                <EventAvailableIcon sx={{color: BRAND_NAVY, fontSize: 20}}/> Lịch tư vấn trực tiếp
                                             </MenuItem>
                                         </>
                                     ) : (
@@ -4781,7 +4781,7 @@ function MainHeader() {
                                                 sx={{cursor: 'pointer'}}
                                             >
                                                 <ListItemText
-                                                    primary="Lịch tư vấn viên"
+                                                    primary="Lịch tư vấn trực tiếp"
                                                     sx={{color: BRAND_NAVY, fontWeight: 600}}
                                                 />
                                             </ListItem>

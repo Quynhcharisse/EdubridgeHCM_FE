@@ -3741,6 +3741,9 @@ export default function SchoolSearchDetailView({
             setBookingPhone("");
             setBookingQuestion("");
             setParentSlotsRefreshNonce((n) => n + 1);
+            if (isParent && typeof navigate === "function") {
+                navigate(PARENT_OFFLINE_CONSULTATIONS_PATH);
+            }
         } catch (error) {
             const apiMessage =
                 error?.response?.data?.message ||
@@ -3750,7 +3753,7 @@ export default function SchoolSearchDetailView({
         } finally {
             setBookingSubmitting(false);
         }
-    }, [bookingPhone, bookingQuestion, selectedConsultBookingSlot]);
+    }, [bookingPhone, bookingQuestion, selectedConsultBookingSlot, isParent, navigate]);
     const consultBookingDisplayDate = React.useMemo(() => {
         const raw = String(selectedConsultBookingSlot?.appointmentDate || "").slice(0, 10);
         if (!raw) return "";

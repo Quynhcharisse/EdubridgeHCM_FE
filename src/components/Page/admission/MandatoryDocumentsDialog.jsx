@@ -20,6 +20,11 @@ import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import Slide from "@mui/material/Slide";
 import {BRAND_NAVY} from "../../../constants/homeLandingTheme";
+import {
+    isImageTemplateUrl,
+    openTemplateFileInNewTab,
+    resolveAbsoluteFileUrl,
+} from "../../ui/DocumentTemplatePreview.jsx";
 
 const DIALOG_BG = "#e8f4fc";
 const HEADER_BG = "#d9ecff";
@@ -30,21 +35,28 @@ const SlideUp = forwardRef(function SlideUp(props, ref) {
     return <Slide direction="up" ref={ref} {...props} />;
 });
 
-function isImageUrl(url) {
-    const u = String(url ?? "").trim().toLowerCase();
-    if (!u) return false;
-    return (
-        /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(u) ||
-        u.includes("/image/upload/") ||
-        u.includes("/storage/v1/object/public/")
-    );
+function pickTemplateUrlFromDoc(doc) {
+    const candidates = [
+        doc?.templateFileUrl,
+        doc?.templateUrl,
+        doc?.fileUrl,
+        doc?.sampleUrl,
+        doc?.template_url,
+        doc?.file_url,
+        doc?.url,
+    ];
+    for (const raw of candidates) {
+        const resolved = resolveAbsoluteFileUrl(raw);
+        if (resolved) return resolved;
+    }
+    return "";
 }
 
 export function normalizeSubmissionDocument(doc) {
     return {
-        name: String(doc?.name ?? "").trim(),
-        templateUrl: String(doc?.templateFileUrl ?? doc?.templateUrl ?? "").trim(),
-        required: Boolean(doc?.required),
+        name: String(doc?.name ?? doc?.documentName ?? doc?.label ?? "").trim(),
+        templateUrl: pickTemplateUrlFromDoc(doc),
+        required: doc?.required !== false && doc?.required !== "false",
     };
 }
 
@@ -57,7 +69,7 @@ function TemplatePreview({doc, onPreviewImage}) {
     const url = doc.templateUrl;
     if (!url) return null;
 
-    if (isImageUrl(url)) {
+    if (isImageTemplateUrl(url)) {
         return (
             <Button
                 variant="outlined"
@@ -93,7 +105,7 @@ function TemplatePreview({doc, onPreviewImage}) {
             size="small"
             variant="text"
             endIcon={<OpenInNewOutlinedIcon sx={{fontSize: 16}} />}
-            onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+            onClick={() => openTemplateFileInNewTab(url, doc.name)}
             sx={{
                 flexShrink: 0,
                 textTransform: "none",

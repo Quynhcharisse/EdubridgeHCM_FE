@@ -200,7 +200,7 @@ const offlineDetailModalSx = {
   headerBar: "linear-gradient(180deg, #dceef9 0%, #c9e3f5 100%)",
 };
 
-function OfflineConsultDetailField({ label, value, grid = 12 }) {
+function OfflineConsultDetailField({ label, value, grid = 12, hideLabel = false }) {
   if (!hasText(value)) return null;
   return (
     <Grid size={{ xs: 12, sm: grid }}>
@@ -213,9 +213,11 @@ function OfflineConsultDetailField({ label, value, grid = 12 }) {
           height: "100%",
         }}
       >
-        <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: offlineDetailModalSx.labelColor, mb: 0.5 }}>
-          {label}
-        </Typography>
+        {!hideLabel && label ? (
+          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: offlineDetailModalSx.labelColor, mb: 0.5 }}>
+            {label}
+          </Typography>
+        ) : null}
         <Typography
           sx={{
             fontSize: 15,
@@ -300,7 +302,7 @@ function OfflineConsultDetailContent({ row }) {
   const hasSchool = hasText(schoolName) || hasText(campusName) || hasText(address) || hasText(phone);
   const hasAppt = hasText(idStr) || hasText(statusLabel) || hasText(scheduleText);
   const hasPeople = hasText(parentName) || hasText(studentName);
-  const hasContent = hasText(question) || hasText(note) || hasText(cancelReason);
+  const hasNotes = hasText(note) || hasText(cancelReason);
 
   return (
     <Stack spacing={2}>
@@ -370,15 +372,21 @@ function OfflineConsultDetailContent({ row }) {
         </OfflineConsultDetailSection>
       ) : null}
 
-      {hasContent ? (
+      {hasText(question) ? (
         <OfflineConsultDetailSection
-          title="Nội dung & ghi chú"
+          title="Câu hỏi của phụ huynh"
           icon={<StickyNote2OutlinedIcon sx={{ fontSize: 22 }} />}
         >
-          {hasText(question) ? (
-            <OfflineConsultDetailField label="Nội dung đăng ký" value={question} grid={12} />
-          ) : null}
-          {hasText(note) ? <OfflineConsultDetailField label="Ghi chú" value={note} grid={12} /> : null}
+          <OfflineConsultDetailField hideLabel value={question} grid={12} />
+        </OfflineConsultDetailSection>
+      ) : null}
+
+      {hasNotes ? (
+        <OfflineConsultDetailSection
+          title="Ghi chú"
+          icon={<StickyNote2OutlinedIcon sx={{ fontSize: 22 }} />}
+        >
+          {hasText(note) ? <OfflineConsultDetailField hideLabel value={note} grid={12} /> : null}
           {hasText(cancelReason) ? (
             <OfflineConsultDetailField label="Lý do hủy" value={cancelReason} grid={12} />
           ) : null}
