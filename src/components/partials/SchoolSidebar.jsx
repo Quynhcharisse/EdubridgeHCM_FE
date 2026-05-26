@@ -258,6 +258,7 @@ const menuGroupsBase = [
             { text: "Cơ sở", icon: <ApartmentIcon />, path: "/school/campus" },
             { text: "Tư vấn viên", icon: <SupportAgentIcon />, path: "/school/counselors" },
             { text: "Lịch tư vấn viên", icon: <EventAvailableIcon />, path: "/school/counselor-schedule" },
+            { text: "Danh sách lịch hẹn", icon: <FactCheckOutlinedIcon />, path: "/school/consultation" },
         ],
     },
     {

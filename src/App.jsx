@@ -72,6 +72,7 @@ const SchoolPrograms = lazy(() => import("./components/Page/school/SchoolProgram
 const SchoolPurchasedPackages = lazy(() => import("./components/Page/school/SchoolPurchasedPackages.jsx"));
 const SchoolParentsInterestPage = lazy(() => import("./components/Page/school/SchoolParentsInterestPage.jsx"));
 const SchoolCampusAdmissionReservations = lazy(() => import("./components/Page/school/SchoolCampusAdmissionReservations.jsx"));
+const SchoolConsultationPage = lazy(() => import("./components/Page/school/SchoolConsultationPage.jsx"));
 const ParentProfile = lazy(() => import("./components/auth/ParentProfile.jsx"));
 const SavedSchoolsPage = lazy(() => import("./components/Page/SavedSchoolsPage.jsx"));
 const CompareSchoolsPage = lazy(() => import("./components/Page/CompareSchoolsPage.jsx"));
@@ -357,6 +358,10 @@ const router = createBrowserRouter([
                 )
             } ,
             {
+                path: 'consultation',
+                element: <Navigate to="/school/consultation-stats" replace/>
+            },
+            {
                 path: 'consultation-stats',
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
@@ -377,6 +382,14 @@ const router = createBrowserRouter([
                 element: (
                     <Suspense fallback={<LoadingFallback/>}>
                         <SchoolCampusAdmissionReservations/>
+                    </Suspense>
+                )
+            },
+            {
+                path: 'consultation',
+                element: (
+                    <Suspense fallback={<LoadingFallback/>}>
+                        <SchoolConsultationPage/>
                     </Suspense>
                 )
             },
@@ -435,6 +448,10 @@ const router = createBrowserRouter([
                         <SchoolCounselors/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'schedule',
+                element: <Navigate to="/school/counselor-schedule" replace/>
             },
             {
                 path: 'counselor-schedule',
@@ -757,6 +774,10 @@ const router = createBrowserRouter([
                         <ParentOfflineConsultationsPage/>
                     </Suspense>
                 )
+            },
+            {
+                path: 'reservations',
+                element: <Navigate to="/parent/admission-reservations" replace/>
             },
             {
                 path: 'admission-reservations',
