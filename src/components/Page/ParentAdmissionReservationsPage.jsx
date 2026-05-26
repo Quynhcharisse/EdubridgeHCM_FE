@@ -35,7 +35,9 @@ import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import {AdmissionDocumentsSection} from "./admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "./admission/PaymentProofPreview.jsx";
 import ReservationPaymentDialog from "./admission/ReservationPaymentDialog.jsx";
-import MandatoryDocumentsDialog from "./admission/MandatoryDocumentsDialog.jsx";
+import MandatoryDocumentsDialog, {
+    normalizeSubmissionDocumentList,
+} from "./admission/MandatoryDocumentsDialog.jsx";
 import RejectReasonAlert from "./admission/RejectReasonAlert.jsx";
 import {
     formatReservationDateOfBirth,
@@ -699,10 +701,8 @@ export default function ParentAdmissionReservationsPage() {
 
         const applyDocsPayload = (source) => {
             setMandatoryDocsPayload({
-                mandatoryDocuments: Array.isArray(source?.mandatoryDocuments)
-                    ? source.mandatoryDocuments
-                    : [],
-                methodDocuments: Array.isArray(source?.methodDocuments) ? source.methodDocuments : [],
+                mandatoryDocuments: normalizeSubmissionDocumentList(source?.mandatoryDocuments),
+                methodDocuments: normalizeSubmissionDocumentList(source?.methodDocuments),
                 context: {
                     schoolName: source?.schoolName ?? reservation?.schoolName,
                     programName: source?.programName ?? reservation?.programName,
@@ -716,7 +716,7 @@ export default function ParentAdmissionReservationsPage() {
             ? reservation.mandatoryDocuments
             : [];
         const rowMethod = Array.isArray(reservation?.methodDocuments) ? reservation.methodDocuments : [];
-        if (rowMandatory.length > 0 && rowMethod.length > 0) {
+        if (rowMandatory.length > 0 || rowMethod.length > 0) {
             applyDocsPayload({
                 ...reservation,
                 mandatoryDocuments: rowMandatory,

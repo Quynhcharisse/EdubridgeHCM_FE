@@ -46,8 +46,8 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
-import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CloudinaryUpload from "../../ui/CloudinaryUpload.jsx";
+import DocumentTemplatePreview from "../../ui/DocumentTemplatePreview.jsx";
 import ImageLightboxOverlay from "../../ui/ImageLightboxOverlay.jsx";
 import axiosClient from "../../../configs/APIConfig.jsx";
 import {
@@ -529,7 +529,9 @@ export default function AdminPlatformSettings() {
     const [admissionPreviewMethodTab, setAdmissionPreviewMethodTab] = useState(0);
     const [mandatoryOcrExpandedIdxs, setMandatoryOcrExpandedIdxs] = useState([]);
     const [methodDocUploadingKeys, setMethodDocUploadingKeys] = useState(() => new Set());
+    const [mandatoryDocUploadingKeys, setMandatoryDocUploadingKeys] = useState(() => new Set());
     const methodDocFileInputRefs = useRef({});
+    const mandatoryDocFileInputRefs = useRef({});
     const [studentFieldMenuAnchor, setStudentFieldMenuAnchor] = useState(null);
     const [studentFieldMenuDocIdx, setStudentFieldMenuDocIdx] = useState(null);
     const [admissionImagePreview, setAdmissionImagePreview] = useState({
@@ -1688,9 +1690,10 @@ export default function AdminPlatformSettings() {
         const uploadKey = `${normalizedMethodCode}-${docIdx}`;
         setMethodDocUploadingKeys((prev) => new Set([...prev, uploadKey]));
         try {
+            const fileType = file.type.startsWith("image/") ? "image" : "doc";
             const formData = new FormData();
             formData.append("file", file);
-            const res = await axiosClient.post("/auth/upload/file?fileType=image", formData, {
+            const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             const body = res.data?.body ?? res.data;
@@ -1715,7 +1718,7 @@ export default function AdminPlatformSettings() {
                 nextGroups[gIdx] = currentGroup;
                 return { ...prev, methodDocumentRequirements: nextGroups };
             });
-            enqueueSnackbar(res.data?.message || "Đã tải hình mẫu lên.", { variant: "success" });
+            enqueueSnackbar(res.data?.message || "Đã tải mẫu hồ sơ lên.", { variant: "success" });
         } catch (e) {
             console.error("[AdminPlatformSettings] method catalog template upload:", e);
             enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {
@@ -1723,6 +1726,39 @@ export default function AdminPlatformSettings() {
             });
         } finally {
             setMethodDocUploadingKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(uploadKey);
+                return next;
+            });
+        }
+    }, []);
+
+    const handleMandatoryTemplateUpload = useCallback(async (docIdx, file) => {
+        if (!file) return;
+        const uploadKey = `mandatory-${docIdx}`;
+        setMandatoryDocUploadingKeys((prev) => new Set([...prev, uploadKey]));
+        try {
+            const fileType = file.type.startsWith("image/") ? "image" : "doc";
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await axiosClient.post(`/auth/upload/file?fileType=${fileType}`, formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            const body = res.data?.body ?? res.data;
+            const fileUrl = body?.fileUrl != null ? String(body.fileUrl).trim() : "";
+            if (!fileUrl) {
+                enqueueSnackbar("Không nhận được URL file sau khi tải lên.", { variant: "error" });
+                return;
+            }
+            updateMandatoryDocScalars(setAdmissionTemplateForm, docIdx, { templateFileUrl: fileUrl });
+            enqueueSnackbar(res.data?.message || "Đã tải mẫu hồ sơ lên.", { variant: "success" });
+        } catch (e) {
+            console.error("[AdminPlatformSettings] mandatory template upload:", e);
+            enqueueSnackbar(e?.response?.data?.message || "Tải file thất bại, vui lòng thử lại.", {
+                variant: "error",
+            });
+        } finally {
+            setMandatoryDocUploadingKeys((prev) => {
                 const next = new Set(prev);
                 next.delete(uploadKey);
                 return next;
@@ -2896,8 +2932,11 @@ export default function AdminPlatformSettings() {
                         <Stack spacing={1.25}>
                             {mandatoryDocsSource.map((doc, dIdx) => {
                                 const ocrCriteriaCount = countMandatoryOcrCriteria(doc);
-                                const showOcrBlock =
-                                    admissionMandatoryEditing || ocrCriteriaCount > 0 || (doc?.templateFileUrl && isImageUrl(doc.templateFileUrl));
+                                const templateFileUrl = doc?.templateFileUrl ? String(doc.templateFileUrl).trim() : "";
+                                const mandatoryUploadKey = `mandatory-${dIdx}`;
+                                const isUploadingMandatoryTemplate = mandatoryDocUploadingKeys.has(mandatoryUploadKey);
+                                const showDetailPanel =
+                                    admissionMandatoryEditing || ocrCriteriaCount > 0 || Boolean(templateFileUrl);
 
                                 return (
                                     <Box
@@ -3020,120 +3059,162 @@ export default function AdminPlatformSettings() {
                                                 )}
                                             </Stack>
                                         </Box>
-                                        {(admissionMandatoryEditing || (doc?.templateFileUrl && isImageUrl(doc.templateFileUrl)) || ocrCriteriaCount > 0) ? (
+                                        {showDetailPanel ? (
                                             <Stack
                                                 direction="row"
                                                 sx={{ borderTop: "1px solid #dbeafe", bgcolor: "#f8fafc" }}
                                                 divider={<Box sx={{ width: "1px", bgcolor: "#dbeafe", flexShrink: 0 }} />}
                                             >
-                                                {/* Hình ảnh mẫu — 1/3 */}
+                                                {/* Mẫu hồ sơ — 1/3 */}
                                                 <Box sx={{ flex: "0 0 33.333%", minWidth: 0, px: 1.5, py: 1.25 }}>
-                                                    {doc?.templateFileUrl && isImageUrl(doc.templateFileUrl) ? (
-                                                        <Stack spacing={0.75} alignItems="flex-start">
-                                                            <Typography variant="caption" sx={{ fontWeight: 700, color: "#475569" }}>
-                                                                Hình ảnh mẫu
-                                                            </Typography>
-                                                            <Box sx={{ position: "relative", display: "inline-block" }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#475569", display: "block", mb: 0.75 }}>
+                                                        Mẫu hồ sơ
+                                                    </Typography>
+                                                    {templateFileUrl ? (
+                                                        <Stack spacing={1} alignItems="flex-start">
+                                                            {isImageUrl(templateFileUrl) ? (
                                                                 <Box
-                                                                    component="button"
-                                                                    type="button"
-                                                                    onClick={() => openAdmissionImagePreview(doc.templateFileUrl, "Hình ảnh mẫu")}
                                                                     sx={{
-                                                                        display: "inline-block",
                                                                         borderRadius: 1.5,
                                                                         overflow: "hidden",
                                                                         border: "1px solid #cbd5e1",
                                                                         lineHeight: 0,
-                                                                        p: 0,
-                                                                        cursor: "pointer",
-                                                                        background: "transparent",
+                                                                        maxWidth: "100%",
                                                                     }}
                                                                 >
                                                                     <Box
                                                                         component="img"
-                                                                        src={doc.templateFileUrl}
-                                                                        alt="Hình ảnh mẫu"
-                                                                        sx={{ display: "block", width: "auto", maxWidth: "100%", maxHeight: 220, objectFit: "contain" }}
+                                                                        src={templateFileUrl}
+                                                                        alt="Mẫu hồ sơ"
+                                                                        sx={{
+                                                                            display: "block",
+                                                                            width: "auto",
+                                                                            maxWidth: "100%",
+                                                                            maxHeight: 180,
+                                                                            objectFit: "contain",
+                                                                        }}
                                                                     />
                                                                 </Box>
+                                                            ) : (
+                                                                <Stack
+                                                                    direction="row"
+                                                                    spacing={0.75}
+                                                                    alignItems="center"
+                                                                    sx={{
+                                                                        px: 1,
+                                                                        py: 0.75,
+                                                                        borderRadius: 1.5,
+                                                                        border: "1px solid #cbd5e1",
+                                                                        bgcolor: "#fff",
+                                                                        maxWidth: "100%",
+                                                                    }}
+                                                                >
+                                                                    <InsertDriveFileOutlinedIcon sx={{ fontSize: 20, color: "#2563eb", flexShrink: 0 }} />
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{ fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                                                    >
+                                                                        {doc?.name || doc?.code || "Tệp mẫu"}
+                                                                    </Typography>
+                                                                </Stack>
+                                                            )}
+                                                            <Stack direction="row" spacing={0.25} alignItems="center">
+                                                                <DocumentTemplatePreview
+                                                                    fileUrl={templateFileUrl}
+                                                                    fileName={doc?.name || doc?.code}
+                                                                    title={doc?.name || doc?.code || "Mẫu hồ sơ"}
+                                                                />
                                                                 {admissionMandatoryEditing ? (
-                                                                    <Stack direction="row" spacing={0.5} sx={{ position: "absolute", top: 6, right: 6 }}>
-                                                                        <CloudinaryUpload
-                                                                            accept="image/*"
-                                                                            multiple={false}
-                                                                            disabled={mandatoryRowDisabled}
-                                                                            onSuccess={(results) => {
-                                                                                const url = results?.[0]?.url ?? "";
-                                                                                updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: url });
+                                                                    <>
+                                                                        <input
+                                                                            type="file"
+                                                                            hidden
+                                                                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                                            ref={(el) => {
+                                                                                if (el) mandatoryDocFileInputRefs.current[mandatoryUploadKey] = el;
+                                                                                else delete mandatoryDocFileInputRefs.current[mandatoryUploadKey];
                                                                             }}
-                                                                            onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
-                                                                        >
-                                                                            {({ inputId, loading }) => (
-                                                                                <label htmlFor={inputId}>
-                                                                                    <Tooltip title="Tải ảnh mới">
-                                                                                        <span>
-                                                                                            <IconButton
-                                                                                                size="small"
-                                                                                                component="span"
-                                                                                                disabled={mandatoryRowDisabled || loading}
-                                                                                                sx={{ bgcolor: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e1", "&:hover": { bgcolor: "#fff" } }}
-                                                                                            >
-                                                                                                <FileUploadOutlinedIcon fontSize="small" />
-                                                                                            </IconButton>
-                                                                                        </span>
-                                                                                    </Tooltip>
-                                                                                </label>
-                                                                            )}
-                                                                        </CloudinaryUpload>
-                                                                        <Tooltip title="Xóa hình ảnh">
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                e.target.value = "";
+                                                                                if (file) void handleMandatoryTemplateUpload(dIdx, file);
+                                                                            }}
+                                                                        />
+                                                                        <Tooltip title="Tải mẫu hồ sơ">
+                                                                            <span>
+                                                                                <IconButton
+                                                                                    size="small"
+                                                                                    color="primary"
+                                                                                    disabled={mandatoryRowDisabled || isUploadingMandatoryTemplate}
+                                                                                    onClick={() =>
+                                                                                        mandatoryDocFileInputRefs.current[mandatoryUploadKey]?.click()
+                                                                                    }
+                                                                                    aria-label="Tải mẫu hồ sơ"
+                                                                                >
+                                                                                    {isUploadingMandatoryTemplate ? (
+                                                                                        <CircularProgress size={18} color="inherit" />
+                                                                                    ) : (
+                                                                                        <FileUploadOutlinedIcon fontSize="small" />
+                                                                                    )}
+                                                                                </IconButton>
+                                                                            </span>
+                                                                        </Tooltip>
+                                                                        <Tooltip title="Xóa mẫu hồ sơ">
                                                                             <IconButton
                                                                                 size="small"
-                                                                                disabled={mandatoryRowDisabled}
-                                                                                onClick={() => updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: "" })}
-                                                                                sx={{ bgcolor: "rgba(255,255,255,0.9)", border: "1px solid #fca5a5", color: "#dc2626", "&:hover": { bgcolor: "#fff1f2" } }}
+                                                                                color="error"
+                                                                                disabled={mandatoryRowDisabled || isUploadingMandatoryTemplate}
+                                                                                onClick={() =>
+                                                                                    updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, {
+                                                                                        templateFileUrl: "",
+                                                                                    })
+                                                                                }
+                                                                                aria-label="Xóa mẫu hồ sơ"
                                                                             >
                                                                                 <DeleteOutlineIcon fontSize="small" />
                                                                             </IconButton>
                                                                         </Tooltip>
-                                                                    </Stack>
+                                                                    </>
                                                                 ) : null}
-                                                            </Box>
+                                                            </Stack>
                                                         </Stack>
                                                     ) : admissionMandatoryEditing ? (
                                                         <Stack spacing={0.75}>
-                                                            <Typography variant="caption" sx={{ fontWeight: 700, color: "#475569" }}>
-                                                                Hình ảnh mẫu
+                                                            <input
+                                                                type="file"
+                                                                hidden
+                                                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                                ref={(el) => {
+                                                                    if (el) mandatoryDocFileInputRefs.current[mandatoryUploadKey] = el;
+                                                                    else delete mandatoryDocFileInputRefs.current[mandatoryUploadKey];
+                                                                }}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    e.target.value = "";
+                                                                    if (file) void handleMandatoryTemplateUpload(dIdx, file);
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                disabled={mandatoryRowDisabled || isUploadingMandatoryTemplate}
+                                                                startIcon={
+                                                                    isUploadingMandatoryTemplate ? (
+                                                                        <CircularProgress size={16} color="inherit" />
+                                                                    ) : (
+                                                                        <FileUploadOutlinedIcon fontSize="small" />
+                                                                    )
+                                                                }
+                                                                onClick={() =>
+                                                                    mandatoryDocFileInputRefs.current[mandatoryUploadKey]?.click()
+                                                                }
+                                                                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, alignSelf: "flex-start" }}
+                                                            >
+                                                                {isUploadingMandatoryTemplate ? "Đang tải..." : "Tải mẫu hồ sơ"}
+                                                            </Button>
+                                                            <Typography variant="caption" sx={{ color: "#94a3b8" }}>
+                                                                Ảnh, PDF, Word hoặc Excel
                                                             </Typography>
-                                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                                <CloudinaryUpload
-                                                                    accept="image/*"
-                                                                    multiple={false}
-                                                                    disabled={mandatoryRowDisabled}
-                                                                    onSuccess={(results) => {
-                                                                        const url = results?.[0]?.url ?? "";
-                                                                        updateMandatoryDocScalars(setAdmissionTemplateForm, dIdx, { templateFileUrl: url });
-                                                                    }}
-                                                                    onError={(msg) => enqueueSnackbar(msg, { variant: "error" })}
-                                                                >
-                                                                    {({ inputId, loading }) => (
-                                                                        <label htmlFor={inputId}>
-                                                                            <Button
-                                                                                size="small"
-                                                                                variant="outlined"
-                                                                                component="span"
-                                                                                disabled={mandatoryRowDisabled || loading}
-                                                                                startIcon={<InsertDriveFileOutlinedIcon fontSize="small" />}
-                                                                                sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, whiteSpace: "nowrap" }}
-                                                                            >
-                                                                                {loading ? "Đang tải..." : "Tải hình ảnh mẫu"}
-                                                                            </Button>
-                                                                        </label>
-                                                                    )}
-                                                                </CloudinaryUpload>
-                                                                <Typography variant="caption" sx={{ color: "#94a3b8" }}>
-                                                                    Chưa có hình ảnh mẫu
-                                                                </Typography>
-                                                            </Stack>
                                                         </Stack>
                                                     ) : null}
                                                 </Box>
@@ -3534,16 +3615,11 @@ export default function AdminPlatformSettings() {
                                                                         </Box>
                                                                         <Box sx={{ display: "flex", justifyContent: "center" }}>
                                                                             {templateUrl ? (
-                                                                                <Tooltip title="Xem hình mẫu" placement="top">
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        onClick={() => openAdmissionImagePreview(templateUrl, "Hình mẫu hồ sơ")}
-                                                                                        aria-label="Xem hình mẫu"
-                                                                                        sx={{ color: "#2563eb", p: 0.25, "&:hover": { bgcolor: "#eff6ff" } }}
-                                                                                    >
-                                                                                        <OpenInNewOutlinedIcon sx={{ fontSize: 18 }} />
-                                                                                    </IconButton>
-                                                                                </Tooltip>
+                                                                                <DocumentTemplatePreview
+                                                                                    fileUrl={templateUrl}
+                                                                                    fileName={doc?.name || doc?.code}
+                                                                                    title={doc?.name || doc?.code || "Mẫu hồ sơ"}
+                                                                                />
                                                                             ) : null}
                                                                         </Box>
                                                                     </Box>
@@ -3554,7 +3630,7 @@ export default function AdminPlatformSettings() {
                                                                             <input
                                                                                 type="file"
                                                                                 hidden
-                                                                                accept="image/*"
+                                                                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                                                                                 ref={(el) => {
                                                                                     if (el) methodDocFileInputRefs.current[methodDocUploadKey] = el;
                                                                                     else delete methodDocFileInputRefs.current[methodDocUploadKey];
@@ -3571,7 +3647,7 @@ export default function AdminPlatformSettings() {
                                                                                     }
                                                                                 }}
                                                                             />
-                                                                            <Tooltip title="Tải hình mẫu">
+                                                                            <Tooltip title="Tải mẫu hồ sơ">
                                                                                 <span>
                                                                                     <IconButton
                                                                                         size="small"
@@ -3580,7 +3656,7 @@ export default function AdminPlatformSettings() {
                                                                                         onClick={() =>
                                                                                             methodDocFileInputRefs.current[methodDocUploadKey]?.click()
                                                                                         }
-                                                                                        aria-label="Tải hình mẫu"
+                                                                                        aria-label="Tải mẫu hồ sơ"
                                                                                     >
                                                                                         {isUploadingMethodTemplate ? (
                                                                                             <CircularProgress size={18} color="inherit" />
