@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Avatar,
   Box,
@@ -389,7 +390,11 @@ function OfflineConsultDetailContent({ row }) {
 }
 
 export default function ParentOfflineConsultationsPage() {
-  const [activeStatus, setActiveStatus] = useState(OFFLINE_CONSULTATION_STATUSES[0]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = OFFLINE_CONSULTATION_STATUSES.includes(searchParams.get("status"))
+    ? searchParams.get("status")
+    : OFFLINE_CONSULTATION_STATUSES[0];
+  const [activeStatus, setActiveStatus] = useState(initialStatus);
   const [page, setPage] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -476,6 +481,7 @@ export default function ParentOfflineConsultationsPage() {
             onChange={(_, value) => {
               setActiveStatus(value);
               setPage(0);
+              setSearchParams({ status: value });
             }}
             variant="scrollable"
             scrollButtons="auto"

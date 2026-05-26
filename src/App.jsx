@@ -1,5 +1,6 @@
 import './styles/index.css'
 import {createBrowserRouter, Navigate, RouterProvider} from "react-router-dom";
+import ChunkErrorElement from './components/ui/ChunkErrorElement.jsx';
 import {lazy, Suspense, useEffect} from "react";
 import {SnackbarProvider, useSnackbar} from 'notistack';
 import {Button, createTheme, CssBaseline, Slide, ThemeProvider} from '@mui/material';
@@ -150,6 +151,7 @@ const router = createBrowserRouter([
                 <WebAppLayout/>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
@@ -310,6 +312,7 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
@@ -344,6 +347,7 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
@@ -558,6 +562,7 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
@@ -688,6 +693,7 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
@@ -746,6 +752,7 @@ const router = createBrowserRouter([
                 </ProtectedRoute>
             </Suspense>
         ),
+        errorElement: <ChunkErrorElement/>,
         children: [
             {
                 index: true,
