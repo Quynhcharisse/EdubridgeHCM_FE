@@ -5,8 +5,13 @@ import {
     Box,
     Button,
     Card,
+    CardMedia,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     IconButton,
     Menu,
     MenuItem,
@@ -35,7 +40,7 @@ import {FaSchool} from "react-icons/fa";
 import {useNavigate} from "react-router-dom";
 import {enqueueSnackbar} from "notistack";
 
-import {getUserIdentity} from "../../utils/savedSchoolsStorage";
+import {getSchoolStorageKey, getUserIdentity} from "../../utils/savedSchoolsStorage";
 import {
     getCompareSchools,
     MAX_COMPARE_SCHOOLS,
@@ -51,7 +56,57 @@ import {mapPublicSchoolDetailToRow} from "../../utils/schoolPublicMapper.js";
 import {normalizeBoardingTypeForApi, parseBoardingType} from "../../constants/schoolBoardingType.js";
 
 const SCHOOL_ICON_TINTS = ["#2563eb", "#3b82f6", "#0ea5e9", "#38bdf8"];
+const SEARCH_SCHOOLS_DETAIL_PATH = "/search-schools/detail";
+
+function buildCompareSchoolDetailHref(row) {
+    if (!row || typeof row !== "object") return null;
+    const schoolKey = String(row.schoolKey || "").trim();
+    const schoolName = String(row.schoolName || "").trim();
+    const detailKey =
+        schoolKey ||
+        getSchoolStorageKey({
+            province: row.province,
+            ward: row.ward,
+            school: schoolName,
+            id: null
+        });
+    if (!detailKey) return null;
+
+    const schoolId = parseSchoolIdFromKey(detailKey);
+    const hasNumericId = Number.isFinite(schoolId) && schoolId > 0;
+    const hasLegacyKey = detailKey.includes("||");
+    if (!hasNumericId && !hasLegacyKey && !schoolName) return null;
+
+    const params = new URLSearchParams();
+    if (schoolName) params.set("school", schoolName);
+    params.set("detail", detailKey);
+    return `${SEARCH_SCHOOLS_DETAIL_PATH}?${params.toString()}`;
+}
 const NEARBY_MARK_KM = 10;
+const COMPARE_LABEL_COL_WIDTH = 220;
+const COMPARE_SCHOOL_COL_WIDTH = 260;
+const COMPARE_SCHOOL_COL_MIN = 180;
+const COMPARE_TABLE_COL_GAP = 16;
+const COMPARE_TABLE_FIT_ALL_COLS_AT = 4;
+
+function compareTableGridColumns(schoolCount) {
+    const n = Math.max(1, Number(schoolCount) || 1);
+    const schoolCols =
+        n >= COMPARE_TABLE_FIT_ALL_COLS_AT
+            ? `repeat(${n}, minmax(${COMPARE_SCHOOL_COL_MIN}px, 1fr))`
+            : `repeat(${n}, ${COMPARE_SCHOOL_COL_WIDTH}px)`;
+    return `${COMPARE_LABEL_COL_WIDTH}px ${schoolCols}`;
+}
+
+function compareTableScrollMinWidth(schoolCount) {
+    const n = Math.max(1, Number(schoolCount) || 1);
+    const schoolColWidth = n >= COMPARE_TABLE_FIT_ALL_COLS_AT ? COMPARE_SCHOOL_COL_MIN : COMPARE_SCHOOL_COL_WIDTH;
+    return COMPARE_LABEL_COL_WIDTH + n * schoolColWidth + (n - 1) * COMPARE_TABLE_COL_GAP;
+}
+
+function compareTableInnerWidth(schoolCount) {
+    return Math.max(1, Number(schoolCount) || 1) >= COMPARE_TABLE_FIT_ALL_COLS_AT ? "100%" : "max-content";
+}
 
 function formatLocation(row) {
     if (row?.locationLabel) return String(row.locationLabel);
@@ -73,12 +128,51 @@ function toText(value, fallback = "—") {
     return t || fallback;
 }
 
-function stripHtml(value) {
-    return String(value || "")
+function decodeHtmlToPlainText(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (typeof document !== "undefined") {
+        const div = document.createElement("div");
+        div.innerHTML = raw;
+        return String(div.innerText || div.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+    return raw
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<\/p>/gi, " ")
+        .replace(/<\/li>/gi, " ")
         .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
         .replace(/&nbsp;/gi, " ")
         .replace(/\s+/g, " ")
         .trim();
+}
+
+/** Chuyển HTML thành các dòng plain text (giữ đoạn từ p, li, br...). */
+function htmlToComparePlainLines(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return [];
+    if (typeof document !== "undefined") {
+        const div = document.createElement("div");
+        div.innerHTML = raw;
+        return String(div.innerText || div.textContent || "")
+            .replace(/\u00a0/g, " ")
+            .split(/\n+/)
+            .map((line) => line.replace(/\s+/g, " ").trim())
+            .filter(Boolean);
+    }
+    const single = decodeHtmlToPlainText(raw);
+    return single ? [single] : [];
+}
+
+function stripHtml(value) {
+    return decodeHtmlToPlainText(value);
 }
 
 function formatMoney(value) {
@@ -298,6 +392,37 @@ function mergePublicDetailForCompare(detailRaw) {
     };
 }
 
+function galleryStringToImageList(gallery) {
+    if (gallery == null || gallery === "") return [];
+    if (Array.isArray(gallery)) {
+        return gallery.map((x) => ({
+            url: x?.url != null ? String(x.url).trim() : "",
+            name: x?.name != null ? String(x.name).trim() : "",
+            altName: x?.altName != null ? String(x.altName).trim() : ""
+        }));
+    }
+    if (typeof gallery !== "string") return [];
+    try {
+        const parsed = JSON.parse(gallery);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((x) => ({
+            url: x?.url != null ? String(x.url).trim() : "",
+            name: x?.name != null ? String(x.name).trim() : "",
+            altName: x?.altName != null ? String(x.altName).trim() : ""
+        }));
+    } catch {
+        return [];
+    }
+}
+
+function imageListFromFacilityImageBlock(imageData) {
+    if (!imageData || typeof imageData !== "object") return [];
+    if (Array.isArray(imageData.imageList) && imageData.imageList.length > 0) {
+        return imageData.imageList;
+    }
+    return galleryStringToImageList(imageData.gallery);
+}
+
 function collectFacilitySummary(campusList) {
     const overviews = [];
     const itemLines = [];
@@ -329,7 +454,7 @@ function collectFacilitySummary(campusList) {
         });
         const imageData = facility?.imageData || {};
         pushImage(imageData?.coverUrl, "Ảnh đại diện");
-        (Array.isArray(imageData?.imageList) ? imageData.imageList : []).forEach((img, idx) => {
+        imageListFromFacilityImageBlock(imageData).forEach((img, idx) => {
             pushImage(img?.url, img?.name || img?.altName || `Ảnh ${idx + 1}`);
         });
     });
@@ -433,7 +558,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         campaignList.flatMap((campaign) =>
             (Array.isArray(campaign?.admissionMethodDetails) ? campaign.admissionMethodDetails : []).map((method) => {
                 const fee = Number(method?.reservationFee);
-                if (!Number.isFinite(fee)) return "";
+                if (!Number.isFinite(fee) || fee <= 0) return "";
                 const label = toText(method?.displayName || method?.methodCode, "Phương thức");
                 return `${label}: ${formatMoney(fee)}`;
             })
@@ -445,7 +570,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         .map((campaign) => {
             const total = Number(campaign?.campaignTotalQuota);
             if (!Number.isFinite(total)) return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: ${total} học sinh`;
+            return `${total} học sinh`;
         }),
         {bullet: false}
     );
@@ -453,19 +578,30 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         campaignList.map((campaign) => {
             const remaining = Number(campaign?.campaignRemainingQuota);
             if (!Number.isFinite(remaining)) return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: còn ${remaining} chỉ tiêu`;
+            return `còn ${remaining} chỉ tiêu`;
         }),
         {bullet: false}
     );
-    const campaignTimelineLines = uniqueCompareLines(
-        campaignList.map((campaign) => {
+    const campaignTimeEntries = campaignList
+        .map((campaign) => {
             const start = formatDateDisplay(campaign?.startDate);
             const end = formatDateDisplay(campaign?.endDate);
-            if (start === "—" && end === "—") return "";
-            return `${toText(campaign?.name, "Chiến dịch")}: ${start} - ${end}`;
-        }),
-        {bullet: false}
-    );
+            if (start === "—" && end === "—") return null;
+            const range =
+                start !== "—" && end !== "—"
+                    ? `${start} – ${end}`
+                    : start !== "—"
+                      ? `Từ ${start}`
+                      : end !== "—"
+                        ? `Đến ${end}`
+                        : "—";
+            return {
+                name: toText(campaign?.name, "Chiến dịch"),
+                range
+            };
+        })
+        .filter(Boolean);
+    const campaignTimelineLines = campaignTimeEntries.map((entry) => `${entry.name}: ${entry.range}`);
     const campaignStatusLines = uniqueCompareLines(
         campaignList.map(
             (campaign) => `${toText(campaign?.name, "Chiến dịch")}: ${mapCampaignStatusLabel(campaign?.status)}`
@@ -502,11 +638,27 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
     )
         .filter(Boolean)
         .map((label) => `- ${label}`);
-    const graduationStandardLines = uniqueCompareLines(
-        offerings.map((offering) => {
+    const graduationStandardHtmlList = (() => {
+        const seen = new Set();
+        const list = [];
+        offerings.forEach((offering) => {
             const {program} = resolveOfferingForCompare(offering);
-            return stripHtml(program?.graduationStandard);
-        })
+            const html = String(program?.graduationStandard || "").trim();
+            if (!html) return;
+            const key = html.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            list.push(html);
+        });
+        return list;
+    })();
+    const graduationStandardLines = uniqueCompareLines(
+        graduationStandardHtmlList.length
+            ? graduationStandardHtmlList.flatMap((html) => htmlToComparePlainLines(html))
+            : offerings.flatMap((offering) => {
+                  const {program} = resolveOfferingForCompare(offering);
+                  return htmlToComparePlainLines(program?.graduationStandard);
+              })
     );
     const facilitySummary = collectFacilitySummary(campusList);
     const facilityOverviewLines = facilitySummary.overviews.length
@@ -536,6 +688,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
             : campaignStatusLines[0] || "—",
         campaignStatusLines: campaignStatusLines.length ? campaignStatusLines : ["—"],
         campaignTimeLines: campaignTimelineLines.length ? campaignTimelineLines : ["—"],
+        campaignTimeEntries: campaignTimeEntries.length ? campaignTimeEntries : [],
         allowedMethodsLines,
         processStepsByMethod,
         quotaTotalLines: quotaTotalLines.length ? quotaTotalLines : ["—"],
@@ -547,6 +700,7 @@ function buildComparisonPayload(row, detail, campaigns, userLocation) {
         learningMethodsLines: learningMethodsLines.length ? learningMethodsLines : ["—"],
         learningMethodsChipText: learningMethodsLines.map((l) => l.replace(/^\s*-\s*/, "")).join(" | "),
         graduationStandardLines: graduationStandardLines.length ? graduationStandardLines : ["—"],
+        graduationStandardHtmlList,
         facilityOverviewLines,
         facilityItemLines,
         facilityImages,
@@ -569,6 +723,7 @@ export default function CompareSchoolsPage() {
     }
 
     const userIdentity = getUserIdentity(userInfo);
+    const isParent = userInfo?.role === "PARENT";
     const [rows, setRows] = React.useState(() => getCompareSchools(userInfo));
     const [menuAnchor, setMenuAnchor] = React.useState(null);
     const [menuSchoolKey, setMenuSchoolKey] = React.useState(null);
@@ -576,6 +731,7 @@ export default function CompareSchoolsPage() {
     const [detailError, setDetailError] = React.useState("");
     const [comparePayloadByKey, setComparePayloadByKey] = React.useState({});
     const [userLocation, setUserLocation] = React.useState(null);
+    const [facilityGallery, setFacilityGallery] = React.useState({open: false, images: [], index: 0});
 
     React.useEffect(() => {
         setRows(getCompareSchools(userInfo));
@@ -677,6 +833,7 @@ export default function CompareSchoolsPage() {
     const remainingSlots = Math.max(0, MAX_COMPARE_SCHOOLS - rows.length);
     const activeAddCount = remainingSlots > 0 ? 1 : 0;
     const lockedAddCount = remainingSlots > 0 ? remainingSlots - 1 : 0;
+    const headerSlotCount = rows.length + activeAddCount + lockedAddCount;
 
     const renderSchoolCard = (row, index) => {
         const tint = SCHOOL_ICON_TINTS[index % SCHOOL_ICON_TINTS.length];
@@ -692,6 +849,7 @@ export default function CompareSchoolsPage() {
                     ...cardSurface,
                     p: 1.5,
                     minHeight: 0,
+                    minWidth: 0,
                     display: "flex",
                     flexDirection: "column",
                     position: "relative"
@@ -838,7 +996,7 @@ export default function CompareSchoolsPage() {
             tone: "#ca8a04",
             rows: [
                 {label: "Trạng thái tuyển sinh", render: (d) => d.campaignStatusLabel},
-                {label: "Thời gian tuyển sinh", render: (d) => d.campaignTimeLines},
+                {label: "Thời gian tuyển sinh", render: (d) => d.campaignTimeEntries, isCampaignTime: true},
                 {label: "Phương thức xét tuyển", render: (d) => d.allowedMethodsLines},
                 {
                     label: "Quy trình các bước",
@@ -852,10 +1010,10 @@ export default function CompareSchoolsPage() {
             title: "4. Chỉ tiêu & Hồ sơ",
             tone: "#ea580c",
             rows: [
-                {label: "Tổng chỉ tiêu năm nay", render: (d) => d.quotaTotalLines},
-                {label: "Chỉ tiêu còn lại", render: (d) => d.quotaRemainingLines},
+                {label: "Tổng chỉ tiêu năm nay", render: (d) => d.quotaTotalLines, emphasizeNumbers: true},
+                {label: "Chỉ tiêu còn lại", render: (d) => d.quotaRemainingLines, emphasizeNumbers: true},
                 {label: "Hồ sơ bắt buộc", render: (d) => d.mandatoryDocLines},
-                {label: "Lệ phí giữ chỗ", render: (d) => d.reservationFeeLines}
+                {label: "Lệ phí giữ chỗ", render: (d) => d.reservationFeeLines, emphasizeNumbers: true}
             ]
         },
         {
@@ -864,9 +1022,13 @@ export default function CompareSchoolsPage() {
             tone: "#6d28d9",
             rows: [
                 {label: "Tên chương trình", render: (d) => d.programNameLines},
-                {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines},
+                {label: "Mức học phí gốc", render: (d) => d.tuitionFeeLines, emphasizeNumbers: true},
                 {label: "Hình thức học tập", render: (d) => d.learningMethodsChipText},
-                {label: "Chuẩn đầu ra", render: (d) => d.graduationStandardLines}
+                {
+                    label: "Tiêu chuẩn đầu ra",
+                    render: (d) => d.graduationStandardHtmlList,
+                    isGraduationHtml: true
+                }
             ]
         },
         {
@@ -889,6 +1051,12 @@ export default function CompareSchoolsPage() {
         fontWeight: 400,
         lineHeight: 1.55
     };
+    const compareSchoolColSx =
+        richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT
+            ? {minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word"}
+            : {};
+    const compareTableRowSx =
+        richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT ? {width: "100%"} : {};
     const sectionTitleSx = (tone) => ({
         fontSize: "0.98rem",
         fontWeight: 800,
@@ -908,6 +1076,73 @@ export default function CompareSchoolsPage() {
         if (!text) return "";
         if (/^https?:\/\//i.test(text)) return text;
         return `https://${text}`;
+    };
+
+    const renderCompareLineWithBoldNumbers = (line) => {
+        const text = String(line || "");
+        if (!text || text === "—") {
+            return <Typography sx={compareCellTextSx}>{text || "—"}</Typography>;
+        }
+        const parts = text.split(/(\d[\d.,]*)/g);
+        return (
+            <Typography sx={{...compareCellTextSx, whiteSpace: "pre-line"}} component="span" display="block">
+                {parts.map((part, idx) =>
+                    /^\d[\d.,]*$/.test(part) ? (
+                        <Box key={idx} component="span" sx={{fontWeight: 600, color: "#334155"}}>
+                            {part}
+                        </Box>
+                    ) : (
+                        <span key={idx}>{part}</span>
+                    )
+                )}
+            </Typography>
+        );
+    };
+
+    const compareRichHtmlSx = {
+        fontSize: "0.9rem",
+        color: "#475569",
+        fontWeight: 400,
+        lineHeight: 1.6,
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        "& p": {margin: "0.4em 0"},
+        "& ul, & ol": {margin: "0.35em 0", pl: 2.2},
+        "& li": {marginBottom: "0.25em"},
+        "& strong, & b": {fontWeight: 600, color: "#334155"}
+    };
+
+    const renderGraduationStandardHtml = (detail) => {
+        const htmlList = Array.isArray(detail?.graduationStandardHtmlList) ? detail.graduationStandardHtmlList : [];
+        if (htmlList.length > 0) {
+            return (
+                <Stack spacing={1}>
+                    {htmlList.map((html, idx) => (
+                        <Box
+                            key={`grad-html-${idx}`}
+                            sx={compareRichHtmlSx}
+                            dangerouslySetInnerHTML={{__html: html}}
+                        />
+                    ))}
+                </Stack>
+            );
+        }
+        const lines = Array.isArray(detail?.graduationStandardLines) ? detail.graduationStandardLines : [];
+        if (!lines.length || (lines.length === 1 && lines[0] === "—")) {
+            return <Typography sx={compareCellTextSx}>—</Typography>;
+        }
+        return (
+            <Stack spacing={0.45}>
+                {lines.map((line, idx) => {
+                    const text = String(line || "").replace(/^\s*-\s*/, "").trim();
+                    return (
+                        <Typography key={`grad-line-${idx}`} sx={compareCellTextSx}>
+                            {text}
+                        </Typography>
+                    );
+                })}
+            </Stack>
+        );
     };
 
     const renderHotlineWebsite = (detail) => {
@@ -941,31 +1176,101 @@ export default function CompareSchoolsPage() {
         );
     };
 
+    const renderCampaignTime = (entries) => {
+        const list = Array.isArray(entries) ? entries : [];
+        if (!list.length) {
+            return <Typography sx={compareCellTextSx}>—</Typography>;
+        }
+        return (
+            <Stack spacing={1}>
+                {list.map((entry, idx) => (
+                    <Box key={`campaign-time-${idx}`}>
+                        <Typography sx={{...compareCellTextSx, fontWeight: 600, color: "#1e293b", display: "block"}}>
+                            {entry?.name || "Chiến dịch"}
+                        </Typography>
+                        <Typography sx={{...compareCellTextSx, display: "block", mt: 0.25}}>
+                            {entry?.range || "—"}
+                        </Typography>
+                    </Box>
+                ))}
+            </Stack>
+        );
+    };
+
+    const openCompareSchoolDetail = React.useCallback(
+        (row) => {
+            const href = buildCompareSchoolDetailHref(row);
+            if (!href) return;
+            if (isParent) {
+                window.location.assign(href);
+                return;
+            }
+            navigate(href);
+        },
+        [isParent, navigate]
+    );
+
+    const openFacilityGallery = (images, index = 0) => {
+        const list = Array.isArray(images) ? images.filter((img) => String(img?.url || "").trim()) : [];
+        if (!list.length) return;
+        setFacilityGallery({
+            open: true,
+            images: list,
+            index: Math.min(Math.max(0, index), list.length - 1)
+        });
+    };
+
     const renderFacilityImages = (images) => {
-        const list = Array.isArray(images) ? images : [];
+        const list = Array.isArray(images) ? images.filter((img) => String(img?.url || "").trim()) : [];
         if (!list.length) {
             return <Typography sx={compareCellTextSx}>—</Typography>;
         }
         return (
             <Box sx={{display: "flex", flexWrap: "wrap", gap: 0.75}}>
-                {list.slice(0, 8).map((img) => (
+                {list.slice(0, 8).map((img, idx) => (
                     <Box
-                        key={img.key}
-                        component="img"
-                        src={img.url}
-                        alt={img.name || "Ảnh CSVC"}
-                        loading="lazy"
-                        title={img.name || "Ảnh CSVC"}
-                        sx={{
-                            width: 92,
-                            height: 68,
-                            objectFit: "cover",
-                            borderRadius: 1,
-                            border: "1px solid #e2e8f0",
-                            bgcolor: "#f8fafc"
+                        key={img.key || img.url}
+                        onClick={() => openFacilityGallery(list, idx)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openFacilityGallery(list, idx);
+                            }
                         }}
-                    />
+                        title={`${img.name || "Ảnh CSVC"} — bấm để xem`}
+                        sx={{
+                            width: 96,
+                            height: 72,
+                            borderRadius: 1,
+                            overflow: "hidden",
+                            border: "1px solid #e2e8f0",
+                            bgcolor: "#f8fafc",
+                            cursor: "zoom-in",
+                            flexShrink: 0,
+                            "&:hover": {borderColor: "#2563eb", boxShadow: "0 2px 8px rgba(37,99,235,0.2)"}
+                        }}
+                    >
+                        <CardMedia
+                            component="img"
+                            image={img.url}
+                            alt={img.name || "Ảnh CSVC"}
+                            loading="lazy"
+                            sx={{width: "100%", height: "100%", objectFit: "cover", display: "block"}}
+                        />
+                    </Box>
                 ))}
+                {list.length > 8 ? (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openFacilityGallery(list, 0)}
+                        sx={{alignSelf: "center", textTransform: "none", fontWeight: 600, fontSize: "0.75rem"}}
+                    >
+                        +{list.length - 8} ảnh
+                    </Button>
+                ) : null}
             </Box>
         );
     };
@@ -1064,7 +1369,7 @@ export default function CompareSchoolsPage() {
                 background: HOME_PAGE_SURFACE_GRADIENT
             }}
         >
-            <Box sx={{maxWidth: 1200, mx: "auto", px: {xs: 2, md: 3}, pb: 5}}>
+            <Box sx={{width: "100%", maxWidth: "100%", mx: 0, px: {xs: 2, md: 3, xl: 4}, pb: 5, boxSizing: "border-box"}}>
                 <Box
                     sx={{
                         display: "flex",
@@ -1099,20 +1404,38 @@ export default function CompareSchoolsPage() {
 
                 <Box
                     sx={{
-                        display: "grid",
-                        gridTemplateColumns: {
-                            xs: "1fr",
-                            sm: "repeat(2, minmax(0, 1fr))",
-                            lg: "repeat(4, minmax(0, 1fr))"
-                        },
-                        gap: 2
+                        width: "100%",
+                        maxWidth: "100%",
+                        overflowX: {xs: rows.length >= 3 ? "auto" : "visible", md: "visible"},
+                        WebkitOverflowScrolling: "touch",
+                        pb: {xs: rows.length >= 3 ? 0.5 : 0, md: 0}
                     }}
                 >
+                    <Box
+                        sx={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                headerSlotCount >= MAX_COMPARE_SCHOOLS
+                                    ? {
+                                          xs: `repeat(${headerSlotCount}, minmax(200px, 1fr))`,
+                                          md: `repeat(${headerSlotCount}, minmax(0, 1fr))`
+                                      }
+                                    : {
+                                          xs: "1fr",
+                                          sm: "repeat(2, minmax(0, 1fr))",
+                                          lg: `repeat(${Math.max(headerSlotCount, 1)}, minmax(0, 1fr))`
+                                      },
+                            gap: 2,
+                            width: "100%",
+                            minWidth: {xs: headerSlotCount >= MAX_COMPARE_SCHOOLS ? headerSlotCount * 200 + (headerSlotCount - 1) * 16 : undefined, md: 0}
+                        }}
+                    >
                     {rows.map((row, i) => renderSchoolCard(row, i))}
                     {activeAddCount > 0 ? renderAddCard(false) : null}
                     {Array.from({length: lockedAddCount}).map((_, i) => (
                         <React.Fragment key={`lock-${i}`}>{renderAddCard(true)}</React.Fragment>
                     ))}
+                    </Box>
                 </Box>
 
                 {rows.length > 0 ? (
@@ -1133,13 +1456,42 @@ export default function CompareSchoolsPage() {
                             </Box>
                         ) : null}
 
-                        <Box sx={{overflowX: "auto", overflowY: "hidden", bgcolor: "transparent", p: 0}}>
-                            <Box sx={{minWidth: 240 + Math.max(1, richRows.length) * 270}}>
+                        {richRows.length >= COMPARE_TABLE_FIT_ALL_COLS_AT ? (
+                            <Typography sx={{fontSize: "0.82rem", color: "#64748b", mb: 0.75, display: {xs: "block", md: "none"}}}>
+                                Cuộn ngang để xem đủ {richRows.length} trường trên màn hình nhỏ
+                            </Typography>
+                        ) : richRows.length >= 3 ? (
+                            <Typography sx={{fontSize: "0.82rem", color: "#64748b", mb: 0.75}}>
+                                Cuộn ngang để xem đủ {richRows.length} trường
+                            </Typography>
+                        ) : null}
+                        <Box
+                            sx={{
+                                width: "100%",
+                                maxWidth: "100%",
+                                overflowX: "auto",
+                                overflowY: "hidden",
+                                WebkitOverflowScrolling: "touch",
+                                scrollbarGutter: "stable",
+                                bgcolor: "transparent",
+                                pb: 1.5,
+                                mx: {xs: -1, sm: 0}
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    width: compareTableInnerWidth(richRows.length),
+                                    minWidth: compareTableScrollMinWidth(richRows.length),
+                                    pr: 2,
+                                    boxSizing: "border-box"
+                                }}
+                            >
                                 <Box
                                     sx={{
+                                        ...compareTableRowSx,
                                         display: "grid",
-                                        gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                        columnGap: "16px",
+                                        gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                        columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                         position: "sticky",
                                         top: 0,
                                         zIndex: 5,
@@ -1165,6 +1517,7 @@ export default function CompareSchoolsPage() {
                                         <Box
                                             key={`sticky-head-${item.raw?.schoolKey}`}
                                             sx={{
+                                                ...compareSchoolColSx,
                                                 px: 1.2,
                                                 py: 1.1,
                                                 borderLeft: "1px solid rgba(59,130,246,0.2)",
@@ -1183,14 +1536,25 @@ export default function CompareSchoolsPage() {
                                                     <Typography sx={{fontWeight: 800, color: "#ffffff", fontSize: "0.92rem", lineHeight: 1.35}}>
                                                         {item.detail.schoolName}
                                                     </Typography>
-                                                    <Button
-                                                        size="small"
-                                                        variant="text"
-                                                        onClick={() => navigate("/search-schools")}
-                                                        sx={{mt: 0.25, p: 0, minWidth: 0, textTransform: "none", fontSize: "0.72rem", fontWeight: 700, color: "#dbeafe"}}
-                                                    >
-                                                        Xem chi tiết
-                                                    </Button>
+                                                    {buildCompareSchoolDetailHref(item.raw) ? (
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            onClick={() => openCompareSchoolDetail(item.raw)}
+                                                            sx={{
+                                                                mt: 0.25,
+                                                                p: 0,
+                                                                minWidth: 0,
+                                                                textTransform: "none",
+                                                                fontSize: "0.72rem",
+                                                                fontWeight: 700,
+                                                                color: "#dbeafe",
+                                                                "&:hover": {bgcolor: "rgba(255,255,255,0.12)"}
+                                                            }}
+                                                        >
+                                                            Xem chi tiết
+                                                        </Button>
+                                                    ) : null}
                                                 </Box>
                                             </Stack>
                                         </Box>
@@ -1201,9 +1565,10 @@ export default function CompareSchoolsPage() {
                                     <Box key={section.key} sx={{bgcolor: sectionStripeBg(sectionIdx)}}>
                                         <Box
                                             sx={{
+                                                ...compareTableRowSx,
                                                 display: "grid",
-                                                gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                                columnGap: "16px",
+                                                gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                                columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                                 borderTop: "1px solid rgba(59,130,246,0.16)"
                                             }}
                                         >
@@ -1253,6 +1618,7 @@ export default function CompareSchoolsPage() {
                                                     <Box
                                                         key={`sec-head-${section.key}-${item.raw?.schoolKey}`}
                                                         sx={{
+                                                            ...compareSchoolColSx,
                                                             position: "relative",
                                                             px: 1.2,
                                                             py: 1.1,
@@ -1311,9 +1677,10 @@ export default function CompareSchoolsPage() {
                                             <Box
                                                 key={`${section.key}-${rowMeta.label}`}
                                                 sx={{
+                                                    ...compareTableRowSx,
                                                     display: "grid",
-                                                    gridTemplateColumns: `240px repeat(${Math.max(1, richRows.length)}, minmax(270px, 1fr))`,
-                                                    columnGap: "16px",
+                                                    gridTemplateColumns: compareTableGridColumns(richRows.length),
+                                                    columnGap: `${COMPARE_TABLE_COL_GAP}px`,
                                                     borderTop: "1px dashed rgba(59,130,246,0.22)"
                                                 }}
                                             >
@@ -1374,6 +1741,7 @@ export default function CompareSchoolsPage() {
                                                         <Box
                                                             key={`${section.key}-${rowMeta.label}-${item.raw?.schoolKey}`}
                                                             sx={{
+                                                                ...compareSchoolColSx,
                                                                 position: "relative",
                                                                 pl: 2.4,
                                                                 pr: 1.2,
@@ -1424,8 +1792,12 @@ export default function CompareSchoolsPage() {
                                                                     zIndex: 2
                                                                 }}
                                                             />
-                                                            {rowMeta.isFacilityImages ? (
+                                                            {rowMeta.isCampaignTime ? (
+                                                                renderCampaignTime(cellText)
+                                                            ) : rowMeta.isFacilityImages ? (
                                                                 renderFacilityImages(cellText)
+                                                            ) : rowMeta.isGraduationHtml ? (
+                                                                renderGraduationStandardHtml(item.detail)
                                                             ) : rowMeta.isHotlineWebsite ? (
                                                                 renderHotlineWebsite(item.detail)
                                                             ) : rowMeta.isProcessByMethod ? (
@@ -1504,9 +1876,22 @@ export default function CompareSchoolsPage() {
                                                                                                     flexShrink: 0
                                                                                                 }}
                                                                                             />
-                                                                                            <Typography sx={compareCellTextSx}>
-                                                                                                {bulletText}
-                                                                                            </Typography>
+                                                                                            {rowMeta.emphasizeNumbers ? (
+                                                                                                renderCompareLineWithBoldNumbers(bulletText)
+                                                                                            ) : (
+                                                                                                <Typography sx={compareCellTextSx}>
+                                                                                                    {bulletText}
+                                                                                                </Typography>
+                                                                                            )}
+                                                                                        </Box>
+                                                                                    );
+                                                                                }
+                                                                                if (rowMeta.emphasizeNumbers) {
+                                                                                    return (
+                                                                                        <Box
+                                                                                            key={`${section.key}-${rowMeta.label}-${item.raw?.schoolKey}-${idx}`}
+                                                                                        >
+                                                                                            {renderCompareLineWithBoldNumbers(normalizedLine)}
                                                                                         </Box>
                                                                                     );
                                                                                 }
@@ -1520,6 +1905,8 @@ export default function CompareSchoolsPage() {
                                                                                 );
                                                                             })}
                                                                         </Stack>
+                                                                    ) : rowMeta.emphasizeNumbers ? (
+                                                                        renderCompareLineWithBoldNumbers(cellText)
                                                                     ) : (
                                                                         <Typography sx={compareCellTextSx}>
                                                                             {cellText}
@@ -1538,6 +1925,94 @@ export default function CompareSchoolsPage() {
                         </Box>
                     </Box>
                 ) : null}
+
+                <Dialog
+                    open={facilityGallery.open}
+                    onClose={() => setFacilityGallery((prev) => ({...prev, open: false}))}
+                    fullWidth
+                    maxWidth="md"
+                >
+                    <DialogTitle sx={{fontWeight: 800}}>Ảnh cơ sở vật chất</DialogTitle>
+                    <DialogContent sx={{pt: "8px !important"}}>
+                        {facilityGallery.images.length > 0 ? (
+                            <>
+                                <CardMedia
+                                    component="img"
+                                    image={facilityGallery.images[facilityGallery.index]?.url}
+                                    alt={facilityGallery.images[facilityGallery.index]?.name || "Ảnh CSVC"}
+                                    sx={{
+                                        width: "100%",
+                                        maxHeight: {xs: 300, sm: 420},
+                                        objectFit: "contain",
+                                        borderRadius: 2,
+                                        bgcolor: "#e2e8f0",
+                                        mb: 1.2
+                                    }}
+                                />
+                                <Typography sx={{fontSize: "0.88rem", color: "#475569", mb: 1}}>
+                                    {facilityGallery.images[facilityGallery.index]?.name || "Ảnh CSVC"}
+                                </Typography>
+                                {facilityGallery.images.length > 1 ? (
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: {
+                                                xs: "repeat(3, minmax(0, 1fr))",
+                                                sm: "repeat(6, minmax(0, 1fr))"
+                                            },
+                                            gap: 0.8
+                                        }}
+                                    >
+                                        {facilityGallery.images.slice(0, 12).map((img, idx) => (
+                                            <Card
+                                                key={img.key || img.url}
+                                                onClick={() =>
+                                                    setFacilityGallery((prev) => ({...prev, index: idx}))
+                                                }
+                                                sx={{
+                                                    borderRadius: 1.2,
+                                                    overflow: "hidden",
+                                                    border:
+                                                        idx === facilityGallery.index
+                                                            ? "2px solid #2563eb"
+                                                            : "1px solid rgba(148,163,184,0.45)",
+                                                    cursor: "pointer"
+                                                }}
+                                            >
+                                                <CardMedia
+                                                    component="img"
+                                                    image={img.url}
+                                                    alt={img.name || "Ảnh CSVC"}
+                                                    sx={{height: 74, objectFit: "cover"}}
+                                                />
+                                            </Card>
+                                        ))}
+                                    </Box>
+                                ) : null}
+                            </>
+                        ) : (
+                            <Typography sx={{fontSize: "0.9rem", color: "#64748b"}}>Chưa có ảnh.</Typography>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            component="a"
+                            href={facilityGallery.images[facilityGallery.index]?.url || undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            disabled={!facilityGallery.images[facilityGallery.index]?.url}
+                            sx={{textTransform: "none", fontWeight: 700}}
+                        >
+                            Mở ảnh gốc
+                        </Button>
+                        <Button
+                            onClick={() => setFacilityGallery((prev) => ({...prev, open: false}))}
+                            sx={{textTransform: "none", fontWeight: 700}}
+                        >
+                            Đóng
+                        </Button>
+                    </DialogActions>
+                </Dialog>
 
                 <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu}>
                     <MenuItem
