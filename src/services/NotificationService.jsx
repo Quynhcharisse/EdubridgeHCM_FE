@@ -122,13 +122,25 @@ export const resolveNotificationRoute = ({eventType, data = {}, role}) => {
         case NOTIFICATION_EVENTS.COUNSELLOR_SLOT_UNASSIGNED:
             return "/counsellor/calendar";
         case NOTIFICATION_EVENTS.CONSULTATION_BOOKED:
-        case NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED:
-        case NOTIFICATION_EVENTS.CONSULTATION_CANCELLED:
-        case NOTIFICATION_EVENTS.CONSULTATION_COMPLETED:
-        case NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW:
-            if (role === "PARENT") return "/parent/offline-consultations";
+            if (role === "PARENT") return "/parent/offline-consultations?status=pending";
             if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
             if (role === "SCHOOL") return "/school/consultation-stats";
+            return "/home";
+        case NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED:
+            if (role === "PARENT") return "/parent/offline-consultations?status=confirmed";
+            if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
+            return "/home";
+        case NOTIFICATION_EVENTS.CONSULTATION_CANCELLED:
+            if (role === "PARENT") return "/parent/offline-consultations?status=cancelled";
+            if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
+            return "/home";
+        case NOTIFICATION_EVENTS.CONSULTATION_COMPLETED:
+            if (role === "PARENT") return "/parent/offline-consultations?status=completed";
+            if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
+            return "/home";
+        case NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW:
+            if (role === "PARENT") return "/parent/offline-consultations?status=no-show";
+            if (role === "COUNSELLOR") return "/counsellor/parent-consultation";
             return "/home";
         default:
             if (role === "ADMIN") return "/admin/dashboard";
