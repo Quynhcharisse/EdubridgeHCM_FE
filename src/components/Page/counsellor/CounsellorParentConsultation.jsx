@@ -2646,11 +2646,6 @@ export default function CounsellorParentConsultation() {
                   }
                 }}
               />
-              <Tooltip title="Emoji">
-                <IconButton size="small" sx={{ color: APP_PRIMARY_MAIN }}>
-                  <MoodRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
               <IconButton
                 onClick={handleSend}
                 disabled={!inputValue.trim() || !selectedConversation}
