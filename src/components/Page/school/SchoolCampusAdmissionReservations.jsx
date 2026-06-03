@@ -1411,10 +1411,12 @@ export default function SchoolCampusAdmissionReservations() {
         return [...years].sort((a, b) => b - a);
     }, [campaigns]);
 
-    const loadData = React.useCallback(async ({statusOverride} = {}) => {
+    const loadData = React.useCallback(async ({statusOverride, silent = false} = {}) => {
         const activeStatus = statusOverride ?? statusFilter;
-        setLoading(true);
-        setError("");
+        if (!silent) {
+            setLoading(true);
+            setError("");
+        }
         try {
             const [campaignList, res] = await Promise.all([
                 getAdmissionCampaigns(),
@@ -1432,12 +1434,14 @@ export default function SchoolCampusAdmissionReservations() {
             setAllForms(mappedForms);
             setPendingCount(mappedForms.filter((row) => row.status === RESERVATION_STATUS.PENDING).length);
         } catch (err) {
-            setCampaigns([]);
-            setAllForms([]);
-            setPendingCount(0);
-            setError(getApiErrorMessage(err, "Không tải được danh sách hồ sơ nhập học."));
+            if (!silent) {
+                setCampaigns([]);
+                setAllForms([]);
+                setPendingCount(0);
+                setError(getApiErrorMessage(err, "Không tải được danh sách hồ sơ nhập học."));
+            }
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [statusFilter]);
 
@@ -1452,6 +1456,31 @@ export default function SchoolCampusAdmissionReservations() {
     React.useEffect(() => {
         if (schoolCtxLoading) return;
         void loadData();
+    }, [schoolCtxLoading, loadData]);
+
+    React.useEffect(() => {
+        if (schoolCtxLoading) return;
+
+        const refreshIfVisible = () => {
+            if (document.visibilityState === "visible") {
+                void loadData({silent: true});
+            }
+        };
+
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === "visible") {
+                void loadData({silent: true});
+            }
+        }, 10000);
+
+        window.addEventListener("focus", refreshIfVisible);
+        document.addEventListener("visibilitychange", refreshIfVisible);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener("focus", refreshIfVisible);
+            document.removeEventListener("visibilitychange", refreshIfVisible);
+        };
     }, [schoolCtxLoading, loadData]);
 
     React.useEffect(() => {
@@ -1982,7 +2011,7 @@ export default function SchoolCampusAdmissionReservations() {
                                                                             <TableRow sx={{bgcolor: "#f8fafc"}}>
                                                                                 <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Phụ huynh</TableCell>
                                                                                 <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Học sinh</TableCell>
-                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>SĐT</TableCell>
+                                                                                <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>SĐT phụ huynh</TableCell>
                                                                                 <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Chương trình</TableCell>
                                                                                 <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Ngày nộp</TableCell>
                                                                                 <TableCell sx={{fontWeight: 700, color: "#1e293b"}}>Trạng thái</TableCell>
