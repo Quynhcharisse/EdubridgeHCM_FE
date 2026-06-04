@@ -263,6 +263,7 @@ export const sendConfirmEnrollmentEmail = async ({
    schoolName,
    programName,
    confirmCode,
+   emailSupport,
 }) => {
    if (!CONFIRM_ENROLLMENT_TEMPLATE_ID) {
        console.warn("Thiếu VITE_EMAILJS_CONFIRM_ENROLLMENT_TEMPLATE_ID — bỏ qua gửi email xác nhận nhập học.");
@@ -298,6 +299,8 @@ export const sendConfirmEnrollmentEmail = async ({
        program_name: (programName || "").trim() || "—",
        confirmCode: (confirmCode || "").trim() || "N/A",
        confirm_code: (confirmCode || "").trim() || "N/A",
+       emailSupport: (emailSupport || "").trim(),
+       email_support: (emailSupport || "").trim(),
    };
 
 

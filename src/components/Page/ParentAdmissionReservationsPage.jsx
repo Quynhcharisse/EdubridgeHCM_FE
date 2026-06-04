@@ -818,6 +818,7 @@ export default function ParentAdmissionReservationsPage() {
             res?.data?.confirmCode ??
             confirmEnrollmentTarget?.confirmCode ??
             "N/A";
+            const emailSupport = res?.data?.data?.emailSupport ?? "";
             void sendConfirmEnrollmentEmail({
             parentEmail: confirmEnrollmentTarget?.parentEmail ?? "",
             studentName: confirmEnrollmentTarget?.studentName ?? "",
@@ -825,6 +826,7 @@ export default function ParentAdmissionReservationsPage() {
             schoolName: confirmEnrollmentTarget?.schoolName ?? "",
             programName: confirmEnrollmentTarget?.programName ?? confirmEnrollmentTarget?.program ?? "",
             confirmCode,
+            emailSupport,
             });
 
             setConfirmEnrollmentTarget(null);
