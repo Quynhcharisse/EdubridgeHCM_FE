@@ -10,7 +10,7 @@ import {
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import {Link as RouterLink, useNavigate, useSearchParams} from 'react-router-dom';
+import {Link as RouterLink, useLocation, useNavigate, useSearchParams} from 'react-router-dom';
 import {enqueueSnackbar} from 'notistack';
 import AdmissionSubmissionFormContent from './admission/AdmissionSubmissionFormContent.jsx';
 import {useAdmissionDocumentUpload} from './admission/useAdmissionDocumentUpload.js';
@@ -42,9 +42,12 @@ import {APP_PRIMARY_DARK, BRAND_NAVY, BRAND_PASTEL_AURA} from '../../constants/h
 export default function ParentAdmissionHoldProfilePage() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const preselectedStudentId = Number(searchParams.get('studentId')) || null;
     const returnUrl = searchParams.get('returnUrl') || null;
     const hasReturnUrl = !!returnUrl;
+    const reservationError = Boolean(location.state?.reservationError);
+    const reservationRejectReason = String(location.state?.reservationRejectReason ?? '').trim();
 
     const catalogRef = useRef([]);
     const templateLoadSeqRef = useRef(0);
@@ -323,6 +326,9 @@ export default function ParentAdmissionHoldProfilePage() {
             applyTemplateResponse(templateRes, sid);
             setIsEditingTemplate(false);
             enqueueSnackbar('Lưu mẫu hồ sơ giữ chỗ thành công', {variant: 'success'});
+            if (reservationError) {
+                navigate(`${location.pathname}${location.search}`, {replace: true, state: null});
+            }
         } catch (err) {
             console.error('[ParentAdmissionHoldProfilePage] submit:', err);
             const serverMsg = err?.response?.data?.message || err?.message || 'Lưu hồ sơ thất bại.';
@@ -367,6 +373,41 @@ export default function ParentAdmissionHoldProfilePage() {
                 )}
        
 
+                {reservationError ? (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            mb: 2,
+                            p: 3,
+                            borderRadius: 3,
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            bgcolor: 'rgba(254, 226, 226, 0.95)',
+                        }}
+                    >
+                        <Stack spacing={1}>
+                            <Typography sx={{fontWeight: 700, color: '#b91c1c'}}>
+                                Hồ sơ giữ chỗ bị từ chối. Vui lòng chỉnh sửa lại.
+                            </Typography>
+                            {reservationRejectReason ? (
+                                <Box
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: 2,
+                                        bgcolor: 'rgba(254, 226, 226, 1)',
+                                        border: '1px solid rgba(239, 68, 68, 0.14)',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        fontSize: 14,
+                                        color: '#991b1b',
+                                        lineHeight: 1.6,
+                                    }}
+                                >
+                                    {`Lý do: ${reservationRejectReason}`}
+                                </Box>
+                            ) : null}
+                        </Stack>
+                    </Paper>
+                ) : null}
                 <Paper
                     elevation={0}
                     sx={{

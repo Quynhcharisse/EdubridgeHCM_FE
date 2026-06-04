@@ -1026,7 +1026,6 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
     const [processing, setProcessing] = React.useState(false);
     const [confirming, setConfirming] = React.useState(false);
     const [result, setResult] = React.useState(null);
-    const [activeTab, setActiveTab] = React.useState("valid");
 
     // Fetch campaigns khi dialog mở
     React.useEffect(() => {
@@ -1035,7 +1034,6 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
         setResult(null);
         setSelectedCampaignId("");
         setSelectedCampaignName("");
-        setActiveTab("valid");
         setCampaignsLoading(true);
         getAdmissionCampaigns()
             .then((data) => {
@@ -1108,17 +1106,6 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
     const totalForms = result?.totalForms ?? 0;
     const summary = result?.summary ?? {valid: 0, invalid: 0, skipped: 0, error: 0};
     const forms = Array.isArray(result?.forms) ? result.forms : [];
-    const validForms = forms.filter((f) => f.overallStatus === "valid");
-    const invalidForms = forms.filter((f) => f.overallStatus === "invalid");
-    const skippedForms = forms.filter((f) => f.overallStatus === "skipped");
-    const errorForms = forms.filter((f) => f.overallStatus === "error");
-
-    const TAB_CONFIG = [
-        {key: "valid",   label: "Hợp lệ",            count: validForms.length,   activeColor: "#166534"},
-        {key: "invalid", label: "Không hợp lệ",      count: invalidForms.length, activeColor: "#d97706"},
-        {key: "skipped", label: "Bỏ qua kiểm tra",   count: skippedForms.length, activeColor: "#475569"},
-        {key: "error",   label: "Hồ sơ lỗi",         count: errorForms.length,   activeColor: "#dc2626"},
-    ];
 
     return (
         <Dialog
@@ -1193,74 +1180,18 @@ function AutoApproveDialog({open, onClose, onDone, pendingCount = 0}) {
                             </Stack>
                         </Box>
 
-                        {/* Tabs */}
                         {forms.length === 0 ? (
                             <Stack alignItems="center" spacing={1} sx={{py: 4}}>
                                 <CheckCircleRoundedIcon sx={{fontSize: 36, color: "#86efac"}} />
                                 <Typography sx={{color: "#64748b", fontWeight: 500}}>Không có hồ sơ nào được xử lý.</Typography>
                             </Stack>
                         ) : (
-                            <Box>
-                                <Box sx={{borderBottom: "1px solid #e2e8f0", bgcolor: "#fff", px: 3}}>
-                                    <Tabs
-                                        value={activeTab}
-                                        onChange={(_, v) => setActiveTab(v)}
-                                        sx={{
-                                            "& .MuiTab-root": {textTransform: "none", fontWeight: 700, fontSize: 13.5, minHeight: 44, px: 2},
-                                            "& .MuiTabs-indicator": {height: 3, borderRadius: "3px 3px 0 0"},
-                                        }}
-                                    >
-                                        {TAB_CONFIG.map(({key, label, count, activeColor}) => (
-                                            <Tab
-                                                key={key}
-                                                value={key}
-                                                label={
-                                                    <Stack direction="row" spacing={0.75} alignItems="center">
-                                                        <span>{label}</span>
-                                                        <Box sx={{
-                                                            minWidth: 20, height: 20, borderRadius: 999, px: 0.75,
-                                                            bgcolor: activeTab === key ? activeColor : "#e2e8f0",
-                                                            color: activeTab === key ? "#fff" : "#64748b",
-                                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                                            fontSize: 11, fontWeight: 800, lineHeight: 1, transition: "background-color 0.2s",
-                                                        }}>
-                                                            {count}
-                                                        </Box>
-                                                    </Stack>
-                                                }
-                                            />
-                                        ))}
-                                    </Tabs>
-                                </Box>
-                                <Box sx={{px: 3, py: 2.5}}>
-                                    {activeTab === "valid" && (
-                                        validForms.length === 0
-                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ hợp lệ.</Typography>
-                                            : <Stack spacing={1}>{validForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
-                                    )}
-                                    {activeTab === "invalid" && (
-                                        invalidForms.length === 0
-                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ không hợp lệ.</Typography>
-                                            : <Stack spacing={1}>{invalidForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
-                                    )}
-                                    {activeTab === "skipped" && (
-                                        skippedForms.length === 0
-                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ bỏ qua kiểm tra.</Typography>
-                                            : (
-                                                <Stack spacing={1.5}>
-                                                    <Alert severity="warning" sx={{borderRadius: 2, fontSize: "0.875rem"}}>
-                                                        Các hồ sơ bỏ qua kiểm tra cần được <strong>duyệt thủ công</strong>. Vui lòng liên hệ quản trị viên hệ thống để được hỗ trợ thêm.
-                                                    </Alert>
-                                                    <Stack spacing={1}>{skippedForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
-                                                </Stack>
-                                            )
-                                    )}
-                                    {activeTab === "error" && (
-                                        errorForms.length === 0
-                                            ? <Typography variant="body2" sx={{color: "#64748b", textAlign: "center", py: 2}}>Không có hồ sơ lỗi.</Typography>
-                                            : <Stack spacing={1}>{errorForms.map((f) => <FormResultCard key={f.formId} form={f} />)}</Stack>
-                                    )}
-                                </Box>
+                            <Box sx={{px: 3, py: 2.5}}>
+                                <Stack spacing={1}>
+                                    {forms.map((f) => (
+                                        <FormResultCard key={f.formId} form={f} />
+                                    ))}
+                                </Stack>
                             </Box>
                         )}
                     </Box>
@@ -1445,12 +1376,11 @@ export default function SchoolCampusAdmissionReservations() {
         }
     }, [statusFilter]);
 
-    const redirectToProcessedStatusView = React.useCallback((nextStatus) => {
-        if (!RESERVATION_STATUS_FILTER_VALUES.has(nextStatus)) return;
+    const redirectToProcessedStatusView = React.useCallback(() => {
         setDetailOpen(false);
         setSelectedReservation(null);
-        setStatusFilter(nextStatus);
-        void loadData({statusOverride: nextStatus});
+        setStatusFilter("ALL");
+        void loadData({statusOverride: "ALL"});
     }, [loadData]);
 
     React.useEffect(() => {
