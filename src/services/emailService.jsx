@@ -252,3 +252,66 @@ Hệ thống Edubridge`;
         throw error;
     }
 };
+/**
+* Gửi email xác nhận nhập học cho phụ huynh sau khi parent confirm enrollment thành công.
+* @param {{ parentEmail: string, studentName: string, studentCode: string, schoolName: string, programName: string, confirmCode: string }} params
+*/
+export const sendConfirmEnrollmentEmail = async ({
+   parentEmail,
+   studentName,
+   studentCode,
+   schoolName,
+   programName,
+   confirmCode,
+}) => {
+   if (!CONFIRM_ENROLLMENT_TEMPLATE_ID) {
+       console.warn("Thiếu VITE_EMAILJS_CONFIRM_ENROLLMENT_TEMPLATE_ID — bỏ qua gửi email xác nhận nhập học.");
+       return;
+   }
+
+
+   const toEmail = (parentEmail || "").trim();
+   if (!toEmail) {
+       console.warn("sendConfirmEnrollmentEmail: parentEmail rỗng — bỏ qua.");
+       return;
+   }
+
+
+   emailjs.init({ publicKey: WELCOME_PUBLIC_KEY });
+
+
+   const templateParams = {
+       // Recipient
+       to_email: toEmail,
+       email: toEmail,
+       user_email: toEmail,
+       userEmail: toEmail,
+       parentEmail: toEmail,
+       // Content
+       studentName: (studentName || "").trim() || "—",
+       student_name: (studentName || "").trim() || "—",
+       studentCode: (studentCode || "").trim() || "—",
+       student_code: (studentCode || "").trim() || "—",
+       schoolName: (schoolName || "").trim() || "—",
+       school_name: (schoolName || "").trim() || "—",
+       programName: (programName || "").trim() || "—",
+       program_name: (programName || "").trim() || "—",
+       confirmCode: (confirmCode || "").trim() || "N/A",
+       confirm_code: (confirmCode || "").trim() || "N/A",
+   };
+
+
+   try {
+       const response = await emailjs.send(
+           WELCOME_SERVICE_ID,
+           CONFIRM_ENROLLMENT_TEMPLATE_ID,
+           templateParams,
+           { publicKey: WELCOME_PUBLIC_KEY }
+       );
+       console.log("Send confirm enrollment email success:", response);
+       return response;
+   } catch (error) {
+       console.error("Send confirm enrollment email failed:", error);
+       // Không throw — lỗi email không được chặn flow chính
+   }
+};
