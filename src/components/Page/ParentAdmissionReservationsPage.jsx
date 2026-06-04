@@ -26,6 +26,8 @@ import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import {enqueueSnackbar} from "notistack";
+import {sendConfirmEnrollmentEmail} from "../../services/emailService.jsx";
+
 import {
     getParentAdmissionReservationForms,
     pickAdmissionReservationFormsFromResponse,
@@ -778,6 +780,21 @@ export default function ParentAdmissionReservationsPage() {
                 res?.data?.message || "Xác nhận nhập học thành công.",
                 {variant: "success"},
             );
+            // Gửi email xác nhận nhập học cho phụ huynh (fire-and-forget, không block UI)
+            const confirmCode =
+            res?.data?.data?.confirmCode ??
+            res?.data?.confirmCode ??
+            confirmEnrollmentTarget?.confirmCode ??
+            "N/A";
+            void sendConfirmEnrollmentEmail({
+            parentEmail: confirmEnrollmentTarget?.parentEmail ?? "",
+            studentName: confirmEnrollmentTarget?.studentName ?? "",
+            studentCode: confirmEnrollmentTarget?.studentCode ?? "",
+            schoolName: confirmEnrollmentTarget?.schoolName ?? "",
+            programName: confirmEnrollmentTarget?.programName ?? confirmEnrollmentTarget?.program ?? "",
+            confirmCode,
+            });
+
             setConfirmEnrollmentTarget(null);
             await loadReservations({silent: true});
             const nextStatus =

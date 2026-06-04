@@ -291,6 +291,7 @@ function OfflineConsultDetailContent({ row }) {
   const schoolName = pickTrim(row?.schoolName);
   const campusName = pickTrim(row?.campusName);
   const address = pickTrim(row?.address);
+  const emailSupport = pickTrim(row?.emailSupport);
   const phone = pickTrim(row?.phone);
   const parentName = pickTrim(row?.parentName);
   const studentName = pickTrim(pickStudentName(row));
@@ -299,8 +300,7 @@ function OfflineConsultDetailContent({ row }) {
   const cancelReason = pickTrim(row?.cancelReason);
   const idStr = row?.id != null && row?.id !== "" ? String(row.id) : "";
   const scheduleText = getOfflineScheduleDisplay(row);
-
-  const hasSchool = hasText(schoolName) || hasText(campusName) || hasText(address) || hasText(phone);
+  const hasSchool = hasText(schoolName) || hasText(campusName) || hasText(address) || hasText(phone) || hasText(emailSupport);
   const hasAppt = hasText(idStr) || hasText(statusLabel) || hasText(scheduleText);
   const hasPeople = hasText(parentName) || hasText(studentName);
   const hasNotes = hasText(note) || hasText(cancelReason);
@@ -329,7 +329,9 @@ function OfflineConsultDetailContent({ row }) {
               grid={hasText(campusName) ? 6 : 12}
             />
           ) : null}
-          {hasText(address) ? <OfflineConsultDetailField label="Địa chỉ" value={address} grid={12} /> : null}
+                {hasText(emailSupport) ? (
+      <OfflineConsultDetailField label="Email hỗ trợ" value={emailSupport} grid={12} />
+      ) : null}
         </OfflineConsultDetailSection>
       ) : null}
 
