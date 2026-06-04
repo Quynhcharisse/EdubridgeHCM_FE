@@ -21,6 +21,15 @@ export const NOTIFICATION_EVENTS = {
     CONSULTATION_CANCELLED: "CONSULTATION_CANCELLED",
     CONSULTATION_COMPLETED: "CONSULTATION_COMPLETED",
     CONSULTATION_NO_SHOW:   "CONSULTATION_NO_SHOW",
+
+    // ── Reservation form ──────────────────────────────────────────
+    RESERVATION_PENDING:          "RESERVATION_PENDING",
+    RESERVATION_APPROVAL:         "RESERVATION_APPROVAL",
+    RESERVATION_PAYMENT_PENDING:  "RESERVATION_PAYMENT_PENDING",
+    RESERVATION_PAYMENT_REJECTED: "RESERVATION_PAYMENT_REJECTED",
+    RESERVATION_DEPOSITED:        "RESERVATION_DEPOSITED",
+    RESERVATION_CONFIRMED:        "RESERVATION_CONFIRMED",
+    RESERVATION_REJECTED:         "RESERVATION_REJECTED",
 };
 
 const EVENT_ROLE_MATRIX = {
@@ -43,6 +52,14 @@ const EVENT_ROLE_MATRIX = {
     [NOTIFICATION_EVENTS.CONSULTATION_CANCELLED]: [ROLES.PARENT],        // Counsellor huỷ → Parent nhận
     [NOTIFICATION_EVENTS.CONSULTATION_COMPLETED]: [ROLES.PARENT],        // Counsellor kết thúc → Parent nhận
     [NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW]:   [ROLES.PARENT],        // Counsellor đánh dấu → Parent nhận
+
+    [NOTIFICATION_EVENTS.RESERVATION_PENDING]:          [ROLES.SCHOOL],         // Parent nộp hồ sơ → School nhận
+    [NOTIFICATION_EVENTS.RESERVATION_APPROVAL]:         [ROLES.PARENT],         // School duyệt → Parent nhận
+    [NOTIFICATION_EVENTS.RESERVATION_PAYMENT_PENDING]:  [ROLES.SCHOOL],         // Parent tải minh chứng → School nhận
+    [NOTIFICATION_EVENTS.RESERVATION_PAYMENT_REJECTED]: [ROLES.PARENT],         // School từ chối minh chứng → Parent nhận
+    [NOTIFICATION_EVENTS.RESERVATION_DEPOSITED]:        [ROLES.PARENT],         // School xác nhận cọc → Parent nhận
+    [NOTIFICATION_EVENTS.RESERVATION_CONFIRMED]:        [ROLES.SCHOOL],         // Parent xác nhận chọn trường → School nhận
+    [NOTIFICATION_EVENTS.RESERVATION_REJECTED]:         [ROLES.PARENT],         // School từ chối hồ sơ → Parent nhận
 };
 
 export const normalizeNotificationEventType = (payload) => {
@@ -58,10 +75,17 @@ export const normalizeNotificationEventType = (payload) => {
         COUNSELLOR_SLOT_ASSIGNED:    NOTIFICATION_EVENTS.COUNSELLOR_SLOT_ASSIGNED,
         COUNSELLOR_SLOT_UNASSIGNED:  NOTIFICATION_EVENTS.COUNSELLOR_SLOT_UNASSIGNED,
         CONSULTATION_BOOKED:         NOTIFICATION_EVENTS.CONSULTATION_BOOKED,
-        CONSULTATION_CONFIRMED: NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED,
-        CONSULTATION_CANCELLED: NOTIFICATION_EVENTS.CONSULTATION_CANCELLED,
-        CONSULTATION_COMPLETED: NOTIFICATION_EVENTS.CONSULTATION_COMPLETED,
-        CONSULTATION_NO_SHOW:   NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW,
+        CONSULTATION_CONFIRMED:      NOTIFICATION_EVENTS.CONSULTATION_CONFIRMED,
+        CONSULTATION_CANCELLED:      NOTIFICATION_EVENTS.CONSULTATION_CANCELLED,
+        CONSULTATION_COMPLETED:      NOTIFICATION_EVENTS.CONSULTATION_COMPLETED,
+        CONSULTATION_NO_SHOW:        NOTIFICATION_EVENTS.CONSULTATION_NO_SHOW,
+        RESERVATION_PENDING:          NOTIFICATION_EVENTS.RESERVATION_PENDING,
+        RESERVATION_APPROVAL:         NOTIFICATION_EVENTS.RESERVATION_APPROVAL,
+        RESERVATION_PAYMENT_PENDING:  NOTIFICATION_EVENTS.RESERVATION_PAYMENT_PENDING,
+        RESERVATION_PAYMENT_REJECTED: NOTIFICATION_EVENTS.RESERVATION_PAYMENT_REJECTED,
+        RESERVATION_DEPOSITED:        NOTIFICATION_EVENTS.RESERVATION_DEPOSITED,
+        RESERVATION_CONFIRMED:        NOTIFICATION_EVENTS.RESERVATION_CONFIRMED,
+        RESERVATION_REJECTED:         NOTIFICATION_EVENTS.RESERVATION_REJECTED,
     };
     return aliasMap[raw] || raw;
 };
@@ -186,6 +210,50 @@ export const getNotificationMessage = (payload) => {
             body:  locationLabel
                 ? `Bạn đã không đến buổi tư vấn tại ${locationLabel}${dateLabel}. Vui lòng đặt lịch mới nếu cần.`
                 : `Bạn đã không đến buổi tư vấn đã đặt${dateLabel}. Vui lòng đặt lịch mới nếu cần.`,
+        },
+
+        // ── Reservation form ───────────────────────────────────────
+        [NOTIFICATION_EVENTS.RESERVATION_PENDING]: {
+            title: actorName ? `Hồ sơ đặt chỗ mới từ ${actorName}` : "Hồ sơ đặt chỗ mới",
+            body:  actorName
+                ? `${actorName} vừa nộp hồ sơ đặt chỗ. Vui lòng xem xét và phê duyệt.`
+                : "Có hồ sơ đặt chỗ mới vừa được nộp. Vui lòng xem xét và phê duyệt.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_APPROVAL]: {
+            title: "Hồ sơ của bạn được duyệt",
+            body:  locationLabel
+                ? `Hồ sơ đặt chỗ của bạn tại ${locationLabel} đã được duyệt. Vui lòng chọn gói và tải lên minh chứng thanh toán.`
+                : "Hồ sơ đặt chỗ của bạn đã được duyệt. Vui lòng chọn gói và tải lên minh chứng thanh toán.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_PAYMENT_PENDING]: {
+            title: actorName ? `Minh chứng thanh toán mới từ ${actorName}` : "Minh chứng thanh toán mới",
+            body:  actorName
+                ? `${actorName} vừa tải lên minh chứng đặt cọc. Vui lòng xác nhận.`
+                : "Có minh chứng đặt cọc mới vừa được tải lên. Vui lòng xác nhận.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_PAYMENT_REJECTED]: {
+            title: "Minh chứng thanh toán bị từ chối",
+            body:  locationLabel
+                ? `Minh chứng đặt cọc của bạn tại ${locationLabel} chưa được xác nhận. Vui lòng tải lại minh chứng hợp lệ.`
+                : "Minh chứng đặt cọc của bạn chưa được xác nhận. Vui lòng tải lại minh chứng hợp lệ.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_DEPOSITED]: {
+            title: "Đặt cọc thành công",
+            body:  locationLabel
+                ? `Xác nhận đặt cọc của bạn tại ${locationLabel} đã được chấp nhận. Suất học đã được giữ chỗ.`
+                : "Xác nhận đặt cọc của bạn đã được chấp nhận. Suất học đã được giữ chỗ.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_CONFIRMED]: {
+            title: actorName ? `${actorName} xác nhận nhập học` : "Xác nhận nhập học mới",
+            body:  actorName
+                ? `${actorName} đã xác nhận chọn trường bạn. Hồ sơ nhập học đã được chốt.`
+                : "Có phụ huynh đã xác nhận chọn trường bạn. Hồ sơ nhập học đã được chốt.",
+        },
+        [NOTIFICATION_EVENTS.RESERVATION_REJECTED]: {
+            title: "Hồ sơ bị từ chối",
+            body:  locationLabel
+                ? `Hồ sơ đặt chỗ của bạn tại ${locationLabel} đã bị từ chối.`
+                : "Hồ sơ đặt chỗ của bạn đã bị từ chối.",
         },
     };
 
