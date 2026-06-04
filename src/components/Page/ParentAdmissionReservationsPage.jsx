@@ -22,6 +22,7 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
@@ -47,6 +48,7 @@ import {
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
 } from "./admission/admissionSubmissionUtils.js";
+import {useNavigate} from "react-router-dom";
 import {APP_PRIMARY_DARK, BRAND_NAVY} from "../../constants/homeLandingTheme";
 import {
     MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS,
@@ -267,10 +269,8 @@ function ReservationCard({
                           : normalizedStatus === RESERVATION_STATUS.CANCELLED
                             ? "Đơn đã được hủy."
                             : normalizedStatus === RESERVATION_STATUS.REJECTED
-                              ? isDisplayableValue(reservation?.rejectReason)
-                                  ? `Lý do từ chối hồ sơ: ${reservation.rejectReason}`
-                                  : "Hồ sơ bị trường từ chối."
-                              : null;
+                      ? null
+                      : null;
     const showConfirmEnrollment = canParentConfirmEnrollment(reservation);
     const showMandatoryDocuments = normalizedStatus === RESERVATION_STATUS.CONFIRMED;
     const confirmEnrollmentLoading =
@@ -491,6 +491,7 @@ function PaymentProofImageModal({open, url, onClose}) {
 }
 
 function DetailDialog({reservation, onClose}) {
+    const navigate = useNavigate();
     const open = Boolean(reservation);
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
     const statusMeta = getStatusMeta(reservation?.status);
@@ -623,10 +624,41 @@ function DetailDialog({reservation, onClose}) {
                             elevation={0}
                             sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}
                         >
-                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY, mb: 1.5}}>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 1.5}}>
+                            <Typography sx={{fontWeight: 700, color: BRAND_NAVY}}>
                                 Minh chứng đính kèm
                             </Typography>
-                            <AdmissionDocumentsSection
+                            {normalizedStatus === RESERVATION_STATUS.REJECTED ? (
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<EditOutlinedIcon />}
+                                    onClick={() => {
+                                        const studentId = Number(reservation?.studentProfileId);
+                                        if (!Number.isFinite(studentId) || studentId <= 0) return;
+                                        const returnUrl = encodeURIComponent("/parent/admission-reservations");
+                                        navigate(
+                                            `/parent/admission-hold-profile?studentId=${studentId}&returnUrl=${returnUrl}`,
+                                            {
+                                                state: {
+                                                    reservationError: true,
+                                                    reservationRejectReason: reservation?.rejectReason ?? "",
+                                                },
+                                            },
+                                        );
+                                    }}
+                                    sx={{
+                                        textTransform: "none",
+                                        borderRadius: 2,
+                                        px: 1.5,
+                                        minWidth: 0,
+                                    }}
+                                >
+                                    Chỉnh sửa
+                                </Button>
+                            ) : null}
+                        </Stack>
+                        <AdmissionDocumentsSection
                                 docs={readonlyDocs}
                                 docsLoading={false}
                                 docsError=""
@@ -786,6 +818,7 @@ export default function ParentAdmissionReservationsPage() {
             res?.data?.confirmCode ??
             confirmEnrollmentTarget?.confirmCode ??
             "N/A";
+            const emailSupport = res?.data?.data?.emailSupport ?? "";
             void sendConfirmEnrollmentEmail({
             parentEmail: confirmEnrollmentTarget?.parentEmail ?? "",
             studentName: confirmEnrollmentTarget?.studentName ?? "",
@@ -793,6 +826,7 @@ export default function ParentAdmissionReservationsPage() {
             schoolName: confirmEnrollmentTarget?.schoolName ?? "",
             programName: confirmEnrollmentTarget?.programName ?? confirmEnrollmentTarget?.program ?? "",
             confirmCode,
+            emailSupport,
             });
 
             setConfirmEnrollmentTarget(null);
