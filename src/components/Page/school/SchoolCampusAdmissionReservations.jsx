@@ -75,6 +75,7 @@ import {getApiErrorMessage} from "../../../utils/getApiErrorMessage.js";
 import {AdmissionDocumentsSection} from "../admission/AdmissionDocumentUploadFields.jsx";
 import {PaymentProofPreview} from "../admission/PaymentProofPreview.jsx";
 import RejectReasonAlert from "../admission/RejectReasonAlert.jsx";
+import DocumentReviewDialog from "../admission/DocumentReviewDialog.jsx";
 import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
 import {
     HOC_BA_THCS_CODE,
@@ -300,6 +301,7 @@ const mapRow = (item, index) => {
         identityCard: String(item?.identityCard ?? "—"),
         profileMetadata,
         transcriptImages,
+        submittedDocuments: Array.isArray(item?.submittedDocuments) ? item.submittedDocuments : [],
         paymentProofUrl: item?.paymentProofUrl ?? null,
         note: String(item?.note ?? item?.message ?? "").trim(),
         rejectReason: String(item?.rejectReason ?? "").trim(),
@@ -1259,6 +1261,7 @@ export default function SchoolCampusAdmissionReservations() {
     const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
 
     const [confirmState, setConfirmState] = React.useState({open: false, form: null});
+    const [docReviewOpen, setDocReviewOpen] = React.useState(false);
     const [rejectState, setRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [paymentConfirmState, setPaymentConfirmState] = React.useState({open: false, form: null});
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
@@ -1490,7 +1493,7 @@ export default function SchoolCampusAdmissionReservations() {
                         variant="success"
                         title="Phê duyệt"
                         disabled={submittingId === row.id}
-                        onClick={() => setConfirmState({open: true, form: row})}
+                        onClick={() => { setConfirmState({open: true, form: row}); setDocReviewOpen(true); }}
                     >
                         <CheckCircleRoundedIcon />
                     </RowActionButton>
@@ -1526,18 +1529,18 @@ export default function SchoolCampusAdmissionReservations() {
         </Stack>
     );
 
-    const handleApprove = async () => {
+    const handleApprove = async (checkedDocuments) => {
         const form = confirmState.form;
         if (!form) return;
-        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
                 action: "APPROVE",
-                checkedDocuments,
+                checkedDocuments: Array.isArray(checkedDocuments) ? checkedDocuments : [],
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
+            setDocReviewOpen(false);
             setConfirmState({open: false, form: null});
             redirectToProcessedStatusView(RESERVATION_STATUS.APPROVAL);
         } catch (err) {
@@ -1999,24 +2002,14 @@ export default function SchoolCampusAdmissionReservations() {
                 onConfirm={() => void handleExportExcelConfirm()}
             />
 
-            <ConfirmDialog
-                open={confirmState.open}
-                title="Xác nhận phê duyệt"
-                description={
-                    <>
-                        Bạn có chắc chắn muốn <ConfirmHighlight>phê duyệt</ConfirmHighlight> hồ sơ nhập học này?
-                    </>
-                }
-                extraDescription={
-                    <>
-                        Hồ sơ sẽ chuyển sang trạng thái <ConfirmHighlight>đã duyệt</ConfirmHighlight> và phụ huynh có thể tiếp tục thanh toán.
-                    </>
-                }
-                cancelText="Hủy"
-                confirmText={submittingId != null ? "Đang xử lý..." : "Phê duyệt"}
-                loading={submittingId != null}
-                onCancel={() => setConfirmState({open: false, form: null})}
-                onConfirm={handleApprove}
+            <DocumentReviewDialog
+                open={docReviewOpen && confirmState.open}
+                onClose={() => { setDocReviewOpen(false); setConfirmState({open: false, form: null}); }}
+                onConfirmApprove={handleApprove}
+                isSubmitting={submittingId != null}
+                submittedDocuments={Array.isArray(confirmState.form?.submittedDocuments) ? confirmState.form.submittedDocuments : []}
+                transcriptImages={Array.isArray(confirmState.form?.transcriptImages) ? confirmState.form.transcriptImages : []}
+                studentName={confirmState.form?.studentName}
             />
 
             <ConfirmDialog
@@ -2105,6 +2098,7 @@ export default function SchoolCampusAdmissionReservations() {
                 isSubmitting={submittingId != null}
                 onApprove={() => {
                     setConfirmState({ open: true, form: selectedReservation });
+                    setDocReviewOpen(true);
                     if (isMobile) setDetailOpen(false);
                 }}
                 onReject={() => {
