@@ -58,12 +58,17 @@ function ImagePanel({url, label, onPreview}) {
         <Box
             sx={{
                 flex: 1,
+                minHeight: 220,
                 borderRadius: 2,
                 border: `1.5px solid ${PANEL_BORDER}`,
                 overflow: "hidden",
                 position: "relative",
                 cursor: "pointer",
                 "&:hover .zoom-icon": {opacity: 1},
+                bgcolor: "#f8fafc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
             }}
             onClick={() => onPreview(url, label)}
         >
@@ -71,7 +76,7 @@ function ImagePanel({url, label, onPreview}) {
                 component="img"
                 src={url}
                 alt={label}
-                sx={{width: "100%", height: 140, objectFit: "cover", display: "block"}}
+                sx={{width: "100%", height: 220, objectFit: "contain", display: "block", backgroundColor: "#f8fafc"}}
             />
             <Box
                 className="zoom-icon"
