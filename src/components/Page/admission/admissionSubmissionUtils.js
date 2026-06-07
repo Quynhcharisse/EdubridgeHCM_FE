@@ -599,6 +599,64 @@ export function submissionDocumentsToReadonlyDocs(submissionDocuments) {
         .filter(Boolean);
 }
 
+export function pickDocTemplateUrl(doc) {
+    if (!doc || typeof doc !== 'object') return null;
+    for (const key of ['templateFileUrl', 'templateUrl', 'fileUrl']) {
+        const url = String(doc[key] ?? '').trim();
+        if (url) return url;
+    }
+    return null;
+}
+
+export function buildDocTemplateUrlMapFromSchoolConfig(configBody, methodCode) {
+    const map = new Map();
+    if (!configBody || typeof configBody !== 'object') return map;
+
+    let docRoot = configBody;
+    if (configBody.documentRequirementsData && typeof configBody.documentRequirementsData === 'object') {
+        docRoot = configBody.documentRequirementsData;
+    } else if (
+        configBody.admissionSettingsData?.documentRequirementsData &&
+        typeof configBody.admissionSettingsData.documentRequirementsData === 'object'
+    ) {
+        docRoot = configBody.admissionSettingsData.documentRequirementsData;
+    }
+
+    const mandatoryAll = Array.isArray(docRoot?.mandatoryAll) ? docRoot.mandatoryAll : [];
+    for (const doc of mandatoryAll) {
+        const code = String(doc?.code ?? '').trim().toUpperCase();
+        const url = pickDocTemplateUrl(doc);
+        if (code && url) map.set(code, url);
+    }
+
+    const normalizedMethod = String(methodCode ?? '').trim().toUpperCase();
+    const byMethod = Array.isArray(docRoot?.byMethod) ? docRoot.byMethod : [];
+    for (const group of byMethod) {
+        const groupCode = String(group?.methodCode ?? group?.method_code ?? '').trim().toUpperCase();
+        if (normalizedMethod && groupCode && groupCode !== normalizedMethod) continue;
+        const documents = Array.isArray(group?.documents) ? group.documents : [];
+        for (const doc of documents) {
+            const code = String(doc?.code ?? '').trim().toUpperCase();
+            const url = pickDocTemplateUrl(doc);
+            if (code && url) map.set(code, url);
+        }
+    }
+
+    return map;
+}
+
+export function mergeDocTemplatesIntoReadonlyDocs(docs, templateMap) {
+    if (!Array.isArray(docs) || !docs.length) return docs || [];
+    if (!templateMap || !(templateMap instanceof Map) || templateMap.size === 0) return docs;
+    return docs.map((doc) => {
+        const code = String(doc?.code ?? '').trim().toUpperCase();
+        if (TRANSCRIPT_DOCUMENT_KEYS.has(code)) return doc;
+        const templateFileUrl = templateMap.get(code);
+        if (!templateFileUrl) return doc;
+        return {...doc, templateFileUrl};
+    });
+}
+
 export function reservationToReadonlyDocs(reservation) {
     if (!reservation || typeof reservation !== 'object') return [];
     let docs = submissionDocumentsToReadonlyDocs(
@@ -664,7 +722,8 @@ export function applySubmissionPrefillToDocs(docs, submissionDocuments) {
         const urls = parseSubmissionImageUrls(match?.imageUrl ?? match?.url);
         if (!urls.length) return doc;
         const slots = doc.slots.map((_, i) => urls[i] ?? null);
-        return {...doc, slots};
+        const templateFileUrl = (match?.templateFileUrl ?? match?.templateUrl ?? '').trim ? (match?.templateFileUrl ?? match?.templateUrl ?? '').trim() : (String(match?.templateFileUrl ?? match?.templateUrl ?? '') || '').trim();
+        return {...doc, slots, templateFileUrl: templateFileUrl || doc.templateFileUrl || null};
     });
 }
 
