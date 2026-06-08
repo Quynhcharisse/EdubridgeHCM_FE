@@ -2283,8 +2283,7 @@ export default function SchoolCampusAdmissionReservations() {
                     <>
                         Xuất hồ sơ chiến dịch{" "}
                         <ConfirmHighlight>{exportExcelConfirm.campaignName || "này"}</ConfirmHighlight> với
-                        trạng thái <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight> và{" "}
-                        <ConfirmHighlight>{exportExcelStatusLabels[1]}</ConfirmHighlight>.
+                        trạng thái <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight>.
                     </>
                 }
                 extraDescription="Bạn có muốn tiếp tục tải xuống?"
