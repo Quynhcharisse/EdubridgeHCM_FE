@@ -378,6 +378,16 @@ function ReservationCard({
                                     </Typography>
                                 </Stack>
                             ) : null}
+                            {submittedDate ? (
+                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
+                                    Ngày nộp: {submittedDate}
+                                </Typography>
+                            ) : null}
+                            {showMandatoryDocuments && confirmEndDate ? (
+                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
+                                    Ngày hạn nộp hồ sơ tại trường: {confirmEndDate}
+                                </Typography>
+                            ) : null}
                         </Stack>
                         {statusHint ? (
                             <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mt: 0.25}}>
