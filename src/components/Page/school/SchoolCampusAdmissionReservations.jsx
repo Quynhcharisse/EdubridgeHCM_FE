@@ -14,6 +14,7 @@ import {
     DialogTitle,
     Fade,
     Grid,
+    Modal,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -79,13 +80,20 @@ import ConfirmDialog, {ConfirmHighlight} from "../../ui/ConfirmDialog.jsx";
 import {
     HOC_BA_THCS_CODE,
     HOC_BA_THCS_GRADE_LABELS,
+    buildDocTemplateUrlMapFromSchoolConfig,
     formatReservationDateOfBirth,
+    mergeDocTemplatesIntoReadonlyDocs,
     pickCheckedDocumentsFromReservation,
     pickProfileMetaDataFromTemplate,
     pickReservationDateOfBirth,
     reservationToReadonlyDocs,
     sanitizeReservationDisplayValue,
 } from "../admission/admissionSubmissionUtils.js";
+import {
+    getSchoolConfigByKey,
+    parseSchoolConfigResponseBody,
+    SCHOOL_CONFIG_KEY,
+} from "../../../services/SchoolFacilityService.jsx";
 import {
     RESERVATION_STATUS,
     RESERVATION_STATUS_FILTER_OPTIONS,
@@ -289,6 +297,7 @@ const mapRow = (item, index) => {
         registerClass: displayOrDash(item?.registerClass ?? item?.gradeName ?? item?.targetGrade),
         programName: displayOrDash(item?.programName),
         methodName: displayOrDash(item?.methodName ?? item?.admissionMethodCode),
+        admissionMethodCode: String(item?.admissionMethodCode ?? item?.methodCode ?? "").trim() || null,
         campusProgramOfferingId: displayOrDash(item?.campusProgramOfferingId),
         confirmCode: displayOrDash(item?.confirmCode ?? item?.confirm_code),
         submittedAt,
@@ -300,6 +309,7 @@ const mapRow = (item, index) => {
         identityCard: String(item?.identityCard ?? "—"),
         profileMetadata,
         transcriptImages,
+        submittedDocuments: Array.isArray(item?.submittedDocuments) ? item.submittedDocuments : [],
         paymentProofUrl: item?.paymentProofUrl ?? null,
         note: String(item?.note ?? item?.message ?? "").trim(),
         rejectReason: String(item?.rejectReason ?? "").trim(),
@@ -512,7 +522,7 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onCo
                         </Button>
                     </Stack>
                 ) : isPaymentPending ? (
-                    <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 200 }, flexShrink: 0 }}>
+                    <Stack direction={{ xs: "column", sm: "row", lg: "column" }} spacing={1} sx={{ width: { xs: "100%", lg: 180 }, flexShrink: 0 }}>
                         <Button
                             variant="outlined"
                             startIcon={<VisibilityRoundedIcon />}
@@ -520,23 +530,6 @@ function AdmissionReservationCard({ row, isSubmitting, onApprove, onReject, onCo
                             sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700, borderColor: "#bfdbfe", color: "#1e3a8a" }}
                         >
                             Xem chi tiết
-                        </Button>
-                        <Button
-                            variant="contained"
-                            disabled={isSubmitting}
-                            onClick={onConfirmPayment}
-                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 800, background: "linear-gradient(90deg, #0D64DE 0%, #2563eb 100%)" }}
-                        >
-                            Xác nhận hoàn thành
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            disabled={isSubmitting}
-                            onClick={onRejectPayment}
-                            sx={{ textTransform: "none", borderRadius: 999, fontWeight: 700 }}
-                        >
-                            Từ chối thanh toán
                         </Button>
                     </Stack>
                 ) : (
@@ -605,12 +598,22 @@ function DetailInfoRow({ label, value }) {
     );
 }
 
+const PENDING_REVIEW_IMAGE_SX = {
+    display: "block",
+    maxWidth: "min(100vw - 64px, 320px)",
+    maxHeight: 320,
+    width: "auto",
+    height: "auto",
+    objectFit: "contain",
+};
+
 function AdmissionReservationDetailDrawer({
     open,
     row,
     onClose,
     onApprove,
     onReject,
+    onRejectWithReason,
     onConfirmPayment,
     onRejectPayment,
     onPreviewPaymentProof,
@@ -624,6 +627,143 @@ function AdmissionReservationDetailDrawer({
         () => (row ? reservationToReadonlyDocs(row) : []),
         [row],
     );
+
+    const [docTemplateMap, setDocTemplateMap] = React.useState(() => new Map());
+
+    React.useEffect(() => {
+        if (!open || !isPending) {
+            setDocTemplateMap(new Map());
+            return undefined;
+        }
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await getSchoolConfigByKey(SCHOOL_CONFIG_KEY.DOCUMENT_REQUIREMENTS_DATA);
+                if (cancelled) return;
+                const body = parseSchoolConfigResponseBody(res);
+                const methodCode = row?.admissionMethodCode ?? row?.raw?.admissionMethodCode ?? row?.raw?.methodCode;
+                setDocTemplateMap(buildDocTemplateUrlMapFromSchoolConfig(body, methodCode));
+            } catch {
+                if (!cancelled) setDocTemplateMap(new Map());
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, isPending, row?.id, row?.admissionMethodCode, row?.raw?.admissionMethodCode, row?.raw?.methodCode]);
+
+    const readonlyDocsWithTemplates = React.useMemo(
+        () => mergeDocTemplatesIntoReadonlyDocs(readonlyDocs, docTemplateMap),
+        [readonlyDocs, docTemplateMap],
+    );
+
+    const buildReviewItemsFromDocs = (docs) => {
+        return (Array.isArray(docs) ? docs : []).map((doc, idx) => ({
+            key: String(doc.code || doc.name || `doc-${idx}`),
+            label: String(doc.name || doc.code || `Tài liệu ${idx + 1}`),
+            required: doc.required !== false,
+            templateFileUrl: doc.templateFileUrl || null,
+            submissionUrls: Array.isArray(doc.slots) ? doc.slots.filter((u) => u != null && String(u).trim() !== "") : [],
+            status: null,
+            reason: "",
+        }));
+    };
+
+    const [docReviewItems, setDocReviewItems] = React.useState([]);
+
+    React.useEffect(() => {
+        if (row && isPending) {
+            setDocReviewItems(buildReviewItemsFromDocs(readonlyDocsWithTemplates));
+        } else {
+            setDocReviewItems([]);
+        }
+    }, [row?.id, row?.status, JSON.stringify(readonlyDocsWithTemplates)]);
+
+    const handleReviewChange = (key, next) => {
+        setDocReviewItems((prev) => prev.map((it) => (it.key === key ? {...it, ...next} : it)));
+    };
+
+    const reviewSummary = {
+        hasInvalid: docReviewItems.some((it) => it.status === "invalid"),
+        allValid: docReviewItems.length > 0 && docReviewItems.every((it) => it.status === "valid"),
+    };
+
+    const buildReviewRejectReason = () => docReviewItems
+        .filter((it) => it.status === "invalid")
+        .map((it) => {
+            const note = String(it.reason || "").trim();
+            return note ? `${it.label}: ${note}` : `${it.label}: Không hợp lệ`;
+        })
+        .join("\n");
+
+    const [imagePreview, setImagePreview] = React.useState(null);
+    const openImagePreview = (url, title) => setImagePreview({url, title});
+    const closeImagePreview = () => setImagePreview(null);
+
+    const renderSubmissionImages = (item) => {
+        if (item.submissionUrls.length === 0) {
+            return <Typography sx={{color: "#94a3b8"}}>Chưa có ảnh</Typography>;
+        }
+
+        if (item.submissionUrls.length === 1) {
+            return (
+                <Box
+                    onClick={() => openImagePreview(item.submissionUrls[0], item.label)}
+                    sx={{cursor: "pointer", width: "100%", display: "flex", alignItems: "center", justifyContent: "center"}}
+                >
+                    <Box
+                        component="img"
+                        src={item.submissionUrls[0]}
+                        alt={item.label}
+                        sx={PENDING_REVIEW_IMAGE_SX}
+                    />
+                </Box>
+            );
+        }
+
+        return (
+            <Box sx={{display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1}}>
+                {item.submissionUrls.map((url, index) => (
+                    <Box
+                        key={`${item.key}-preview-${index}`}
+                        onClick={() => openImagePreview(url, `${item.label} ${index + 1}`)}
+                        sx={{
+                            cursor: "pointer",
+                            borderRadius: 1.5,
+                            border: "1px solid #e2e8f0",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            bgcolor: "#fff",
+                            overflow: "hidden",
+                            position: "relative",
+                            p: 0.5,
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src={url}
+                            alt={`${item.label} ${index + 1}`}
+                            sx={PENDING_REVIEW_IMAGE_SX}
+                        />
+                        <Box
+                            sx={{
+                                position: "absolute",
+                                inset: 0,
+                                bgcolor: "rgba(15, 23, 42, 0.06)",
+                                opacity: 0,
+                                transition: "opacity 0.2s ease",
+                                '&:hover': {opacity: 1},
+                            }}
+                        />
+                    </Box>
+                ))}
+            </Box>
+        );
+    };
+
     return (
         <Dialog
             open={open}
@@ -734,19 +874,189 @@ function AdmissionReservationDetailDrawer({
                         <Typography sx={{fontWeight: 700, color: "#1e3a8a", mb: 1.5}}>
                             Minh chứng đính kèm
                         </Typography>
-                        <AdmissionDocumentsSection
-                            docs={readonlyDocs}
-                            docsLoading={false}
-                            docsError=""
-                            cloudinaryReady
-                            uploadingSlots={new Set()}
-                            disabled
-                            readOnly
-                            onPickFile={() => {}}
-                            onRemoveSlot={() => {}}
-                            emptyMessage="Chưa có ảnh minh chứng trong hồ sơ này."
-                        />
+                        {isPending ? (
+                            <Stack spacing={2}>
+                                {docReviewItems.length === 0 ? (
+                                    <Typography sx={{color: "#64748b"}}>Chưa có tài liệu để đánh giá.</Typography>
+                                ) : (
+                                    docReviewItems.map((item) => (
+                                        <Paper
+                                            key={item.key}
+                                            elevation={0}
+                                            sx={{
+                                                p: 2,
+                                                borderRadius: 2,
+                                                border: `1px solid ${item.status === "valid" ? "#bbf7d0" : item.status === "invalid" ? "#fecaca" : "#e2e8f0"}`,
+                                                bgcolor: item.status === "valid" ? "rgba(134,239,172,0.14)" : item.status === "invalid" ? "rgba(254,202,202,0.14)" : "#fff",
+                                            }}
+                                        >
+                                            <Stack direction={{xs: "column", md: "row"}} spacing={2} alignItems="stretch">
+                                                <Box sx={{flex: 1}}>
+                                                    <Typography sx={{fontSize: 14, fontWeight: 700, color: "#1e293b", mb: 1}}>
+                                                        {item.label}
+                                                        {item.required && <Box component="span" sx={{color: "#dc2626", ml: 0.5}}>*</Box>}
+                                                    </Typography>
+                                                    <Stack direction="column" spacing={1} sx={{mb: 1}} onClick={(e) => e.stopPropagation()}>
+                                                        <Stack direction="row" spacing={1}>
+                                                            <Button
+                                                                size="small"
+                                                                variant={item.status === "valid" ? "contained" : "outlined"}
+                                                                onClick={() => handleReviewChange(item.key, {status: "valid", reason: item.reason})}
+                                                                sx={{
+                                                                    textTransform: "none",
+                                                                    minWidth: 44,
+                                                                    borderColor: item.status === "valid" ? "#16a34a" : "#d1fae5",
+                                                                    color: item.status === "valid" ? "#fff" : "#166534",
+                                                                    bgcolor: item.status === "valid" ? "#16a34a" : "transparent",
+                                                                    fontWeight: 700,
+                                                                    transition: "all 0.15s ease",
+                                                                    '&:hover': {
+                                                                        bgcolor: item.status === "valid" ? "#15803d" : "rgba(22,163,74,0.08)",
+                                                                    },
+                                                                }}
+                                                            >
+                                                                ✓
+                                                            </Button>
+                                                            <Button
+                                                                size="small"
+                                                                variant={item.status === "invalid" ? "contained" : "outlined"}
+                                                                onClick={() => handleReviewChange(item.key, {status: "invalid", reason: item.reason})}
+                                                                sx={{
+                                                                    textTransform: "none",
+                                                                    minWidth: 44,
+                                                                    borderColor: item.status === "invalid" ? "#dc2626" : "#fee2e2",
+                                                                    color: item.status === "invalid" ? "#fff" : "#991b1b",
+                                                                    bgcolor: item.status === "invalid" ? "#dc2626" : "transparent",
+                                                                    fontWeight: 700,
+                                                                    transition: "all 0.15s ease",
+                                                                    '&:hover': {
+                                                                        bgcolor: item.status === "invalid" ? "#b91c1c" : "rgba(220,38,38,0.08)",
+                                                                    },
+                                                                }}
+                                                            >
+                                                                ✕
+                                                            </Button>
+                                                        </Stack>
+                                                        {item.status === "invalid" && (
+                                                            <TextField
+                                                                fullWidth
+                                                                size="small"
+                                                                multiline
+                                                                rows={2}
+                                                                placeholder="Nhập lý do lỗi tài liệu"
+                                                                value={item.reason}
+                                                                onChange={(e) => handleReviewChange(item.key, {reason: e.target.value})}
+                                                                sx={{
+                                                                    mt: 1,
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        borderRadius: 1.5,
+                                                                        minHeight: 42,
+                                                                    },
+                                                                    '& .MuiInputBase-inputMultiline': {
+                                                                        px: 1.25,
+                                                                        py: 0.75,
+                                                                    },
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Stack>
+                                                    <Box sx={{display: "flex", gap: 1, alignItems: "center"}}>
+                                                        {item.key !== HOC_BA_THCS_CODE ? (
+                                                            <Box sx={{flex: 1, minWidth: 0}}>
+                                                                <Typography sx={{fontSize: 12, color: "#475569", mb: 0.5}}>Mẫu yêu cầu của trường</Typography>
+                                                                <Box sx={{borderRadius: 1.5, border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f8fafc", p: 0.5}}>
+                                                                    {item.templateFileUrl ? (
+                                                                        <Box
+                                                                            component="img"
+                                                                            src={item.templateFileUrl}
+                                                                            alt={item.label}
+                                                                            onClick={() => openImagePreview(item.templateFileUrl, `Mẫu: ${item.label}`)}
+                                                                            sx={{...PENDING_REVIEW_IMAGE_SX, cursor: "zoom-in"}}
+                                                                        />
+                                                                    ) : (
+                                                                        <Typography sx={{color: "#94a3b8", py: 2}}>Không có mẫu</Typography>
+                                                                    )}
+                                                                </Box>
+                                                            </Box>
+                                                        ) : null}
+                                                        <Box sx={{flex: 1, minWidth: 0}}>
+                                                            <Typography sx={{fontSize: 12, color: "#475569", mb: 0.5}}>Ảnh phụ huynh nộp</Typography>
+                                                            <Box sx={{borderRadius: 1.5, border: "1px solid #e2e8f0", p: 0.5, bgcolor: "#fff"}}>
+                                                                {renderSubmissionImages(item)}
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+                                                </Box>
+                                            </Stack>
+                                        </Paper>
+                                    ))
+                                )}
+                            </Stack>
+                        ) : (
+                            <AdmissionDocumentsSection
+                                docs={readonlyDocs}
+                                docsLoading={false}
+                                docsError=""
+                                cloudinaryReady
+                                uploadingSlots={new Set()}
+                                disabled
+                                readOnly
+                                showSchoolTemplate={false}
+                                onPickFile={() => {}}
+                                onRemoveSlot={() => {}}
+                                emptyMessage="Chưa có ảnh minh chứng trong hồ sơ này."
+                            />
+                        )}
                     </Paper>
+                    <Modal
+                        open={Boolean(imagePreview?.url)}
+                        onClose={closeImagePreview}
+                        slotProps={{
+                            backdrop: {
+                                sx: {
+                                    backdropFilter: "blur(8px)",
+                                    bgcolor: "rgba(15, 23, 42, 0.55)",
+                                },
+                            },
+                        }}
+                        sx={{display: "flex", alignItems: "center", justifyContent: "center", p: {xs: 2, md: 3}}}
+                    >
+                        <Box sx={{position: "relative", outline: "none", width: "100%", maxWidth: "96vw"}}>
+                            <IconButton
+                                aria-label="Đóng"
+                                onClick={closeImagePreview}
+                                sx={{
+                                    position: "absolute",
+                                    top: -44,
+                                    right: 0,
+                                    color: "#fff",
+                                    bgcolor: "rgba(15, 23, 42, 0.65)",
+                                    '&:hover': {bgcolor: "rgba(15, 23, 42, 0.8)"},
+                                }}
+                            >
+                                <CloseRoundedIcon />
+                            </IconButton>
+                            {imagePreview?.title ? (
+                                <Typography sx={{color: "#fff", fontWeight: 700, fontSize: 15, mb: 1, textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.4)"}}>
+                                    {imagePreview.title}
+                                </Typography>
+                            ) : null}
+                            <Box
+                                component="img"
+                                src={imagePreview?.url || ""}
+                                alt={imagePreview?.title || "Ảnh minh chứng"}
+                                sx={{
+                                    display: "block",
+                                    width: "100%",
+                                    maxWidth: "820px",
+                                    maxHeight: "72vh",
+                                    objectFit: "contain",
+                                    borderRadius: 2,
+                                    boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
+                                }}
+                            />
+                        </Box>
+                    </Modal>
 
                     {isPaymentPending || row?.paymentProofUrl ? (
                         <Paper elevation={0} sx={{p: 2, borderRadius: 3, border: "1px solid #c7e2f8", bgcolor: "rgba(255,255,255,0.65)"}}>
@@ -775,10 +1085,27 @@ function AdmissionReservationDetailDrawer({
             <DialogActions sx={{p: 2, borderTop: "1px solid #b8d8f4", bgcolor: "#eef7ff", flexWrap: "wrap", gap: 1}}>
                 {isPending ? (
                     <>
-                        <Button variant="contained" onClick={onApprove} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                        <Button
+                            variant="contained"
+                            onClick={() => onApprove && onApprove(row)}
+                            disabled={isSubmitting || !reviewSummary.allValid}
+                            sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800, bgcolor: reviewSummary.allValid ? undefined : "#cbd5e1"}}
+                        >
                             Phê duyệt
                         </Button>
-                        <Button variant="outlined" color="error" onClick={onReject} disabled={isSubmitting} sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={() => {
+                                if (reviewSummary.hasInvalid && onRejectWithReason) {
+                                    onRejectWithReason(buildReviewRejectReason());
+                                } else if (onReject) {
+                                    onReject();
+                                }
+                            }}
+                            disabled={isSubmitting}
+                            sx={{textTransform: "none", borderRadius: 2.5, fontWeight: 800}}
+                        >
                             Từ chối
                         </Button>
                     </>
@@ -1258,7 +1585,7 @@ export default function SchoolCampusAdmissionReservations() {
     const [previewImages, setPreviewImages] = React.useState([]);
     const [selectedImageIndex, setSelectedImageIndex] = React.useState(0);
 
-    const [confirmState, setConfirmState] = React.useState({open: false, form: null});
+    
     const [rejectState, setRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
     const [paymentConfirmState, setPaymentConfirmState] = React.useState({open: false, form: null});
     const [paymentRejectState, setPaymentRejectState] = React.useState({open: false, form: null, reason: "", touched: false});
@@ -1484,61 +1811,19 @@ export default function SchoolCampusAdmissionReservations() {
             <RowActionButton variant="view" title="Xem chi tiết" onClick={() => openDetail(row)}>
                 <VisibilityRoundedIcon />
             </RowActionButton>
-            {row.status === RESERVATION_STATUS.PENDING ? (
-                <>
-                    <RowActionButton
-                        variant="success"
-                        title="Phê duyệt"
-                        disabled={submittingId === row.id}
-                        onClick={() => setConfirmState({open: true, form: row})}
-                    >
-                        <CheckCircleRoundedIcon />
-                    </RowActionButton>
-                    <RowActionButton
-                        variant="danger"
-                        title="Từ chối hồ sơ"
-                        disabled={submittingId === row.id}
-                        onClick={() => setRejectState({open: true, form: row, reason: "", touched: false})}
-                    >
-                        <CancelRoundedIcon />
-                    </RowActionButton>
-                </>
-            ) : row.status === RESERVATION_STATUS.PAYMENT_PENDING ? (
-                <>
-                    <RowActionButton
-                        variant="success"
-                        title="Xác nhận hoàn thành"
-                        disabled={submittingId === row.id}
-                        onClick={() => setPaymentConfirmState({open: true, form: row})}
-                    >
-                        <CheckCircleRoundedIcon />
-                    </RowActionButton>
-                    <RowActionButton
-                        variant="danger"
-                        title="Từ chối thanh toán"
-                        disabled={submittingId === row.id}
-                        onClick={() => setPaymentRejectState({open: true, form: row, reason: "", touched: false})}
-                    >
-                        <CancelRoundedIcon />
-                    </RowActionButton>
-                </>
-            ) : null}
         </Stack>
     );
 
-    const handleApprove = async () => {
-        const form = confirmState.form;
+    const handleApprove = async (form) => {
         if (!form) return;
-        const checkedDocuments = pickCheckedDocumentsFromReservation(form);
         setSubmittingId(form.id);
         try {
             await processAdmissionReservationForm({
                 formId: form.id,
                 action: "APPROVE",
-                checkedDocuments,
+                checkedDocuments: pickCheckedDocumentsFromReservation(form),
             });
             enqueueSnackbar("Phê duyệt thành công", {variant: "success"});
-            setConfirmState({open: false, form: null});
             redirectToProcessedStatusView(RESERVATION_STATUS.APPROVAL);
         } catch (err) {
             enqueueSnackbar(getApiErrorMessage(err, "Không thể phê duyệt hồ sơ."), {variant: "error"});
@@ -1949,17 +2234,31 @@ export default function SchoolCampusAdmissionReservations() {
                                                                             </TableRow>
                                                                         </TableHead>
                                                                         <TableBody>
-                                                                            {group.forms.map((row) => (
-                                                                                <TableRow key={row.id} hover sx={{"&:hover": {bgcolor: "rgba(122, 169, 235, 0.06)"}}}>
-                                                                                    <TableCell sx={{fontWeight: 600, color: "#1e293b"}}>{row.parentName}</TableCell>
-                                                                                    <TableCell>{row.studentName}</TableCell>
-                                                                                    <TableCell>{row.phone || "—"}</TableCell>
-                                                                                    <TableCell>{row.programName || "—"}</TableCell>
-                                                                                    <TableCell sx={{whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
-                                                                                    <TableCell><StatusChip status={row.status} /></TableCell>
-                                                                                    <TableCell align="right">{renderFormActions(row)}</TableCell>
-                                                                                </TableRow>
-                                                                            ))}
+                                                                            {group.forms.map((row) => {
+                                                                                const rowAccent = row.status === RESERVATION_STATUS.PENDING
+                                                                                    ? {borderLeft: "4px solid #fbbf24", bgcolor: "rgba(251, 191, 36, 0.08)"}
+                                                                                    : row.status === RESERVATION_STATUS.PAYMENT_PENDING
+                                                                                        ? {borderLeft: "4px solid #8b5cf6", bgcolor: "rgba(139, 92, 246, 0.08)"}
+                                                                                        : {};
+                                                                                return (
+                                                                                    <TableRow
+                                                                                        key={row.id}
+                                                                                        hover
+                                                                                        sx={{
+                                                                                            "&:hover": {bgcolor: "rgba(122, 169, 235, 0.06)"},
+                                                                                            ...rowAccent,
+                                                                                        }}
+                                                                                    >
+                                                                                        <TableCell sx={{fontWeight: 600, color: "#1e293b"}}>{row.parentName}</TableCell>
+                                                                                        <TableCell>{row.studentName}</TableCell>
+                                                                                        <TableCell>{row.phone || "—"}</TableCell>
+                                                                                        <TableCell>{row.programName || "—"}</TableCell>
+                                                                                        <TableCell sx={{whiteSpace: "nowrap"}}>{formatDateOnly(row.submittedAt)}</TableCell>
+                                                                                        <TableCell><StatusChip status={row.status} /></TableCell>
+                                                                                        <TableCell align="right">{renderFormActions(row)}</TableCell>
+                                                                                    </TableRow>
+                                                                                );
+                                                                            })}
                                                                         </TableBody>
                                                                     </Table>
                                                                 )}
@@ -1999,25 +2298,7 @@ export default function SchoolCampusAdmissionReservations() {
                 onConfirm={() => void handleExportExcelConfirm()}
             />
 
-            <ConfirmDialog
-                open={confirmState.open}
-                title="Xác nhận phê duyệt"
-                description={
-                    <>
-                        Bạn có chắc chắn muốn <ConfirmHighlight>phê duyệt</ConfirmHighlight> hồ sơ nhập học này?
-                    </>
-                }
-                extraDescription={
-                    <>
-                        Hồ sơ sẽ chuyển sang trạng thái <ConfirmHighlight>đã duyệt</ConfirmHighlight> và phụ huynh có thể tiếp tục thanh toán.
-                    </>
-                }
-                cancelText="Hủy"
-                confirmText={submittingId != null ? "Đang xử lý..." : "Phê duyệt"}
-                loading={submittingId != null}
-                onCancel={() => setConfirmState({open: false, form: null})}
-                onConfirm={handleApprove}
-            />
+            
 
             <ConfirmDialog
                 open={rejectState.open}
@@ -2104,12 +2385,28 @@ export default function SchoolCampusAdmissionReservations() {
                 fullScreen={isMobile}
                 isSubmitting={submittingId != null}
                 onApprove={() => {
-                    setConfirmState({ open: true, form: selectedReservation });
+                    if (selectedReservation) handleApprove(selectedReservation);
                     if (isMobile) setDetailOpen(false);
                 }}
                 onReject={() => {
                     setRejectState({ open: true, form: selectedReservation, reason: "", touched: false });
                     if (isMobile) setDetailOpen(false);
+                }}
+                onRejectWithReason={(reason) => {
+                    if (!selectedReservation) return;
+                    setSubmittingId(selectedReservation.id);
+                    processAdmissionReservationForm({
+                        formId: selectedReservation.id,
+                        action: "REJECT",
+                        rejectReason: reason,
+                        checkedDocuments: pickCheckedDocumentsFromReservation(selectedReservation),
+                    })
+                        .then(() => {
+                            enqueueSnackbar("Từ chối thành công", {variant: "success"});
+                            redirectToProcessedStatusView(RESERVATION_STATUS.REJECTED);
+                        })
+                        .catch((err) => enqueueSnackbar(getApiErrorMessage(err, "Không thể từ chối hồ sơ."), {variant: "error"}))
+                        .finally(() => setSubmittingId(null));
                 }}
                 onConfirmPayment={() => {
                     setPaymentConfirmState({ open: true, form: selectedReservation });

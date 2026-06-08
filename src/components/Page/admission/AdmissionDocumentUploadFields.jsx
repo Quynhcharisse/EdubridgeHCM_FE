@@ -15,7 +15,7 @@ import {
     InsertPhoto as InsertPhotoIcon,
     ZoomIn as ZoomInIcon,
 } from '@mui/icons-material';
-import {HOC_BA_THCS_GRADE_LABELS} from './admissionSubmissionUtils.js';
+import {HOC_BA_THCS_CODE, HOC_BA_THCS_GRADE_LABELS} from './admissionSubmissionUtils.js';
 
 function ImagePreviewModal({preview, onClose}) {
     const open = Boolean(preview?.url);
@@ -97,6 +97,7 @@ export function AdmissionDocumentsSection({
     onPickFile,
     onRemoveSlot,
     readOnly = false,
+    showSchoolTemplate,
     emptyMessage = 'Không có hồ sơ nào cần nộp.',
 }) {
     const [preview, setPreview] = useState(null);
@@ -150,6 +151,7 @@ export function AdmissionDocumentsSection({
                         uploadingSlots={uploadingSlots}
                         disabled={disabled}
                         readOnly={readOnly}
+                        showSchoolTemplate={showSchoolTemplate ?? false}
                         onPickFile={onPickFile}
                         onRemoveSlot={onRemoveSlot}
                         onViewImage={(url, title) => setPreview({url, title})}
@@ -168,6 +170,7 @@ function DocumentItem({
     uploadingSlots,
     disabled,
     readOnly,
+    showSchoolTemplate = false,
     onPickFile,
     onRemoveSlot,
     onViewImage,
@@ -175,10 +178,13 @@ function DocumentItem({
     const filledSlotCount = doc.slots.filter(
         (url) => typeof url === 'string' && url.trim() !== '',
     ).length;
-    if (readOnly && filledSlotCount === 0) return null;
+    const hasTemplate = typeof doc.templateFileUrl === 'string' && doc.templateFileUrl.trim() !== '';
+    if (readOnly && filledSlotCount === 0 && !(showSchoolTemplate && hasTemplate)) return null;
 
     const slotCount = doc.slots.length;
     const isMultiSlot = slotCount > 1;
+    const isTranscriptDoc = doc.code === HOC_BA_THCS_CODE;
+    const showTemplate = showSchoolTemplate && !isTranscriptDoc;
 
     return (
         <Box
@@ -211,16 +217,23 @@ function DocumentItem({
                 ) : null}
             </Typography>
 
-            <Box
-                sx={{
-                    display: 'grid',
-                    gridTemplateColumns: isMultiSlot
+            <Box sx={{display: 'grid', gridTemplateColumns: showTemplate ? {xs: '1fr', md: isMultiSlot ? '1fr 1fr' : '1fr 1fr'} : undefined, gap: 1.25}}>
+                {showTemplate && (
+                    <Box sx={{p: 1, borderRadius: 1.5, border: '1px dashed rgba(148,163,184,0.55)', bgcolor: '#f8fafc'}}>
+                        <Typography sx={{fontSize: '0.86rem', color: '#64748b', fontWeight: 700, mb: 0.75}}>Mẫu yêu cầu của trường</Typography>
+                        {hasTemplate ? (
+                            <Box component="img" src={doc.templateFileUrl} alt={doc.name} sx={{maxWidth: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 1}} />
+                        ) : (
+                            <Box sx={{px: 1.5, py: 1.25, borderRadius: 1.5, border: '1px dashed rgba(148,163,184,0.55)', bgcolor: '#f8fafc'}}>
+                                <Typography sx={{fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600}}>Không có mẫu</Typography>
+                            </Box>
+                        )}
+                    </Box>
+                )}
+
+                <Box sx={{display: 'grid', gridTemplateColumns: isMultiSlot
                         ? {xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 1fr))'}
-                        : {xs: 'auto'},
-                    justifyContent: isMultiSlot ? undefined : 'flex-start',
-                    gap: 1.25,
-                }}
-            >
+                        : {xs: 'auto'}, justifyContent: isMultiSlot ? undefined : 'flex-start', gap: 1.25}}>
                 {doc.slots.map((url, slotIndex) => {
                     const hasUrl = typeof url === 'string' && url.trim() !== '';
                     if (readOnly && !hasUrl) return null;
@@ -245,6 +258,7 @@ function DocumentItem({
                         />
                     );
                 })}
+                </Box>
             </Box>
         </Box>
     );
