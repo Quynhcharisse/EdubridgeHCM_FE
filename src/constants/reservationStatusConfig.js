@@ -195,6 +195,10 @@ export function canParentConfirmEnrollment(reservation) {
     return normalizeReservationStatus(reservation?.status) === RESERVATION_STATUS.DEPOSITED;
 }
 
+export function canParentCancelReservation(reservation) {
+    return normalizeReservationStatus(reservation?.status) === RESERVATION_STATUS.CONFIRMED;
+}
+
 export function canParentRetryReservationPayment(reservation) {
     if (!isParentReservationPaymentAgain(reservation)) return true;
     return pickReservationPaymentAgainCount(reservation) < MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS;

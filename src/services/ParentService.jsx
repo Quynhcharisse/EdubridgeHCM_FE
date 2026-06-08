@@ -295,6 +295,14 @@ export const putParentAdmissionReservationFormConfirmEnrollment = async (admissi
     return response || null;
 };
 
+export const deleteParentAdmissionReservationFormCancel = async (admissionFormId, cancelReason) => {
+    const id = normalizeAdmissionFormId(admissionFormId);
+    const response = await axiosClient.delete('/parent/admission/reservation/form/cancel', {
+        data: {admissionFormId: id, cancelReason: String(cancelReason ?? '').trim()},
+    });
+    return response || null;
+};
+
 function normalizeAdmissionFormId(admissionFormId) {
     const id = Number(admissionFormId);
     if (!Number.isFinite(id) || id <= 0) {

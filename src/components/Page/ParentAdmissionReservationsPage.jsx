@@ -8,6 +8,7 @@ import {
     CircularProgress,
     Container,
     Dialog,
+    DialogActions,
     DialogContent,
     DialogTitle,
     Fade,
@@ -16,10 +17,12 @@ import {
     Stack,
     Tab,
     Tabs,
+    TextField,
     Typography
 } from "@mui/material";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import AssignmentTurnedInRoundedIcon from "@mui/icons-material/AssignmentTurnedInRounded";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -30,6 +33,7 @@ import {enqueueSnackbar} from "notistack";
 import {sendConfirmEnrollmentEmail} from "../../services/emailService.jsx";
 
 import {
+    deleteParentAdmissionReservationFormCancel,
     getParentAdmissionReservationForms,
     pickAdmissionReservationFormsFromResponse,
     putParentAdmissionReservationFormConfirmEnrollment,
@@ -54,6 +58,7 @@ import {
     MAX_PARENT_PAYMENT_AGAIN_ATTEMPTS,
     PARENT_RESERVATION_FILTERS,
     RESERVATION_STATUS,
+    canParentCancelReservation,
     canParentConfirmEnrollment,
     canParentOpenReservationPayment,
     canParentRetryReservationPayment,
@@ -235,6 +240,7 @@ function ReservationCard({
     onOpenPayment,
     onOpenConfirmEnrollment,
     onOpenMandatoryDocuments,
+    onOpenCancelReservation,
     confirmEnrollmentLoadingId,
 }) {
     const normalizedStatus = normalizeReservationStatus(reservation?.status);
@@ -273,6 +279,7 @@ function ReservationCard({
                       : null;
     const showConfirmEnrollment = canParentConfirmEnrollment(reservation);
     const showMandatoryDocuments = normalizedStatus === RESERVATION_STATUS.CONFIRMED;
+    const showCancelReservation = canParentCancelReservation(reservation);
     const confirmEnrollmentLoading =
         confirmEnrollmentLoadingId != null &&
         Number(confirmEnrollmentLoadingId) === Number(reservation?.admissionFormId ?? reservation?.id);
@@ -371,16 +378,6 @@ function ReservationCard({
                                     </Typography>
                                 </Stack>
                             ) : null}
-                            {submittedDate ? (
-                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
-                                    Ngày nộp: {submittedDate}
-                                </Typography>
-                            ) : null}
-                            {showMandatoryDocuments && confirmEndDate ? (
-                                <Typography sx={{fontSize: 13.5, color: "#64748b"}}>
-                                    Ngày hạn nộp hồ sơ tại trường: {confirmEndDate}
-                                </Typography>
-                            ) : null}
                         </Stack>
                         {statusHint ? (
                             <Typography sx={{fontSize: 13, color: statusMeta.color, fontWeight: 500, mt: 0.25}}>
@@ -450,6 +447,22 @@ function ReservationCard({
                             }}
                         >
                             Hồ sơ cần nộp
+                        </Button>
+                    ) : null}
+                    {showCancelReservation ? (
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<CancelOutlinedIcon />}
+                            onClick={() => onOpenCancelReservation(reservation)}
+                            sx={{
+                                ...RESERVATION_CARD_ACTION_BUTTON_SX,
+                                borderColor: "#fca5a5",
+                                color: "#dc2626",
+                                "&:hover": {bgcolor: "#fef2f2", borderColor: "#f87171"},
+                            }}
+                        >
+                            Hủy hồ sơ
                         </Button>
                     ) : null}
                     <Button
@@ -698,6 +711,9 @@ export default function ParentAdmissionReservationsPage() {
         context: {},
     });
     const [mandatoryDocsLoading, setMandatoryDocsLoading] = useState(false);
+    const [cancelReservationTarget, setCancelReservationTarget] = useState(null);
+    const [cancelReason, setCancelReason] = useState("");
+    const [cancelLoading, setCancelLoading] = useState(false);
     const mountedRef = useRef(true);
     const reservationStatusSnapshotRef = useRef(new Map());
 
@@ -844,6 +860,33 @@ export default function ParentAdmissionReservationsPage() {
             setConfirmEnrollmentLoadingId(null);
         }
     }, [confirmEnrollmentTarget, loadReservations]);
+
+    const handleCancelReservation = useCallback(async () => {
+        const formId = Number(
+            cancelReservationTarget?.admissionFormId ?? cancelReservationTarget?.id,
+        );
+        if (!Number.isFinite(formId) || formId <= 0) {
+            enqueueSnackbar("Không xác định được mã đơn.", {variant: "warning"});
+            return;
+        }
+        setCancelLoading(true);
+        try {
+            const res = await deleteParentAdmissionReservationFormCancel(formId, cancelReason);
+            enqueueSnackbar(res?.data?.message || "Hủy hồ sơ thành công.", {variant: "success"});
+            setCancelReservationTarget(null);
+            setCancelReason("");
+            await loadReservations({silent: true});
+            setFilter(getParentReservationFilterValueForStatus(RESERVATION_STATUS.CANCELLED));
+        } catch (error) {
+            console.error("[ParentAdmissionReservationsPage] cancel reservation:", error);
+            enqueueSnackbar(
+                error?.response?.data?.message || error?.message || "Hủy hồ sơ thất bại.",
+                {variant: "error"},
+            );
+        } finally {
+            setCancelLoading(false);
+        }
+    }, [cancelReservationTarget, cancelReason, loadReservations]);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -1031,6 +1074,10 @@ export default function ParentAdmissionReservationsPage() {
                                         onOpenPayment={setPaymentReservation}
                                         onOpenConfirmEnrollment={setConfirmEnrollmentTarget}
                                         onOpenMandatoryDocuments={handleOpenMandatoryDocuments}
+                                        onOpenCancelReservation={(r) => {
+                                            setCancelReservationTarget(r);
+                                            setCancelReason("");
+                                        }}
                                         confirmEnrollmentLoadingId={confirmEnrollmentLoadingId}
                                     />
                                 ))}
@@ -1087,6 +1134,109 @@ export default function ParentAdmissionReservationsPage() {
                 }}
                 onConfirm={() => void handleConfirmEnrollment()}
             />
+            <Dialog
+                open={Boolean(cancelReservationTarget)}
+                onClose={() => {
+                    if (cancelLoading) return;
+                    setCancelReservationTarget(null);
+                    setCancelReason("");
+                }}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{sx: {borderRadius: 3}}}
+            >
+                <DialogTitle
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        px: 3,
+                        py: 2,
+                        bgcolor: "#fff1f2",
+                        borderBottom: "1px solid #fecaca",
+                    }}
+                >
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                        <CancelOutlinedIcon sx={{color: "#dc2626"}} />
+                        <Typography sx={{fontWeight: 700, color: "#dc2626", fontSize: 18}}>
+                            Hủy hồ sơ
+                        </Typography>
+                    </Stack>
+                    <IconButton
+                        onClick={() => {
+                            if (cancelLoading) return;
+                            setCancelReservationTarget(null);
+                            setCancelReason("");
+                        }}
+                        disabled={cancelLoading}
+                    >
+                        <CloseRoundedIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{px: 3, py: 2.5}}>
+                    <Typography sx={{mb: 1.5, color: "#334155", fontSize: 14.5}}>
+                        Bạn có chắc muốn hủy hồ sơ{" "}
+                        <Box component="span" sx={{fontWeight: 700}}>
+                            {cancelReservationTarget?.schoolName ?? "này"}
+                        </Box>
+                        ? Hành động này không thể hoàn tác.
+                    </Typography>
+                    <Box
+                        sx={{
+                            mb: 2,
+                            px: 2,
+                            py: 1.25,
+                            borderRadius: 2,
+                            bgcolor: "#fff7ed",
+                            border: "1px solid #fdba74",
+                        }}
+                    >
+                        <Typography sx={{fontSize: 13.5, color: "#b45309", fontWeight: 600}}>
+                            Lưu ý: Tiền đặt cọc giữ chỗ tại trường sẽ không được hoàn lại sau khi hủy.
+                        </Typography>
+                    </Box>
+                    <TextField
+                        label="Lý do hủy"
+                        required
+                        multiline
+                        minRows={3}
+                        fullWidth
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        disabled={cancelLoading}
+                        placeholder="Nhập lý do hủy hồ sơ..."
+                        sx={{"& .MuiOutlinedInput-root": {borderRadius: 2}}}
+                    />
+                </DialogContent>
+                <DialogActions sx={{px: 3, pb: 2.5, gap: 1}}>
+                    <Button
+                        variant="outlined"
+                        disabled={cancelLoading}
+                        onClick={() => {
+                            setCancelReservationTarget(null);
+                            setCancelReason("");
+                        }}
+                        sx={{textTransform: "none", borderRadius: 2, fontWeight: 600}}
+                    >
+                        Đóng
+                    </Button>
+                    <Button
+                        variant="contained"
+                        disabled={cancelLoading || !cancelReason.trim()}
+                        onClick={() => void handleCancelReservation()}
+                        sx={{
+                            textTransform: "none",
+                            borderRadius: 2,
+                            fontWeight: 700,
+                            bgcolor: "#dc2626",
+                            "&:hover": {bgcolor: "#b91c1c"},
+                            boxShadow: "0 4px 12px rgba(220,38,38,0.22)",
+                        }}
+                    >
+                        {cancelLoading ? "Đang hủy..." : "Xác nhận hủy"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

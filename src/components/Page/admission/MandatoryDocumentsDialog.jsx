@@ -359,27 +359,22 @@ export default function MandatoryDocumentsDialog({
                     ) : (
                         <Fade in timeout={400}>
                             <Stack spacing={2.25}>
-                                <Typography
-                                    sx={{
-                                        fontSize: 14,
-                                        color: BRAND_NAVY,
-                                        fontWeight: 600,
-                                        lineHeight: 1.55,
-                                        px: 0.25,
-                                    }}
-                                >
-                                    Chuẩn bị hồ sơ và nộp tại trường tới ngày{" "}
-                                    {confirmEndDateFormatted ? (
-                                        <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
-                                            {confirmEndDateFormatted}
-                                        </Box>
-                                    ) : "—"}
-                                    . Hồ sơ có dấu{" "}
-                                    <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
-                                        *
-                                    </Box>{" "}
-                                    là bắt buộc.
-                                </Typography>
+                                <Stack spacing={0.75} sx={{px: 0.25}}>
+                                    <Typography sx={{fontSize: 14, color: BRAND_NAVY, fontWeight: 600, lineHeight: 1.55}}>
+                                        1. Xác nhận trực tuyến: Hạn chót trước ngày{" "}
+                                        {confirmEndDateFormatted ? (
+                                            <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>
+                                                {confirmEndDateFormatted}
+                                            </Box>
+                                        ) : "—"}
+                                        .
+                                    </Typography>
+                                    <Typography sx={{fontSize: 14, color: BRAND_NAVY, fontWeight: 600, lineHeight: 1.55}}>
+                                        2. Nộp hồ sơ tại trường: Sau khi xác nhận online thành công, vui lòng chuẩn bị và mang các hồ sơ bắt buộc (có dấu{" "}
+                                        <Box component="span" sx={{color: "#dc2626", fontWeight: 700}}>*</Box>
+                                        ) dưới đây đến nộp trực tiếp tại trường.
+                                    </Typography>
+                                </Stack>
 
                                 <DocumentsPanel
                                     title="Hồ sơ chung"
