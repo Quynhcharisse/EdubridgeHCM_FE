@@ -151,7 +151,7 @@ export function AdmissionDocumentsSection({
                         uploadingSlots={uploadingSlots}
                         disabled={disabled}
                         readOnly={readOnly}
-                        showSchoolTemplate={showSchoolTemplate ?? readOnly}
+                        showSchoolTemplate={showSchoolTemplate ?? false}
                         onPickFile={onPickFile}
                         onRemoveSlot={onRemoveSlot}
                         onViewImage={(url, title) => setPreview({url, title})}
