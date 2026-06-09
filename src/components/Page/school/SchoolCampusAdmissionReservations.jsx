@@ -981,7 +981,7 @@ function AdmissionReservationDetailDrawer({
                                                         ) : null}
                                                         <Box sx={{flex: 1, minWidth: 0}}>
                                                             <Typography sx={{fontSize: 12, color: "#475569", mb: 0.5}}>Ảnh phụ huynh nộp</Typography>
-                                                            <Box sx={{borderRadius: 1.5, border: "1px solid #e2e8f0", p: 0.5, bgcolor: "#fff"}}>
+                                                            <Box sx={{borderRadius: 1.5, border: "1px solid #e2e8f0", p: 0.5, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center"}}>
                                                                 {renderSubmissionImages(item)}
                                                             </Box>
                                                         </Box>
@@ -1021,14 +1021,25 @@ function AdmissionReservationDetailDrawer({
                         }}
                         sx={{display: "flex", alignItems: "center", justifyContent: "center", p: {xs: 2, md: 3}}}
                     >
-                        <Box sx={{position: "relative", outline: "none", width: "100%", maxWidth: "96vw"}}>
+                        <Box
+                            tabIndex={-1}
+                            sx={{
+                                outline: "none",
+                                position: "relative",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                maxWidth: "min(96vw, 820px)",
+                                textAlign: "center",
+                            }}
+                        >
                             <IconButton
                                 aria-label="Đóng"
                                 onClick={closeImagePreview}
                                 sx={{
-                                    position: "absolute",
-                                    top: -44,
-                                    right: 0,
+                                    position: "fixed",
+                                    top: 16,
+                                    right: 16,
                                     color: "#fff",
                                     bgcolor: "rgba(15, 23, 42, 0.65)",
                                     '&:hover': {bgcolor: "rgba(15, 23, 42, 0.8)"},
@@ -1037,7 +1048,7 @@ function AdmissionReservationDetailDrawer({
                                 <CloseRoundedIcon />
                             </IconButton>
                             {imagePreview?.title ? (
-                                <Typography sx={{color: "#fff", fontWeight: 700, fontSize: 15, mb: 1, textAlign: "center", textShadow: "0 1px 4px rgba(0,0,0,0.4)"}}>
+                                <Typography sx={{color: "#fff", fontWeight: 700, fontSize: 15, mb: 1, textShadow: "0 1px 4px rgba(0,0,0,0.4)"}}>
                                     {imagePreview.title}
                                 </Typography>
                             ) : null}
@@ -1047,9 +1058,10 @@ function AdmissionReservationDetailDrawer({
                                 alt={imagePreview?.title || "Ảnh minh chứng"}
                                 sx={{
                                     display: "block",
-                                    width: "100%",
-                                    maxWidth: "820px",
+                                    maxWidth: "100%",
                                     maxHeight: "72vh",
+                                    width: "auto",
+                                    height: "auto",
                                     objectFit: "contain",
                                     borderRadius: 2,
                                     boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
@@ -2283,8 +2295,7 @@ export default function SchoolCampusAdmissionReservations() {
                     <>
                         Xuất hồ sơ chiến dịch{" "}
                         <ConfirmHighlight>{exportExcelConfirm.campaignName || "này"}</ConfirmHighlight> với
-                        trạng thái <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight> và{" "}
-                        <ConfirmHighlight>{exportExcelStatusLabels[1]}</ConfirmHighlight>.
+                        trạng thái <ConfirmHighlight>{exportExcelStatusLabels[0]}</ConfirmHighlight>.
                     </>
                 }
                 extraDescription="Bạn có muốn tiếp tục tải xuống?"
